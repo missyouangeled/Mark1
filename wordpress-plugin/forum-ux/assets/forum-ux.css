@@ -36,6 +36,11 @@ body.forum-ux-active .forum-home-footer-card {
   box-shadow: var(--forum-shadow);
 }
 
+body.forum-ux-active .entry-content > #af-wrapper,
+body.forum-ux-active .forum-home-footer-card {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
 body.forum-ux-active .forum-hero-card {
   display: grid;
   grid-template-columns: minmax(0, 2.5fr) minmax(240px, 0.9fr);
@@ -319,13 +324,18 @@ body.forum-ux-active #statistics-body {
   background: #fff;
 }
 
+body.forum-ux-active .content-container {
+  border-radius: 0 0 18px 18px;
+  overflow: hidden;
+}
+
 body.forum-ux-active .content-element.forum,
 body.forum-ux-active .content-element.topic {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(190px, 220px);
-  gap: 16px;
-  align-items: center;
-  padding: 20px 16px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(170px, 210px);
+  gap: 14px;
+  align-items: start;
+  padding: 18px 14px;
   border-bottom: 1px solid var(--forum-border);
   background: #fff;
   transition: background 0.16s ease;
@@ -355,12 +365,12 @@ body.forum-ux-active .topic-name {
 body.forum-ux-active .forum-title,
 body.forum-ux-active .topic-name > a {
   display: inline-block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--forum-text);
   text-decoration: none;
-  font-size: 1.03rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.48;
+  line-height: 1.45;
 }
 
 body.forum-ux-active .forum-title:hover,
@@ -382,33 +392,44 @@ body.forum-ux-active #statistics-online-users::before {
   color: var(--forum-muted);
 }
 
+body.forum-ux-active .topic-stats,
+body.forum-ux-active .forum-stats {
+  letter-spacing: 0.01em;
+}
+
 body.forum-ux-active .topic-name small,
 body.forum-ux-active .topic-stats,
 body.forum-ux-active .topic-lastpost-small,
 body.forum-ux-active .forum-stats,
 body.forum-ux-active .forum-lastpost-small {
   display: block;
-  margin-top: 4px;
-  font-size: 0.9rem;
+  margin-top: 3px;
+  font-size: 0.84rem;
+  line-height: 1.55;
 }
 
 body.forum-ux-active .forum-poster,
 body.forum-ux-active .topic-poster {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
+  padding-top: 2px;
 }
 
 body.forum-ux-active .forum-poster-avatar img,
 body.forum-ux-active .topic-poster-avatar img,
 body.forum-ux-active .post-author-avatar img {
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
 }
 
 body.forum-ux-active .forum-poster-summary,
 body.forum-ux-active .topic-poster-summary {
   text-align: right;
+  font-size: 0.83rem;
+  line-height: 1.45;
 }
 
 body.forum-ux-active .forum-poster-summary > a,
