@@ -37,6 +37,7 @@ final class Forum_UX_Bridge {
     public function add_body_classes(array $classes): array {
         if (is_page('forum') || is_front_page()) {
             $classes[] = 'forum-ux-active';
+            $classes[] = is_user_logged_in() ? 'forum-user-logged-in' : 'forum-user-guest';
         }
 
         return $classes;
@@ -52,15 +53,28 @@ final class Forum_UX_Bridge {
             return $content;
         }
 
+        $hero_actions = is_user_logged_in()
+            ? implode('', [
+                '<a class="forum-hero-button forum-hero-button-primary" href="/wordpress/index.php/member-center/">进入会员中心</a>',
+                '<a class="forum-hero-button forum-hero-button-secondary" href="/wordpress/index.php/forum/addtopic/102/">去发第一帖</a>',
+            ])
+            : implode('', [
+                '<a class="forum-hero-button forum-hero-button-primary" href="/wordpress/index.php/register/">立即注册</a>',
+                '<a class="forum-hero-button forum-hero-button-secondary" href="/wordpress/index.php/login/">已有账号，去登录</a>',
+            ]);
+
+        $hero_intro = is_user_logged_in()
+            ? '<p>欢迎回来。你现在可以直接进入会员中心、发布新主题，或者继续参与社区里的讨论。</p>'
+            : '<p>这里适合发起交流、提问求助、结识同好。游客可以先看内容，注册登录后再发帖和回复，逻辑更清爽，也更适合长期运营。</p>';
+
         $hero = implode('', [
             '<section class="forum-hero-card">',
             '<div class="forum-hero-copy">',
             '<div class="forum-brand-row"><img class="forum-brand-mark" src="/wordpress/branding/night-talk-mark.svg" alt="夜谈论坛标志"><span class="forum-hero-kicker">夜谈论坛</span></div>',
             '<h2>公开浏览，登录后即可参与讨论</h2>',
-            '<p>这里适合发起交流、提问求助、结识同好。游客可以先看内容，注册登录后再发帖和回复，逻辑更清爽，也更适合长期运营。</p>',
+            $hero_intro,
             '<div class="forum-hero-actions">',
-            '<a class="forum-hero-button forum-hero-button-primary" href="/wordpress/index.php/register/">立即注册</a>',
-            '<a class="forum-hero-button forum-hero-button-secondary" href="/wordpress/index.php/login/">已有账号，去登录</a>',
+            $hero_actions,
             '</div>',
             '</div>',
             '<div class="forum-hero-side">',
@@ -70,6 +84,10 @@ final class Forum_UX_Bridge {
             '</div>',
             '</section>'
         ]);
+
+        $quick_links = is_user_logged_in()
+            ? '<p><a href="/wordpress/index.php/member-center/">会员中心</a><br><a href="/wordpress/index.php/forum/addtopic/102/">去综合讨论发第一帖</a><br><a href="/wordpress/index.php/community-announcements/">社区公告</a></p>'
+            : '<p><a href="/wordpress/index.php/register/">注册账号</a><br><a href="/wordpress/index.php/login/">登录论坛</a><br><a href="/wordpress/index.php/member-center/">会员中心</a><br><a href="/wordpress/index.php/community-announcements/">社区公告</a></p>';
 
         $footer = implode('', [
             '<section class="forum-home-footer">',
@@ -85,7 +103,7 @@ final class Forum_UX_Bridge {
             '</div>',
             '<div class="forum-home-footer-card">',
             '<h3>快速入口</h3>',
-            '<p><a href="/wordpress/index.php/register/">注册账号</a><br><a href="/wordpress/index.php/login/">登录论坛</a><br><a href="/wordpress/index.php/member-center/">会员中心</a><br><a href="/wordpress/index.php/community-announcements/">社区公告</a></p>',
+            $quick_links,
             '</div>',
             '</div>',
             '</section>'

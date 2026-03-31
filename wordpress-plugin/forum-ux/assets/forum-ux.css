@@ -239,6 +239,16 @@ body.forum-ux-active #forum-navigation a.register-link {
   border-color: transparent;
 }
 
+body.forum-user-logged-in #forum-navigation a.login-link,
+body.forum-user-logged-in #forum-navigation a.register-link {
+  opacity: 0.45;
+}
+
+body.forum-user-guest #forum-navigation a.login-link,
+body.forum-user-guest #forum-navigation a.register-link {
+  opacity: 1;
+}
+
 body.forum-ux-active .forum-title {
   font-weight: 700;
   font-size: 1.03rem;
