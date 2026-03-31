@@ -17,6 +17,7 @@ final class Forum_UX_Bridge {
         add_action('wp_enqueue_scripts', [$this, 'enqueue_assets'], 30);
         add_filter('body_class', [$this, 'add_body_classes']);
         add_filter('gettext', [$this, 'translate_forum_strings'], 20, 3);
+        add_filter('the_content', [$this, 'inject_forum_hero'], 8);
     }
 
     public function enqueue_assets(): void {
@@ -28,7 +29,7 @@ final class Forum_UX_Bridge {
             'forum-ux-bridge',
             plugin_dir_url(__FILE__) . 'assets/forum-ux.css',
             [],
-            '0.1.0'
+            '0.1.1'
         );
     }
 
@@ -38,6 +39,33 @@ final class Forum_UX_Bridge {
         }
 
         return $classes;
+    }
+
+    public function inject_forum_hero(string $content): string {
+        if (!(is_page('forum') || is_front_page()) || !in_the_loop() || !is_main_query()) {
+            return $content;
+        }
+
+        $hero = implode('', [
+            '<section class="forum-hero-card">',
+            '<div class="forum-hero-copy">',
+            '<span class="forum-hero-kicker">社区论坛</span>',
+            '<h2>公开浏览，登录后即可参与讨论</h2>',
+            '<p>这里适合发起交流、提问求助、结识同好。游客可以先看内容，注册登录后再发帖和回复，逻辑更清爽，也更适合长期运营。</p>',
+            '<div class="forum-hero-actions">',
+            '<a class="forum-hero-button forum-hero-button-primary" href="/wordpress/index.php/register/">立即注册</a>',
+            '<a class="forum-hero-button forum-hero-button-secondary" href="/wordpress/index.php/login/">已有账号，去登录</a>',
+            '</div>',
+            '</div>',
+            '<div class="forum-hero-side">',
+            '<div class="forum-hero-stat"><strong>3</strong><span>公开版块</span></div>',
+            '<div class="forum-hero-stat"><strong>游客可看</strong><span>未登录也能浏览内容</span></div>',
+            '<div class="forum-hero-stat"><strong>注册后参与</strong><span>发帖、回复、互动一步到位</span></div>',
+            '</div>',
+            '</section>'
+        ]);
+
+        return $hero . $content;
     }
 
     public function translate_forum_strings(string $translated, string $text, string $domain): string {
