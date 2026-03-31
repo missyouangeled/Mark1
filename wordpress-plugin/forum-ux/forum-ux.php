@@ -75,10 +75,11 @@ final class Forum_UX_Bridge {
             '<div class="forum-home-footer-card">',
             '<h3>参与规则</h3>',
             '<ul><li>先搜索，再提问</li><li>标题尽量明确</li><li>保持友善交流</li></ul>',
+            '<p><a href="/wordpress/index.php/community-rules/">查看完整社区规则</a></p>',
             '</div>',
             '<div class="forum-home-footer-card">',
             '<h3>快速入口</h3>',
-            '<p><a href="/wordpress/index.php/register/">注册账号</a><br><a href="/wordpress/index.php/login/">登录论坛</a><br><a href="/wordpress/index.php/member-center/">会员中心</a></p>',
+            '<p><a href="/wordpress/index.php/register/">注册账号</a><br><a href="/wordpress/index.php/login/">登录论坛</a><br><a href="/wordpress/index.php/member-center/">会员中心</a><br><a href="/wordpress/index.php/community-announcements/">社区公告</a></p>',
             '</div>',
             '</div>',
             '</section>'
