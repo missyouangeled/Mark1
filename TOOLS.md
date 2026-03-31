@@ -31,6 +31,16 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+## Local Setup Notes
+
+### OpenClaw automation
+
+- Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
+- Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
+- User systemd units:
+  - `~/.config/systemd/user/openclaw-resume-watch.service`
+  - `~/.config/systemd/user/openclaw-resume-watch.timer`
+
 ## Why Separate?
 
 Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
