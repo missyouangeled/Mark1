@@ -16,9 +16,13 @@ final class Simple_Frontend_Auth {
     private const LOGIN_ACTION = 'sfa_login';
     private const REGISTER_ACTION = 'sfa_register';
     private const NOTICE_KEY = 'sfa_notice';
+    private const LOGIN_PAGE_SLUG = 'login';
+    private const REGISTER_PAGE_SLUG = 'register';
+    private const MEMBER_CENTER_SLUG = 'member-center';
 
     public function __construct() {
         add_action('init', [$this, 'handle_form_submissions']);
+        add_action('template_redirect', [$this, 'handle_page_access_rules']);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
 
         add_shortcode('sfa_login_form', [$this, 'render_login_shortcode']);
@@ -132,11 +136,11 @@ final class Simple_Frontend_Auth {
     }
 
     private function render_login_form(array $atts): string {
-        $redirect = $atts['redirect'] !== '' ? $atts['redirect'] : home_url('/');
+        $redirect = $this->normalize_redirect_target($atts['redirect'] !== '' ? $atts['redirect'] : $this->get_member_center_url());
         $register_link = '';
 
         if ($this->as_bool($atts['show_register_link']) && !empty($atts['register_url'])) {
-            $register_link = '<p class="sfa-helper">还没有账号？<a href="' . esc_url($atts['register_url']) . '">去注册</a></p>';
+            $register_link = '<p class="sfa-helper">还没有账号？<a href="' . esc_url($this->normalize_frontend_url($atts['register_url'])) . '">去注册</a></p>';
         }
 
         ob_start();
@@ -166,11 +170,11 @@ final class Simple_Frontend_Auth {
     }
 
     private function render_register_form(array $atts): string {
-        $redirect = $atts['redirect'] !== '' ? $atts['redirect'] : home_url('/');
+        $redirect = $this->normalize_redirect_target($atts['redirect'] !== '' ? $atts['redirect'] : $this->get_member_center_url());
         $login_link = '';
 
         if ($this->as_bool($atts['show_login_link']) && !empty($atts['login_url'])) {
-            $login_link = '<p class="sfa-helper">已经有账号？<a href="' . esc_url($atts['login_url']) . '">去登录</a></p>';
+            $login_link = '<p class="sfa-helper">已经有账号？<a href="' . esc_url($this->normalize_frontend_url($atts['login_url'])) . '">去登录</a></p>';
         }
 
         ob_start();
@@ -199,6 +203,27 @@ final class Simple_Frontend_Auth {
         </form>
         <?php
         return (string) ob_get_clean();
+    }
+
+    public function handle_page_access_rules(): void {
+        if (is_admin()) {
+            return;
+        }
+
+        if (is_page(self::MEMBER_CENTER_SLUG) && !is_user_logged_in()) {
+            $message = '请先登录；如果还没有账号，请先完成注册。';
+            $target = add_query_arg(
+                'redirect_to',
+                rawurlencode($this->get_member_center_url()),
+                $this->get_login_page_url()
+            );
+            $this->redirect_with_notice('error', $message, 'login', $target);
+        }
+
+        if (is_user_logged_in() && (is_page(self::LOGIN_PAGE_SLUG) || is_page(self::REGISTER_PAGE_SLUG))) {
+            wp_safe_redirect($this->get_member_center_url());
+            exit;
+        }
     }
 
     private function handle_login(): void {
@@ -333,12 +358,78 @@ final class Simple_Frontend_Auth {
     }
 
     private function resolve_redirect_url(): string {
-        $redirect = isset($_POST['sfa_redirect']) ? esc_url_raw(wp_unslash($_POST['sfa_redirect'])) : '';
-        if ($redirect === '') {
+        $posted_redirect = isset($_POST['sfa_redirect']) ? wp_unslash($_POST['sfa_redirect']) : '';
+        if (is_string($posted_redirect) && $posted_redirect !== '') {
+            return $this->normalize_redirect_target($posted_redirect);
+        }
+
+        $query_redirect = isset($_GET['redirect_to']) ? wp_unslash($_GET['redirect_to']) : '';
+        if (is_string($query_redirect) && $query_redirect !== '') {
+            return $this->normalize_redirect_target($query_redirect);
+        }
+
+        return $this->get_member_center_url();
+    }
+
+    private function get_login_page_url(): string {
+        return $this->get_page_url_by_slug(self::LOGIN_PAGE_SLUG);
+    }
+
+    private function get_register_page_url(): string {
+        return $this->get_page_url_by_slug(self::REGISTER_PAGE_SLUG);
+    }
+
+    private function get_member_center_url(): string {
+        return $this->get_page_url_by_slug(self::MEMBER_CENTER_SLUG);
+    }
+
+    private function get_page_url_by_slug(string $slug): string {
+        $page = get_page_by_path($slug, OBJECT, 'page');
+        if ($page instanceof WP_Post) {
+            $url = get_permalink($page);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return home_url('/');
+    }
+
+    private function normalize_frontend_url(string $value): string {
+        $value = trim($value);
+        if ($value === '') {
             return home_url('/');
         }
 
-        return $redirect;
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return esc_url_raw($value);
+        }
+
+        $slug = trim((string) parse_url($value, PHP_URL_PATH), '/');
+        if ($slug === self::LOGIN_PAGE_SLUG) {
+            return $this->get_login_page_url();
+        }
+        if ($slug === self::REGISTER_PAGE_SLUG) {
+            return $this->get_register_page_url();
+        }
+        if ($slug === self::MEMBER_CENTER_SLUG) {
+            return $this->get_member_center_url();
+        }
+
+        $page = get_page_by_path($slug, OBJECT, 'page');
+        if ($page instanceof WP_Post) {
+            $url = get_permalink($page);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return home_url('/' . ltrim($value, '/'));
+    }
+
+    private function normalize_redirect_target(string $value): string {
+        $url = $this->normalize_frontend_url($value);
+        return wp_validate_redirect($url, $this->get_member_center_url());
     }
 
     private function valid_nonce(string $action): bool {

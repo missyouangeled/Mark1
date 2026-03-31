@@ -34,12 +34,12 @@
 
 ## 页面接入示例
 
-- 登录页：`[sfa_login_form]`
-- 注册页：`[sfa_register_form]`
+- 登录页：`[sfa_login_form show_register_link="true" register_url="register"]`
+- 注册页：`[sfa_register_form auto_login="true" show_login_link="true" login_url="login"]`
 - 合并页：`[sfa_auth_forms]`
 
 ## 推荐页面结构
 
-- `/login` → 放 `[sfa_login_form]`
-- `/register` → 放 `[sfa_register_form]`
-- `/member-center` → 登录后跳转页
+- `/login` → 放 `[sfa_login_form show_register_link="true" register_url="register"]`
+- `/register` → 放 `[sfa_register_form auto_login="true" show_login_link="true" login_url="login"]`
+- `/member-center` → 登录后跳转页，未登录时自动跳转到登录页
