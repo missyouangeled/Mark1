@@ -23,8 +23,8 @@ body.forum-ux-active footer.wp-block-template-part {
 }
 
 body.forum-ux-active .entry-content.wp-block-post-content {
-  width: 75vw;
-  max-width: 75vw;
+  width: 88vw;
+  max-width: 88vw;
   margin: 0 auto;
 }
 
@@ -581,8 +581,8 @@ body.forum-ux-active .wp-block-site-title a {
 
 @media (max-width: 980px) {
   body.forum-ux-active .entry-content.wp-block-post-content {
-    width: 92vw;
-    max-width: 92vw;
+    width: 94vw;
+    max-width: 94vw;
   }
 
   body.forum-ux-active .forum-hero-card,

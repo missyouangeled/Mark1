@@ -78,7 +78,7 @@ final class Forum_UX_Bridge {
             '</div>',
             '</div>',
             '<div class="forum-hero-side">',
-            '<div class="forum-hero-stat"><strong>3</strong><span>公开版块</span></div>',
+            '<div class="forum-hero-stat"><strong>8+</strong><span>公开版块</span></div>',
             '<div class="forum-hero-stat"><strong>游客可看</strong><span>未登录也能浏览内容</span></div>',
             '<div class="forum-hero-stat"><strong>注册后参与</strong><span>发帖、回复、互动一步到位</span></div>',
             '</div>',
