@@ -40,9 +40,22 @@ body.forum-ux-active .forum-hero-card {
   box-shadow: 0 24px 60px rgba(49, 46, 129, 0.28);
 }
 
+body.forum-ux-active .forum-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+body.forum-ux-active .forum-brand-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
 body.forum-ux-active .forum-hero-kicker {
   display: inline-flex;
-  margin-bottom: 12px;
   padding: 6px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
@@ -320,6 +333,13 @@ body.forum-ux-active .forum-home-footer-card a {
 
 body.forum-ux-active .forum-home-footer-card a:hover {
   color: var(--forum-accent);
+}
+
+body.forum-ux-active .wp-block-site-title a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
 }
 
 @media (max-width: 900px) {

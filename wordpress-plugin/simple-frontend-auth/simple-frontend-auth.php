@@ -330,7 +330,8 @@ final class Simple_Frontend_Auth {
             '<p>邮箱：' . esc_html($current_user->user_email) . '</p>';
 
         if ($include_member_links) {
-            $content .= '<p>这里是会员中心，你现在可以继续扩展资料页、订单页、权限内容。</p>';
+            $content .= '<p>这里是会员中心。你现在可以先去论坛发第一帖，或者继续完善社区内容。</p>';
+            $content .= '<p><a class="sfa-button" href="' . esc_url(home_url('/index.php/forum/addtopic/102/')) . '">去综合讨论发第一帖</a></p>';
         }
 
         $content .= '<p><a class="sfa-button sfa-button-secondary" href="' . esc_url($logout_url) . '">退出登录</a></p>' .

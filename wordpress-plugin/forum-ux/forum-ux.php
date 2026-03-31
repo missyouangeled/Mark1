@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
 final class Forum_UX_Bridge {
     public function __construct() {
         add_action('wp_enqueue_scripts', [$this, 'enqueue_assets'], 30);
+        add_action('wp_head', [$this, 'inject_brand_assets'], 5);
         add_filter('body_class', [$this, 'add_body_classes']);
         add_filter('gettext', [$this, 'translate_forum_strings'], 20, 3);
         add_filter('the_content', [$this, 'inject_forum_hero'], 8);
@@ -41,6 +42,11 @@ final class Forum_UX_Bridge {
         return $classes;
     }
 
+    public function inject_brand_assets(): void {
+        $brand_url = home_url('/branding/night-talk-mark.svg');
+        echo '<link rel="icon" type="image/svg+xml" href="' . esc_url($brand_url) . '">';
+    }
+
     public function inject_forum_hero(string $content): string {
         if (!(is_page('forum') || is_front_page()) || !in_the_loop() || !is_main_query()) {
             return $content;
@@ -49,7 +55,7 @@ final class Forum_UX_Bridge {
         $hero = implode('', [
             '<section class="forum-hero-card">',
             '<div class="forum-hero-copy">',
-            '<span class="forum-hero-kicker">社区论坛</span>',
+            '<div class="forum-brand-row"><img class="forum-brand-mark" src="/wordpress/branding/night-talk-mark.svg" alt="夜谈论坛标志"><span class="forum-hero-kicker">夜谈论坛</span></div>',
             '<h2>公开浏览，登录后即可参与讨论</h2>',
             '<p>这里适合发起交流、提问求助、结识同好。游客可以先看内容，注册登录后再发帖和回复，逻辑更清爽，也更适合长期运营。</p>',
             '<div class="forum-hero-actions">',
