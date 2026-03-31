@@ -1,0 +1,106 @@
+body.forum-ux-active {
+  --forum-accent: #4f46e5;
+  --forum-accent-2: #7c3aed;
+  --forum-surface: #ffffff;
+  --forum-surface-soft: #f8fafc;
+  --forum-border: #e2e8f0;
+  --forum-text: #0f172a;
+  --forum-muted: #475569;
+}
+
+body.forum-ux-active .wp-site-blocks {
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 220px, #ffffff 100%);
+}
+
+body.forum-ux-active .entry-content > #af-wrapper {
+  background: var(--forum-surface);
+  border: 1px solid var(--forum-border);
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+body.forum-ux-active #forum-header {
+  margin-bottom: 20px;
+}
+
+body.forum-ux-active #forum-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+body.forum-ux-active #forum-navigation a {
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: var(--forum-surface-soft);
+  border: 1px solid var(--forum-border);
+  color: var(--forum-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+body.forum-ux-active #forum-navigation a:hover,
+body.forum-ux-active .forum-title:hover,
+body.forum-ux-active .topic-title:hover {
+  color: var(--forum-accent);
+}
+
+body.forum-ux-active .notices-panel .notice {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+body.forum-ux-active .title-element,
+body.forum-ux-active .title-element-dark {
+  border-radius: 16px 16px 0 0;
+}
+
+body.forum-ux-active .content-container,
+body.forum-ux-active .stats-card,
+body.forum-ux-active #statistics-body {
+  border-color: var(--forum-border);
+}
+
+body.forum-ux-active .content-element {
+  background: #fff;
+}
+
+body.forum-ux-active .content-element:hover {
+  background: #f8fafc;
+}
+
+body.forum-ux-active .forum-name,
+body.forum-ux-active .topic-name {
+  color: var(--forum-text);
+}
+
+body.forum-ux-active .forum-description,
+body.forum-ux-active .forum-stats,
+body.forum-ux-active .topic-stats,
+body.forum-ux-active .post-author,
+body.forum-ux-active .post-date,
+body.forum-ux-active #statistics {
+  color: var(--forum-muted);
+}
+
+body.forum-ux-active #forum-search input {
+  border-radius: 999px;
+  border: 1px solid var(--forum-border);
+  padding: 10px 14px;
+}
+
+body.forum-ux-active .button,
+body.forum-ux-active input[type="submit"],
+body.forum-ux-active button {
+  border-radius: 12px;
+}
+
+body.forum-ux-active .main-title {
+  font-size: 2rem;
+  margin-bottom: 18px;
+}
