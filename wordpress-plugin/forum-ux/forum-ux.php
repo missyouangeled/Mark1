@@ -26,11 +26,14 @@ final class Forum_UX_Bridge {
             return;
         }
 
+        $css_path = plugin_dir_path(__FILE__) . 'assets/forum-ux.css';
+        $version = file_exists($css_path) ? (string) filemtime($css_path) : '0.1.2';
+
         wp_enqueue_style(
             'forum-ux-bridge',
             plugin_dir_url(__FILE__) . 'assets/forum-ux.css',
             [],
-            '0.1.1'
+            $version
         );
     }
 

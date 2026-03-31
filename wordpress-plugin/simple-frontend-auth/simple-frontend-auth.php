@@ -32,11 +32,14 @@ final class Simple_Frontend_Auth {
     }
 
     public function enqueue_assets(): void {
+        $css_path = plugin_dir_path(__FILE__) . 'assets/simple-frontend-auth.css';
+        $version = file_exists($css_path) ? (string) filemtime($css_path) : '0.1.1';
+
         wp_register_style(
             'simple-frontend-auth',
             plugin_dir_url(__FILE__) . 'assets/simple-frontend-auth.css',
             [],
-            '0.1.0'
+            $version
         );
     }
 
