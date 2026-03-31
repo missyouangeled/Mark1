@@ -42,4 +42,4 @@
 
 - `/login` → 放 `[sfa_login_form show_register_link="true" register_url="register"]`
 - `/register` → 放 `[sfa_register_form auto_login="true" show_login_link="true" login_url="login"]`
-- `/member-center` → 登录后跳转页，未登录时自动跳转到登录页
+- `/member-center` → 放 `[sfa_member_center]`，未登录时自动跳转到登录页，已登录时显示账户信息和退出按钮

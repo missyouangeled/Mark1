@@ -28,6 +28,7 @@ final class Simple_Frontend_Auth {
         add_shortcode('sfa_login_form', [$this, 'render_login_shortcode']);
         add_shortcode('sfa_register_form', [$this, 'render_register_shortcode']);
         add_shortcode('sfa_auth_forms', [$this, 'render_combined_shortcode']);
+        add_shortcode('sfa_member_center', [$this, 'render_member_center_shortcode']);
     }
 
     public function enqueue_assets(): void {
@@ -221,8 +222,8 @@ final class Simple_Frontend_Auth {
         }
 
         if (is_user_logged_in() && (is_page(self::LOGIN_PAGE_SLUG) || is_page(self::REGISTER_PAGE_SLUG))) {
-            wp_safe_redirect($this->get_member_center_url());
-            exit;
+            $message = '你已经登录了，已为你跳转到会员中心。';
+            $this->redirect_with_notice('success', $message, 'member-center', $this->get_member_center_url());
         }
     }
 
@@ -303,17 +304,39 @@ final class Simple_Frontend_Auth {
         $this->redirect_with_notice('success', '注册成功，请登录。', 'register', $this->resolve_redirect_url());
     }
 
-    private function render_logged_in_box(): string {
-        $current_user = wp_get_current_user();
-        $logout_url = wp_logout_url(home_url('/'));
+    public function render_member_center_shortcode(array $atts = []): string {
+        wp_enqueue_style('simple-frontend-auth');
 
-        return $this->wrap_card(
-            '账户状态',
-            '<div class="sfa-logged-in">' .
+        if (!is_user_logged_in()) {
+            $message = '请先登录后再查看会员中心。';
+            $target = add_query_arg(
+                'redirect_to',
+                rawurlencode($this->get_member_center_url()),
+                $this->get_login_page_url()
+            );
+            $this->redirect_with_notice('error', $message, 'login', $target);
+        }
+
+        return $this->render_logged_in_box(true);
+    }
+
+    private function render_logged_in_box(bool $include_member_links = false): string {
+        $current_user = wp_get_current_user();
+        $logout_url = wp_logout_url($this->get_login_page_url());
+        $content = '<div class="sfa-logged-in">' .
+            $this->render_notices('member-center') .
             '<p>你已登录，当前用户：<strong>' . esc_html($current_user->display_name ?: $current_user->user_login) . '</strong></p>' .
-            '<p><a class="sfa-button sfa-button-secondary" href="' . esc_url($logout_url) . '">退出登录</a></p>' .
-            '</div>'
-        );
+            '<p>用户名：' . esc_html($current_user->user_login) . '</p>' .
+            '<p>邮箱：' . esc_html($current_user->user_email) . '</p>';
+
+        if ($include_member_links) {
+            $content .= '<p>这里是会员中心，你现在可以继续扩展资料页、订单页、权限内容。</p>';
+        }
+
+        $content .= '<p><a class="sfa-button sfa-button-secondary" href="' . esc_url($logout_url) . '">退出登录</a></p>' .
+            '</div>';
+
+        return $this->wrap_card('账户状态', $content);
     }
 
     private function render_notices(?string $context = null): string {

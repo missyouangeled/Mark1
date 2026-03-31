@@ -12,6 +12,7 @@
 - 登录后自动回到会员中心
 - 已登录用户访问登录/注册页时自动跳回会员中心
 - 登录后显示当前用户和退出按钮
+- 会员中心支持专用短代码显示当前登录状态
 - 短代码接入，无需改 WordPress 核心
 
 ## 文件结构
@@ -70,6 +71,12 @@ wp-content/plugins/
 
 ```text
 [sfa_auth_forms login_redirect="/member-center" register_redirect="/member-center" auto_login="true"]
+```
+
+### 4. 会员中心
+
+```text
+[sfa_member_center]
 ```
 
 ## 下一步建议
