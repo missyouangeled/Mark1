@@ -110,6 +110,7 @@ final class Forum_UX_Bridge {
             'Please ' => '请',
             ' to create posts and topics.' => '后发帖和回复。',
             'Last post' => '最后回复',
+            'Last post:' => '最后回复：',
             'No topics yet!' => '还没有帖子',
             'New posts' => '新帖子',
             'Nothing new' => '暂无新内容',
@@ -125,6 +126,19 @@ final class Forum_UX_Bridge {
             'Currently Online:' => '当前在线：',
             'Guests' => '位游客',
             'Guest' => '位游客',
+            'Menu' => '菜单',
+            'New Topic' => '发布新主题',
+            'Subject:' => '标题：',
+            'Cancel' => '取消',
+            'Submit' => '提交',
+            'By' => '作者',
+            'Replies' => '回复',
+            'Reply' => '回复',
+            'Views' => '浏览',
+            'Topic' => '主题',
+            'Edit Post' => '编辑回复',
+            'New Reply' => '发表回复',
+            'Search' => '搜索',
         ];
 
         return $map[$text] ?? $translated;
