@@ -104,3 +104,68 @@ body.forum-ux-active .main-title {
   font-size: 2rem;
   margin-bottom: 18px;
 }
+
+body.forum-ux-active .entry-content > #af-wrapper::before {
+  content: "社区首页 · 游客可浏览，登录后可发帖与回复";
+  display: inline-flex;
+  margin-bottom: 14px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+body.forum-ux-active .forum-title {
+  font-weight: 700;
+  font-size: 1.03rem;
+}
+
+body.forum-ux-active .content-element.forum {
+  border-bottom: 1px solid var(--forum-border);
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+body.forum-ux-active .content-element.forum:last-child {
+  border-bottom: none;
+}
+
+body.forum-ux-active #statistics {
+  margin-top: 22px;
+}
+
+body.forum-ux-active #statistics-elements {
+  gap: 12px;
+}
+
+body.forum-ux-active .statistics-element {
+  background: #f8fafc;
+  border: 1px solid var(--forum-border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+body.forum-ux-active .forum-status {
+  color: var(--forum-accent);
+}
+
+body.forum-ux-active .notices-panel .notice {
+  font-size: 0;
+}
+
+body.forum-ux-active .notices-panel .notice::before {
+  content: "游客可以浏览论坛内容；登录或注册后才能发帖和回复。";
+  font-size: 0.98rem;
+}
+
+body.forum-ux-active #statistics-online-users {
+  font-size: 0;
+}
+
+body.forum-ux-active #statistics-online-users::before {
+  content: "欢迎新成员加入社区。游客可浏览，登录后即可参与讨论。";
+  font-size: 0.95rem;
+  color: var(--forum-muted);
+}
