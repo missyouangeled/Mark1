@@ -270,7 +270,7 @@ final class Simple_Frontend_Auth {
         }
 
         if (username_exists($username)) {
-            $this->redirect_with_notice('error', '用户名已存在。', 'register');
+            $this->redirect_with_notice('error', '用户名已存在，请更换一个用户名。', 'register');
         }
 
         if (!is_email($email)) {
@@ -278,7 +278,7 @@ final class Simple_Frontend_Auth {
         }
 
         if (email_exists($email)) {
-            $this->redirect_with_notice('error', '邮箱已被使用。', 'register');
+            $this->redirect_with_notice('error', '该邮箱已经注册了，请更换邮箱或直接登录。', 'register');
         }
 
         if ($password !== $password_confirm) {
