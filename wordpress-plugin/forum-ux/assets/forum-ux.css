@@ -249,6 +249,15 @@ body.forum-user-guest #forum-navigation a.register-link {
   opacity: 1;
 }
 
+body.forum-user-logged-in .wp-block-page-list a[href*="/register/"],
+body.forum-user-logged-in .wp-block-page-list a[href*="/login/"] {
+  display: none;
+}
+
+body.forum-user-guest .wp-block-page-list a[href*="/member-center/"] {
+  opacity: 0.7;
+}
+
 body.forum-ux-active .forum-title {
   font-weight: 700;
   font-size: 1.03rem;
@@ -281,6 +290,14 @@ body.forum-ux-active .post-element {
 body.forum-ux-active .topic-name,
 body.forum-ux-active .post-content {
   line-height: 1.7;
+}
+
+body.forum-ux-active .post-content {
+  max-width: 76ch;
+}
+
+body.forum-ux-active .post-content p {
+  margin-bottom: 0.9em;
 }
 
 body.forum-ux-active .topic-name > a {
