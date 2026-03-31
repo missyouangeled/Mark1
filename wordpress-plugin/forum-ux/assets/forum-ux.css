@@ -22,7 +22,8 @@ body.forum-ux-active footer.wp-block-template-part {
 }
 
 body.forum-ux-active .entry-content.wp-block-post-content {
-  max-width: min(1500px, 94vw);
+  width: 75vw;
+  max-width: 75vw;
   margin: 0 auto;
 }
 
