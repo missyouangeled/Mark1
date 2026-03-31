@@ -329,6 +329,68 @@ body.forum-ux-active .content-container {
   overflow: hidden;
 }
 
+body.asgaros-forum-overview.forum-ux-active .title-element[id^="forum-category-"] {
+  margin-top: 12px;
+  min-height: 54px;
+  padding: 0 18px;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbfc 100%);
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-container {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px;
+  background: #fff;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum {
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+  min-height: 220px;
+  padding: 18px;
+  border: 1px solid var(--forum-border);
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-status {
+  margin-bottom: 6px;
+  font-size: 1.1rem;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-name {
+  display: block;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-title {
+  font-size: 1.02rem;
+  margin-bottom: 8px;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-description {
+  min-height: 3.2em;
+  font-size: 0.9rem;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-stats,
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-lastpost-small {
+  margin-top: 8px;
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-poster {
+  justify-content: flex-start;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--forum-border);
+}
+
+body.asgaros-forum-overview.forum-ux-active .content-element.forum .forum-poster-summary {
+  text-align: left;
+}
+
 body.forum-ux-active .content-element.forum,
 body.forum-ux-active .content-element.topic {
   display: grid;
