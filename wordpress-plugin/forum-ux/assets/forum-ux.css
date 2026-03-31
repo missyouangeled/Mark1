@@ -1,19 +1,20 @@
 body.forum-ux-active {
-  --forum-accent: #3b82f6;
-  --forum-accent-strong: #2563eb;
-  --forum-bg: #f3f5f7;
+  --forum-accent: #14b8a6;
+  --forum-accent-strong: #0f766e;
+  --forum-accent-soft: #e6fffb;
+  --forum-bg: #f4f6f8;
   --forum-surface: #ffffff;
   --forum-surface-soft: #f8fafc;
-  --forum-border: #e5e7eb;
-  --forum-border-strong: #d1d5db;
-  --forum-text: #111827;
-  --forum-muted: #6b7280;
-  --forum-muted-2: #9ca3af;
-  --forum-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --forum-border: #eceff3;
+  --forum-border-strong: #dbe2ea;
+  --forum-text: #18222d;
+  --forum-muted: #6b7785;
+  --forum-muted-2: #98a2ad;
+  --forum-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
 }
 
 body.forum-ux-active .wp-site-blocks {
-  background: var(--forum-bg);
+  background: linear-gradient(180deg, #eefaf8 0, #f4f6f8 180px, #f4f6f8 100%);
 }
 
 body.forum-ux-active .wp-block-post-title,
@@ -37,11 +38,11 @@ body.forum-ux-active .forum-home-footer-card {
 
 body.forum-ux-active .forum-hero-card {
   display: grid;
-  grid-template-columns: minmax(0, 2.7fr) minmax(240px, 0.9fr);
-  gap: 30px;
-  margin-bottom: 24px;
-  padding: 34px 36px;
-  border-radius: 20px;
+  grid-template-columns: minmax(0, 2.5fr) minmax(240px, 0.9fr);
+  gap: 26px;
+  margin-bottom: 18px;
+  padding: 30px 32px;
+  border-radius: 24px;
 }
 
 body.forum-ux-active .forum-brand-row {
@@ -52,17 +53,17 @@ body.forum-ux-active .forum-brand-row {
 }
 
 body.forum-ux-active .forum-brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
 }
 
 body.forum-ux-active .forum-hero-kicker {
   display: inline-flex;
   align-items: center;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: #eff6ff;
+  background: var(--forum-accent-soft);
   color: var(--forum-accent-strong);
   font-size: 0.82rem;
   font-weight: 700;
@@ -72,8 +73,8 @@ body.forum-ux-active .forum-hero-kicker {
 body.forum-ux-active .forum-hero-card h2 {
   margin: 0 0 14px;
   color: var(--forum-text);
-  font-size: 2.28rem;
-  line-height: 1.12;
+  font-size: 2.18rem;
+  line-height: 1.15;
   letter-spacing: -0.03em;
   max-width: 18ch;
 }
@@ -82,14 +83,14 @@ body.forum-ux-active .forum-hero-card p {
   margin: 0;
   color: var(--forum-muted);
   line-height: 1.85;
-  font-size: 1.02rem;
-  max-width: 62ch;
+  font-size: 1rem;
+  max-width: 60ch;
 }
 
 body.forum-ux-active .forum-hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px;
   margin-top: 24px;
 }
 
@@ -97,12 +98,12 @@ body.forum-ux-active .forum-hero-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 20px;
+  min-height: 46px;
+  padding: 0 18px;
   border-radius: 12px;
   text-decoration: none;
   font-weight: 700;
-  font-size: 0.96rem;
+  font-size: 0.95rem;
   transition: all 0.16s ease;
 }
 
@@ -112,7 +113,7 @@ body.forum-ux-active .forum-hero-button-primary {
 }
 
 body.forum-ux-active .forum-hero-button-primary:hover {
-  background: #1d4ed8;
+  background: #115e59;
 }
 
 body.forum-ux-active .forum-hero-button-secondary {
@@ -128,7 +129,7 @@ body.forum-ux-active .forum-hero-button-secondary:hover {
 
 body.forum-ux-active .forum-hero-side {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-content: start;
 }
 
@@ -149,22 +150,22 @@ body.forum-ux-active .forum-hero-stat strong {
 body.forum-ux-active .forum-hero-stat span {
   color: var(--forum-muted);
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 body.forum-ux-active .entry-content > #af-wrapper {
-  border-radius: 18px;
+  border-radius: 22px;
   padding: 28px 30px;
 }
 
 body.forum-ux-active .entry-content > #af-wrapper::before {
-  content: "社区首页 · 游客可浏览，登录后可发帖与回复";
+  content: "内容社区 · 游客可浏览，登录后参与讨论";
   display: inline-flex;
   align-items: center;
   margin-bottom: 14px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: #eff6ff;
+  background: var(--forum-accent-soft);
   color: var(--forum-accent-strong);
   font-size: 0.84rem;
   font-weight: 700;
@@ -179,7 +180,7 @@ body.forum-ux-active #forum-navigation-mobile a {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--forum-surface-soft);
   border: 1px solid var(--forum-border);
   color: var(--forum-text);
@@ -199,23 +200,20 @@ body.forum-ux-active #forum-navigation a {
   align-items: center;
   min-height: 40px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--forum-surface-soft);
   border: 1px solid var(--forum-border);
   color: var(--forum-text);
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.93rem;
   transition: all 0.16s ease;
 }
 
 body.forum-ux-active #forum-navigation a:hover {
   color: var(--forum-accent-strong);
-  border-color: #bfdbfe;
-  background: #f8fbff;
-}
-
-body.forum-ux-active #forum-navigation a.home-link {
-  background: #fff;
+  border-color: #c7f2ec;
+  background: #f6fffd;
 }
 
 body.forum-ux-active #forum-navigation a.register-link {
@@ -225,7 +223,7 @@ body.forum-ux-active #forum-navigation a.register-link {
 }
 
 body.forum-ux-active #forum-navigation a.register-link:hover {
-  background: #1d4ed8;
+  background: #115e59;
   color: #fff;
 }
 
@@ -247,7 +245,7 @@ body.forum-ux-active #forum-search input,
 body.forum-ux-active #forum-editor-form .editor-subject-input,
 body.forum-ux-active #forum-editor-form textarea {
   border: 1px solid var(--forum-border-strong);
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -262,21 +260,22 @@ body.forum-ux-active #forum-breadcrumbs {
   border-radius: 12px;
   background: var(--forum-surface-soft);
   color: var(--forum-muted);
+  font-size: 0.92rem;
 }
 
 body.forum-ux-active .notices-panel .notice {
   margin-bottom: 16px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
+  border: 1px solid #c7f2ec;
+  background: #f3fffd;
   font-size: 0;
 }
 
 body.forum-ux-active .notices-panel .notice::before {
   content: "游客可以浏览论坛内容；登录或注册后才能发帖和回复。";
   color: var(--forum-accent-strong);
-  font-size: 0.96rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
@@ -285,7 +284,7 @@ body.forum-ux-active .main-title-topic,
 body.forum-ux-active .main-title-forum {
   margin-bottom: 16px;
   color: var(--forum-text);
-  font-size: 1.7rem;
+  font-size: 1.72rem;
   letter-spacing: -0.02em;
 }
 
@@ -296,19 +295,20 @@ body.forum-ux-active .title-element-dark {
   justify-content: space-between;
   min-height: 48px;
   padding: 0 16px;
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px 14px 0 0;
   font-weight: 700;
+  font-size: 0.97rem;
 }
 
 body.forum-ux-active .title-element {
-  background: #f8fafc;
+  background: #f9fbfc;
   color: var(--forum-text);
   border: 1px solid var(--forum-border);
   border-bottom: none;
 }
 
 body.forum-ux-active .title-element-dark {
-  background: #111827;
+  background: #18222d;
   color: #fff;
 }
 
@@ -322,10 +322,10 @@ body.forum-ux-active #statistics-body {
 body.forum-ux-active .content-element.forum,
 body.forum-ux-active .content-element.topic {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) minmax(180px, 220px);
+  grid-template-columns: 34px minmax(0, 1fr) minmax(190px, 220px);
   gap: 16px;
   align-items: center;
-  padding: 18px 16px;
+  padding: 20px 16px;
   border-bottom: 1px solid var(--forum-border);
   background: #fff;
   transition: background 0.16s ease;
@@ -333,7 +333,7 @@ body.forum-ux-active .content-element.topic {
 
 body.forum-ux-active .content-element.forum:hover,
 body.forum-ux-active .content-element.topic:hover {
-  background: #fafcff;
+  background: #fbfdfd;
 }
 
 body.forum-ux-active .content-element.forum:last-child,
@@ -358,9 +358,9 @@ body.forum-ux-active .topic-name > a {
   margin-bottom: 6px;
   color: var(--forum-text);
   text-decoration: none;
-  font-size: 1.02rem;
+  font-size: 1.03rem;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.48;
 }
 
 body.forum-ux-active .forum-title:hover,
@@ -382,6 +382,16 @@ body.forum-ux-active #statistics-online-users::before {
   color: var(--forum-muted);
 }
 
+body.forum-ux-active .topic-name small,
+body.forum-ux-active .topic-stats,
+body.forum-ux-active .topic-lastpost-small,
+body.forum-ux-active .forum-stats,
+body.forum-ux-active .forum-lastpost-small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}
+
 body.forum-ux-active .forum-poster,
 body.forum-ux-active .topic-poster {
   display: flex;
@@ -393,7 +403,7 @@ body.forum-ux-active .topic-poster {
 body.forum-ux-active .forum-poster-avatar img,
 body.forum-ux-active .topic-poster-avatar img,
 body.forum-ux-active .post-author-avatar img {
-  border-radius: 12px;
+  border-radius: 14px;
 }
 
 body.forum-ux-active .forum-poster-summary,
@@ -422,7 +432,7 @@ body.forum-ux-active .button-normal,
 body.forum-ux-active .forum-editor-button,
 body.forum-ux-active input[type="submit"] {
   min-height: 40px;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 body.forum-ux-active .button-normal,
@@ -438,7 +448,7 @@ body.forum-ux-active .pages-and-menu .forum-editor-button::before {
 }
 
 body.forum-ux-active .button-red.cancel {
-  background: #e5e7eb;
+  background: #e8edf2;
   color: var(--forum-text) !important;
   border: none;
 }
@@ -448,7 +458,7 @@ body.forum-ux-active .addpost-editor,
 body.forum-ux-active #forum-editor-form {
   margin-bottom: 18px;
   border: 1px solid var(--forum-border);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
   background: #fff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
@@ -464,21 +474,21 @@ body.forum-ux-active #forum-editor-form .editor-element {
 
 body.forum-ux-active .post-element {
   margin-bottom: 14px;
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--forum-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
 body.forum-ux-active .post-content {
-  max-width: 78ch;
+  max-width: 80ch;
   color: var(--forum-text);
-  line-height: 1.8;
+  line-height: 1.85;
 }
 
 body.forum-ux-active .post-content p {
-  margin-bottom: 0.9em;
+  margin-bottom: 1em;
 }
 
 body.forum-ux-active #statistics {
@@ -492,7 +502,7 @@ body.forum-ux-active #statistics-elements {
 body.forum-ux-active .statistics-element {
   background: var(--forum-surface-soft);
   border: 1px solid var(--forum-border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 14px;
 }
 
@@ -516,7 +526,7 @@ body.forum-ux-active .forum-home-footer-grid {
 }
 
 body.forum-ux-active .forum-home-footer-card {
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 20px;
 }
 
@@ -549,6 +559,11 @@ body.forum-ux-active .wp-block-site-title a {
 }
 
 @media (max-width: 980px) {
+  body.forum-ux-active .entry-content.wp-block-post-content {
+    width: 92vw;
+    max-width: 92vw;
+  }
+
   body.forum-ux-active .forum-hero-card,
   body.forum-ux-active .forum-home-footer-grid {
     grid-template-columns: 1fr;
