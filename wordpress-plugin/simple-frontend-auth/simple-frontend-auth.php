@@ -36,7 +36,8 @@ final class Simple_Frontend_Auth {
     }
 
     public function handle_form_submissions(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $request_method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
+        if ($request_method !== 'POST') {
             return;
         }
 
