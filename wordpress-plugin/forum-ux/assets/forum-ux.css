@@ -17,11 +17,7 @@ body.forum-ux-active .wp-block-post-title {
 }
 
 body.forum-ux-active footer.wp-block-template-part {
-  opacity: 0.72;
-}
-
-body.forum-ux-active footer.wp-block-template-part .wp-block-navigation a {
-  color: #64748b;
+  display: none;
 }
 
 body.forum-ux-active .entry-content > #af-wrapper {
@@ -283,8 +279,52 @@ body.forum-ux-active #statistics-online-users::before {
   color: var(--forum-muted);
 }
 
+body.forum-ux-active .forum-home-footer {
+  margin-top: 26px;
+}
+
+body.forum-ux-active .forum-home-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+body.forum-ux-active .forum-home-footer-card {
+  background: #fff;
+  border: 1px solid var(--forum-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+body.forum-ux-active .forum-home-footer-card h3 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+body.forum-ux-active .forum-home-footer-card p,
+body.forum-ux-active .forum-home-footer-card li,
+body.forum-ux-active .forum-home-footer-card a {
+  color: var(--forum-muted);
+  line-height: 1.7;
+}
+
+body.forum-ux-active .forum-home-footer-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+body.forum-ux-active .forum-home-footer-card a {
+  text-decoration: none;
+}
+
+body.forum-ux-active .forum-home-footer-card a:hover {
+  color: var(--forum-accent);
+}
+
 @media (max-width: 900px) {
-  body.forum-ux-active .forum-hero-card {
+  body.forum-ux-active .forum-hero-card,
+  body.forum-ux-active .forum-home-footer-grid {
     grid-template-columns: 1fr;
   }
 }

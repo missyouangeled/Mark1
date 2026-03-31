@@ -65,7 +65,26 @@ final class Forum_UX_Bridge {
             '</section>'
         ]);
 
-        return $hero . $content;
+        $footer = implode('', [
+            '<section class="forum-home-footer">',
+            '<div class="forum-home-footer-grid">',
+            '<div class="forum-home-footer-card">',
+            '<h3>社区说明</h3>',
+            '<p>这是一个面向公开浏览的讨论社区。游客可以先了解内容与氛围，注册登录后再发帖、回复、参与互动。</p>',
+            '</div>',
+            '<div class="forum-home-footer-card">',
+            '<h3>参与规则</h3>',
+            '<ul><li>先搜索，再提问</li><li>标题尽量明确</li><li>保持友善交流</li></ul>',
+            '</div>',
+            '<div class="forum-home-footer-card">',
+            '<h3>快速入口</h3>',
+            '<p><a href="/wordpress/index.php/register/">注册账号</a><br><a href="/wordpress/index.php/login/">登录论坛</a><br><a href="/wordpress/index.php/member-center/">会员中心</a></p>',
+            '</div>',
+            '</div>',
+            '</section>'
+        ]);
+
+        return $hero . $content . $footer;
     }
 
     public function translate_forum_strings(string $translated, string $text, string $domain): string {
