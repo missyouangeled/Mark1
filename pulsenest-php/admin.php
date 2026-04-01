@@ -14,6 +14,11 @@ function admin_url(array $overrides = [], string $hash = ''): string {
         'author_keyword' => trim((string) ($_GET['author_keyword'] ?? '')),
         'content_keyword' => trim((string) ($_GET['content_keyword'] ?? '')),
         'comment_status' => trim((string) ($_GET['comment_status'] ?? '')),
+        'post_recommend_group' => trim((string) ($_GET['post_recommend_group'] ?? '')),
+        'post_recommend_priority' => trim((string) ($_GET['post_recommend_priority'] ?? '')),
+        'post_is_sticky' => trim((string) ($_GET['post_is_sticky'] ?? '')),
+        'post_is_featured' => trim((string) ($_GET['post_is_featured'] ?? '')),
+        'post_home_slot' => trim((string) ($_GET['post_home_slot'] ?? '')),
         'post_page' => (int) ($_GET['post_page'] ?? 1),
         'comment_page' => (int) ($_GET['comment_page'] ?? 1),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
@@ -47,9 +52,13 @@ function admin_notification_copy(string $type): string {
         'post_like' => '有人点赞帖子',
         'comment_like' => '有人点赞评论',
         'comment_reply' => '有人回复评论',
-        'comment_moderated' => '评论审核结果通知作者',
+        'comment_moderated' => '评论审核结果通知作者（区分已通过 / 已隐藏）',
         default => '有人回复帖子',
     };
+}
+
+function site_setting_field_name(string $settingKey): string {
+    return 'setting_' . str_replace('.', '__', $settingKey);
 }
 
 function admin_pagination(array $baseQuery, string $pageKey, int $page, int $totalPages, string $hash = ''): string {
@@ -130,7 +139,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_home_copy') {
         $settings = [];
         foreach (array_keys(default_home_copy_settings()) as $settingKey) {
-            $settings[$settingKey] = trim((string) ($_POST[$settingKey] ?? ''));
+            $fieldName = site_setting_field_name($settingKey);
+            $settings[$settingKey] = trim((string) ($_POST[$fieldName] ?? ''));
         }
         set_site_settings($settings);
         log_moderation_action((int) $user['id'], 'home_copy_updated', 'site_settings', null, '首页 Hero / Focus 文案已更新');
@@ -484,6 +494,11 @@ $postTitleKeyword = trim((string) ($_GET['post_title_keyword'] ?? ''));
 $authorKeyword = trim((string) ($_GET['author_keyword'] ?? ''));
 $contentKeyword = trim((string) ($_GET['content_keyword'] ?? ''));
 $commentStatusFilter = trim((string) ($_GET['comment_status'] ?? ''));
+$postRecommendGroupFilter = trim((string) ($_GET['post_recommend_group'] ?? ''));
+$postRecommendPriorityFilterRaw = trim((string) ($_GET['post_recommend_priority'] ?? ''));
+$postStickyFilter = trim((string) ($_GET['post_is_sticky'] ?? ''));
+$postFeaturedFilter = trim((string) ($_GET['post_is_featured'] ?? ''));
+$postHomeSlotFilter = trim((string) ($_GET['post_home_slot'] ?? ''));
 $postPage = max(1, (int) ($_GET['post_page'] ?? 1));
 $commentPage = max(1, (int) ($_GET['comment_page'] ?? 1));
 $postPageSize = 12;
@@ -565,7 +580,41 @@ $userRows = db()->query(
      ORDER BY FIELD(u.role, "admin", "moderator", "member"), u.created_at DESC, u.id DESC'
 )->fetchAll();
 
-$postCountTotal = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$recommendGroups = recommend_group_definitions();
+$homeSlotDefinitions = home_slot_definitions();
+$postWhere = [];
+$postParams = [];
+if ($postRecommendGroupFilter !== '' && isset($recommendGroups[$postRecommendGroupFilter])) {
+    $postWhere[] = 'p.recommend_group = :post_recommend_group';
+    $postParams['post_recommend_group'] = $postRecommendGroupFilter;
+}
+if ($postRecommendPriorityFilterRaw !== '' && is_numeric($postRecommendPriorityFilterRaw)) {
+    $postWhere[] = 'p.recommend_priority = :post_recommend_priority';
+    $postParams['post_recommend_priority'] = (int) $postRecommendPriorityFilterRaw;
+}
+if (in_array($postStickyFilter, ['1', '0'], true)) {
+    $postWhere[] = 'p.is_sticky = :post_is_sticky';
+    $postParams['post_is_sticky'] = (int) $postStickyFilter;
+}
+if (in_array($postFeaturedFilter, ['1', '0'], true)) {
+    $postWhere[] = 'p.is_featured = :post_is_featured';
+    $postParams['post_is_featured'] = (int) $postFeaturedFilter;
+}
+if ($postHomeSlotFilter === '__bound__') {
+    $postWhere[] = 'p.home_slot IS NOT NULL AND p.home_slot <> ""';
+} elseif ($postHomeSlotFilter === '__unbound__') {
+    $postWhere[] = '(p.home_slot IS NULL OR p.home_slot = "")';
+} elseif ($postHomeSlotFilter !== '' && isset($homeSlotDefinitions[$postHomeSlotFilter])) {
+    $postWhere[] = 'p.home_slot = :post_home_slot';
+    $postParams['post_home_slot'] = $postHomeSlotFilter;
+}
+$postWhereSql = $postWhere ? ' WHERE ' . implode(' AND ', $postWhere) : '';
+$postCountStmt = db()->prepare('SELECT COUNT(*) FROM posts p' . $postWhereSql);
+foreach ($postParams as $key => $value) {
+    $postCountStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+}
+$postCountStmt->execute();
+$postCountTotal = (int) $postCountStmt->fetchColumn();
 $postTotalPages = max(1, (int) ceil($postCountTotal / $postPageSize));
 $postPage = min($postPage, $postTotalPages);
 $postOffset = ($postPage - 1) * $postPageSize;
@@ -585,10 +634,14 @@ $postStmt = db()->prepare(
      ) c ON c.post_id = p.id
      LEFT JOIN (
         SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
-     ) l ON l.post_id = p.id
-     ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC
+     ) l ON l.post_id = p.id'
+     . $postWhereSql .
+    ' ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC
      LIMIT :limit OFFSET :offset'
 );
+foreach ($postParams as $key => $value) {
+    $postStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+}
 $postStmt->bindValue(':limit', $postPageSize, PDO::PARAM_INT);
 $postStmt->bindValue(':offset', $postOffset, PDO::PARAM_INT);
 $postStmt->execute();
@@ -615,8 +668,6 @@ $boardRows = db()->query(
      ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
 )->fetchAll();
 
-$homeSlotDefinitions = home_slot_definitions();
-$recommendGroups = recommend_group_definitions();
 $homeCopy = home_copy_config();
 $boundSlotRows = db()->query('SELECT id, title, home_slot FROM posts WHERE home_slot IS NOT NULL AND home_slot <> ""')->fetchAll();
 $boundSlots = [];
@@ -766,7 +817,47 @@ render_header('PulseNest · 后台管理', $user, [
   <section id="posts" class="glass panel-card admin-panel-card">
     <div class="section-kicker">Posts</div>
     <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐分组、显示优先级、推荐位等级、首页运营卡绑定。首页卡会自动保持唯一绑定。</span></div>
-    <div class="admin-log-meta muted">共 <?= $postCountTotal ?> 篇帖子 · 第 <?= $postPage ?> / <?= $postTotalPages ?> 页</div>
+    <form class="admin-filter-row" method="get" action="/admin.php#posts">
+      <input type="hidden" name="post_id" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
+      <input type="hidden" name="author_id" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
+      <input type="hidden" name="post_title_keyword" value="<?= e($postTitleKeyword) ?>">
+      <input type="hidden" name="author_keyword" value="<?= e($authorKeyword) ?>">
+      <input type="hidden" name="content_keyword" value="<?= e($contentKeyword) ?>">
+      <input type="hidden" name="comment_status" value="<?= e($commentStatusFilter) ?>">
+      <input type="hidden" name="comment_page" value="<?= $commentPage ?>">
+      <input type="hidden" name="log_action" value="<?= e($logActionFilter) ?>">
+      <input type="hidden" name="log_target_type" value="<?= e($logTargetTypeFilter) ?>">
+      <input type="hidden" name="log_actor_id" value="<?= $logActorIdFilter ?>">
+      <input type="hidden" name="log_page" value="<?= $logPage ?>">
+      <select class="input admin-filter-input" name="post_recommend_group">
+        <option value="">全部推荐分组</option>
+        <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
+          <option value="<?= e($groupKey) ?>" <?= $postRecommendGroupFilter === $groupKey ? 'selected' : '' ?>><?= e($groupMeta['label']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <input class="input admin-filter-input" type="number" min="0" max="999" name="post_recommend_priority" placeholder="推荐优先级（精确值）" value="<?= e($postRecommendPriorityFilterRaw) ?>">
+      <select class="input admin-filter-input" name="post_is_sticky">
+        <option value="">是否置顶：全部</option>
+        <option value="1" <?= $postStickyFilter === '1' ? 'selected' : '' ?>>仅看置顶</option>
+        <option value="0" <?= $postStickyFilter === '0' ? 'selected' : '' ?>>仅看未置顶</option>
+      </select>
+      <select class="input admin-filter-input" name="post_is_featured">
+        <option value="">是否精华：全部</option>
+        <option value="1" <?= $postFeaturedFilter === '1' ? 'selected' : '' ?>>仅看精华</option>
+        <option value="0" <?= $postFeaturedFilter === '0' ? 'selected' : '' ?>>仅看非精华</option>
+      </select>
+      <select class="input admin-filter-input" name="post_home_slot">
+        <option value="">首页位：全部</option>
+        <option value="__bound__" <?= $postHomeSlotFilter === '__bound__' ? 'selected' : '' ?>>仅看已绑定首页位</option>
+        <option value="__unbound__" <?= $postHomeSlotFilter === '__unbound__' ? 'selected' : '' ?>>仅看未绑定首页位</option>
+        <?php foreach ($homeSlotDefinitions as $slotKey => $slotMeta): ?>
+          <option value="<?= e($slotKey) ?>" <?= $postHomeSlotFilter === $slotKey ? 'selected' : '' ?>><?= e($slotMeta['label']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button class="pill-btn solid" type="submit">筛选</button>
+      <a class="pill-btn" href="<?= e(admin_url(['post_recommend_group' => null, 'post_recommend_priority' => null, 'post_is_sticky' => null, 'post_is_featured' => null, 'post_home_slot' => null, 'post_page' => null], '#posts')) ?>">清空</a>
+    </form>
+    <div class="admin-log-meta muted">当前筛选命中 <?= count($postRows) ?> 篇帖子 · 共 <?= $postCountTotal ?> 篇 · 第 <?= $postPage ?> / <?= $postTotalPages ?> 页</div>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>版块</th><th>热度</th><th>运营位</th><th>操作</th></tr></thead>
@@ -833,7 +924,24 @@ render_header('PulseNest · 后台管理', $user, [
       </table>
     </div>
 
-    <?= admin_pagination([], 'post_page', $postPage, $postTotalPages, '#posts') ?>
+    <?= admin_pagination([
+      'post_id' => $postFilterId,
+      'author_id' => $authorFilterId,
+      'post_title_keyword' => $postTitleKeyword,
+      'author_keyword' => $authorKeyword,
+      'content_keyword' => $contentKeyword,
+      'comment_status' => $commentStatusFilter,
+      'post_recommend_group' => $postRecommendGroupFilter,
+      'post_recommend_priority' => $postRecommendPriorityFilterRaw,
+      'post_is_sticky' => $postStickyFilter,
+      'post_is_featured' => $postFeaturedFilter,
+      'post_home_slot' => $postHomeSlotFilter,
+      'comment_page' => $commentPage,
+      'log_action' => $logActionFilter,
+      'log_target_type' => $logTargetTypeFilter,
+      'log_actor_id' => $logActorIdFilter,
+      'log_page' => $logPage,
+    ], 'post_page', $postPage, $postTotalPages, '#posts') ?>
 
     <div class="permission-grid" style="margin-top:20px;">
       <?php foreach ($homeSlotDefinitions as $slotKey => $slotMeta): ?>
@@ -859,21 +967,24 @@ render_header('PulseNest · 后台管理', $user, [
       <div class="permission-grid">
         <div>
           <div class="admin-list-card-head"><strong>Hero 主视觉</strong><span class="tiny-badge">首页顶部</span></div>
-          <input class="input" name="home.hero.eyebrow" value="<?= e($homeCopy['home.hero.eyebrow']) ?>" placeholder="眉标">
-          <input class="input" name="home.hero.title" value="<?= e($homeCopy['home.hero.title']) ?>" placeholder="主标题">
-          <textarea class="input" name="home.hero.body" rows="4" placeholder="Hero 副文案"><?= e($homeCopy['home.hero.body']) ?></textarea>
+          <div class="notice subtle-notice" style="margin-bottom: 12px;">混合模式：Hero 绑定帖子后，可继续单独决定主标题 / 副文案是否覆盖帖子的标题 / 摘要。</div>
+          <input class="input" name="<?= e(site_setting_field_name('home.hero.eyebrow')) ?>" value="<?= e($homeCopy['home.hero.eyebrow']) ?>" placeholder="眉标">
+          <input class="input" name="<?= e(site_setting_field_name('home.hero.title')) ?>" value="<?= e($homeCopy['home.hero.title']) ?>" placeholder="主标题">
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('home.hero.use_custom_title')) ?>" value="1" <?= hero_uses_custom_title($homeCopy) ? 'checked' : '' ?>> 绑定帖子后仍使用上面这条自定义主标题</label>
+          <textarea class="input" name="<?= e(site_setting_field_name('home.hero.body')) ?>" rows="4" placeholder="Hero 副文案"><?= e($homeCopy['home.hero.body']) ?></textarea>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('home.hero.use_custom_body')) ?>" value="1" <?= hero_uses_custom_body($homeCopy) ? 'checked' : '' ?>> 绑定帖子后仍使用上面这条自定义副文案</label>
           <div class="admin-inline-stack">
-            <input class="input" name="home.hero.tag_primary" value="<?= e($homeCopy['home.hero.tag_primary']) ?>" placeholder="标签 1">
-            <input class="input" name="home.hero.tag_secondary" value="<?= e($homeCopy['home.hero.tag_secondary']) ?>" placeholder="标签 2">
+            <input class="input" name="<?= e(site_setting_field_name('home.hero.tag_primary')) ?>" value="<?= e($homeCopy['home.hero.tag_primary']) ?>" placeholder="标签 1">
+            <input class="input" name="<?= e(site_setting_field_name('home.hero.tag_secondary')) ?>" value="<?= e($homeCopy['home.hero.tag_secondary']) ?>" placeholder="标签 2">
           </div>
         </div>
         <?php foreach (['focus_one' => '焦点卡 1', 'focus_two' => '焦点卡 2', 'focus_three' => '焦点卡 3'] as $slotKey => $slotLabel): ?>
           <div>
             <div class="admin-list-card-head"><strong><?= e($slotLabel) ?></strong><span class="tiny-badge"><?= e($slotKey) ?></span></div>
-            <input class="input" name="home.<?= e($slotKey) ?>.badge" value="<?= e($homeCopy['home.' . $slotKey . '.badge']) ?>" placeholder="顶部标签">
-            <input class="input" name="home.<?= e($slotKey) ?>.title" value="<?= e($homeCopy['home.' . $slotKey . '.title']) ?>" placeholder="标题">
-            <textarea class="input" name="home.<?= e($slotKey) ?>.body" rows="3" placeholder="副文案"><?= e($homeCopy['home.' . $slotKey . '.body']) ?></textarea>
-            <input class="input" name="home.<?= e($slotKey) ?>.tag" value="<?= e($homeCopy['home.' . $slotKey . '.tag']) ?>" placeholder="标签">
+            <input class="input" name="<?= e(site_setting_field_name('home.' . $slotKey . '.badge')) ?>" value="<?= e($homeCopy['home.' . $slotKey . '.badge']) ?>" placeholder="顶部标签">
+            <input class="input" name="<?= e(site_setting_field_name('home.' . $slotKey . '.title')) ?>" value="<?= e($homeCopy['home.' . $slotKey . '.title']) ?>" placeholder="标题">
+            <textarea class="input" name="<?= e(site_setting_field_name('home.' . $slotKey . '.body')) ?>" rows="3" placeholder="副文案"><?= e($homeCopy['home.' . $slotKey . '.body']) ?></textarea>
+            <input class="input" name="<?= e(site_setting_field_name('home.' . $slotKey . '.tag')) ?>" value="<?= e($homeCopy['home.' . $slotKey . '.tag']) ?>" placeholder="标签">
           </div>
         <?php endforeach; ?>
       </div>

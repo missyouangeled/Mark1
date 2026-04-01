@@ -79,6 +79,7 @@ function ensure_database_schema(PDO $pdo): void {
         post_id INT UNSIGNED NOT NULL,
         comment_id INT UNSIGNED DEFAULT NULL,
         type VARCHAR(40) NOT NULL,
+        moderation_status VARCHAR(20) DEFAULT NULL,
         is_read TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -194,6 +195,9 @@ function ensure_database_schema(PDO $pdo): void {
     }
     if (!index_exists($pdo, 'forum_boards', 'idx_forum_boards_category_sort')) {
         $pdo->exec('ALTER TABLE forum_boards ADD KEY idx_forum_boards_category_sort (category_id, sort_order, id)');
+    }
+    if (!column_exists($pdo, 'notifications', 'moderation_status')) {
+        $pdo->exec('ALTER TABLE notifications ADD COLUMN moderation_status VARCHAR(20) DEFAULT NULL AFTER type');
     }
     if (!index_exists($pdo, 'notifications', 'idx_notifications_type_created')) {
         $pdo->exec('ALTER TABLE notifications ADD KEY idx_notifications_type_created (type, created_at)');
@@ -661,6 +665,8 @@ function default_home_copy_settings(): array {
         'home.hero.body' => '首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。',
         'home.hero.tag_primary' => '首页运营卡',
         'home.hero.tag_secondary' => '站内回复提醒',
+        'home.hero.use_custom_title' => '1',
+        'home.hero.use_custom_body' => '1',
         'home.focus_one.badge' => 'OPS SLOT',
         'home.focus_one.title' => '焦点卡 1 待绑定',
         'home.focus_one.body' => '后台可把重点帖子直接塞进这张中部卡位。',
@@ -790,18 +796,19 @@ function unread_notification_count(?int $userId): int {
     return (int) $stmt->fetchColumn();
 }
 
-function create_notification(int $recipientUserId, int $actorUserId, string $type, int $postId, ?int $commentId = null): void {
+function create_notification(int $recipientUserId, int $actorUserId, string $type, int $postId, ?int $commentId = null, array $meta = []): void {
     if ($recipientUserId === $actorUserId) {
         return;
     }
 
-    $stmt = db()->prepare('INSERT INTO notifications (recipient_user_id, actor_user_id, post_id, comment_id, type) VALUES (:recipient_user_id, :actor_user_id, :post_id, :comment_id, :type)');
+    $stmt = db()->prepare('INSERT INTO notifications (recipient_user_id, actor_user_id, post_id, comment_id, type, moderation_status) VALUES (:recipient_user_id, :actor_user_id, :post_id, :comment_id, :type, :moderation_status)');
     $stmt->execute([
         'recipient_user_id' => $recipientUserId,
         'actor_user_id' => $actorUserId,
         'post_id' => $postId,
         'comment_id' => $commentId,
         'type' => $type,
+        'moderation_status' => $meta['moderation_status'] ?? null,
     ]);
 }
 
@@ -845,7 +852,9 @@ function create_comment_moderation_notification(array $comment, array $post, int
     if (!in_array($targetStatus, ['approved', 'hidden'], true)) {
         return;
     }
-    create_notification($recipientUserId, $actorUserId, 'comment_moderated', $postId, $commentId);
+    create_notification($recipientUserId, $actorUserId, 'comment_moderated', $postId, $commentId, [
+        'moderation_status' => $targetStatus,
+    ]);
 }
 
 function notification_type_label(string $type): string {
@@ -859,13 +868,44 @@ function notification_type_label(string $type): string {
     };
 }
 
+function notification_moderation_copy(?string $status): array {
+    return match ($status ?: '') {
+        'approved' => [
+            'label' => '已通过',
+            'verb' => '已通过',
+            'summary' => '你的评论已审核通过',
+            'description' => '你的评论已审核通过，已重新对外展示。',
+        ],
+        'hidden' => [
+            'label' => '已隐藏',
+            'verb' => '已隐藏',
+            'summary' => '你的评论已被隐藏',
+            'description' => '你的评论已被隐藏，当前不会在前台公开展示。',
+        ],
+        default => [
+            'label' => '状态更新',
+            'verb' => '已更新',
+            'summary' => '你的评论审核状态已更新',
+            'description' => '你的评论审核状态发生变化，请前往帖子查看。',
+        ],
+    };
+}
+
+function hero_uses_custom_title(array $homeCopy): bool {
+    return ($homeCopy['home.hero.use_custom_title'] ?? '1') === '1';
+}
+
+function hero_uses_custom_body(array $homeCopy): bool {
+    return ($homeCopy['home.hero.use_custom_body'] ?? '1') === '1';
+}
+
 function notification_message(array $item): string {
     $title = '《' . trim((string) ($item['title'] ?? '这篇帖子')) . '》';
     return match ($item['type'] ?? '') {
         'comment_reply' => '回复了你的评论：' . $title,
         'post_like' => '点赞了你的帖子：' . $title,
         'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
-        'comment_moderated' => '你的评论审核状态已更新：' . $title,
+        'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null)['summary'] . '：' . $title,
         default => '回复了你的帖子：' . $title,
     };
 }

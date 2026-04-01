@@ -70,7 +70,7 @@ if ($onlyUnread) {
 }
 
 $stmt = db()->prepare(
-    'SELECT n.id, n.type, n.is_read, n.created_at,
+    'SELECT n.id, n.type, n.moderation_status, n.is_read, n.created_at,
             p.id AS post_id, p.title,
             c.content AS comment_content,
             actor.id AS actor_id, actor.nickname AS actor_nickname, actor.username AS actor_username, actor.avatar_path AS actor_avatar_path
@@ -116,8 +116,8 @@ render_header('PulseNest · 我的提醒', $user, [
   <section class="glass nebula-hero nebula-hero-split">
     <div class="nebula-copy">
       <div class="brand-chip">纳达尔星项目 · 星云初始01 · 站内提醒</div>
-      <h1>提醒流继续细化：未读、类型、批量已读、按类型清空，都能自己收拾。</h1>
-      <p class="page-desc nebula-desc">通知系统现在不只会聚合回复 / 帖子点赞 / 评论点赞，还能按未读和类型筛选；如果某一类提醒太密，也能直接按类型批量标已读或清空。</p>
+      <h1>提醒流继续细化：未读、类型、批量已读、按类型清空，以及更明确的审核结果，都能自己收拾。</h1>
+      <p class="page-desc nebula-desc">通知系统现在不只会聚合回复 / 帖子点赞 / 评论点赞；评论审核提醒也会明确区分“已通过 / 已隐藏”，再配合未读和类型筛选，用户能更快读懂每一条运营动作。</p>
       <div class="hero-stats compact-hero-stats">
         <div class="hero-stat"><div class="label">未读提醒</div><div class="num"><?= $unreadCount ?></div><div class="note">头部导航同步显示</div></div>
         <div class="hero-stat"><div class="label">当前结果</div><div class="num"><?= $currentResultCount ?></div><div class="note"><?= $onlyUnread ? '当前仅看未读' : '当前为全部状态' ?></div></div>
@@ -193,7 +193,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'post_like' => '有人点赞你的帖子',
                 'comment_like' => '有人点赞你的评论',
                 'comment_reply' => '有人回复你的评论',
-                'comment_moderated' => '你的评论被审核通过或隐藏时通知',
+                'comment_moderated' => '你的评论被审核后，会明确告诉你当前是已通过还是已隐藏',
                 default => '有人回复你的帖子',
               }) ?></td>
             </tr>
@@ -208,12 +208,13 @@ render_header('PulseNest · 我的提醒', $user, [
 
   <section class="glass panel-card">
     <div class="section-kicker">Notification Feed</div>
-    <div class="side-head"><h3>提醒列表</h3></div>
+    <div class="side-head admin-head-row"><h3>提醒列表</h3><span class="muted">评论审核通知会直接标出“已通过 / 已隐藏”，不再只给一个模糊的状态更新。</span></div>
     <div class="list-stack notification-stack">
       <?php if (!$notifications): ?>
         <div class="empty-inline nebula-empty">当前筛选条件下没有提醒。换个类型，或者等下一次互动把这里点亮。</div>
       <?php else: ?>
         <?php foreach ($notifications as $item): ?>
+          <?php $moderationCopy = ($item['type'] ?? '') === 'comment_moderated' ? notification_moderation_copy($item['moderation_status'] ?? null) : null; ?>
           <article class="notification-card <?= (int) $item['is_read'] === 0 ? 'unread' : '' ?>">
             <div class="post-head">
               <div class="user">
@@ -224,7 +225,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 ], 'user-avatar') ?>
                 <div>
                   <div class="user-name-line"><?= e($item['actor_nickname']) ?> <span class="tiny-badge">@<?= e($item['actor_username']) ?></span></div>
-                  <div class="muted"><?= e(human_time($item['created_at'])) ?> · <?= e(notification_type_label($item['type'])) ?></div>
+                  <div class="muted"><?= e(human_time($item['created_at'])) ?> · <?= e(notification_type_label($item['type'])) ?><?= $moderationCopy ? ' · ' . e($moderationCopy['label']) : '' ?></div>
                 </div>
               </div>
               <span class="small-chip <?= (int) $item['is_read'] === 0 ? 'a' : 'b' ?>"><?= (int) $item['is_read'] === 0 ? '未读' : '已读' ?></span>
@@ -234,13 +235,20 @@ render_header('PulseNest · 我的提醒', $user, [
                 'comment_reply' => '回复了你的评论：',
                 'post_like' => '点赞了你的帖子：',
                 'comment_like' => '点赞了你在这篇帖子下的评论：',
-                'comment_moderated' => '你的评论审核状态已更新，关联帖子：',
+                'comment_moderated' => ($moderationCopy['summary'] ?? '你的评论审核状态已更新') . '，关联帖子：',
                 default => '回复了你的帖子：',
               }) ?>
               <a class="inline-link" href="/post.php?id=<?= (int) $item['post_id'] ?>"><?= e($item['title']) ?></a>
             </div>
+            <?php if ($moderationCopy): ?>
+              <div class="chips" style="margin-top: 10px; gap: 6px;">
+                <span class="chip">审核结果 · <?= e($moderationCopy['label']) ?></span>
+                <?php if (!empty($item['comment_content'])): ?><span class="chip">评论已留痕</span><?php endif; ?>
+              </div>
+              <div class="muted" style="margin-top: 8px;"><?= e($moderationCopy['description']) ?></div>
+            <?php endif; ?>
             <?php if (!empty($item['comment_content'])): ?>
-              <div class="muted">关联评论：<?= e(excerpt($item['comment_content'], 72)) ?></div>
+              <div class="muted" style="margin-top: 8px;">关联评论：<?= e(excerpt($item['comment_content'], 72)) ?></div>
             <?php endif; ?>
           </article>
         <?php endforeach; ?>

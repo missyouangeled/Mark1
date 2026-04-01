@@ -55,6 +55,10 @@ foreach ($posts as $post) {
     }
 }
 $heroPost = $homeSlotPosts['hero'] ?? $posts[0] ?? null;
+$heroUsesCustomTitle = hero_uses_custom_title($homeCopy);
+$heroUsesCustomBody = hero_uses_custom_body($homeCopy);
+$heroDisplayTitle = $heroPost && !$heroUsesCustomTitle ? ($heroPost['title'] ?? $homeCopy['home.hero.title']) : $homeCopy['home.hero.title'];
+$heroDisplayBody = $heroPost && !$heroUsesCustomBody ? excerpt((string) ($heroPost['content'] ?? ''), 118) : $homeCopy['home.hero.body'];
 $focusPosts = [
     'focus_one' => $homeSlotPosts['focus_one'] ?? ($posts[1] ?? $posts[0] ?? null),
     'focus_two' => $homeSlotPosts['focus_two'] ?? ($posts[2] ?? $posts[1] ?? $posts[0] ?? null),
@@ -95,7 +99,7 @@ function render_focus_card(?array $post, string $slotKey, array $homeCopy, array
 }
 
 render_header('PulseNest', $user, [
-    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定',
+    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定 / Hero 混合文案',
 ]);
 ?>
   <main class="shell home-page">
@@ -109,8 +113,15 @@ render_header('PulseNest', $user, [
           <div class="hero-copy">
             <div>
               <div class="brand-chip"><?= e($homeCopy['home.hero.eyebrow']) ?></div>
-              <h1><?= e($homeCopy['home.hero.title']) ?></h1>
-              <p class="hero-text"><?= e($homeCopy['home.hero.body']) ?></p>
+              <h1><?= e($heroDisplayTitle) ?></h1>
+              <p class="hero-text"><?= e($heroDisplayBody) ?></p>
+             <?php if ($heroPost): ?>
+              <div class="chips" style="margin-top: 14px; gap: 6px;">
+                <span class="chip">Hero 已绑定帖子</span>
+                <span class="chip">标题<?= $heroUsesCustomTitle ? '使用自定义覆盖' : '跟随帖子' ?></span>
+                <span class="chip">副文案<?= $heroUsesCustomBody ? '使用自定义覆盖' : '跟随帖子摘要' ?></span>
+              </div>
+             <?php endif; ?>
             </div>
             <div class="hero-actions-row">
               <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '开始分享内容' : '立即加入社区' ?></a>
@@ -133,6 +144,7 @@ render_header('PulseNest', $user, [
               <div class="kicker"><?= e($homeSlotDefs['hero']['label']) ?></div>
               <div class="title"><?= e($heroPost['title'] ?? 'Starfall Zero') ?></div>
               <div class="text"><?= e($heroPost ? excerpt($heroPost['content'], 56) : '沉浸式星际探索 + 高强度战斗循环') ?></div>
+              <?php if ($heroPost): ?><div class="muted" style="margin-top:10px;">左侧主文案当前<?= $heroUsesCustomTitle || $heroUsesCustomBody ? '已启用部分覆盖模式' : '完全跟随绑定帖子' ?>。</div><?php endif; ?>
               <div class="chips">
                 <?php if ($heroPost): ?>
                   <span class="chip"><?= e(board_badge($heroPost)) ?></span>
@@ -296,7 +308,7 @@ render_header('PulseNest', $user, [
           <div class="section-kicker">Top Rated</div>
           <div class="section-title">功能验收清单</div>
           <div class="rank-list">
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">帖子运营位</div><div class="meta">后台支持置顶 / 精华 / 推荐位 / 首页卡</div></div><div class="score">OK</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">帖子运营位</div><div class="meta">后台支持置顶 / 精华 / 推荐位 / 首页卡 / Hero 混合文案</div></div><div class="score">OK</div></div></div>
             <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">评论管理</div><div class="meta">评论支持 approved / pending / hidden</div></div><div class="score">OK</div></div></div>
             <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">通知筛选</div><div class="meta">支持未读 / 类型筛选与批量处理</div></div><div class="score">OK</div></div></div>
             <div class="rank-item"><div class="rank-row"><div class="rank-index">#4</div><div class="rank-main"><div class="rank-name">既有功能保留</div><div class="meta">点赞、评论、用户主页、上传均未破坏</div></div><div class="score">OK</div></div></div>

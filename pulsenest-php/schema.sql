@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   post_id INT UNSIGNED NOT NULL,
   comment_id INT UNSIGNED DEFAULT NULL,
   type VARCHAR(40) NOT NULL,
+  moderation_status VARCHAR(20) DEFAULT NULL,
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -208,3 +209,27 @@ ON DUPLICATE KEY UPDATE
   description = VALUES(description),
   accent_color = VALUES(accent_color),
   sort_order = VALUES(sort_order);
+
+INSERT INTO site_settings (setting_key, setting_value)
+VALUES
+  ('home.hero.eyebrow', '星云初始01 · 首页升级到可运营的论坛首页'),
+  ('home.hero.title', '保住这套星云观感的同时，把真正能运营的帖子位也接进来。'),
+  ('home.hero.body', '首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。'),
+  ('home.hero.tag_primary', '首页运营卡'),
+  ('home.hero.tag_secondary', '站内回复提醒'),
+  ('home.hero.use_custom_title', '1'),
+  ('home.hero.use_custom_body', '1'),
+  ('home.focus_one.badge', 'OPS SLOT'),
+  ('home.focus_one.title', '焦点卡 1 待绑定'),
+  ('home.focus_one.body', '后台可把重点帖子直接塞进这张中部卡位。'),
+  ('home.focus_one.tag', '焦点卡 1'),
+  ('home.focus_two.badge', 'OPS SLOT'),
+  ('home.focus_two.title', '焦点卡 2 待绑定'),
+  ('home.focus_two.body', '适合放活动帖、征集帖、版本说明帖。'),
+  ('home.focus_two.tag', '焦点卡 2'),
+  ('home.focus_three.badge', 'OPS SLOT'),
+  ('home.focus_three.title', '焦点卡 3 待绑定'),
+  ('home.focus_three.body', '维持视觉稳定，同时把中段内容改成可运营入口。'),
+  ('home.focus_three.tag', '焦点卡 3')
+ON DUPLICATE KEY UPDATE
+  setting_value = COALESCE(site_settings.setting_value, VALUES(setting_value));
