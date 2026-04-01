@@ -4,8 +4,8 @@ import { ranked } from '@/data/games';
 
 export default function RankingsPage() {
   return (
-    <div className="page-shell pb-16 pt-8 md:pb-24 md:pt-10">
-      <section className="glass rounded-[36px] p-6 md:p-8">
+    <div className="page-shell pb-24 pt-10 md:pb-32 md:pt-14">
+      <section className="glass rounded-[36px] p-7 md:p-9">
         <SectionTitle
           kicker="Rankings"
           title="排行榜：把社区判断浓缩成最容易扫读的列表"
@@ -13,12 +13,12 @@ export default function RankingsPage() {
         />
       </section>
 
-      <section className="mt-10 space-y-5">
+      <section className="mt-16 space-y-6 md:mt-20 md:space-y-7">
         {ranked.map((game, index) => (
           <Link
             key={game.slug}
             href={`/game/${game.slug}`}
-            className="glass flex flex-col gap-5 rounded-[30px] p-5 transition hover:-translate-y-0.5 hover:border-emerald-300/28 md:flex-row md:items-center md:p-6"
+            className="glass flex flex-col gap-6 rounded-[30px] p-6 transition hover:-translate-y-0.5 hover:border-emerald-300/28 md:flex-row md:items-center md:gap-7 md:p-7"
           >
             <div className="flex items-center gap-4 md:w-48">
               <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-white/6 text-2xl font-semibold text-white/86">#{index + 1}</div>

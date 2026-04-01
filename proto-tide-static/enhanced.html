@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseNest Enhanced Preview</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: rgba(24, 29, 38, 0.92);
+      --soft: #9aa4b2;
+      --line: rgba(255, 255, 255, 0.08);
+      --brand: #23d3a2;
+      --brand-2: #6df0cf;
+      --text: #f4f7fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, rgba(35, 211, 162, 0.18), transparent 28%),
+        radial-gradient(circle at 90% 12%, rgba(124, 92, 255, 0.16), transparent 22%),
+        linear-gradient(180deg, #101319 0%, #090b10 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    .page-shell { width: min(1240px, calc(100% - 32px)); margin: 0 auto; }
+    .glass {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+    }
+    .header-glow {
+      background: linear-gradient(90deg, rgba(35,211,162,0.08), rgba(119,231,255,0.04), rgba(176,109,240,0.08));
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .header-strip {
+      min-height: 40px; display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:12px; color: rgba(255,255,255,0.64);
+    }
+    .header-pill {
+      display:inline-flex; align-items:center; gap:8px; padding: 6px 12px; border-radius:999px; border:1px solid rgba(35,211,162,0.16); background: rgba(35,211,162,0.08); color:#d8fff4;
+    }
+    .header-pill::before {
+      content:""; width:8px; height:8px; border-radius:999px; background:#6df0cf; box-shadow:0 0 12px rgba(109,240,207,0.9);
+    }
+    .site-header {
+      position: sticky; top: 0; z-index: 40; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.30); backdrop-filter: blur(18px);
+    }
+    .site-header-main {
+      min-height: 82px; display:flex; align-items:center; justify-content:space-between; gap:20px;
+    }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .brand-mark {
+      width: 46px; height: 46px; border-radius: 18px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#061015; font-weight:900;
+      box-shadow: 0 16px 40px rgba(35,211,162,0.28);
+    }
+    .brand-title { font-size:18px; font-weight:800; }
+    .brand-sub { margin-top: 4px; font-size:12px; color: var(--soft); }
+    .nav { display:flex; gap: 10px; }
+    .nav a {
+      padding: 10px 16px; border-radius:999px; color: rgba(255,255,255,0.78); transition:.18s ease;
+    }
+    .nav a:hover { background: rgba(255,255,255,0.08); color:#fff; }
+    .header-actions { display:flex; align-items:center; gap:12px; }
+    .search {
+      min-width: 270px; height: 44px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:#121418; display:flex; align-items:center; padding: 0 18px; color: rgba(255,255,255,0.44); font-size:14px;
+    }
+    .pill-btn {
+      height: 42px; padding: 0 18px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(35,211,162,0.75); color:#d9fff6; font-size:14px; font-weight:700;
+      cursor:pointer; transition:.18s ease;
+    }
+    .pill-btn.solid { background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#081115; border:none; }
+
+    .hero-area { padding-top: 40px; padding-bottom: 40px; }
+    .hero-grid { display:grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; align-items:stretch; }
+    .hero-panel {
+      position: relative; background:
+        radial-gradient(circle at 0% 0%, rgba(35, 211, 162, 0.12), transparent 22%),
+        radial-gradient(circle at 100% 0%, rgba(110, 98, 255, 0.14), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)),
+        var(--panel);
+      border-radius: 36px; overflow:hidden; min-height: 100%;
+    }
+    .hero-inner { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 32px; padding: 40px; min-height: 100%; }
+    .hero-copy { display:flex; flex-direction:column; justify-content:space-between; gap:32px; }
+    .brand-chip {
+      display:inline-flex; width: fit-content; border-radius:999px; padding: 10px 16px; font-size:14px; font-weight:700; color:#d7fff4;
+      background: linear-gradient(135deg, rgba(35,211,162,0.18), rgba(109,240,207,0.1)); border:1px solid rgba(109,240,207,0.26);
+    }
+    h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spacing: -0.04em; }
+    .hero-text { max-width: 620px; font-size: 16px; line-height: 1.95; color: rgba(255,255,255,0.72); }
+    .hero-actions { display:flex; flex-wrap:wrap; gap: 14px; }
+    .hero-stats { display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .hero-stat {
+      border-radius:24px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); padding:18px;
+    }
+    .hero-stat .label { font-size:12px; letter-spacing:.28em; text-transform:uppercase; color: rgba(255,255,255,0.42); }
+    .hero-stat .num { margin-top: 8px; font-size: 28px; font-weight: 800; }
+    .hero-stat .note { margin-top: 6px; font-size:13px; line-height:1.7; color: var(--soft); }
+    .hero-art {
+      position: relative; min-height: 100%; border-radius: 30px; overflow:hidden; border:1px solid rgba(255,255,255,0.10);
+      background:
+        radial-gradient(circle at 24% 18%, rgba(255,255,255,0.38), transparent 16%),
+        radial-gradient(circle at 78% 12%, rgba(109,240,207,0.34), transparent 20%),
+        linear-gradient(135deg, #283e8e 0%, #7a4ff3 42%, #11d19f 100%);
+    }
+    .hero-art::after { content:""; position:absolute; inset:0; background: linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.08), transparent); }
+    .hero-art-top {
+      position:absolute; inset-inline: 0; top: 0; z-index: 1; display:flex; justify-content:space-between; padding: 22px;
+    }
+    .badge { padding: 8px 12px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.2); }
+    .badge.soft { background: rgba(244,63,94,0.16); color:#ffe1e7; border-color: transparent; }
+    .hero-art-bottom { position:absolute; inset-inline: 0; bottom: 0; z-index:1; padding: 28px; }
+    .hero-art-bottom .kicker { font-size:12px; letter-spacing:.35em; text-transform:uppercase; color: rgba(199,255,241,0.8); }
+    .hero-art-bottom .title { margin-top:12px; font-size:34px; font-weight:800; }
+    .hero-art-bottom .text { margin-top: 8px; color: rgba(255,255,255,0.74); line-height:1.85; }
+    .chips { margin-top: 22px; display:flex; flex-wrap:wrap; gap:10px; }
+    .chip { padding: 7px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.18); font-size:12px; }
+
+    .right-stack { display:grid; gap: 24px; grid-template-rows: 1fr auto; }
+    .section-card { border-radius: 32px; padding: 24px; }
+    .section-kicker { font-size: 13px; letter-spacing: .32em; text-transform: uppercase; color: rgba(109,240,207,0.88); font-weight:700; }
+    .section-title { margin-top: 10px; font-size: 28px; font-weight: 800; line-height: 1.15; }
+    .hot-list, .feed-list, .focus-grid, .tag-cloud, .author-list, .rank-list, .cards-3, .notes-grid { margin-top: 24px; }
+    .hot-list, .feed-list, .author-list, .rank-list { display:flex; flex-direction:column; gap:14px; }
+    .hot-item, .feed-item, .author-item, .rank-item, .note-card {
+      border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
+    }
+    .hot-item { padding:16px; }
+    .hot-row { display:flex; gap:14px; align-items:flex-start; }
+    .rank-no { width:40px; height:40px; border-radius:16px; background: rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex:none; }
+    .hot-main { flex:1; min-width:0; }
+    .hot-main .title { font-size:14px; line-height:1.7; color: rgba(255,255,255,0.92); }
+    .hot-main .heat { margin-top: 6px; font-size: 12px; color: var(--soft); }
+    .feed-item { display:flex; gap:12px; padding: 14px 16px; }
+    .pulse-dot { width:10px; height:10px; border-radius:999px; margin-top:7px; background:#6df0cf; box-shadow:0 0 0 rgba(109,240,207,0.65); animation: pulseGlow 2s infinite; flex:none; }
+    .feed-item .time { font-size:12px; color: rgba(255,255,255,0.42); }
+    .feed-item .text { margin-top: 4px; font-size:14px; line-height:1.7; color: rgba(255,255,255,0.84); }
+
+    .row-mid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap:24px; margin-top: 88px; align-items:stretch; }
+    .focus-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .focus-card {
+      min-height: 230px; border-radius: 28px; overflow:hidden; border:1px solid rgba(255,255,255,0.10); padding: 20px; position:relative;
+    }
+    .focus-1 { background: radial-gradient(circle at 20% 18%, rgba(255,255,255,0.26), transparent 16%), linear-gradient(135deg, #2e3192 0%, #1bffff 100%); }
+    .focus-2 { background: radial-gradient(circle at 84% 18%, rgba(255,255,255,0.18), transparent 16%), linear-gradient(135deg, #7928ca 0%, #ff0080 100%); }
+    .focus-3 { background: radial-gradient(circle at 16% 22%, rgba(255,255,255,0.22), transparent 16%), linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .focus-top-badge { position:absolute; top: 16px; right: 16px; padding: 7px 11px; border-radius:999px; background: rgba(0,0,0,0.18); font-size:12px; }
+    .focus-emoji { font-size: 34px; }
+    .focus-title { margin-top: 70px; font-size: 22px; font-weight: 800; }
+    .focus-text { margin-top: 10px; font-size: 14px; line-height: 1.8; color: rgba(255,255,255,0.82); }
+    .tag-cloud { display:flex; flex-wrap:wrap; gap:12px; }
+    .tag-cloud-item { padding: 9px 14px; border-radius: 999px; font-size: 13px; border:1px solid transparent; }
+    .tag-cloud-item.a { border-color: rgba(35,211,162,0.22); background: rgba(35,211,162,0.10); color:#d7fff4; }
+    .tag-cloud-item.b { border-color: rgba(86,190,255,0.18); background: rgba(86,190,255,0.10); color:#dff6ff; }
+    .tag-cloud-item.c { border-color: rgba(217,70,239,0.18); background: rgba(217,70,239,0.10); color:#ffe0ff; }
+    .mood-box { margin-top: 28px; padding: 18px; border-radius:24px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+    .progress { margin-top:14px; height:12px; border-radius:999px; overflow:hidden; background: rgba(255,255,255,0.08); }
+    .progress > div { width:74%; height:100%; border-radius:999px; background: linear-gradient(90deg,#23d3a2,#77e7ff,#b06df0); }
+    .mood-box p { margin: 12px 0 0; font-size: 14px; line-height: 1.8; color: var(--soft); }
+
+    .row-bottom { margin-top: 96px; display:grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; align-items:stretch; }
+    .section-large-head { margin-top: 14px; font-size: 44px; font-weight: 800; line-height: 1.08; }
+    .section-large-desc { margin-top: 14px; font-size: 16px; line-height: 1.95; color: var(--soft); }
+    .ticker { margin-top: 18px; padding: 12px 16px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); font-size:14px; color: rgba(255,255,255,0.72); }
+    .cards-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .supplement-card { margin-top: 28px; padding: 24px; border-radius: 30px; }
+    .supplement-grid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 20px; }
+    .supplement-block { border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); padding: 20px; }
+    .supplement-block h4 { margin: 0; font-size: 20px; }
+    .supplement-block p { margin: 10px 0 0; font-size: 14px; line-height: 1.85; color: var(--soft); }
+    .mini-feed { margin-top: 16px; display:flex; flex-direction:column; gap: 12px; }
+    .mini-feed-item { display:flex; gap: 10px; align-items:flex-start; padding: 12px 14px; border-radius: 18px; background: rgba(255,255,255,0.03); }
+    .mini-feed-item i { width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: linear-gradient(135deg,#23d3a2,#77e7ff); box-shadow: 0 0 10px rgba(109,240,207,0.5); flex:none; }
+    .mini-feed-item strong { display:block; font-size: 14px; color: rgba(255,255,255,0.92); }
+    .mini-feed-item span { display:block; margin-top: 4px; font-size: 13px; line-height: 1.7; color: var(--soft); }
+    .badge-row { margin-top: 18px; display:flex; flex-wrap:wrap; gap: 10px; }
+    .soft-badge { padding: 8px 12px; border-radius: 999px; font-size: 12px; color: rgba(255,255,255,0.86); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
+    .game-card { height:100%; display:flex; flex-direction:column; border-radius:30px; overflow:hidden; }
+    .game-cover { position:relative; height:300px; }
+    .game-cover::after { content:""; position:absolute; inset:0; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); }
+    .game-cover.alt1 { background: radial-gradient(circle at 20% 18%, rgba(255,255,255,0.3), transparent 14%), radial-gradient(circle at 80% 10%, rgba(255,201,99,0.3), transparent 22%), linear-gradient(135deg, #ee6f57 0%, #6f42c1 50%, #2ceaa3 100%); }
+    .game-cover.alt2 { background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.24), transparent 12%), radial-gradient(circle at 72% 18%, rgba(86,190,255,0.28), transparent 20%), linear-gradient(135deg, #0c6ff9 0%, #0fc9c3 56%, #09203f 100%); }
+    .game-cover.alt3 { background: radial-gradient(circle at 28% 14%, rgba(255,255,255,0.3), transparent 12%), radial-gradient(circle at 78% 24%, rgba(255,132,182,0.32), transparent 18%), linear-gradient(135deg, #f97316 0%, #e11d48 44%, #1f2937 100%); }
+    .game-cover-top { position:absolute; top:16px; left:16px; right:16px; z-index:1; display:flex; justify-content:space-between; gap:10px; }
+    .small-chip { padding:7px 11px; border-radius:999px; font-size:12px; }
+    .small-chip.a { background: linear-gradient(135deg, rgba(35,211,162,0.18), rgba(109,240,207,0.1)); border:1px solid rgba(109,240,207,0.26); }
+    .small-chip.b { background: rgba(0,0,0,0.24); }
+    .game-cover-bottom { position:absolute; left:0; right:0; bottom:0; z-index:1; padding: 18px 20px 22px; }
+    .game-title { font-size: 26px; font-weight: 800; line-height: 1.15; }
+    .game-sub { margin-top: 8px; font-size: 14px; color: rgba(255,255,255,0.76); }
+    .game-body { display:flex; flex-direction:column; gap:18px; padding:24px; }
+    .game-body p { margin:0; font-size:14px; line-height:1.9; color: rgba(255,255,255,0.74); }
+    .game-meta { margin-top:auto; display:flex; justify-content:space-between; gap:14px; font-size:14px; }
+
+    .notes-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .note-card { padding:20px; }
+    .note-card h4 { margin:0; font-size:18px; }
+    .note-card p { margin: 12px 0 0; font-size:14px; line-height:1.85; color: var(--soft); }
+    .right-col-stack { display:grid; gap: 24px; grid-template-rows: 1fr 1fr; }
+    .author-list, .rank-list { display:flex; flex-direction:column; gap:14px; }
+    .author-item, .rank-item { padding:16px; }
+    .author-row, .rank-row { display:flex; align-items:center; gap:14px; }
+    .author-badge, .rank-index { width:54px; height:54px; border-radius:20px; border:1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:24px; flex:none; }
+    .author-main, .rank-main { flex:1; min-width:0; }
+    .author-name, .rank-name { display:flex; align-items:center; gap:8px; font-weight:700; }
+    .tiny-badge { padding: 5px 8px; border-radius:999px; background: rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.22); font-size:11px; color:#ffe8bf; }
+    .author-main .meta, .rank-main .meta { margin-top: 6px; font-size:13px; color: var(--soft); }
+    .author-item p { margin: 12px 0 0; font-size:14px; line-height:1.8; color: rgba(255,255,255,0.72); }
+    .score { font-size:14px; font-weight:800; color: var(--brand-2); }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(109,240,207,0.45); }
+      70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(109,240,207,0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(109,240,207,0); }
+    }
+
+    @media (max-width: 1100px) {
+      .site-header-main { flex-wrap: wrap; min-height: auto; padding: 18px 0; }
+      .hero-grid, .row.top, .row.mid, .row.bottom, .focus-grid, .cards-3, .notes-grid, .right-col-stack, .supplement-grid { grid-template-columns: 1fr; }
+      .right-stack { grid-template-rows: unset; }
+      .hero-art { min-height: 360px; }
+    }
+    @media (max-width: 720px) {
+      .page-shell { width: min(100%, calc(100% - 20px)); }
+      .header-strip { flex-direction: column; align-items:flex-start; padding: 8px 0; }
+      .site-header-main { gap: 14px; }
+      .nav, .search { display:none; }
+      .hero-inner { grid-template-columns: 1fr; padding: 24px; }
+      h1 { font-size: 38px; }
+      .hero-stats, .focus-grid, .cards-3, .notes-grid { grid-template-columns: 1fr; }
+      .row.mid { margin-top: 64px; }
+      .row.bottom { margin-top: 72px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-glow">
+      <div class="page-shell header-strip">
+        <div class="header-pill">社区热度实时刷新中</div>
+        <div>今日焦点：独立叙事 / 组队共斗 / 夜游氛围</div>
+      </div>
+    </div>
+    <div class="page-shell site-header-main">
+      <div class="brand">
+        <div class="brand-mark">PN</div>
+        <div>
+          <div class="brand-title">PulseNest</div>
+          <div class="brand-sub">像逛热门论坛一样找下一款会沉迷的游戏</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#">首页</a>
+        <a href="#">发现</a>
+        <a href="#">排行榜</a>
+      </nav>
+      <div class="header-actions">
+        <div class="search">🔎 搜索榜单、话题、作者、游戏名</div>
+        <a class="pill-btn solid" href="#">登录体验</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell hero-area">
+    <section class="hero-grid">
+      <div class="glass hero-panel">
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <div>
+              <div class="brand-chip">本周焦点 · 编辑精选 · 热榜第一候选</div>
+              <h1>像逛热门论坛首页一样，先被氛围钩住，再被热度和观点留下来。</h1>
+              <p class="hero-text">这轮增强把 PulseNest 从“漂亮原型”往“更像真实热门社区站”推进：加入热榜、活动卡、标签云、作者推荐、实时动态、悬浮操作和更明显的论坛感信息编排。</p>
+            </div>
+            <div class="hero-actions">
+              <a class="pill-btn solid" href="#">进入主推详情</a>
+              <a class="pill-btn" href="#">去看发现页专题</a>
+            </div>
+            <div class="hero-stats">
+              <div class="hero-stat"><div class="label">72h 热帖</div><div class="num">268</div><div class="note">比昨日 +18%</div></div>
+              <div class="hero-stat"><div class="label">活跃作者</div><div class="num">1.3k</div><div class="note">创作氛围稳定上扬</div></div>
+              <div class="hero-stat"><div class="label">正在围观</div><div class="num">24.6k</div><div class="note">首页实时滚动中</div></div>
+            </div>
+          </div>
+          <div class="hero-art">
+            <div class="hero-art-top">
+              <span class="badge">Forum Pick</span>
+              <span class="badge soft">热帖角标</span>
+            </div>
+            <div class="hero-art-bottom">
+              <div class="kicker">Hero Pick</div>
+              <div class="title">Starfall Zero</div>
+              <div class="text">沉浸式星际探索 + 高强度战斗循环</div>
+              <div class="chips"><span class="chip">iOS</span><span class="chip">Android</span><span class="chip">PC 串流</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="right-stack">
+        <section class="glass section-card">
+          <div class="section-kicker">Hot Board</div>
+          <div class="section-title">右侧热榜</div>
+          <div class="hot-list">
+            <div class="hot-item"><div class="hot-row"><div class="rank-no">#1</div><div class="hot-main"><div class="title">为什么《Starfall Zero》一眼就有“年度相”</div><div class="heat">12.8k 热度</div></div></div></div>
+            <div class="hot-item"><div class="hot-row"><div class="rank-no">#2</div><div class="hot-main"><div class="title">四人开黑到底该冲哪款？这三款越聊越上头</div><div class="heat">9.4k 热度</div></div></div></div>
+            <div class="hot-item"><div class="hot-row"><div class="rank-no">#3</div><div class="hot-main"><div class="title">本周最适合熬夜沉浸的剧情向作品整理</div><div class="heat">7.1k 热度</div></div></div></div>
+            <div class="hot-item"><div class="hot-row"><div class="rank-no">#4</div><div class="hot-main"><div class="title">轻策略不是轻深度：Mech Haven 的系统感太顺了</div><div class="heat">6.3k 热度</div></div></div></div>
+          </div>
+        </section>
+
+        <section class="glass section-card">
+          <div class="section-kicker">Pulse Feed</div>
+          <div class="feed-list">
+            <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">19 秒前</div><div class="text">有 36 位玩家正在围观 “夜航派对” 活动卡</div></div></div>
+            <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">2 分钟前</div><div class="text">本周热帖榜单更新，Starfall Zero 再次登顶</div></div></div>
+            <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">5 分钟前</div><div class="text">编辑精选新增 2 个“适合下班后放空”的清单</div></div></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="row-mid">
+      <section class="glass section-card">
+        <div class="section-kicker">Focus Slots</div>
+        <div class="section-title">焦点位 / 活动卡 / 论坛运营位</div>
+        <div class="focus-grid">
+          <div class="focus-card focus-1"><div class="focus-top-badge">NOW</div><div class="focus-emoji">🌌</div><div class="focus-title">夜航派对</div><div class="focus-text">限时讨论活动 · 参与话题可点亮夜光徽章</div></div>
+          <div class="focus-card focus-2"><div class="focus-top-badge">HOT</div><div class="focus-emoji">🧠</div><div class="focus-title">编辑推荐墙</div><div class="focus-text">6 位编辑轮流上墙，展示“今晚真想玩”的理由</div></div>
+          <div class="focus-card focus-3"><div class="focus-top-badge">NEW</div><div class="focus-emoji">🎮</div><div class="focus-title">开黑招募</div><div class="focus-text">自动聚合同类型玩家偏好，像论坛招募贴一样直给</div></div>
+        </div>
+      </section>
+
+      <section class="glass section-card">
+        <div class="section-kicker">Tag Cloud</div>
+        <div class="section-title">标签云 / 轻入口导航</div>
+        <div class="tag-cloud">
+          <span class="tag-cloud-item a">#今晚玩什么</span>
+          <span class="tag-cloud-item b">#高分独立</span>
+          <span class="tag-cloud-item c">#开黑四排</span>
+          <span class="tag-cloud-item a">#剧情浓度</span>
+          <span class="tag-cloud-item b">#机甲经营</span>
+          <span class="tag-cloud-item c">#像素新宠</span>
+          <span class="tag-cloud-item a">#买断推荐</span>
+          <span class="tag-cloud-item b">#氛围党集合</span>
+        </div>
+        <div class="mood-box">
+          <div class="section-kicker" style="font-size:12px;">今日社区情绪</div>
+          <div class="progress"><div></div></div>
+          <p>本日更偏向“高颜值 + 轻沉浸 + 适合分享观点”的内容，说明社区不只是找游戏，也在找表达欲。</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="row-bottom">
+      <section>
+        <div class="section-kicker">Trending Now</div>
+        <div class="section-large-head">最近讨论度最高的 3 款候选</div>
+        <div class="section-large-desc">继续保留原本稳定的卡片浏览逻辑，同时给卡片所在区域加入更像热门站首页的“正在热聊”语境。</div>
+        <div class="ticker">🔥 热议中：剧情浓度 / 四人开黑 / 年度美术 / 夜游氛围 / 独立黑马 / 机甲拼装 / 轻竞速叙事</div>
+        <div class="cards-3">
+          <article class="glass game-card"><div class="game-cover alt1"><div class="game-cover-top"><span class="small-chip a">热门新作</span><span class="small-chip b">多人共斗</span></div><div class="game-cover-bottom"><div class="game-title">Echo Drifters</div><div class="game-sub">组队穿越被噪音吞没的城市</div></div></div><div class="game-body"><p>强调角色技能联动与潮流视觉包装的组队动作游戏。</p><div class="game-meta"><div>★ 9.2 · 87 万关注</div><div style="color: var(--brand);">查看详情</div></div></div></article>
+          <article class="glass game-card"><div class="game-cover alt2"><div class="game-cover-top"><span class="small-chip a">社区高分</span><span class="small-chip b">策略经营</span></div><div class="game-cover-bottom"><div class="game-title">Mech Haven</div><div class="game-sub">把废土据点焊成你的钢铁王国</div></div></div><div class="game-body"><p>围绕机甲零件组合和据点经营展开的中重度策略作品。</p><div class="game-meta"><div>★ 8.9 · 46 万下载</div><div style="color: var(--brand);">查看详情</div></div></div></article>
+          <article class="glass game-card"><div class="game-cover alt3"><div class="game-cover-top"><span class="small-chip a">独立佳作</span><span class="small-chip b">叙事竞速</span></div><div class="game-cover-bottom"><div class="game-title">Petal Blitz</div><div class="game-sub">霓虹花店白天营业，夜晚参加街头竞速</div></div></div><div class="game-body"><p>用花店经营和街头竞速讲成长故事的轻叙事作品。</p><div class="game-meta"><div>★ 8.7 · 31 万想玩</div><div style="color: var(--brand);">查看详情</div></div></div></article>
+        </div>
+
+        <div class="glass supplement-card">
+          <div class="supplement-grid">
+            <div class="supplement-block">
+              <div class="section-kicker">Forum Signals</div>
+              <h4>社区速报 / 今晚值得继续往下逛的三个方向</h4>
+              <p>这里补的是“卡片区结束以后，用户还能顺着看什么”。它既能填上画面节奏，也能让左侧信息不至于突然断掉。</p>
+              <div class="mini-feed">
+                <div class="mini-feed-item"><i></i><div><strong>剧情向讨论升温</strong><span>今天关于“年度剧情体验”的帖子互动明显增加，说明用户不只想知道好不好玩，也想知道值不值得投入情绪。</span></div></div>
+                <div class="mini-feed-item"><i></i><div><strong>轻策略内容回潮</strong><span>Mech Haven 相关讨论集中在“系统深度”和“新手是否好上手”，这类长线内容有继续发酵空间。</span></div></div>
+                <div class="mini-feed-item"><i></i><div><strong>深夜氛围标签有效</strong><span>夜游、独立、放空、耳机沉浸这些词在首页更容易让人停下来看第二眼。</span></div></div>
+              </div>
+            </div>
+
+            <div class="supplement-block">
+              <div class="section-kicker">Editor Picks</div>
+              <h4>编辑补充标签</h4>
+              <p>给左侧再加一层“轻运营”味道，让它和右侧的推荐作者 / 高分速览在体量上更匹配。</p>
+              <div class="badge-row">
+                <span class="soft-badge">深夜可玩</span>
+                <span class="soft-badge">适合长评</span>
+                <span class="soft-badge">争议话题</span>
+                <span class="soft-badge">新手友好</span>
+                <span class="soft-badge">视觉优先</span>
+                <span class="soft-badge">小众黑马</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="right-col-stack">
+        <section class="glass section-card">
+          <div class="section-kicker">Recommended Authors</div>
+          <div class="section-title">推荐作者 / 勋章感名片</div>
+          <div class="author-list">
+            <div class="author-item"><div class="author-row"><div class="author-badge">🏅</div><div class="author-main"><div class="author-name">Rin <span class="tiny-badge">认证作者</span></div><div class="meta">氛围叙事观察者</div></div><div class="score">92%</div></div><p>擅长把“好不好玩”拆成能读懂的情绪结构。</p></div>
+            <div class="author-item"><div class="author-row"><div class="author-badge">🏅</div><div class="author-main"><div class="author-name">Kite <span class="tiny-badge">认证作者</span></div><div class="meta">联机机制控</div></div><div class="score">88%</div></div><p>喜欢从角色协作、节奏和局内反馈聊设计。</p></div>
+            <div class="author-item"><div class="author-row"><div class="author-badge">🏅</div><div class="author-main"><div class="author-name">Moss <span class="tiny-badge">认证作者</span></div><div class="meta">独立游戏挖掘机</div></div><div class="score">95%</div></div><p>总能从小体量作品里翻出惊喜与审美亮点。</p></div>
+          </div>
+        </section>
+
+        <section class="glass section-card">
+          <div class="section-kicker">Top Rated</div>
+          <div class="section-title">高分速览</div>
+          <div class="rank-list">
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">Starfall Zero</div><div class="meta">在遗失轨道上重启文明火种</div></div><div class="score">9.5</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">Echo Drifters</div><div class="meta">组队穿越被噪音吞没的城市</div></div><div class="score">9.2</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">Mech Haven</div><div class="meta">把废土据点焊成你的钢铁王国</div></div><div class="score">8.9</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#4</div><div class="rank-main"><div class="rank-name">Petal Blitz</div><div class="meta">霓虹花店白天营业，夜晚参加街头竞速</div></div><div class="score">8.7</div></div></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

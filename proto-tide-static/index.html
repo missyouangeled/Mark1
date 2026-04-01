@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseNest Static Preview</title>
+  <style>
+    :root {
+      --bg: #07090d;
+      --panel: #181b20;
+      --panel-soft: #1f2329;
+      --panel-softer: #232830;
+      --panel-tint-a: rgba(35,211,162,0.08);
+      --panel-tint-b: rgba(79,110,255,0.08);
+      --panel-tint-c: rgba(255,149,102,0.06);
+      --soft: #9aa4b2;
+      --line: rgba(255,255,255,0.08);
+      --brand: #23d3a2;
+      --brand-2: #6df0cf;
+      --text: #f4f7fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(35,211,162,0.14), transparent 24%),
+        radial-gradient(circle at 92% 8%, rgba(78,98,255,0.14), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(255,149,102,0.10), transparent 26%),
+        linear-gradient(180deg, #0b0d11 0%, #0a0c10 46%, #0c0f14 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+    .shell { width: min(1360px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar {
+      position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px);
+      background: rgba(11,13,17,0.88); border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .topbar-inner {
+      height: 76px; display: grid; grid-template-columns: 220px minmax(380px, 1fr) auto; align-items: center; gap: 22px;
+    }
+    .brand { display:flex; align-items:center; gap:14px; font-size: 18px; font-weight: 800; }
+    .brand-mark {
+      width: 46px; height: 46px; border-radius: 18px; display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#061015; font-weight: 900; box-shadow: 0 16px 40px rgba(35,211,162,0.28);
+    }
+    .search {
+      height: 44px; border-radius: 999px; background: #121418; border: 1px solid rgba(255,255,255,0.08);
+      display:flex; align-items:center; padding: 0 18px; color: rgba(255,255,255,0.44);
+    }
+    .actions { display:flex; align-items:center; gap: 14px; }
+    .pill-btn {
+      height: 40px; padding: 0 18px; border-radius: 999px; display:flex; align-items:center; justify-content:center; font-size: 14px; font-weight: 700;
+      border: 1px solid rgba(35,211,162,0.75); color: #d9fff6; background: transparent;
+    }
+    .pill-btn.solid { background: linear-gradient(135deg,#23d3a2,#6df0cf); color: #081115; border: none; }
+    .avatar { width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg,#dff7ff,#b8fff2); }
+
+    .layout {
+      display: grid; grid-template-columns: 240px minmax(0, 1fr) 320px; gap: 28px; padding: 28px 0 72px;
+      align-items: start;
+    }
+    .left, .center, .right { min-width: 0; }
+    .sticky-col { position: sticky; top: 100px; }
+    .left-section { padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .left-section:last-child { border-bottom: none; }
+    .menu-list, .forum-list { display:flex; flex-direction:column; gap: 8px; }
+    .menu-item, .forum-item {
+      display:flex; align-items:center; gap: 14px; min-height: 48px; padding: 0 14px; border-radius: 14px; color: rgba(255,255,255,0.9);
+    }
+    .menu-item:hover, .forum-item:hover { background: rgba(255,255,255,0.05); }
+    .forum-item.active {
+      background: linear-gradient(135deg, rgba(35,211,162,0.10), rgba(78,98,255,0.08));
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .icon {
+      width: 22px; height: 22px; border-radius: 8px; display:flex; align-items:center; justify-content:center; color: rgba(255,255,255,0.88);
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(109,240,207,0.08)); font-size: 12px; font-weight: 700;
+    }
+    .side-title { font-size: 15px; font-weight: 700; margin: 0 0 14px; color: rgba(255,255,255,0.92); }
+    .muted { color: var(--soft); }
+
+    .card {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        radial-gradient(circle at top left, var(--panel-tint-a), transparent 38%),
+        radial-gradient(circle at top right, var(--panel-tint-b), transparent 34%),
+        var(--panel);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 24px;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.24);
+    }
+    .hero-card { overflow: hidden; }
+    .hero-banner {
+      height: 220px; position: relative;
+      background:
+        radial-gradient(circle at 20% 12%, rgba(255,255,255,0.22), transparent 16%),
+        radial-gradient(circle at 80% 18%, rgba(35,211,162,0.22), transparent 20%),
+        linear-gradient(135deg,#2140a8 0%, #3045a9 35%, #1187a9 100%);
+    }
+    .hero-banner::after { content:""; position:absolute; inset:0; background: linear-gradient(to top, rgba(0,0,0,0.26), rgba(0,0,0,0.02)); }
+    .hero-top {
+      position:absolute; left: 26px; right: 26px; bottom: 22px; z-index: 1; display:flex; align-items:flex-end; justify-content:space-between; gap: 20px;
+    }
+    .hero-brand {
+      display:flex; align-items:center; gap: 16px;
+    }
+    .hero-brand-mark {
+      width: 58px; height: 58px; border-radius: 20px; background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#061015;
+      display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 22px;
+    }
+    .follow-btn {
+      min-width: 100px; height: 46px; border-radius: 999px; display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#081115; font-weight: 800;
+    }
+    .quick-icons {
+      display:grid; grid-template-columns: repeat(5, 1fr); gap: 14px; padding: 20px 22px 10px;
+    }
+    .quick-icon {
+      text-align:center; color: rgba(255,255,255,0.86); font-size: 13px;
+    }
+    .quick-icon .bubble {
+      width: 52px; height: 52px; border-radius: 18px; background: linear-gradient(135deg, rgba(35,211,162,0.18), rgba(78,98,255,0.14)); margin: 0 auto 10px;
+      display:flex; align-items:center; justify-content:center; font-size: 22px;
+    }
+    .tabs {
+      display:flex; align-items:center; gap: 28px; padding: 0 22px; margin-top: 6px; min-height: 62px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .tab.active { font-size: 18px; font-weight: 800; color: #fff; }
+    .tab { color: rgba(255,255,255,0.76); }
+    .topics {
+      padding: 18px 22px 22px;
+    }
+    .topic-row {
+      display:flex; flex-wrap:wrap; gap: 10px; margin-bottom: 18px;
+    }
+    .topic-chip {
+      padding: 8px 14px; border-radius: 999px; background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(109,240,207,0.06)); color: rgba(255,255,255,0.82); font-size: 13px;
+    }
+    .post {
+      border-top: 1px solid rgba(255,255,255,0.08); padding-top: 22px;
+    }
+    .post-head { display:flex; align-items:center; justify-content:space-between; gap: 16px; }
+    .user { display:flex; align-items:center; gap: 14px; }
+    .user-avatar {
+      width: 48px; height: 48px; border-radius: 999px; background: linear-gradient(135deg,#ffd8d2,#f7f6ff);
+    }
+    .post-title {
+      margin: 18px 0 0; font-size: 28px; line-height: 1.14; font-weight: 800;
+    }
+    .post-text { margin: 16px 0 0; font-size: 16px; line-height: 1.95; color: rgba(255,255,255,0.74); }
+    .post-grid {
+      margin-top: 22px; display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .thumb {
+      aspect-ratio: 1 / 1; border-radius: 16px; background: linear-gradient(135deg,#5b3e63,#f1977c);
+    }
+    .thumb:nth-child(2) { background: linear-gradient(135deg,#dff5ff,#f7fbff); }
+    .thumb:nth-child(3) { background: linear-gradient(135deg,#fff0d8,#ffe1bf); }
+    .thumb:nth-child(4) { background: linear-gradient(135deg,#e7ffe8,#cbf4d1); }
+    .thumb:nth-child(5) { background: linear-gradient(135deg,#ffd7cf,#9caab8); }
+    .post-actions {
+      margin-top: 16px; display:flex; align-items:center; gap: 24px; color: rgba(255,255,255,0.68); font-size: 14px;
+    }
+
+    .side-stack { display:flex; flex-direction:column; gap: 16px; }
+    .side-card { padding: 20px; }
+    .side-head { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 18px; }
+    .side-head h3 { margin: 0; font-size: 18px; }
+    .tool-grid { display:grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    .tool-item { text-align:center; font-size: 13px; color: rgba(255,255,255,0.88); }
+    .tool-item .tool-bubble {
+      width: 48px; height: 48px; border-radius: 16px; background: linear-gradient(135deg, rgba(35,211,162,0.18), rgba(78,98,255,0.14)); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px; font-size: 20px;
+    }
+    .tool-upload {
+      min-height: 72px; border-radius: 18px; background: rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.14);
+      display:flex; align-items:center; justify-content:center; gap: 10px; color: rgba(255,255,255,0.86); font-weight: 700;
+    }
+    .mod-list, .rank-users { display:flex; flex-direction:column; gap: 14px; }
+    .mod-item, .rank-user {
+      display:flex; align-items:center; justify-content:space-between; gap: 12px;
+    }
+    .mod-user, .rank-user-main { display:flex; align-items:center; gap: 12px; min-width: 0; }
+    .avatar-sm { width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg,#dff7ff,#ffc8be); }
+    .follow-small {
+      min-width: 72px; height: 36px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; color: rgba(255,255,255,0.9); font-weight: 700;
+    }
+
+    @media (max-width: 1180px) {
+      .topbar-inner { grid-template-columns: 220px 1fr; }
+      .actions { display:none; }
+      .layout { grid-template-columns: 220px minmax(0,1fr); }
+      .right { display:none; }
+    }
+    @media (max-width: 860px) {
+      .shell { width: min(100%, calc(100% - 24px)); }
+      .topbar-inner { grid-template-columns: 1fr; height: auto; padding: 16px 0; }
+      .search { display:none; }
+      .layout { grid-template-columns: 1fr; gap: 18px; }
+      .left { display:none; }
+      .quick-icons, .tool-grid { grid-template-columns: repeat(3,1fr); }
+      .hero-banner { height: 190px; }
+      .post-grid { grid-template-columns: repeat(2,1fr); }
+      .post-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">PN</div>
+        <div>PulseNest</div>
+      </div>
+      <div class="search">🔎&nbsp;&nbsp;搜索你下一款会沉迷的游戏</div>
+      <div class="actions">
+        <div class="pill-btn solid">下载手机 APP</div>
+        <div class="pill-btn">下载 PC 版</div>
+        <div class="avatar"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell layout">
+    <aside class="left">
+      <div class="sticky-col">
+        <div class="left-section">
+          <div class="menu-list">
+            <a class="menu-item" href="#"><span class="icon">T</span><span>首页</span></a>
+            <a class="menu-item" href="#"><span class="icon">榜</span><span>排行榜</span></a>
+            <a class="menu-item" href="#"><span class="icon">✦</span><span>发现</span></a>
+            <a class="menu-item" href="#"><span class="icon">云</span><span>云游戏</span></a>
+            <a class="menu-item" href="#"><span class="icon">PC</span><span>PC 游戏</span></a>
+          </div>
+        </div>
+
+        <div class="left-section">
+          <div class="menu-list">
+            <a class="menu-item" href="#"><span class="icon">动</span><span>动态</span></a>
+            <a class="menu-item" href="#"><span class="icon">发</span><span>发布</span></a>
+          </div>
+        </div>
+
+        <div class="left-section">
+          <h4 class="side-title">论坛</h4>
+          <div class="forum-list">
+            <a class="forum-item active" href="#"><span class="icon">花</span><span>我的花园世界</span></a>
+            <a class="forum-item" href="#"><span class="icon">洛</span><span>洛克王国：世界</span></a>
+            <a class="forum-item" href="#"><span class="icon">心</span><span>心动小镇</span></a>
+            <a class="forum-item" href="#"><span class="icon">初</span><span>初音未来：缤纷舞台</span></a>
+            <a class="forum-item" href="#"><span class="icon">诸</span><span>诸神皇冠</span></a>
+            <a class="forum-item" href="#"><span class="icon">更多</span><span class="muted">显示更多</span></a>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="center">
+      <section class="card hero-card">
+        <div class="hero-banner">
+          <div class="hero-top">
+            <div class="hero-brand">
+              <div class="hero-brand-mark">PN</div>
+              <div>
+                <div style="font-size: 34px; font-weight: 800; line-height: 1.08;">PulseNest</div>
+                <div style="margin-top: 8px; color: rgba(255,255,255,0.74);">灵感社区站 · 69 万关注 · 3.9 万帖子</div>
+              </div>
+            </div>
+            <div class="follow-btn">关注</div>
+          </div>
+        </div>
+
+        <div class="quick-icons">
+          <div class="quick-icon"><div class="bubble">❓</div>常见问题</div>
+          <div class="quick-icon"><div class="bubble">📢</div>官方公告</div>
+          <div class="quick-icon"><div class="bubble">💬</div>召唤客服</div>
+          <div class="quick-icon"><div class="bubble">📝</div>玩家说</div>
+          <div class="quick-icon"><div class="bubble">🎮</div>聊聊游戏</div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">全部</div>
+          <div class="tab">官方</div>
+          <div class="tab">一起玩</div>
+          <div class="tab">玩家说</div>
+          <div class="tab">精华</div>
+          <div class="tab">视频</div>
+        </div>
+
+        <div class="topics">
+          <div class="topic-row">
+            <span class="topic-chip">帮助中心</span>
+            <span class="topic-chip">官方公告</span>
+            <span class="topic-chip">最新活动</span>
+            <span class="topic-chip">站内资讯</span>
+            <span class="topic-chip">玩家说</span>
+            <span class="topic-chip">组队招募</span>
+          </div>
+
+          <article class="post">
+            <div class="post-head">
+              <div class="user">
+                <div class="user-avatar"></div>
+                <div>
+                  <div style="font-weight: 700;">朵朵</div>
+                  <div class="muted" style="margin-top: 4px; font-size: 14px;">17 小时前</div>
+                </div>
+              </div>
+              <div class="muted">⋯</div>
+            </div>
+
+            <h1 class="post-title">像逛游戏社区一样，找到真正想立刻下载的下一款作品。</h1>
+            <p class="post-text">今天，我收到了来自一些朋友的祝福。谢谢你们，我很开心。也想借这条动态说一句：如果一个内容社区想让人留下来，它一定不只是“把信息堆出来”，而是要让人感觉愿意继续往下逛。</p>
+
+            <div class="post-grid">
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+            </div>
+
+            <div class="post-actions">
+              <span>💬 11</span>
+              <span>👍 12</span>
+              <span>↗ 分享</span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <aside class="right">
+      <div class="sticky-col side-stack">
+        <section class="card side-card">
+          <div class="side-head"><h3>发布到论坛</h3></div>
+          <div class="tool-grid">
+            <div class="tool-item"><div class="tool-bubble">🖼️</div>发图文</div>
+            <div class="tool-item"><div class="tool-bubble">🎬</div>发视频</div>
+            <div class="tool-item"><div class="tool-bubble">📄</div>发长帖</div>
+            <div class="tool-item"><div class="tool-bubble">🗓️</div>发活动</div>
+          </div>
+        </section>
+
+        <section class="card side-card">
+          <div class="side-head"><h3>游戏工具箱</h3><span class="muted">管理</span></div>
+          <div class="tool-upload">⬆ 上传游戏工具</div>
+        </section>
+
+        <section class="card side-card">
+          <div class="side-head"><h3>版主</h3></div>
+          <div class="mod-list">
+            <div class="mod-item"><div class="mod-user"><div class="avatar-sm"></div><div><div style="font-weight:700;">水蓝</div><div class="muted" style="margin-top:4px; font-size: 14px;">1016 粉丝</div></div></div><div class="follow-small">关注</div></div>
+            <div class="mod-item"><div class="mod-user"><div class="avatar-sm"></div><div><div style="font-weight:700;">布斯特bear</div><div class="muted" style="margin-top:4px; font-size: 14px;">579 粉丝</div></div></div><div class="follow-small">关注</div></div>
+            <div class="mod-item"><div class="mod-user"><div class="avatar-sm"></div><div><div style="font-weight:700;">PulseNest 客服 Cc</div><div class="muted" style="margin-top:4px; font-size: 14px;">3296 粉丝</div></div></div><div class="follow-small">关注</div></div>
+            <div class="mod-item"><div class="mod-user"><div class="avatar-sm"></div><div><div style="font-weight:700;">PulseNest 评价君</div><div class="muted" style="margin-top:4px; font-size: 14px;">7748 粉丝</div></div></div><div class="follow-small">关注</div></div>
+          </div>
+        </section>
+
+        <section class="card side-card">
+          <div class="side-head"><h3>论坛用户排行</h3></div>
+          <div class="rank-users">
+            <div class="rank-user"><div class="rank-user-main"><div class="avatar-sm"></div><div><div style="font-weight:700;">PulseNest 客服 Cc</div><div class="muted" style="margin-top:4px; font-size:14px;">论坛等级 · Lv9</div></div></div><div class="follow-small">关注</div></div>
+            <div class="rank-user"><div class="rank-user-main"><div class="avatar-sm"></div><div><div style="font-weight:700;">薄荷晨星</div><div class="muted" style="margin-top:4px; font-size:14px;">论坛等级 · Lv8</div></div></div><div class="follow-small">关注</div></div>
+            <div class="rank-user"><div class="rank-user-main"><div class="avatar-sm"></div><div><div style="font-weight:700;">晚风研究员</div><div class="muted" style="margin-top:4px; font-size:14px;">论坛等级 · Lv7</div></div></div><div class="follow-small">关注</div></div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

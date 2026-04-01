@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseNest · 注册</title>
+  <style>
+    :root {
+      --bg: #0b0d11;
+      --panel: #181b20;
+      --panel-soft: #1f2329;
+      --line: rgba(255,255,255,0.08);
+      --soft: #9aa4b2;
+      --text: #f4f7fb;
+      --brand: #23d3a2;
+      --brand-2: #6df0cf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(35,211,162,0.14), transparent 24%),
+        radial-gradient(circle at 94% 14%, rgba(78,98,255,0.14), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(255,149,102,0.10), transparent 26%),
+        linear-gradient(180deg, #0b0d11 0%, #0a0c10 46%, #0c0f14 100%);
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell { width: min(1220px, calc(100% - 32px)); margin: 0 auto; }
+    .topbar { height: 82px; display:flex; align-items:center; justify-content:space-between; gap: 18px; }
+    .brand { display:flex; align-items:center; gap: 14px; font-size: 18px; font-weight: 800; }
+    .brand-mark {
+      width: 46px; height: 46px; border-radius: 18px; display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#061015; font-weight: 900; box-shadow: 0 16px 40px rgba(35,211,162,0.28);
+    }
+    .back {
+      height: 42px; padding: 0 16px; border-radius: 999px; display:flex; align-items:center; justify-content:center;
+      border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.82); background: rgba(255,255,255,0.04);
+    }
+    .layout { min-height: calc(100vh - 82px); display:grid; grid-template-columns: 0.98fr 1.02fr; gap: 30px; align-items: center; padding: 10px 0 40px; }
+    .hero {
+      position: relative; overflow: hidden; border-radius: 34px; min-height: 700px;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(255,255,255,0.22), transparent 16%),
+        radial-gradient(circle at 82% 12%, rgba(35,211,162,0.18), transparent 18%),
+        radial-gradient(circle at 72% 84%, rgba(255,149,102,0.14), transparent 20%),
+        linear-gradient(145deg, #2b2142 0%, #49357e 34%, #176d72 72%, #0e2f2b 100%);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 28px 90px rgba(0,0,0,0.28);
+    }
+    .hero::after { content:""; position:absolute; inset:0; background: linear-gradient(180deg, rgba(8,10,14,0.04), rgba(8,10,14,0.18) 42%, rgba(8,10,14,0.62) 100%); }
+    .hero-inner { position: relative; z-index: 1; height: 100%; padding: 42px; display:flex; flex-direction:column; justify-content:space-between; }
+    .hero-badge { display:inline-flex; width: fit-content; padding: 10px 16px; border-radius: 999px; background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); font-size: 13px; color: rgba(255,255,255,0.88); }
+    .hero-copy h1 { margin: 0; max-width: 10ch; font-size: 50px; line-height: 1.06; letter-spacing: -0.04em; }
+    .hero-copy p { margin: 18px 0 0; max-width: 560px; font-size: 17px; line-height: 1.95; color: rgba(255,255,255,0.76); }
+    .feature-list { display:flex; flex-direction:column; gap: 16px; }
+    .feature {
+      display:flex; gap: 14px; align-items:flex-start; border-radius: 24px; padding: 18px 20px; background: rgba(9,12,18,0.28); border: 1px solid rgba(255,255,255,0.1);
+    }
+    .dot { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, rgba(35,211,162,0.22), rgba(109,240,207,0.12)); display:flex; align-items:center; justify-content:center; font-weight: 900; color:#d8fff4; }
+    .feature strong { display:block; font-size: 16px; }
+    .feature span { display:block; margin-top: 8px; font-size: 14px; line-height: 1.85; color: rgba(255,255,255,0.72); }
+
+    .panel {
+      border-radius: 34px; padding: 34px; background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        radial-gradient(circle at top left, rgba(35,211,162,0.08), transparent 42%),
+        radial-gradient(circle at top right, rgba(79,110,255,0.08), transparent 36%),
+        #181b20;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+    }
+    .kicker { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3em; color: rgba(109,240,207,0.88); }
+    .panel h2 { margin: 14px 0 0; font-size: 40px; line-height: 1.08; letter-spacing: -0.03em; }
+    .panel .desc { margin: 16px 0 0; font-size: 15px; line-height: 1.9; color: var(--soft); }
+    .tabs { margin-top: 26px; display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 8px; border-radius: 20px; background: rgba(255,255,255,0.04); }
+    .tab { min-height: 48px; border-radius: 14px; display:flex; align-items:center; justify-content:center; color: rgba(255,255,255,0.74); font-weight: 700; }
+    .tab.active { background: linear-gradient(135deg, rgba(35,211,162,0.16), rgba(78,98,255,0.12)); color: #fff; }
+    .form { margin-top: 28px; display:flex; flex-direction:column; gap: 18px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field label { display:block; margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.88); font-weight: 600; }
+    .input { width: 100%; height: 56px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); padding: 0 18px; color: #fff; font-size: 15px; outline: none; }
+    .input:focus { border-color: rgba(109,240,207,0.5); box-shadow: 0 0 0 4px rgba(35,211,162,0.08); }
+    .submit { margin-top: 8px; width: 100%; height: 56px; border: none; border-radius: 20px; font-size: 15px; font-weight: 800; cursor: pointer; background: linear-gradient(135deg,#23d3a2,#6df0cf); color: #091115; box-shadow: 0 18px 40px rgba(35,211,162,0.22); }
+    .agreement { font-size: 14px; line-height: 1.8; color: var(--soft); }
+    .link { color: rgba(109,240,207,0.92); font-weight: 700; }
+    .bottom-tip { margin-top: 24px; font-size: 14px; line-height: 1.8; color: var(--soft); }
+    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .hero { min-height: 560px; } .hero-copy h1 { font-size: 40px; } }
+    @media (max-width: 640px) { .shell { width: min(100%, calc(100% - 20px)); } .hero-inner, .panel { padding: 22px; } .hero-copy h1 { font-size: 34px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <a href="/" class="brand"><div class="brand-mark">PN</div><div>PulseNest</div></a>
+      <a href="/" class="back">← 返回首页</a>
+    </div>
+
+    <div class="layout">
+      <section class="hero">
+        <div class="hero-inner">
+          <div class="hero-badge">Create Your Identity · 建立你的社区身份卡</div>
+          <div class="hero-copy">
+            <h1>用一个新的账号，正式进入这个会让你停留的社区。</h1>
+            <p>注册页不应该只是填信息，它更像一次“加入感”的建立：你会有自己的昵称、自己的关注、自己的论坛痕迹，也会慢慢形成自己的内容偏好。</p>
+          </div>
+          <div class="feature-list">
+            <div class="feature"><div class="dot">01</div><div><strong>建立身份</strong><span>从第一天开始拥有自己的主页、关注列表与论坛记录。</span></div></div>
+            <div class="feature"><div class="dot">02</div><div><strong>加入讨论</strong><span>注册后可以发帖、回复、收藏、点赞，也能在内容流里留下自己的声音。</span></div></div>
+            <div class="feature"><div class="dot">03</div><div><strong>持续发现</strong><span>随着你的浏览和互动，内容推荐会慢慢向你的偏好靠拢。</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="kicker">Create Account</div>
+        <h2>创建你的 PulseNest 账号</h2>
+        <p class="desc">风格和首页一致，但信息组织更克制：让注册这件事看起来轻一点、顺一点，不像后台填表。</p>
+
+        <div class="tabs">
+          <a class="tab" href="/login.html">登录</a>
+          <a class="tab active" href="/register.html">注册</a>
+        </div>
+
+        <form class="form">
+          <div class="grid">
+            <div class="field"><label>昵称</label><input class="input" placeholder="输入你想展示的昵称" /></div>
+            <div class="field"><label>用户名</label><input class="input" placeholder="设置唯一用户名" /></div>
+          </div>
+          <div class="field"><label>邮箱地址</label><input class="input" placeholder="输入常用邮箱" /></div>
+          <div class="grid">
+            <div class="field"><label>密码</label><input class="input" type="password" placeholder="设置密码" /></div>
+            <div class="field"><label>确认密码</label><input class="input" type="password" placeholder="再次输入密码" /></div>
+          </div>
+          <div class="agreement">注册即表示你同意 PulseNest 的<a class="link" href="#">用户协议</a>与<a class="link" href="#">隐私政策</a>，并接受论坛社区规则。</div>
+          <button class="submit" type="button">立即创建账号</button>
+        </form>
+
+        <div class="bottom-tip">已经有账号了？<a class="link" href="/login.html">去登录</a>。如果你还想先看看社区氛围，也可以回首页继续逛。</div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

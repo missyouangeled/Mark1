@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseNest · 登录</title>
+  <style>
+    :root {
+      --bg: #0b0d11;
+      --panel: #181b20;
+      --panel-soft: #1f2329;
+      --line: rgba(255,255,255,0.08);
+      --soft: #9aa4b2;
+      --text: #f4f7fb;
+      --brand: #23d3a2;
+      --brand-2: #6df0cf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(35,211,162,0.14), transparent 24%),
+        radial-gradient(circle at 92% 8%, rgba(78,98,255,0.14), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(255,149,102,0.10), transparent 26%),
+        linear-gradient(180deg, #0b0d11 0%, #0a0c10 46%, #0c0f14 100%);
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell { width: min(1220px, calc(100% - 32px)); margin: 0 auto; }
+    .topbar {
+      height: 82px; display:flex; align-items:center; justify-content:space-between; gap: 18px;
+    }
+    .brand { display:flex; align-items:center; gap: 14px; font-size: 18px; font-weight: 800; }
+    .brand-mark {
+      width: 46px; height: 46px; border-radius: 18px; display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#23d3a2,#6df0cf); color:#061015; font-weight: 900; box-shadow: 0 16px 40px rgba(35,211,162,0.28);
+    }
+    .back {
+      height: 42px; padding: 0 16px; border-radius: 999px; display:flex; align-items:center; justify-content:center;
+      border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.82); background: rgba(255,255,255,0.04);
+    }
+    .layout {
+      min-height: calc(100vh - 82px); display:grid; grid-template-columns: 1.05fr 0.95fr; gap: 30px; align-items: center; padding: 10px 0 40px;
+    }
+    .hero {
+      position: relative; overflow: hidden; border-radius: 34px; min-height: 700px;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(255,255,255,0.22), transparent 16%),
+        radial-gradient(circle at 82% 12%, rgba(35,211,162,0.18), transparent 18%),
+        radial-gradient(circle at 72% 84%, rgba(255,149,102,0.14), transparent 20%),
+        linear-gradient(140deg, #1a2c6f 0%, #19407f 32%, #15708a 68%, #0f302d 100%);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 28px 90px rgba(0,0,0,0.28);
+    }
+    .hero::after {
+      content: ""; position:absolute; inset:0;
+      background: linear-gradient(180deg, rgba(8,10,14,0.04), rgba(8,10,14,0.18) 42%, rgba(8,10,14,0.62) 100%);
+    }
+    .hero-inner { position: relative; z-index: 1; height: 100%; padding: 42px; display:flex; flex-direction:column; justify-content:space-between; }
+    .hero-badge {
+      display:inline-flex; align-items:center; gap: 10px; width: fit-content; padding: 10px 16px; border-radius: 999px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(12px);
+      font-size: 13px; color: rgba(255,255,255,0.88);
+    }
+    .hero-copy h1 {
+      margin: 0; max-width: 10ch; font-size: 52px; line-height: 1.06; letter-spacing: -0.04em;
+    }
+    .hero-copy p {
+      margin: 18px 0 0; max-width: 560px; font-size: 17px; line-height: 1.95; color: rgba(255,255,255,0.76);
+    }
+    .hero-points { display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .hero-point {
+      border-radius: 24px; padding: 18px; background: rgba(9,12,18,0.28); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(14px);
+    }
+    .hero-point strong { display:block; font-size: 22px; }
+    .hero-point span { display:block; margin-top: 8px; font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.72); }
+
+    .panel {
+      border-radius: 34px; padding: 34px; background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        radial-gradient(circle at top left, rgba(35,211,162,0.08), transparent 42%),
+        radial-gradient(circle at top right, rgba(79,110,255,0.08), transparent 36%),
+        #181b20;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+    }
+    .kicker { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3em; color: rgba(109,240,207,0.88); }
+    .panel h2 { margin: 14px 0 0; font-size: 40px; line-height: 1.08; letter-spacing: -0.03em; }
+    .panel .desc { margin: 16px 0 0; font-size: 15px; line-height: 1.9; color: var(--soft); }
+    .tabs {
+      margin-top: 26px; display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 8px; border-radius: 20px; background: rgba(255,255,255,0.04);
+    }
+    .tab { min-height: 48px; border-radius: 14px; display:flex; align-items:center; justify-content:center; color: rgba(255,255,255,0.74); font-weight: 700; }
+    .tab.active { background: linear-gradient(135deg, rgba(35,211,162,0.16), rgba(78,98,255,0.12)); color: #fff; }
+    .form { margin-top: 28px; display:flex; flex-direction:column; gap: 18px; }
+    .field label { display:block; margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.88); font-weight: 600; }
+    .input {
+      width: 100%; height: 56px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+      padding: 0 18px; color: #fff; font-size: 15px; outline: none;
+    }
+    .input:focus { border-color: rgba(109,240,207,0.5); box-shadow: 0 0 0 4px rgba(35,211,162,0.08); }
+    .row { display:flex; align-items:center; justify-content:space-between; gap: 14px; }
+    .checkbox { display:flex; align-items:center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.72); }
+    .checkbox .box { width: 18px; height: 18px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); }
+    .link { color: rgba(109,240,207,0.92); font-weight: 700; }
+    .submit {
+      margin-top: 8px; width: 100%; height: 56px; border: none; border-radius: 20px; font-size: 15px; font-weight: 800; cursor: pointer;
+      background: linear-gradient(135deg,#23d3a2,#6df0cf); color: #091115;
+      box-shadow: 0 18px 40px rgba(35,211,162,0.22);
+    }
+    .divider {
+      margin: 28px 0 0; display:flex; align-items:center; gap: 12px; color: rgba(255,255,255,0.44); font-size: 13px;
+    }
+    .divider::before, .divider::after { content:""; flex:1; height:1px; background: rgba(255,255,255,0.08); }
+    .socials { margin-top: 18px; display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .social {
+      min-height: 52px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+      display:flex; align-items:center; justify-content:center; gap: 10px; font-weight: 700; color: rgba(255,255,255,0.84);
+    }
+    .bottom-tip { margin-top: 24px; font-size: 14px; line-height: 1.8; color: var(--soft); }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .hero { min-height: 540px; }
+      .hero-copy h1 { font-size: 42px; }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100%, calc(100% - 20px)); }
+      .topbar { position: static; }
+      .hero-inner, .panel { padding: 22px; }
+      .hero-copy h1 { font-size: 34px; }
+      .hero-points, .socials { grid-template-columns: 1fr; }
+      .row { flex-direction: column; align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <a href="/" class="brand"><div class="brand-mark">PN</div><div>PulseNest</div></a>
+        <a href="/" class="back">← 返回首页</a>
+      </div>
+    </div>
+
+    <div class="layout">
+      <section class="hero">
+        <div class="hero-inner">
+          <div class="hero-badge">社区身份同步 · 登录后继续逛论坛与内容流</div>
+          <div class="hero-copy">
+            <h1>回来就好，继续从你上次停下的地方开始。</h1>
+            <p>把登录页做成一个冷冰冰的表单太浪费了。PulseNest 的登录页应该还是那种带氛围、有社区感、但不杂乱的体验：你一进来就知道这不是后台，而是一个愿意让人停留的地方。</p>
+          </div>
+          <div class="hero-points">
+            <div class="hero-point"><strong>同步</strong><span>继续查看关注的论坛、收藏内容和最近浏览。</span></div>
+            <div class="hero-point"><strong>参与</strong><span>登录后可以发帖、回复、点赞，也能发布动态。</span></div>
+            <div class="hero-point"><strong>发现</strong><span>系统会根据你的偏好推荐更多值得点开的内容。</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="kicker">Sign In</div>
+        <h2>登录你的 PulseNest 账号</h2>
+        <p class="desc">继续查看论坛、游戏内容流、收藏和动态记录。这个页面保持和首页一致的材质、颜色和呼吸感，但把注意力集中在“快速进入”这件事上。</p>
+
+        <div class="tabs">
+          <a class="tab active" href="/login.html">登录</a>
+          <a class="tab" href="/register.html">注册</a>
+        </div>
+
+        <form class="form">
+          <div class="field">
+            <label>手机号 / 邮箱</label>
+            <input class="input" placeholder="输入你的手机号或邮箱" />
+          </div>
+          <div class="field">
+            <label>密码</label>
+            <input class="input" type="password" placeholder="输入密码" />
+          </div>
+          <div class="row">
+            <div class="checkbox"><span class="box"></span><span>记住我，下次快速登录</span></div>
+            <a class="link" href="#">忘记密码？</a>
+          </div>
+          <button class="submit" type="button">立即登录</button>
+        </form>
+
+        <div class="divider">或使用其他方式登录</div>
+        <div class="socials">
+          <div class="social">微</div>
+          <div class="social">Q</div>
+          <div class="social">苹</div>
+        </div>
+
+        <div class="bottom-tip">还没有账号？<a class="link" href="/register.html">去注册</a>。你也可以先回首页继续看内容，准备好了再进来。</div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>
