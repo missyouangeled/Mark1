@@ -222,7 +222,7 @@ render_header('PulseNest', $user, [
         </div>
       </section>
 
-      <section class="glass section-card">
+      <section class="glass section-card tag-cloud-card">
         <div class="section-kicker">Tag Cloud</div>
         <div class="section-title">当前可直接体验的入口</div>
         <div class="tag-cloud">
@@ -280,7 +280,7 @@ render_header('PulseNest', $user, [
       </section>
 
       <div class="right-col-stack">
-        <section class="glass section-card">
+        <section class="glass section-card authors-card-shell">
           <div class="section-kicker">Recommended Authors</div>
           <div class="section-title">真实成员速览</div>
           <div class="author-list">
@@ -304,7 +304,7 @@ render_header('PulseNest', $user, [
           </div>
         </section>
 
-        <section class="glass section-card">
+        <section class="glass section-card top-rated-card-shell">
           <div class="section-kicker">Top Rated</div>
           <div class="section-title">功能验收清单</div>
           <div class="rank-list">

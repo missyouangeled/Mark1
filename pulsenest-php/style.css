@@ -170,8 +170,8 @@ button, input, textarea, select { font: inherit; }
 .floating-notice { margin-bottom: 20px; }
 .hero-grid, .nebula-section-grid { display:grid; gap: 24px; align-items:stretch; }
 .hero-grid { grid-template-columns: 1.2fr 0.8fr; }
-.row-mid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap:24px; margin-top: 24px; align-items:stretch; }
-.row-bottom { margin-top: 112px; display:grid; grid-template-columns: 1.2fr 0.8fr; gap:24px; align-items:stretch; }
+.row-mid { display:grid; grid-template-columns: 1.2fr 0.8fr; gap:24px; margin-top: 24px; align-items:stretch; }
+.row-bottom { margin-top: 72px; display:grid; grid-template-columns: 1.2fr 0.8fr; gap:24px; align-items:stretch; }
 .right-stack { display:grid; gap: 28px; grid-template-rows: auto auto; align-self: stretch; }
 .nebula-section-grid { grid-template-columns: minmax(0, 1fr) 340px; }
 .detail-grid-wide { grid-template-columns: minmax(0, 1fr) 320px; }
@@ -191,6 +191,13 @@ button, input, textarea, select { font: inherit; }
 .nebula-hero-split { display:grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
 .hero-inner { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 32px; padding: 40px; min-height: 100%; }
 .hero-copy, .nebula-copy, .detail-main-stack, .right-col-stack { display:flex; flex-direction:column; gap:24px; }
+.right-col-stack { position: relative; top: -470px; }
+.authors-card-shell, .top-rated-card-shell { width: 100%; }
+.top-rated-card-shell { min-height: 600px; display: flex; flex-direction: column; }
+.top-rated-card-shell .rank-list { flex: 1; justify-content: space-between; }
+.tag-cloud-card .section-title { margin-bottom: 0; }
+.tag-cloud-card .tag-cloud { margin-top: 46px; }
+.tag-cloud-card .mood-box { margin-top: 38px; }
 .brand-chip {
   display:inline-flex;
   width: fit-content;
@@ -245,10 +252,11 @@ h2, h3 { margin: 0; }
 .tiny-badge.badge-danger { background: rgba(255,102,141,0.14); }
 .section-card, .panel-card, .detail-card, .side-card, .stat-card, .mini-stat, .auth-panel {
   border-radius: 32px;
-  padding: 24px;
+  padding: 26px;
 }
 .section-title { margin-top: 10px; font-size: 28px; font-weight: 800; line-height: 1.15; }
 .hot-list, .feed-list, .focus-grid, .author-list, .rank-list, .cards-3, .notes-grid, .mod-list, .quick-links, .list-stack, .detail-list, .category-stack { margin-top: 24px; }
+.tag-cloud { margin-top: 38px; }
 .pulse-feed-card { margin-top: 28px; min-height: 240px; }
 .pulse-feed-card .feed-list { min-height: 220px; justify-content: flex-start; }
 .hot-list, .feed-list, .author-list, .rank-list, .mod-list, .quick-links, .list-stack, .detail-list, .feature-list, .category-stack { display:flex; flex-direction:column; gap:14px; }
@@ -270,18 +278,24 @@ h2, h3 { margin: 0; }
   background: linear-gradient(135deg,#23d3a2,#77e7ff);
   box-shadow: 0 0 12px rgba(35,211,162,0.8);
 }
-.focus-grid, .cards-3, .stat-grid, .page-grid-three { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.focus-grid, .cards-3, .stat-grid, .page-grid-three { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
 .focus-card, .game-card, .stat-card {
   border-radius: 28px;
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04);
-  padding: 20px;
+  padding: 22px;
 }
 .focus-title, .game-title { font-size: 22px; font-weight: 800; }
+.focus-card { display:flex; flex-direction:column; justify-content:space-between; min-height: 250px; }
+.focus-top-badge { width: fit-content; align-self: flex-end; }
 .focus-text, .game-body p, .mood-box p { color: rgba(255,255,255,0.72); line-height: 1.8; }
 .tag-cloud-item.a { background: rgba(35,211,162,0.12); }
 .tag-cloud-item.b { background: rgba(119,231,255,0.12); }
 .tag-cloud-item.c { background: rgba(176,109,240,0.12); }
+.tag-cloud { gap: 14px; }
+.tag-cloud-item { padding: 10px 16px; font-size: 13px; line-height: 1.4; }
+.mood-box { margin-top: 34px; padding: 22px; }
+.mood-box p { margin: 14px 0 0; font-size: 15px; line-height: 1.9; }
 .mood-box, .game-cover, .profile-chip, .author-item, .comment-card, .forum-pill, .detail-row, .notice, .empty-inline {
   border-radius: 24px;
 }
@@ -290,8 +304,29 @@ h2, h3 { margin: 0; }
   padding: 18px;
   display:flex;
   flex-direction:column;
-  justify-content:space-between;
+  justify-content:flex-start;
+  gap: 18px;
   background: linear-gradient(135deg, rgba(35,211,162,0.2), rgba(176,109,240,0.26));
+}
+.game-cover-top {
+  display:flex;
+  flex-wrap:wrap;
+  gap: 8px;
+  align-items:flex-start;
+}
+.game-cover-bottom {
+  margin-top: 8px;
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+}
+.game-title {
+  line-height: 1.18;
+}
+.game-sub {
+  font-size: 13px;
+  line-height: 1.65;
+  color: rgba(255,255,255,0.72);
 }
 .game-cover.alt2 { background: linear-gradient(135deg, rgba(119,231,255,0.2), rgba(35,211,162,0.24)); }
 .game-cover.alt3 { background: linear-gradient(135deg, rgba(176,109,240,0.24), rgba(255,139,194,0.24)); }
@@ -532,9 +567,9 @@ h2, h3 { margin: 0; }
 }
 .forum-pill { padding: 10px 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
 @media (max-width: 1100px) {
-  .hero-grid, .nebula-section-grid, .auth-wrap, .nebula-hero-split, .admin-grid-two, .hero-inner, .permission-grid { grid-template-columns: 1fr; }
+  .hero-grid, .nebula-section-grid, .auth-wrap, .nebula-hero-split, .admin-grid-two, .hero-inner, .permission-grid, .row-mid { grid-template-columns: 1fr; }
   .row-mid { margin-top: 76px; grid-template-columns: 1fr; }
-  .row-bottom { margin-top: 84px; grid-template-columns: 1fr; }
+  .row-bottom { margin-top: 72px; grid-template-columns: 1fr; }
   .hero-stats, .focus-grid, .cards-3, .stat-grid, .page-grid-three, .filter-grid.two-up, .grid-2 { grid-template-columns: 1fr; }
   .site-header-main { display:flex; flex-direction: column; align-items: flex-start; padding: 16px 0; }
   .header-actions, .nav { width: 100%; }
@@ -544,6 +579,7 @@ h2, h3 { margin: 0; }
   h1 { max-width: none; font-size: 38px; }
 }
 @media (max-width: 720px) {
+  .right-col-stack { top: 0; }
   .shell { width: min(100% - 20px, 1240px); }
   .section-card, .panel-card, .detail-card, .side-card, .stat-card, .auth-panel, .nebula-hero { padding: 18px; border-radius: 24px; }
   .reply-card { margin-left: 0; }
