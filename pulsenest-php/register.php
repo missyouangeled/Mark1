@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->fetch()) {
             $error = '这个邮箱或用户名已经被使用了。';
         } else {
-            $insert = db()->prepare('INSERT INTO pulsenest_users (username, nickname, email, password_hash) VALUES (:username, :nickname, :email, :hash)');
+            $insert = db()->prepare('INSERT INTO pulsenest_users (username, nickname, email, password_hash, is_admin, is_active) VALUES (:username, :nickname, :email, :hash, 0, 1)');
             $insert->execute([
                 'username' => $form['username'],
                 'nickname' => $form['nickname'],
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             $userId = (int) db()->lastInsertId();
-            $select = db()->prepare('SELECT id, username, nickname, email, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+            $select = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
             $select->execute(['id' => $userId]);
             $user = $select->fetch();
             login_user($user);

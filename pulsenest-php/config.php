@@ -33,6 +33,13 @@ function db(): PDO {
 }
 
 function ensure_database_schema(PDO $pdo): void {
+    if (!column_exists($pdo, 'pulsenest_users', 'is_admin')) {
+        $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash");
+    }
+    if (!column_exists($pdo, 'pulsenest_users', 'is_active')) {
+        $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER is_admin");
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS forum_categories (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(80) NOT NULL,
@@ -94,6 +101,15 @@ function ensure_database_schema(PDO $pdo): void {
     if ($defaultBoardId > 0) {
         $stmt = $pdo->prepare('UPDATE posts SET board_id = :board_id WHERE board_id IS NULL');
         $stmt->execute(['board_id' => $defaultBoardId]);
+    }
+
+    $adminCount = (int) $pdo->query('SELECT COUNT(*) FROM pulsenest_users WHERE is_admin = 1')->fetchColumn();
+    if ($adminCount === 0) {
+        $firstUserId = (int) $pdo->query('SELECT id FROM pulsenest_users ORDER BY id ASC LIMIT 1')->fetchColumn();
+        if ($firstUserId > 0) {
+            $stmt = $pdo->prepare('UPDATE pulsenest_users SET is_admin = 1 WHERE id = :id');
+            $stmt->execute(['id' => $firstUserId]);
+        }
     }
 }
 
@@ -183,10 +199,10 @@ function refresh_current_user(): ?array {
         return null;
     }
 
-    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $user['id']]);
     $fresh = $stmt->fetch();
-    if (!$fresh) {
+    if (!$fresh || (int) ($fresh['is_active'] ?? 1) !== 1) {
         unset($_SESSION['user']);
         return null;
     }
@@ -204,6 +220,8 @@ function login_user(array $user): void {
         'email' => $user['email'],
         'avatar_path' => $user['avatar_path'] ?? null,
         'bio' => $user['bio'] ?? null,
+        'is_admin' => (int) ($user['is_admin'] ?? 0),
+        'is_active' => (int) ($user['is_active'] ?? 1),
         'created_at' => $user['created_at'] ?? null,
     ];
 }
@@ -221,10 +239,33 @@ function ensure_guest_only(): void {
 
 function ensure_logged_in(): array {
     $user = refresh_current_user();
-    if (!$user) {
+    if (!$user || (int) ($user['is_active'] ?? 1) !== 1) {
+        start_session_if_needed();
+        unset($_SESSION['user']);
         redirect_to('/login.php');
     }
     return $user;
+}
+
+function is_admin(?array $user): bool {
+    return (int) ($user['is_admin'] ?? 0) === 1;
+}
+
+function ensure_admin(): array {
+    $user = ensure_logged_in();
+    if (!is_admin($user)) {
+        http_response_code(403);
+        exit('Forbidden');
+    }
+    return $user;
+}
+
+function can_manage_post(?array $user, array $post): bool {
+    return $user && (is_admin($user) || (int) $user['id'] === (int) ($post['user_id'] ?? 0));
+}
+
+function can_manage_comment(?array $user, array $comment): bool {
+    return $user && (is_admin($user) || (int) $user['id'] === (int) ($comment['user_id'] ?? 0));
 }
 
 function e(?string $value): string {
@@ -357,6 +398,20 @@ function handle_image_upload(array $file, string $subDir): ?string {
     }
 
     return normalize_uploaded_relative_path($relative);
+}
+
+function delete_uploaded_asset(?string $path): void {
+    if (!$path) {
+        return;
+    }
+    $normalized = ltrim(str_replace('\\', '/', $path), '/');
+    if (!str_starts_with($normalized, 'uploads/')) {
+        return;
+    }
+    $target = __DIR__ . '/' . $normalized;
+    if (is_file($target)) {
+        @unlink($target);
+    }
 }
 
 function asset_url(?string $path): ?string {

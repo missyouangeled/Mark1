@@ -5,7 +5,7 @@ $user = refresh_current_user();
 $postId = (int) ($_GET['id'] ?? 0);
 
 $postStmt = db()->prepare(
-    'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.created_at,
+    'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.created_at, p.updated_at,
             u.nickname, u.username, u.email, u.avatar_path, u.bio,
             fb.name AS board_name, fb.slug AS board_slug,
             fc.name AS category_name, fc.slug AS category_slug,
@@ -82,6 +82,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'delete_post') {
+        if (!can_manage_post($actor, $post)) {
+            http_response_code(403);
+            exit('Forbidden');
+        }
+        $deletePost = db()->prepare('DELETE FROM posts WHERE id = :id LIMIT 1');
+        $deletePost->execute(['id' => $postId]);
+        delete_uploaded_asset($post['image_path'] ?? null);
+        flash_set('success', '帖子已删除。');
+        redirect_to('/posts.php');
+    }
+
+    if ($action === 'update_comment') {
+        $commentId = (int) ($_POST['comment_id'] ?? 0);
+        $content = trim($_POST['content'] ?? '');
+        $commentStmt = db()->prepare('SELECT id, post_id, user_id FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+        $commentStmt->execute(['id' => $commentId, 'post_id' => $postId]);
+        $comment = $commentStmt->fetch();
+        if (!$comment) {
+            flash_set('error', '没有找到要编辑的评论。');
+        } elseif (!can_manage_comment($actor, $comment)) {
+            http_response_code(403);
+            exit('Forbidden');
+        } elseif ($content === '' || mb_strlen($content) < 2) {
+            flash_set('error', '评论至少写 2 个字。');
+        } else {
+            $updateStmt = db()->prepare('UPDATE comments SET content = :content WHERE id = :id');
+            $updateStmt->execute(['content' => $content, 'id' => $commentId]);
+            flash_set('success', '评论已更新。');
+        }
+    }
+
+    if ($action === 'delete_comment') {
+        $commentId = (int) ($_POST['comment_id'] ?? 0);
+        $commentStmt = db()->prepare('SELECT id, post_id, user_id FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+        $commentStmt->execute(['id' => $commentId, 'post_id' => $postId]);
+        $comment = $commentStmt->fetch();
+        if (!$comment) {
+            flash_set('error', '没有找到要删除的评论。');
+        } elseif (!can_manage_comment($actor, $comment)) {
+            http_response_code(403);
+            exit('Forbidden');
+        } else {
+            $deleteStmt = db()->prepare('DELETE FROM comments WHERE id = :id');
+            $deleteStmt->execute(['id' => $commentId]);
+            flash_set('success', '评论已删除。');
+        }
+    }
+
     redirect_to('/post.php?id=' . $postId);
 }
 
@@ -99,7 +148,7 @@ if ($post && $user) {
 $comments = [];
 if ($post) {
     $commentsStmt = db()->prepare(
-        'SELECT c.id, c.parent_id, c.content, c.created_at,
+        'SELECT c.id, c.parent_id, c.content, c.created_at, c.updated_at,
                 u.id AS user_id, u.nickname, u.username, u.avatar_path
          FROM comments c
          INNER JOIN pulsenest_users u ON u.id = c.user_id
@@ -136,6 +185,69 @@ if (!$post) {
 render_header('PulseNest · 帖子详情', $user, [
     'searchText' => '🔎 当前帖子所在版块、作者、相关讨论',
 ]);
+
+function render_comment_item(array $comment, ?array $user, int $postId, bool $isReply = false): void {
+    $avatarClass = $isReply ? 'avatar-sm' : 'avatar';
+    $canManage = can_manage_comment($user, $comment);
+    ?>
+    <article class="comment-card <?= $isReply ? 'reply-card' : '' ?>">
+      <div class="comment-head">
+        <div class="user">
+          <?= render_avatar($comment, $avatarClass) ?>
+          <div>
+            <div class="user-name-line"><a class="inline-link" href="/user.php?id=<?= (int) $comment['user_id'] ?>"><?= e($comment['nickname']) ?></a> <span class="tiny-badge">@<?= e($comment['username']) ?></span></div>
+            <div class="muted"><?= e(human_time($comment['created_at'])) ?><?php if (($comment['updated_at'] ?? '') !== ($comment['created_at'] ?? '')): ?> · 已编辑<?php endif; ?></div>
+          </div>
+        </div>
+      </div>
+      <div class="comment-body"><?= nl2br(e($comment['content'])) ?></div>
+
+      <?php if ($user): ?>
+        <div class="comment-action-row">
+          <?php if (!$isReply): ?>
+            <details class="reply-box inline-details">
+              <summary>回复</summary>
+              <form class="form reply-form" method="post">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="comment">
+                <input type="hidden" name="parent_id" value="<?= (int) $comment['id'] ?>">
+                <textarea class="textarea small-textarea" name="content" placeholder="继续展开聊"></textarea>
+                <button class="submit" type="submit">发送回复</button>
+              </form>
+            </details>
+          <?php endif; ?>
+
+          <?php if ($canManage): ?>
+            <details class="reply-box inline-details">
+              <summary>编辑</summary>
+              <form class="form reply-form" method="post">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="update_comment">
+                <input type="hidden" name="comment_id" value="<?= (int) $comment['id'] ?>">
+                <textarea class="textarea small-textarea" name="content"><?= e($comment['content']) ?></textarea>
+                <button class="submit" type="submit">保存评论</button>
+              </form>
+            </details>
+            <form method="post" class="inline-form danger-inline-form" onsubmit="return confirm('确认删除这条评论？');">
+              <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+              <input type="hidden" name="action" value="delete_comment">
+              <input type="hidden" name="comment_id" value="<?= (int) $comment['id'] ?>">
+              <button class="pill-btn danger" type="submit">删除</button>
+            </form>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if (!$isReply && !empty($comment['children'])): ?>
+        <div class="reply-list">
+          <?php foreach ($comment['children'] as $reply): ?>
+            <?php render_comment_item($reply, $user, $postId, true); ?>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </article>
+    <?php
+}
 ?>
   <main class="shell page-shell nebula-page-shell narrow-post-shell">
     <?php if ($flash): ?>
@@ -150,7 +262,7 @@ render_header('PulseNest · 帖子详情', $user, [
           <div>
             <div class="brand-chip">纳达尔星项目 · 星云初始01 · 帖子详情页</div>
             <h1><?= e($post['title']) ?></h1>
-            <p class="page-desc nebula-desc">详情页现在会展示帖子归属版块，评论 / 回复会触发对应的站内提醒。</p>
+            <p class="page-desc nebula-desc">详情页现在支持帖子编辑 / 删除、评论编辑 / 删除，权限至少收敛到作者本人和管理员。</p>
           </div>
           <div class="hero-actions-row detail-hero-actions">
             <a class="pill-btn" href="/posts.php?board=<?= e($post['board_slug']) ?>">返回版块</a>
@@ -172,7 +284,7 @@ render_header('PulseNest · 帖子详情', $user, [
                 <?= render_avatar($post, 'user-avatar large') ?>
                 <div>
                   <div class="user-name-line"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><?= e($post['nickname']) ?></a> <span class="tiny-badge">@<?= e($post['username']) ?></span></div>
-                  <div class="muted" style="margin-top: 6px; font-size: 14px;">发布于 <?= e(substr($post['created_at'], 0, 16)) ?> · <?= e(board_badge($post)) ?></div>
+                  <div class="muted" style="margin-top: 6px; font-size: 14px;">发布于 <?= e(substr($post['created_at'], 0, 16)) ?> · <?= e(board_badge($post)) ?><?php if (($post['updated_at'] ?? '') !== ($post['created_at'] ?? '')): ?> · 已编辑<?php endif; ?></div>
                 </div>
               </div>
               <span class="small-chip a">文章详情</span>
@@ -183,7 +295,7 @@ render_header('PulseNest · 帖子详情', $user, [
             <div class="article-meta"><span>作者邮箱：<?= e($post['email']) ?></span><span><a class="inline-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">查看同版块更多帖子</a></span></div>
             <?php if (!empty($post['bio'])): ?><div class="article-meta">作者简介：<?= e($post['bio']) ?></div><?php endif; ?>
             <div class="article-body"><?= nl2br(e($post['content'])) ?></div>
-            <div class="action-bar">
+            <div class="action-bar action-bar-wrap">
               <?php if ($user): ?>
                 <form method="post" class="inline-form">
                   <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
@@ -195,6 +307,14 @@ render_header('PulseNest · 帖子详情', $user, [
               <?php endif; ?>
               <span class="meta-pill"><?= (int) $post['comment_count'] ?> 条评论</span>
               <span class="meta-pill"><?= e(board_badge($post)) ?></span>
+              <?php if (can_manage_post($user, $post)): ?>
+                <a class="pill-btn" href="/edit-post.php?id=<?= (int) $post['id'] ?>">编辑帖子</a>
+                <form method="post" class="inline-form danger-inline-form" onsubmit="return confirm('确认删除这篇帖子？此操作不可撤销。');">
+                  <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                  <input type="hidden" name="action" value="delete_post">
+                  <button class="pill-btn danger" type="submit">删除帖子</button>
+                </form>
+              <?php endif; ?>
             </div>
           </article>
 
@@ -222,49 +342,7 @@ render_header('PulseNest · 帖子详情', $user, [
                 <div class="empty-inline nebula-empty">还没有人回复，来做第一个把讨论点亮的人。</div>
               <?php else: ?>
                 <?php foreach ($commentTree as $comment): ?>
-                  <article class="comment-card">
-                    <div class="comment-head">
-                      <div class="user">
-                        <?= render_avatar($comment, 'avatar') ?>
-                        <div>
-                          <div class="user-name-line"><a class="inline-link" href="/user.php?id=<?= (int) $comment['user_id'] ?>"><?= e($comment['nickname']) ?></a> <span class="tiny-badge">@<?= e($comment['username']) ?></span></div>
-                          <div class="muted"><?= e(human_time($comment['created_at'])) ?></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="comment-body"><?= nl2br(e($comment['content'])) ?></div>
-                    <?php if ($user): ?>
-                      <details class="reply-box">
-                        <summary>回复这条评论</summary>
-                        <form class="form reply-form" method="post">
-                          <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                          <input type="hidden" name="action" value="comment">
-                          <input type="hidden" name="parent_id" value="<?= (int) $comment['id'] ?>">
-                          <textarea class="textarea small-textarea" name="content" placeholder="继续展开聊"></textarea>
-                          <button class="submit" type="submit">发送回复</button>
-                        </form>
-                      </details>
-                    <?php endif; ?>
-
-                    <?php if (!empty($comment['children'])): ?>
-                      <div class="reply-list">
-                        <?php foreach ($comment['children'] as $reply): ?>
-                          <article class="comment-card reply-card">
-                            <div class="comment-head">
-                              <div class="user">
-                                <?= render_avatar($reply, 'avatar-sm') ?>
-                                <div>
-                                  <div class="user-name-line"><a class="inline-link" href="/user.php?id=<?= (int) $reply['user_id'] ?>"><?= e($reply['nickname']) ?></a> <span class="tiny-badge">@<?= e($reply['username']) ?></span></div>
-                                  <div class="muted"><?= e(human_time($reply['created_at'])) ?></div>
-                                </div>
-                              </div>
-                            </div>
-                            <div class="comment-body"><?= nl2br(e($reply['content'])) ?></div>
-                          </article>
-                        <?php endforeach; ?>
-                      </div>
-                    <?php endif; ?>
-                  </article>
+                  <?php render_comment_item($comment, $user, $postId); ?>
                 <?php endforeach; ?>
               <?php endif; ?>
             </div>
@@ -293,6 +371,9 @@ render_header('PulseNest · 帖子详情', $user, [
               <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">同版块帖子</a>
               <a class="quick-link" href="/notifications.php">我的提醒</a>
               <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>">作者主页</a>
+              <?php if (can_manage_post($user, $post)): ?>
+                <a class="quick-link" href="/edit-post.php?id=<?= (int) $post['id'] ?>">编辑当前帖子</a>
+              <?php endif; ?>
             </div>
           </section>
         </aside>

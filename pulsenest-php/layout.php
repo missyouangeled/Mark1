@@ -20,7 +20,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
     <div class="header-glow">
       <div class="shell header-strip">
         <div class="header-pill">社区热度实时刷新中</div>
-        <div class="header-strip-text"><?= $user ? '已登录 · ' . e($user['nickname']) . '，版块、搜索和通知都已接通。' : '今日焦点：版块浏览 / 内容搜索 / 回复提醒' ?></div>
+        <div class="header-strip-text"><?= $user ? '已登录 · ' . e($user['nickname']) . '，版块、搜索、通知和后台入口都已接通。' : '今日焦点：版块浏览 / 内容搜索 / 回复提醒' ?></div>
       </div>
     </div>
     <div class="shell site-header-main">
@@ -36,6 +36,9 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <a href="/posts.php">发现</a>
         <a href="/notifications.php">提醒<?= $user && $unreadCount ? '<span class="nav-badge">' . $unreadCount . '</span>' : '' ?></a>
         <a href="/account.php">会员中心</a>
+        <?php if ($user && is_admin($user)): ?>
+          <a href="/admin.php">后台</a>
+        <?php endif; ?>
       </nav>
       <div class="header-actions">
         <?php if ($showSearch): ?>
@@ -43,6 +46,9 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <?php endif; ?>
 
         <?php if ($user): ?>
+          <?php if (is_admin($user)): ?>
+            <a class="header-user-chip" href="/admin.php"><span>后台管理</span></a>
+          <?php endif; ?>
           <a class="header-user-chip" href="/notifications.php">
             <span>提醒<?= $unreadCount ? ' · ' . $unreadCount : '' ?></span>
           </a>
