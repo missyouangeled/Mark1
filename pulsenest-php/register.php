@@ -52,28 +52,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-render_header('PulseNest · 注册', null, ['showSearch' => false]);
+render_header('PulseNest · 注册', null, ['showSearch' => false, 'headerMode' => 'auth']);
 ?>
-  <div class="shell auth-wrap">
-    <section class="auth-hero register">
+  <div class="shell auth-wrap nebula-auth-wrap">
+    <section class="glass auth-hero register nebula-panel">
       <div class="auth-hero-inner">
-        <div class="auth-badge">Create Your Identity · 建立你的社区身份卡</div>
-        <div class="auth-copy">
-          <h1>用一个新的账号，正式进入这个会让你停留的社区。</h1>
-          <p>注册页不是后台填表，而是加入感的起点：你会有自己的昵称、自己的内容记录，也会开始形成自己的社区轨迹。</p>
+        <div>
+          <div class="auth-badge">Create Your Identity · 建立你的社区身份卡</div>
+          <div class="auth-copy auth-copy-wide">
+            <h1>用一个新的账号，正式进入这个会让你停留的社区。</h1>
+            <p>这一页沿着“星云初始01”的视觉语言继续走，但把注意力收束到真正完成建号这件事上。提交后会直接写进 MySQL，然后自动登录，首页也会立刻切到你的身份状态。</p>
+          </div>
         </div>
+
         <div class="feature-list">
-          <div class="feature"><div class="dot">01</div><div><strong>建立身份</strong><span>从第一天开始拥有自己的主页、关注列表与论坛记录。</span></div></div>
-          <div class="feature"><div class="dot">02</div><div><strong>加入讨论</strong><span>注册后可以发帖、回复、收藏、点赞，也能在内容流里留下自己的声音。</span></div></div>
-          <div class="feature"><div class="dot">03</div><div><strong>持续发现</strong><span>随着浏览和互动增加，内容推荐会慢慢向你的偏好靠拢。</span></div></div>
+          <div class="feature"><div class="dot">01</div><div><strong>建立身份</strong><span>昵称、用户名、邮箱和密码都做基础校验，建号后可直接进入会员中心。</span></div></div>
+          <div class="feature"><div class="dot">02</div><div><strong>加入讨论</strong><span>注册完成就是登录态，发帖、内容流和个人中心马上可用。</span></div></div>
+          <div class="feature"><div class="dot">03</div><div><strong>保持一致</strong><span>注册页和首页使用同一套玻璃卡、渐变光晕和论坛型信息密度。</span></div></div>
         </div>
       </div>
     </section>
 
-    <section class="auth-panel">
-      <div class="kicker">Create Account</div>
+    <section class="glass auth-panel nebula-form-panel">
+      <div class="section-kicker">Create Account</div>
       <h2>创建你的 PulseNest 账号</h2>
-      <p class="desc">风格和首页一致，但信息组织更克制：让注册这件事看起来轻一点、顺一点，不像后台填表。</p>
+      <p class="desc">注册成功后会自动建立 session 并跳回首页。顶部按钮、首页状态卡和主行动按钮会立刻从“访客”切到“已登录”。</p>
 
       <div class="tabs-auth">
         <a class="tab" href="/login.php">登录</a>

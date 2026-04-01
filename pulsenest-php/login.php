@@ -28,28 +28,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-render_header('PulseNest · 登录', null, ['showSearch' => false]);
+render_header('PulseNest · 登录', null, ['showSearch' => false, 'headerMode' => 'auth']);
 ?>
-  <div class="shell auth-wrap">
-    <section class="auth-hero">
+  <div class="shell auth-wrap nebula-auth-wrap">
+    <section class="glass auth-hero nebula-panel">
       <div class="auth-hero-inner">
-        <div class="auth-badge">社区身份同步 · 登录后继续逛论坛与内容流</div>
-        <div class="auth-copy">
-          <h1>回来就好，继续从你上次停下的地方开始。</h1>
-          <p>PulseNest 的登录页继续保持首页那种带氛围、有层次、但不拧巴的质感。你不是进入后台，而是重新回到自己的社区位置。</p>
+        <div>
+          <div class="auth-badge">社区身份同步 · 登录后继续逛论坛与内容流</div>
+          <div class="auth-copy auth-copy-wide">
+            <h1>回来就好，继续从你上次停下的地方开始。</h1>
+            <p>登录页不再像后台入口，而是延续“星云初始01”的玻璃层次、暗色宇宙底和论坛感信息组织。你登录之后，首页右上角、主行动按钮和会员中心都会直接进入真实状态。</p>
+          </div>
         </div>
+
         <div class="hero-points">
-          <div class="hero-point"><strong>同步</strong><span>继续查看关注的论坛、收藏内容和最近浏览。</span></div>
-          <div class="hero-point"><strong>参与</strong><span>登录后可以发帖、回复、点赞，也能发布动态。</span></div>
-          <div class="hero-point"><strong>发现</strong><span>系统会根据你的偏好推荐更多值得点开的内容。</span></div>
+          <div class="hero-point"><strong>同步</strong><span>刷新当前用户资料，避免旧 session 卡住昵称和邮箱。</span></div>
+          <div class="hero-point"><strong>参与</strong><span>登录后可发帖、进入会员中心，并继续完整测试功能链路。</span></div>
+          <div class="hero-point"><strong>延续</strong><span>视觉贴近已确认首页，不用再在功能页和首页之间来回跳戏。</span></div>
         </div>
       </div>
     </section>
 
-    <section class="auth-panel">
-      <div class="kicker">Sign In</div>
+    <section class="glass auth-panel nebula-form-panel">
+      <div class="section-kicker">Sign In</div>
       <h2>登录你的 PulseNest 账号</h2>
-      <p class="desc">继续查看论坛、游戏内容流、收藏和动态记录。视觉和首页一致，但把注意力收束到“快速进入”这件事上。</p>
+      <p class="desc">支持邮箱或用户名登录，密码使用 PHP 原生哈希校验，登录成功后回首页并立即看到登录态变化。</p>
 
       <div class="tabs-auth">
         <a class="tab active" href="/login.php">登录</a>
@@ -68,7 +71,7 @@ render_header('PulseNest · 登录', null, ['showSearch' => false]);
           <label>密码</label>
           <input class="input" type="password" name="password" placeholder="输入密码" />
         </div>
-        <div class="row">
+        <div class="row compact-row">
           <div class="checkbox"><span class="box"></span><span>记住当前设备（原型展示）</span></div>
           <a class="link" href="/forgot-password.php">忘记密码？</a>
         </div>
