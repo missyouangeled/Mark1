@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($identifier === '' || $password === '') {
         $error = '请先填写账号和密码。';
     } else {
-        $stmt = db()->prepare('SELECT id, username, nickname, email, password_hash, avatar_path, bio, is_admin, is_active, created_at FROM pulsenest_users WHERE email = :id OR username = :id LIMIT 1');
+        $stmt = db()->prepare('SELECT id, username, nickname, email, password_hash, avatar_path, bio, is_admin, is_active, role, created_at FROM pulsenest_users WHERE email = :id OR username = :id LIMIT 1');
         $stmt->execute(['id' => $identifier]);
         $user = $stmt->fetch();
 

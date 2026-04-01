@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $deletePost = db()->prepare('DELETE FROM posts WHERE id = :id LIMIT 1');
         $deletePost->execute(['id' => $postId]);
         delete_uploaded_asset($post['image_path'] ?? null);
+        log_moderation_action((int) $actor['id'], 'post_deleted', 'post', $postId, '《' . $post['title'] . '》');
         flash_set('success', '帖子已删除。');
         redirect_to('/posts.php');
     }
@@ -127,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $deleteStmt = db()->prepare('DELETE FROM comments WHERE id = :id');
             $deleteStmt->execute(['id' => $commentId]);
+            log_moderation_action((int) $actor['id'], 'comment_deleted', 'comment', $commentId, excerpt($comment['content'] ?? '', 80));
             flash_set('success', '评论已删除。');
         }
     }
@@ -228,7 +230,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 <button class="submit" type="submit">保存评论</button>
               </form>
             </details>
-            <form method="post" class="inline-form danger-inline-form" onsubmit="return confirm('确认删除这条评论？');">
+            <form method="post" class="inline-form danger-inline-form" onsubmit="return confirm('确认删除这条评论？此操作会写入日志。');">
               <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
               <input type="hidden" name="action" value="delete_comment">
               <input type="hidden" name="comment_id" value="<?= (int) $comment['id'] ?>">

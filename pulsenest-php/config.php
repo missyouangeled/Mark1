@@ -39,6 +39,12 @@ function ensure_database_schema(PDO $pdo): void {
     if (!column_exists($pdo, 'pulsenest_users', 'is_active')) {
         $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER is_admin");
     }
+    if (!column_exists($pdo, 'pulsenest_users', 'role')) {
+        $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'member' AFTER is_active");
+        $pdo->exec("UPDATE pulsenest_users SET role = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'member' END");
+    }
+    $pdo->exec("UPDATE pulsenest_users SET role = CASE WHEN role = '' OR role IS NULL THEN CASE WHEN is_admin = 1 THEN 'admin' ELSE 'member' END ELSE role END");
+    $pdo->exec("UPDATE pulsenest_users SET is_admin = CASE WHEN role = 'admin' THEN 1 ELSE 0 END");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS forum_categories (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -85,6 +91,20 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_notifications_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS moderation_logs (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        actor_user_id INT UNSIGNED NOT NULL,
+        action_type VARCHAR(40) NOT NULL,
+        target_type VARCHAR(40) NOT NULL,
+        target_id INT UNSIGNED DEFAULT NULL,
+        details VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_moderation_logs_actor_id (actor_user_id),
+        KEY idx_moderation_logs_target (target_type, target_id),
+        CONSTRAINT fk_moderation_logs_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     if (!column_exists($pdo, 'posts', 'board_id')) {
         $pdo->exec('ALTER TABLE posts ADD COLUMN board_id INT UNSIGNED DEFAULT NULL AFTER user_id');
     }
@@ -103,11 +123,11 @@ function ensure_database_schema(PDO $pdo): void {
         $stmt->execute(['board_id' => $defaultBoardId]);
     }
 
-    $adminCount = (int) $pdo->query('SELECT COUNT(*) FROM pulsenest_users WHERE is_admin = 1')->fetchColumn();
+    $adminCount = (int) $pdo->query("SELECT COUNT(*) FROM pulsenest_users WHERE role = 'admin'")->fetchColumn();
     if ($adminCount === 0) {
         $firstUserId = (int) $pdo->query('SELECT id FROM pulsenest_users ORDER BY id ASC LIMIT 1')->fetchColumn();
         if ($firstUserId > 0) {
-            $stmt = $pdo->prepare('UPDATE pulsenest_users SET is_admin = 1 WHERE id = :id');
+            $stmt = $pdo->prepare("UPDATE pulsenest_users SET is_admin = 1, role = 'admin' WHERE id = :id");
             $stmt->execute(['id' => $firstUserId]);
         }
     }
@@ -199,7 +219,7 @@ function refresh_current_user(): ?array {
         return null;
     }
 
-    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $user['id']]);
     $fresh = $stmt->fetch();
     if (!$fresh || (int) ($fresh['is_active'] ?? 1) !== 1) {
@@ -222,6 +242,7 @@ function login_user(array $user): void {
         'bio' => $user['bio'] ?? null,
         'is_admin' => (int) ($user['is_admin'] ?? 0),
         'is_active' => (int) ($user['is_active'] ?? 1),
+        'role' => $user['role'] ?? ((int) ($user['is_admin'] ?? 0) === 1 ? 'admin' : 'member'),
         'created_at' => $user['created_at'] ?? null,
     ];
 }
@@ -247,8 +268,44 @@ function ensure_logged_in(): array {
     return $user;
 }
 
+function user_role(?array $user): string {
+    $role = trim((string) ($user['role'] ?? ''));
+    if ($role !== '') {
+        return $role;
+    }
+    return (int) ($user['is_admin'] ?? 0) === 1 ? 'admin' : 'member';
+}
+
 function is_admin(?array $user): bool {
-    return (int) ($user['is_admin'] ?? 0) === 1;
+    return user_role($user) === 'admin';
+}
+
+function is_moderator(?array $user): bool {
+    return user_role($user) === 'moderator';
+}
+
+function can_access_admin(?array $user): bool {
+    return is_admin($user) || is_moderator($user);
+}
+
+function can_manage_users(?array $user): bool {
+    return is_admin($user);
+}
+
+function can_manage_forum_structure(?array $user): bool {
+    return is_admin($user);
+}
+
+function can_moderate_content(?array $user): bool {
+    return is_admin($user) || is_moderator($user);
+}
+
+function role_label(?string $role): string {
+    return match ($role ?: 'member') {
+        'admin' => '管理员',
+        'moderator' => '版主',
+        default => '成员',
+    };
 }
 
 function ensure_admin(): array {
@@ -260,12 +317,32 @@ function ensure_admin(): array {
     return $user;
 }
 
+function ensure_staff(): array {
+    $user = ensure_logged_in();
+    if (!can_access_admin($user)) {
+        http_response_code(403);
+        exit('Forbidden');
+    }
+    return $user;
+}
+
 function can_manage_post(?array $user, array $post): bool {
-    return $user && (is_admin($user) || (int) $user['id'] === (int) ($post['user_id'] ?? 0));
+    return $user && (can_moderate_content($user) || (int) $user['id'] === (int) ($post['user_id'] ?? 0));
 }
 
 function can_manage_comment(?array $user, array $comment): bool {
-    return $user && (is_admin($user) || (int) $user['id'] === (int) ($comment['user_id'] ?? 0));
+    return $user && (can_moderate_content($user) || (int) $user['id'] === (int) ($comment['user_id'] ?? 0));
+}
+
+function log_moderation_action(int $actorUserId, string $actionType, string $targetType, ?int $targetId = null, ?string $details = null): void {
+    $stmt = db()->prepare('INSERT INTO moderation_logs (actor_user_id, action_type, target_type, target_id, details) VALUES (:actor_user_id, :action_type, :target_type, :target_id, :details)');
+    $stmt->execute([
+        'actor_user_id' => $actorUserId,
+        'action_type' => $actionType,
+        'target_type' => $targetType,
+        'target_id' => $targetId,
+        'details' => $details ? mb_substr($details, 0, 255) : null,
+    ]);
 }
 
 function e(?string $value): string {

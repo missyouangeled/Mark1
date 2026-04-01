@@ -36,7 +36,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <a href="/posts.php">发现</a>
         <a href="/notifications.php">提醒<?= $user && $unreadCount ? '<span class="nav-badge">' . $unreadCount . '</span>' : '' ?></a>
         <a href="/account.php">会员中心</a>
-        <?php if ($user && is_admin($user)): ?>
+        <?php if ($user && can_access_admin($user)): ?>
           <a href="/admin.php">后台</a>
         <?php endif; ?>
       </nav>
@@ -46,8 +46,8 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <?php endif; ?>
 
         <?php if ($user): ?>
-          <?php if (is_admin($user)): ?>
-            <a class="header-user-chip" href="/admin.php"><span>后台管理</span></a>
+          <?php if (can_access_admin($user)): ?>
+            <a class="header-user-chip" href="/admin.php"><span><?= is_admin($user) ? '后台管理' : '版主管理' ?></span></a>
           <?php endif; ?>
           <a class="header-user-chip" href="/notifications.php">
             <span>提醒<?= $unreadCount ? ' · ' . $unreadCount : '' ?></span>

@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             $userId = (int) db()->lastInsertId();
-            $select = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+            $select = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
             $select->execute(['id' => $userId]);
             $user = $select->fetch();
             login_user($user);

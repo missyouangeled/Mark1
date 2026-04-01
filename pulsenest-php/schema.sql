@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS pulsenest_users (
   password_hash VARCHAR(255) NOT NULL,
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
+  role VARCHAR(20) NOT NULL DEFAULT 'member',
   avatar_path VARCHAR(255) DEFAULT NULL,
   bio VARCHAR(280) DEFAULT NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,6 +106,20 @@ CREATE TABLE IF NOT EXISTS notifications (
   CONSTRAINT fk_notifications_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS moderation_logs (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  actor_user_id INT UNSIGNED NOT NULL,
+  action_type VARCHAR(40) NOT NULL,
+  target_type VARCHAR(40) NOT NULL,
+  target_id INT UNSIGNED DEFAULT NULL,
+  details VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_moderation_logs_actor_id (actor_user_id),
+  KEY idx_moderation_logs_target (target_type, target_id),
+  CONSTRAINT fk_moderation_logs_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS password_resets (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   email VARCHAR(190) NOT NULL,
@@ -117,6 +132,13 @@ CREATE TABLE IF NOT EXISTS password_resets (
   KEY idx_password_resets_email (email),
   KEY idx_password_resets_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+UPDATE pulsenest_users
+SET role = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'member' END
+WHERE role IS NULL OR role = '';
+
+UPDATE pulsenest_users
+SET is_admin = CASE WHEN role = 'admin' THEN 1 ELSE 0 END;
 
 INSERT INTO forum_categories (name, slug, description, sort_order)
 VALUES
