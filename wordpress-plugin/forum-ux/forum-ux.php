@@ -21,8 +21,32 @@ final class Forum_UX_Bridge {
         add_filter('the_content', [$this, 'inject_forum_hero'], 8);
     }
 
+    private function is_forum_surface(): bool {
+        return is_page('forum') || is_front_page();
+    }
+
+    private function get_forum_view(): string {
+        global $asgarosforum;
+
+        if (is_object($asgarosforum) && !empty($asgarosforum->current_view)) {
+            return (string) $asgarosforum->current_view;
+        }
+
+        return '';
+    }
+
+    private function should_show_forum_hero(): bool {
+        if (!$this->is_forum_surface()) {
+            return false;
+        }
+
+        $view = $this->get_forum_view();
+
+        return $view === '' || $view === 'overview';
+    }
+
     public function enqueue_assets(): void {
-        if (!is_page('forum') && !is_front_page()) {
+        if (!$this->is_forum_surface()) {
             return;
         }
 
@@ -38,8 +62,9 @@ final class Forum_UX_Bridge {
     }
 
     public function add_body_classes(array $classes): array {
-        if (is_page('forum') || is_front_page()) {
+        if ($this->is_forum_surface()) {
             $classes[] = 'forum-ux-active';
+            $classes[] = 'forum-view-' . sanitize_html_class($this->get_forum_view() ?: 'unknown');
             $classes[] = is_user_logged_in() ? 'forum-user-logged-in' : 'forum-user-guest';
         }
 
@@ -52,7 +77,7 @@ final class Forum_UX_Bridge {
     }
 
     public function inject_forum_hero(string $content): string {
-        if (!(is_page('forum') || is_front_page()) || !in_the_loop() || !is_main_query()) {
+        if (!$this->should_show_forum_hero() || !in_the_loop() || !is_main_query()) {
             return $content;
         }
 
@@ -160,6 +185,18 @@ final class Forum_UX_Bridge {
             'Edit Post' => '编辑回复',
             'New Reply' => '发表回复',
             'Search' => '搜索',
+            'This topic is pinned' => '这个主题已置顶',
+            'This topic is closed' => '这个主题已关闭',
+            'This topic contains a poll' => '这个主题包含投票',
+            'Subforums' => '子版块',
+            'In' => '所在版块',
+            'Topic Author' => '楼主',
+            'Quote from' => '引用自',
+            'on %s' => '发表于 %s',
+            'Last edited on %s' => '最后编辑于 %s',
+            'Last edited on %1$s by %2$s' => '%2$s 最后编辑于 %1$s',
+            'Delete' => '删除',
+            'Are you sure you want to remove this?' => '确定要删除这条内容吗？',
         ];
 
         return $map[$text] ?? $translated;
