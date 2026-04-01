@@ -5,6 +5,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
     $showSearch = $options['showSearch'] ?? true;
     $searchText = $options['searchText'] ?? '🔎 搜索榜单、话题、作者、游戏名';
     $headerMode = $options['headerMode'] ?? 'default';
+    $unreadCount = $user ? unread_notification_count((int) $user['id']) : 0;
     ?>
 <!doctype html>
 <html lang="zh-CN">
@@ -19,7 +20,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
     <div class="header-glow">
       <div class="shell header-strip">
         <div class="header-pill">社区热度实时刷新中</div>
-        <div class="header-strip-text"><?= $user ? '已登录 · ' . e($user['nickname']) . '，你的社区身份已同步。' : '今日焦点：独立叙事 / 组队共斗 / 夜游氛围' ?></div>
+        <div class="header-strip-text"><?= $user ? '已登录 · ' . e($user['nickname']) . '，版块、搜索和通知都已接通。' : '今日焦点：版块浏览 / 内容搜索 / 回复提醒' ?></div>
       </div>
     </div>
     <div class="shell site-header-main">
@@ -33,6 +34,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
       <nav class="nav">
         <a href="/">首页</a>
         <a href="/posts.php">发现</a>
+        <a href="/notifications.php">提醒<?= $user && $unreadCount ? '<span class="nav-badge">' . $unreadCount . '</span>' : '' ?></a>
         <a href="/account.php">会员中心</a>
       </nav>
       <div class="header-actions">
@@ -41,6 +43,9 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <?php endif; ?>
 
         <?php if ($user): ?>
+          <a class="header-user-chip" href="/notifications.php">
+            <span>提醒<?= $unreadCount ? ' · ' . $unreadCount : '' ?></span>
+          </a>
           <a class="header-user-chip" href="/account.php">
             <?= render_avatar($user, 'mini-avatar') ?>
             <span><?= e($user['nickname']) ?></span>

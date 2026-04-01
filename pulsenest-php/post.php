@@ -4,10 +4,38 @@ start_session_if_needed();
 $user = refresh_current_user();
 $postId = (int) ($_GET['id'] ?? 0);
 
+$postStmt = db()->prepare(
+    'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.created_at,
+            u.nickname, u.username, u.email, u.avatar_path, u.bio,
+            fb.name AS board_name, fb.slug AS board_slug,
+            fc.name AS category_name, fc.slug AS category_slug,
+            COALESCE(l.like_count, 0) AS like_count,
+            COALESCE(c.comment_count, 0) AS comment_count
+     FROM posts p
+     INNER JOIN pulsenest_users u ON u.id = p.user_id
+     LEFT JOIN forum_boards fb ON fb.id = p.board_id
+     LEFT JOIN forum_categories fc ON fc.id = fb.category_id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+     ) l ON l.post_id = p.id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+     ) c ON c.post_id = p.id
+     WHERE p.id = :id
+     LIMIT 1'
+);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
     $actor = ensure_logged_in();
+
+    $postStmt->execute(['id' => $postId]);
+    $post = $postStmt->fetch();
+    if (!$post) {
+        http_response_code(404);
+        exit('Post not found.');
+    }
 
     if ($action === 'comment') {
         $content = trim($_POST['content'] ?? '');
@@ -17,11 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (mb_strlen($content) < 2) {
             flash_set('error', '回复至少写 2 个字。');
         } else {
+            $parentComment = null;
             $validParentId = null;
             if ($parentId > 0) {
-                $parentStmt = db()->prepare('SELECT id FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+                $parentStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
                 $parentStmt->execute(['id' => $parentId, 'post_id' => $postId]);
-                $validParentId = $parentStmt->fetchColumn() ? $parentId : null;
+                $parentComment = $parentStmt->fetch() ?: null;
+                $validParentId = $parentComment ? $parentId : null;
             }
 
             $stmt = db()->prepare('INSERT INTO comments (post_id, user_id, parent_id, content) VALUES (:post_id, :user_id, :parent_id, :content)');
@@ -31,7 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'parent_id' => $validParentId,
                 'content' => $content,
             ]);
-            flash_set('success', $validParentId ? '回复已发送。' : '评论已发布。');
+            $newCommentId = (int) db()->lastInsertId();
+            create_reply_notifications($post, $parentComment, (int) $actor['id'], $newCommentId);
+            flash_set('success', $validParentId ? '回复已发送，并已推送站内提醒。' : '评论已发布，并已推送站内提醒。');
         }
     }
 
@@ -54,24 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $flash = flash_get();
-$stmt = db()->prepare(
-    'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at,
-            u.nickname, u.username, u.email, u.avatar_path, u.bio,
-            COALESCE(l.like_count, 0) AS like_count,
-            COALESCE(c.comment_count, 0) AS comment_count
-     FROM posts p
-     INNER JOIN pulsenest_users u ON u.id = p.user_id
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
-     ) l ON l.post_id = p.id
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
-     ) c ON c.post_id = p.id
-     WHERE p.id = :id
-     LIMIT 1'
-);
-$stmt->execute(['id' => $postId]);
-$post = $stmt->fetch();
+$postStmt->execute(['id' => $postId]);
+$post = $postStmt->fetch();
 
 $likedByCurrentUser = false;
 if ($post && $user) {
@@ -118,7 +134,7 @@ if (!$post) {
 }
 
 render_header('PulseNest · 帖子详情', $user, [
-    'searchText' => '🔎 搜索详情上下文、作者、返回相关帖子',
+    'searchText' => '🔎 当前帖子所在版块、作者、相关讨论',
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell narrow-post-shell">
@@ -134,15 +150,15 @@ render_header('PulseNest · 帖子详情', $user, [
           <div>
             <div class="brand-chip">纳达尔星项目 · 星云初始01 · 帖子详情页</div>
             <h1><?= e($post['title']) ?></h1>
-            <p class="page-desc nebula-desc">详情页已经接上真实互动：可以点赞、评论、回复，也能顺着作者信息进入用户主页。</p>
+            <p class="page-desc nebula-desc">详情页现在会展示帖子归属版块，评论 / 回复会触发对应的站内提醒。</p>
           </div>
           <div class="hero-actions-row detail-hero-actions">
-            <a class="pill-btn" href="/posts.php">返回列表</a>
+            <a class="pill-btn" href="/posts.php?board=<?= e($post['board_slug']) ?>">返回版块</a>
             <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/login.php' ?>"><?= $user ? '继续发帖' : '登录后发帖' ?></a>
           </div>
         </div>
         <div class="hero-stats compact-hero-stats detail-stats">
-          <div class="hero-stat"><div class="label">作者</div><div class="num small-num"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><?= e($post['nickname']) ?></a></div><div class="note">@<?= e($post['username']) ?></div></div>
+          <div class="hero-stat"><div class="label">版块</div><div class="num small-num"><?= e(board_badge($post)) ?></div><div class="note">论坛归属已正式接入</div></div>
           <div class="hero-stat"><div class="label">点赞</div><div class="num small-num"><?= (int) $post['like_count'] ?></div><div class="note">已有成员为这篇内容加热</div></div>
           <div class="hero-stat"><div class="label">回复</div><div class="num small-num"><?= (int) $post['comment_count'] ?></div><div class="note"><?= $user ? '你现在可以直接参与讨论' : '登录后可评论和点赞' ?></div></div>
         </div>
@@ -156,7 +172,7 @@ render_header('PulseNest · 帖子详情', $user, [
                 <?= render_avatar($post, 'user-avatar large') ?>
                 <div>
                   <div class="user-name-line"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><?= e($post['nickname']) ?></a> <span class="tiny-badge">@<?= e($post['username']) ?></span></div>
-                  <div class="muted" style="margin-top: 6px; font-size: 14px;">发布于 <?= e(substr($post['created_at'], 0, 16)) ?></div>
+                  <div class="muted" style="margin-top: 6px; font-size: 14px;">发布于 <?= e(substr($post['created_at'], 0, 16)) ?> · <?= e(board_badge($post)) ?></div>
                 </div>
               </div>
               <span class="small-chip a">文章详情</span>
@@ -164,7 +180,7 @@ render_header('PulseNest · 帖子详情', $user, [
             <?php if (!empty($post['image_path'])): ?>
               <div class="post-cover-wrap"><img class="post-cover-image detail-cover" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
             <?php endif; ?>
-            <div class="article-meta">作者邮箱：<?= e($post['email']) ?></div>
+            <div class="article-meta"><span>作者邮箱：<?= e($post['email']) ?></span><span><a class="inline-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">查看同版块更多帖子</a></span></div>
             <?php if (!empty($post['bio'])): ?><div class="article-meta">作者简介：<?= e($post['bio']) ?></div><?php endif; ?>
             <div class="article-body"><?= nl2br(e($post['content'])) ?></div>
             <div class="action-bar">
@@ -178,6 +194,7 @@ render_header('PulseNest · 帖子详情', $user, [
                 <a class="pill-btn" href="/login.php">登录后点赞 · <?= (int) $post['like_count'] ?></a>
               <?php endif; ?>
               <span class="meta-pill"><?= (int) $post['comment_count'] ?> 条评论</span>
+              <span class="meta-pill"><?= e(board_badge($post)) ?></span>
             </div>
           </article>
 
@@ -273,8 +290,8 @@ render_header('PulseNest · 帖子详情', $user, [
           <section class="glass section-card">
             <div class="section-kicker">Quick Jump</div>
             <div class="quick-links">
-              <a class="quick-link" href="/posts.php">返回帖子列表</a>
-              <a class="quick-link" href="/account.php">会员中心</a>
+              <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">同版块帖子</a>
+              <a class="quick-link" href="/notifications.php">我的提醒</a>
               <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>">作者主页</a>
             </div>
           </section>

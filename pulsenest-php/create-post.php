@@ -2,14 +2,27 @@
 require __DIR__ . '/layout.php';
 $user = ensure_logged_in();
 $error = '';
-$form = ['title' => '', 'content' => ''];
+$boards = fetch_board_options();
+$defaultBoardId = (int) ($boards[0]['id'] ?? 0);
+$form = ['title' => '', 'content' => '', 'board_id' => $defaultBoardId];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $form['title'] = trim($_POST['title'] ?? '');
     $form['content'] = trim($_POST['content'] ?? '');
+    $form['board_id'] = (int) ($_POST['board_id'] ?? 0);
 
-    if ($form['title'] === '' || $form['content'] === '') {
+    $selectedBoard = null;
+    foreach ($boards as $board) {
+        if ((int) $board['id'] === (int) $form['board_id']) {
+            $selectedBoard = $board;
+            break;
+        }
+    }
+
+    if (!$selectedBoard) {
+        $error = '请选择一个有效版块。';
+    } elseif ($form['title'] === '' || $form['content'] === '') {
         $error = '标题和正文都要填写。';
     } elseif (mb_strlen($form['title']) < 4 || mb_strlen($form['title']) > 120) {
         $error = '标题长度请控制在 4 到 120 个字符之间。';
@@ -18,15 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $imagePath = handle_image_upload($_FILES['cover_image'] ?? [], POST_UPLOAD_DIR);
-            $stmt = db()->prepare('INSERT INTO posts (user_id, title, content, image_path) VALUES (:user_id, :title, :content, :image_path)');
+            $stmt = db()->prepare('INSERT INTO posts (user_id, board_id, title, content, image_path) VALUES (:user_id, :board_id, :title, :content, :image_path)');
             $stmt->execute([
                 'user_id' => $user['id'],
+                'board_id' => $form['board_id'],
                 'title' => $form['title'],
                 'content' => $form['content'],
                 'image_path' => $imagePath,
             ]);
             $postId = (int) db()->lastInsertId();
-            flash_set('success', '帖子发布成功，已经写入数据库。');
+            flash_set('success', '帖子发布成功，已经写入对应版块。');
             redirect_to('/post.php?id=' . $postId);
         } catch (RuntimeException $e) {
             $error = $e->getMessage();
@@ -35,17 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 render_header('PulseNest · 发帖', $user, [
-    'searchText' => '🔎 搜索灵感、发帖目标、内容流入口',
+    'searchText' => '🔎 搜索灵感、版块入口、社区热门话题',
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell create-post-page">
     <section class="glass nebula-hero nebula-hero-split create-post-hero">
       <div class="nebula-copy">
         <div class="brand-chip">纳达尔星项目 · 星云初始01 · 发帖页</div>
-        <h1>把你的内容直接抛进这片星云，发布后立即进入真实帖子链路。</h1>
-        <p class="page-desc nebula-desc">这一页继续走原本的登录保护与 MySQL 入库逻辑，但现在支持顺手上传一张帖子图片，让列表卡、首页卡和详情页都更像真社区。</p>
+        <h1>把你的内容准确投进对应版块，发出去就能进入真实论坛链路。</h1>
+        <p class="page-desc nebula-desc">现在发帖除了标题、正文和配图，还必须归属到版块。首页、列表页、搜索和通知都会围着这条论坛骨架联动。</p>
         <div class="hero-stats compact-hero-stats">
-          <div class="hero-stat"><div class="label">发布后</div><div class="num small-num">跳详情页</div><div class="note">成功即重定向到 /post.php?id=xx</div></div>
+          <div class="hero-stat"><div class="label">版块归属</div><div class="num small-num">必选</div><div class="note">帖子会挂到分类 / 版块体系里</div></div>
           <div class="hero-stat"><div class="label">配图支持</div><div class="num small-num">单图上传</div><div class="note">保存到 uploads/posts，首页与列表同步显示</div></div>
           <div class="hero-stat"><div class="label">当前用户</div><div class="num small-num"><?= e($user['nickname']) ?></div><div class="note">@<?= e($user['username']) ?></div></div>
         </div>
@@ -54,9 +68,9 @@ render_header('PulseNest · 发帖', $user, [
       <aside class="glass side-card nebula-side-panel">
         <div class="section-kicker">Posting Guide</div>
         <div class="quick-links">
-          <div class="quick-link static-link">标题建议 4~120 字，能一眼看懂重点。</div>
-          <div class="quick-link static-link">正文至少 10 字，方便在列表页展示摘要。</div>
-          <div class="quick-link static-link">帖子图片支持 JPG / PNG / GIF / WEBP，大小 5MB 内。</div>
+          <div class="quick-link static-link">先选版块，再写标题和正文，内容结构会更像真论坛。</div>
+          <div class="quick-link static-link">标题建议 4~120 字，正文至少 10 字。</div>
+          <div class="quick-link static-link">图片支持 JPG / PNG / GIF / WEBP，大小 5MB 内。</div>
         </div>
       </aside>
     </section>
@@ -64,12 +78,20 @@ render_header('PulseNest · 发帖', $user, [
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
       <div class="kicker">Create Post</div>
       <h2>发布一篇新帖子</h2>
-      <p class="desc">继续使用现有标题 + 正文链路，并新增帖子图片上传。提交后真实入库，并立刻能在内容流里验证结果。</p>
+      <p class="desc">继续沿用星云初始01的深色玻璃面板，但帖子已正式接入分类 / 版块系统。</p>
 
       <?php if ($error): ?><div class="notice error"><?= e($error) ?></div><?php endif; ?>
 
       <form class="form" method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+        <div class="field">
+          <label>发布到哪个版块</label>
+          <select class="input" name="board_id">
+            <?php foreach ($boards as $board): ?>
+              <option value="<?= (int) $board['id'] ?>" <?= (int) $form['board_id'] === (int) $board['id'] ? 'selected' : '' ?>><?= e($board['category_name']) ?> / <?= e($board['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
         <div class="field">
           <label>标题</label>
           <input class="input" name="title" value="<?= e($form['title']) ?>" placeholder="给这篇帖子起个吸引人点开的标题" />

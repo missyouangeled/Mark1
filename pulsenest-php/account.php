@@ -144,6 +144,7 @@ render_header('PulseNest · 会员中心', $user, [
             <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
             <div class="detail-row"><span>邮箱</span><strong><?= e($user['email']) ?></strong></div>
             <div class="detail-row"><span>签名</span><strong><?= e($user['bio'] ?: '还没写简介') ?></strong></div>
+          <div class="detail-row"><span>未读提醒</span><strong><?= unread_notification_count((int) $user['id']) ?></strong></div>
           </div>
         </section>
 
@@ -151,6 +152,7 @@ render_header('PulseNest · 会员中心', $user, [
           <div class="section-kicker">Quick Actions</div>
           <div class="quick-links">
             <a class="quick-link" href="/create-post.php">写一篇新帖子</a>
+            <a class="quick-link" href="/notifications.php">查看我的提醒</a>
             <a class="quick-link" href="/posts.php">查看全部帖子</a>
             <a class="quick-link" href="/forgot-password.php">发起密码重置</a>
             <a class="quick-link" href="/">返回首页内容流</a>

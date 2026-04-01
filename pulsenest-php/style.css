@@ -557,6 +557,29 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
 .user-grid { grid-template-columns: minmax(0, 1fr) 320px; }
 .profile-post-card.inner-card { padding: 18px; }
 .user-profile-chip { min-height: 100%; }
+.nav-badge {
+  display:inline-flex; align-items:center; justify-content:center; min-width: 22px; height: 22px; margin-left: 8px;
+  padding: 0 7px; border-radius: 999px; background: linear-gradient(135deg,#23d3a2,#77e7ff); color:#061015; font-size:12px; font-weight:800;
+}
+.filter-form, .compact-form { margin-top: 6px; }
+.filter-grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:16px; align-items:end; }
+.filter-grid.two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.filter-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.forum-pills, .category-stack, .notification-stack { display:flex; flex-direction:column; gap:14px; }
+.forum-pill, .category-card, .notification-card, .forum-pill-inline {
+  border-radius: 20px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+}
+.forum-pill { padding: 14px 16px; color: rgba(255,255,255,0.9); }
+.forum-pill:hover, .board-link-chip:hover { border-color: rgba(109,240,207,0.28); color:#fff; }
+.category-card, .notification-card { padding:18px; }
+.board-chip-list { margin-top: 14px; }
+.board-link-chip { display:inline-flex; }
+.small-section-title { font-size: 22px; }
+.notification-card.unread { background: linear-gradient(135deg, rgba(35,211,162,0.10), rgba(78,98,255,0.08)); }
+select.input { appearance:none; }
+@media (max-width: 900px) {
+  .filter-grid, .filter-grid.two-up { grid-template-columns: 1fr; }
+}
 @media (max-width: 720px) {
   .shell { width: min(100%, calc(100% - 20px)); }
   .header-strip { flex-direction: column; align-items:flex-start; padding: 8px 0; }
@@ -569,7 +592,7 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
   .row-bottom { margin-top: 72px; }
   .auth-hero-inner, .auth-panel, .page-hero, .panel-card, .detail-card, .side-card, .post, .section-card, .nebula-hero { padding-left: 18px; padding-right: 18px; }
   .auth-copy h1, .auth-panel h2, .page-hero h1, .detail-hero h1 { font-size: 34px; }
-  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip, .detail-hero-head, .compose-actions, .avatar-upload-row, .action-bar { align-items:flex-start; flex-direction: column; }
+  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip, .detail-hero-head, .compose-actions, .avatar-upload-row, .action-bar, .filter-actions { align-items:flex-start; flex-direction: column; }
   .narrow-post-shell { width: min(100%, calc(100% - 20px)); }
   .post-cover-image, .detail-cover, .card-cover-image { height: auto; aspect-ratio: 16/10; }
   .reply-list { padding-left: 12px; }
