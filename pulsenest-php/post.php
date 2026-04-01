@@ -19,7 +19,7 @@ $postStmt = db()->prepare(
         SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
      ) l ON l.post_id = p.id
      LEFT JOIN (
-        SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
      ) c ON c.post_id = p.id
      WHERE p.id = :id
      LIMIT 1'
@@ -54,12 +54,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $validParentId = $parentComment ? $parentId : null;
             }
 
-            $stmt = db()->prepare('INSERT INTO comments (post_id, user_id, parent_id, content) VALUES (:post_id, :user_id, :parent_id, :content)');
+            $stmt = db()->prepare('INSERT INTO comments (post_id, user_id, parent_id, content, status) VALUES (:post_id, :user_id, :parent_id, :content, :status)');
             $stmt->execute([
                 'post_id' => $postId,
                 'user_id' => $actor['id'],
                 'parent_id' => $validParentId,
                 'content' => $content,
+                'status' => 'approved',
             ]);
             $newCommentId = (int) db()->lastInsertId();
             create_reply_notifications($post, $parentComment, (int) $actor['id'], $newCommentId);
@@ -175,7 +176,7 @@ if ($post && $user) {
 $comments = [];
 if ($post) {
     $commentsStmt = db()->prepare(
-        'SELECT c.id, c.parent_id, c.content, c.created_at, c.updated_at,
+        'SELECT c.id, c.parent_id, c.content, c.status, c.created_at, c.updated_at,
                 u.id AS user_id, u.nickname, u.username, u.avatar_path,
                 COALESCE(cl.like_count, 0) AS like_count
          FROM comments c
@@ -183,7 +184,7 @@ if ($post) {
          LEFT JOIN (
             SELECT comment_id, COUNT(*) AS like_count FROM comment_likes GROUP BY comment_id
          ) cl ON cl.comment_id = c.id
-         WHERE c.post_id = :post_id
+         WHERE c.post_id = :post_id AND c.status = "approved"
          ORDER BY c.created_at ASC, c.id ASC'
     );
     $commentsStmt->execute(['post_id' => $postId]);

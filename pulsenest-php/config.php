@@ -139,11 +139,39 @@ function ensure_database_schema(PDO $pdo): void {
     if (!index_exists($pdo, 'posts', 'idx_posts_created_board')) {
         $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_created_board (board_id, created_at)');
     }
+    if (!column_exists($pdo, 'posts', 'is_sticky')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN is_sticky TINYINT(1) NOT NULL DEFAULT 0 AFTER image_path');
+    }
+    if (!column_exists($pdo, 'posts', 'is_featured')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN is_featured TINYINT(1) NOT NULL DEFAULT 0 AFTER is_sticky');
+    }
+    if (!column_exists($pdo, 'posts', 'recommend_level')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN recommend_level TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER is_featured');
+    }
+    if (!column_exists($pdo, 'posts', 'home_slot')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN home_slot VARCHAR(40) DEFAULT NULL AFTER recommend_level');
+    }
+    if (!index_exists($pdo, 'posts', 'idx_posts_ops_sort')) {
+        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_ops_sort (is_sticky, recommend_level, is_featured, created_at)');
+    }
+    if (!index_exists($pdo, 'posts', 'idx_posts_home_slot')) {
+        $pdo->exec('ALTER TABLE posts ADD UNIQUE KEY idx_posts_home_slot (home_slot)');
+    }
     if (!index_exists($pdo, 'comments', 'idx_comments_post_created')) {
         $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_post_created (post_id, created_at)');
     }
     if (!index_exists($pdo, 'comments', 'idx_comments_user_created')) {
         $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_user_created (user_id, created_at)');
+    }
+    if (!column_exists($pdo, 'comments', 'status')) {
+        $pdo->exec("ALTER TABLE comments ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'approved' AFTER content");
+    }
+    $pdo->exec("UPDATE comments SET status = 'approved' WHERE status IS NULL OR status = ''");
+    if (!index_exists($pdo, 'comments', 'idx_comments_status_created')) {
+        $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_status_created (status, created_at)');
+    }
+    if (!index_exists($pdo, 'comments', 'idx_comments_post_status_created')) {
+        $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_post_status_created (post_id, status, created_at)');
     }
     if (!index_exists($pdo, 'forum_categories', 'idx_forum_categories_sort')) {
         $pdo->exec('ALTER TABLE forum_categories ADD KEY idx_forum_categories_sort (sort_order, id)');
@@ -571,6 +599,23 @@ function board_badge(array $post): string {
     $boardName = trim((string) ($post['board_name'] ?? '未分区'));
     $categoryName = trim((string) ($post['category_name'] ?? '公共区'));
     return $categoryName . ' / ' . $boardName;
+}
+
+function comment_status_label(string $status): string {
+    return match ($status) {
+        'pending' => '待审核',
+        'hidden' => '已隐藏',
+        default => '已通过',
+    };
+}
+
+function home_slot_definitions(): array {
+    return [
+        'hero' => ['label' => '首页主视觉 Hero', 'desc' => '首页顶部主运营卡'],
+        'focus_one' => ['label' => '首页焦点卡 1', 'desc' => '中部焦点区第一张运营卡'],
+        'focus_two' => ['label' => '首页焦点卡 2', 'desc' => '中部焦点区第二张运营卡'],
+        'focus_three' => ['label' => '首页焦点卡 3', 'desc' => '中部焦点区第三张运营卡'],
+    ];
 }
 
 function fetch_forum_structure(): array {

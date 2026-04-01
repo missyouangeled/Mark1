@@ -18,7 +18,7 @@ if ($selectedBoard !== '') {
     $params['board_slug'] = $selectedBoard;
 }
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot,
                u.nickname, u.username, u.avatar_path,
                fb.name AS board_name, fb.slug AS board_slug,
                fc.name AS category_name, fc.slug AS category_slug,
@@ -32,12 +32,12 @@ $sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at,
            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
         ) l ON l.post_id = p.id
         LEFT JOIN (
-           SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+           SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
         ) c ON c.post_id = p.id';
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT 12';
+$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT 18';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
@@ -45,13 +45,48 @@ $posts = $stmt->fetchAll();
 $postCount = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
 $userCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
 $boardCount = (int) db()->query('SELECT COUNT(*) FROM forum_boards')->fetchColumn();
-$heroPost = $posts[0] ?? null;
-$hotPosts = array_slice($posts, 0, 4);
+$homeSlotDefs = home_slot_definitions();
+$homeSlotPosts = [];
+foreach ($posts as $post) {
+    if (!empty($post['home_slot'])) {
+        $homeSlotPosts[$post['home_slot']] = $post;
+    }
+}
+$heroPost = $homeSlotPosts['hero'] ?? $posts[0] ?? null;
+$focusPosts = [
+    'focus_one' => $homeSlotPosts['focus_one'] ?? ($posts[1] ?? $posts[0] ?? null),
+    'focus_two' => $homeSlotPosts['focus_two'] ?? ($posts[2] ?? $posts[1] ?? $posts[0] ?? null),
+    'focus_three' => $homeSlotPosts['focus_three'] ?? ($posts[3] ?? $posts[2] ?? $posts[0] ?? null),
+];
 $feedPosts = array_slice($posts, 0, 3);
 $trendingPosts = array_slice($posts, 0, 3);
+$stickyCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_sticky = 1')->fetchColumn();
+$featuredCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_featured = 1')->fetchColumn();
+
+function render_focus_card(?array $post, string $slotKey, string $fallbackTitle, string $fallbackText): void {
+    ?>
+    <div class="focus-card <?= e(match ($slotKey) {
+        'focus_one' => 'focus-1',
+        'focus_two' => 'focus-2',
+        default => 'focus-3',
+    }) ?>">
+      <div class="focus-top-badge">OPS SLOT</div>
+      <div class="focus-emoji"><?= $post ? '🛰️' : '✨' ?></div>
+      <div class="focus-title"><?= e($post['title'] ?? $fallbackTitle) ?></div>
+      <div class="focus-text"><?= e($post ? excerpt($post['content'], 72) : $fallbackText) ?></div>
+      <?php if ($post): ?>
+        <div class="chips" style="margin-top:10px; gap:6px;">
+          <?php if ((int) $post['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
+          <?php if ((int) $post['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
+        </div>
+        <div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $post['id'] ?>">进入帖子</a></div>
+      <?php endif; ?>
+    </div>
+    <?php
+}
 
 render_header('PulseNest', $user, [
-    'searchText' => '🔎 首页支持按分类 / 版块跳转，发现页支持标题 / 正文搜索',
+    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定',
 ]);
 ?>
   <main class="shell home-page">
@@ -64,9 +99,9 @@ render_header('PulseNest', $user, [
         <div class="hero-inner">
           <div class="hero-copy">
             <div>
-              <div class="brand-chip">星云初始01 · 首页升级到论坛骨架 · PHP 功能已接通</div>
-              <h1>先用星云氛围把人留下，再用分类、版块、搜索和提醒把社区真正撑起来。</h1>
-              <p class="hero-text">这一版继续保留已确认的视觉锚点，但首页已经不只是展示热帖：帖子正式归属到分类 / 版块，发现页可以全文搜索，评论回复还会给帖子作者或被回复者发站内提醒。</p>
+              <div class="brand-chip">星云初始01 · 首页升级到可运营的论坛首页</div>
+              <h1>保住这套星云观感的同时，把真正能运营的帖子位也接进来。</h1>
+              <p class="hero-text">首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。</p>
             </div>
             <div class="hero-actions-row">
               <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '开始分享内容' : '立即加入社区' ?></a>
@@ -75,24 +110,32 @@ render_header('PulseNest', $user, [
             </div>
             <div class="hero-stats">
               <div class="hero-stat"><div class="label">社区成员</div><div class="num"><?= $userCount ?></div><div class="note">头像与用户主页已启用</div></div>
-              <div class="hero-stat"><div class="label">实时帖子</div><div class="num"><?= $postCount ?></div><div class="note">支持版块归属与搜索</div></div>
+              <div class="hero-stat"><div class="label">置顶帖子</div><div class="num"><?= $stickyCount ?></div><div class="note">优先抬到首页前列</div></div>
+              <div class="hero-stat"><div class="label">精华帖子</div><div class="num"><?= $featuredCount ?></div><div class="note">可给内容质感做背书</div></div>
               <div class="hero-stat"><div class="label">论坛版块</div><div class="num"><?= $boardCount ?></div><div class="note">首页可按分类或版块浏览</div></div>
             </div>
           </div>
           <div class="hero-art">
             <div class="hero-art-top">
-              <span class="badge">Forum Pick</span>
-              <span class="badge soft"><?= $user ? '已登录' : '访客可注册' ?></span>
+              <span class="badge">Home Hero Slot</span>
+              <span class="badge soft"><?= $heroPost ? ((int) ($heroPost['is_sticky'] ?? 0) === 1 ? '置顶中' : '已绑定') : '等待绑定' ?></span>
             </div>
             <div class="hero-art-bottom">
-              <div class="kicker">Hero Pick</div>
+              <div class="kicker"><?= e($homeSlotDefs['hero']['label']) ?></div>
               <div class="title"><?= e($heroPost['title'] ?? 'Starfall Zero') ?></div>
-              <div class="text"><?= e($heroPost ? excerpt($heroPost['content'], 44) : '沉浸式星际探索 + 高强度战斗循环') ?></div>
+              <div class="text"><?= e($heroPost ? excerpt($heroPost['content'], 56) : '沉浸式星际探索 + 高强度战斗循环') ?></div>
               <div class="chips">
-                <span class="chip">分类 / 版块</span>
-                <span class="chip">标题 / 正文搜索</span>
-                <span class="chip">站内回复提醒</span>
+                <?php if ($heroPost): ?>
+                  <span class="chip"><?= e(board_badge($heroPost)) ?></span>
+                  <span class="chip"><?= (int) $heroPost['like_count'] ?> 赞</span>
+                  <span class="chip"><?= (int) $heroPost['comment_count'] ?> 回复</span>
+                <?php else: ?>
+                  <span class="chip">分类 / 版块</span>
+                  <span class="chip">首页运营卡</span>
+                  <span class="chip">站内回复提醒</span>
+                <?php endif; ?>
               </div>
+              <?php if ($heroPost): ?><div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">查看主运营帖</a></div><?php endif; ?>
             </div>
           </div>
         </div>
@@ -139,11 +182,11 @@ render_header('PulseNest', $user, [
     <section class="row-mid">
       <section class="glass section-card">
         <div class="section-kicker">Focus Slots</div>
-        <div class="section-title">这一轮真正补上的论坛骨架</div>
+        <div class="section-title">首页焦点运营卡</div>
         <div class="focus-grid">
-          <div class="focus-card focus-1"><div class="focus-top-badge">FORUM</div><div class="focus-emoji">🛰️</div><div class="focus-title">分类 / 版块</div><div class="focus-text">帖子现在不再漂浮着存在，而是落到分类与版块体系里，首页和列表页都能按结构浏览。</div></div>
-          <div class="focus-card focus-2"><div class="focus-top-badge">SEARCH</div><div class="focus-emoji">🔎</div><div class="focus-title">标题 / 正文搜索</div><div class="focus-text">发现页支持基础关键词搜索，至少能按标题和正文把帖子筛出来。</div></div>
-          <div class="focus-card focus-3"><div class="focus-top-badge">NOTICE</div><div class="focus-emoji">🔔</div><div class="focus-title">站内提醒</div><div class="focus-text">别人回复你的帖子或评论时，会在提醒页聚合展示，并同步未读数。</div></div>
+          <?php render_focus_card($focusPosts['focus_one'], 'focus_one', '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
+          <?php render_focus_card($focusPosts['focus_two'], 'focus_two', '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
+          <?php render_focus_card($focusPosts['focus_three'], 'focus_three', '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
         </div>
       </section>
 
@@ -154,16 +197,16 @@ render_header('PulseNest', $user, [
           <span class="tag-cloud-item a">#星云初始01</span>
           <span class="tag-cloud-item b">#论坛分类</span>
           <span class="tag-cloud-item c">#论坛版块</span>
-          <span class="tag-cloud-item a">#标题正文搜索</span>
-          <span class="tag-cloud-item b">#站内提醒</span>
-          <span class="tag-cloud-item c">#评论回复</span>
-          <span class="tag-cloud-item a">#帖子点赞</span>
-          <span class="tag-cloud-item b">#用户主页</span>
+          <span class="tag-cloud-item a">#帖子置顶</span>
+          <span class="tag-cloud-item b">#帖子精华</span>
+          <span class="tag-cloud-item c">#首页运营卡</span>
+          <span class="tag-cloud-item a">#通知筛选</span>
+          <span class="tag-cloud-item b">#评论审核</span>
         </div>
         <div class="mood-box">
           <div class="section-kicker mood-kicker">今日社区情绪</div>
           <div class="progress"><div></div></div>
-          <p><?= $user ? '你现在最适合测试完整论坛链路：进一个版块发帖 → 用另一个账号评论 / 回复 → 打开提醒页确认通知。' : '这一版已经不只是皮肤样机，注册后可以完整体验分类、版块、搜索和回复提醒。' ?></p>
+          <p><?= $user ? '现在最适合走完整运营链路：后台给一篇帖子打上置顶 / 首页卡 → 前台刷新首页确认卡位 → 用另一个账号评论 / 点赞验证提醒和审核流。' : '这版已经不只是皮肤样机，注册后能直接体验首页运营卡、帖子流、评论和提醒。' ?></p>
         </div>
       </section>
     </section>
@@ -172,8 +215,8 @@ render_header('PulseNest', $user, [
       <section>
         <div class="section-kicker">Trending Now</div>
         <div class="section-large-head">最近讨论度最高的内容卡</div>
-        <div class="section-large-desc">卡片区继续沿用“星云初始01”的首页观感，但现在会把帖子所属的分类 / 版块一起带出来。</div>
-        <div class="ticker">🔥 已接通：分类 / 版块 / 标题正文搜索 / 站内回复提醒 / 发帖 / 点赞 / 评论 / 回复 / 用户主页</div>
+        <div class="section-large-desc">卡片区继续沿用“星云初始01”的首页观感，但现在会优先考虑置顶 / 推荐位 / 精华逻辑，再把帖子所属版块一起带出来。</div>
+        <div class="ticker">🔥 已接通：置顶 / 精华 / 推荐位 / 首页卡绑定 / 评论审核状态 / 通知筛选 / 站内回复提醒 / 发帖 / 点赞 / 用户主页</div>
         <div class="cards-3">
           <?php if (!$trendingPosts): ?>
             <?php for ($i = 1; $i <= 3; $i++): ?>
@@ -187,7 +230,15 @@ render_header('PulseNest', $user, [
                 <?php else: ?>
                   <div class="game-cover alt<?= ($index % 3) + 1 ?>"><div class="game-cover-top"><span class="small-chip a"><?= e($post['board_name'] ?? '公共区') ?></span><span class="small-chip b">@<?= e($post['username']) ?></span></div><div class="game-cover-bottom"><div class="game-title"><?= e($post['title']) ?></div><div class="game-sub"><?= e(human_time($post['created_at'])) ?></div></div></div>
                 <?php endif; ?>
-                <div class="game-body"><p><?= e(excerpt($post['content'], 82)) ?></p><div class="game-meta"><div><?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</div><div style="color: var(--brand);"><a href="/post.php?id=<?= (int) $post['id'] ?>">查看详情</a></div></div></div>
+                <div class="game-body">
+                  <p><?= e(excerpt($post['content'], 82)) ?></p>
+                  <div class="chips" style="margin-bottom:10px; gap:6px;">
+                    <?php if ((int) $post['is_sticky'] === 1): ?><span class="chip">置顶</span><?php endif; ?>
+                    <?php if ((int) $post['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
+                    <?php if ((int) $post['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
+                  </div>
+                  <div class="game-meta"><div><?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</div><div style="color: var(--brand);"><a href="/post.php?id=<?= (int) $post['id'] ?>">查看详情</a></div></div>
+                </div>
               </article>
             <?php endforeach; ?>
           <?php endif; ?>
@@ -199,7 +250,7 @@ render_header('PulseNest', $user, [
           <div class="section-kicker">Recommended Authors</div>
           <div class="section-title">真实成员速览</div>
           <div class="author-list">
-            <?php if (!$hotPosts): ?>
+            <?php if (!$posts): ?>
               <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批成员</div><div class="meta">注册后这里会跟着内容一起活过来</div></div><div class="score">NEW</div></div><p>现在的重点已经不是占位图，而是让第一批真实用户行为能映射回首页。</p></div>
             <?php else: ?>
               <?php foreach (array_slice($posts, 0, 3) as $post): ?>
@@ -223,9 +274,9 @@ render_header('PulseNest', $user, [
           <div class="section-kicker">Top Rated</div>
           <div class="section-title">功能验收清单</div>
           <div class="rank-list">
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">论坛分类 / 版块</div><div class="meta">帖子已归属到 forum_categories / forum_boards</div></div><div class="score">OK</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">帖子搜索</div><div class="meta">posts.php 支持标题 / 正文搜索</div></div><div class="score">OK</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">站内提醒</div><div class="meta">回复帖子 / 评论时写入 notifications</div></div><div class="score">OK</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">帖子运营位</div><div class="meta">后台支持置顶 / 精华 / 推荐位 / 首页卡</div></div><div class="score">OK</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">评论管理</div><div class="meta">评论支持 approved / pending / hidden</div></div><div class="score">OK</div></div></div>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">通知筛选</div><div class="meta">支持未读 / 类型筛选与批量处理</div></div><div class="score">OK</div></div></div>
             <div class="rank-item"><div class="rank-row"><div class="rank-index">#4</div><div class="rank-main"><div class="rank-name">既有功能保留</div><div class="meta">点赞、评论、用户主页、上传均未破坏</div></div><div class="score">OK</div></div></div>
           </div>
         </section>

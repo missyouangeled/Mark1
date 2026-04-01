@@ -25,7 +25,7 @@ if ($boardSlug !== '') {
     $params['board_slug'] = $boardSlug;
 }
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level,
                u.nickname, u.username, u.avatar_path,
                fb.id AS board_id, fb.name AS board_name, fb.slug AS board_slug,
                fc.id AS category_id, fc.name AS category_name, fc.slug AS category_slug,
@@ -39,14 +39,14 @@ $sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at,
             SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
         ) l ON l.post_id = p.id
         LEFT JOIN (
-            SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
         ) c ON c.post_id = p.id';
 
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
 
-$sql .= ' ORDER BY p.created_at DESC, p.id DESC';
+$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
@@ -169,6 +169,9 @@ render_header('PulseNest · 帖子列表', $user, [
               <p class="post-text compact"><?= nl2br(e(excerpt($post['content'], 220))) ?></p>
               <div class="list-card-footer">
                 <div class="chips">
+                  <?php if ((int) ($post['is_sticky'] ?? 0) === 1): ?><span class="chip">置顶</span><?php endif; ?>
+                  <?php if ((int) ($post['is_featured'] ?? 0) === 1): ?><span class="chip">精华</span><?php endif; ?>
+                  <?php if ((int) ($post['recommend_level'] ?? 0) > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
                   <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                   <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
                   <span class="chip"><?= e(board_badge($post)) ?></span>
