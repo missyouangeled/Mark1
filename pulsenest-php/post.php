@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parentComment = null;
             $validParentId = null;
             if ($parentId > 0) {
-                $parentStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+                $parentStmt = db()->prepare('SELECT id, user_id, content FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
                 $parentStmt->execute(['id' => $parentId, 'post_id' => $postId]);
                 $parentComment = $parentStmt->fetch() ?: null;
                 $validParentId = $parentComment ? $parentId : null;
@@ -78,7 +78,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $insertStmt = db()->prepare('INSERT INTO post_likes (post_id, user_id) VALUES (:post_id, :user_id)');
             $insertStmt->execute(['post_id' => $postId, 'user_id' => $actor['id']]);
-            flash_set('success', '点赞成功，热度 +1。');
+            create_post_like_notification($post, (int) $actor['id']);
+            flash_set('success', '点赞成功，热度 +1，并已通知作者。');
+        }
+    }
+
+    if ($action === 'toggle_comment_like') {
+        $commentId = (int) ($_POST['comment_id'] ?? 0);
+        $commentStmt = db()->prepare('SELECT id, user_id, content FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+        $commentStmt->execute(['id' => $commentId, 'post_id' => $postId]);
+        $comment = $commentStmt->fetch();
+        if (!$comment) {
+            flash_set('error', '没有找到要点赞的评论。');
+        } else {
+            $checkStmt = db()->prepare('SELECT id FROM comment_likes WHERE comment_id = :comment_id AND user_id = :user_id LIMIT 1');
+            $checkStmt->execute(['comment_id' => $commentId, 'user_id' => $actor['id']]);
+            $commentLikeId = $checkStmt->fetchColumn();
+            if ($commentLikeId) {
+                $deleteStmt = db()->prepare('DELETE FROM comment_likes WHERE id = :id');
+                $deleteStmt->execute(['id' => $commentLikeId]);
+                flash_set('success', '已取消对评论的点赞。');
+            } else {
+                $insertStmt = db()->prepare('INSERT INTO comment_likes (comment_id, user_id) VALUES (:comment_id, :user_id)');
+                $insertStmt->execute(['comment_id' => $commentId, 'user_id' => $actor['id']]);
+                create_comment_like_notification($comment, $postId, (int) $actor['id']);
+                flash_set('success', '评论点赞成功，并已通知评论作者。');
+            }
         }
     }
 
@@ -151,14 +176,31 @@ $comments = [];
 if ($post) {
     $commentsStmt = db()->prepare(
         'SELECT c.id, c.parent_id, c.content, c.created_at, c.updated_at,
-                u.id AS user_id, u.nickname, u.username, u.avatar_path
+                u.id AS user_id, u.nickname, u.username, u.avatar_path,
+                COALESCE(cl.like_count, 0) AS like_count
          FROM comments c
          INNER JOIN pulsenest_users u ON u.id = c.user_id
+         LEFT JOIN (
+            SELECT comment_id, COUNT(*) AS like_count FROM comment_likes GROUP BY comment_id
+         ) cl ON cl.comment_id = c.id
          WHERE c.post_id = :post_id
          ORDER BY c.created_at ASC, c.id ASC'
     );
     $commentsStmt->execute(['post_id' => $postId]);
     $comments = $commentsStmt->fetchAll();
+
+    if ($user && $comments) {
+        $commentIds = array_map(static fn(array $comment): int => (int) $comment['id'], $comments);
+        $placeholders = implode(',', array_fill(0, count($commentIds), '?'));
+        $likedStmt = db()->prepare('SELECT comment_id FROM comment_likes WHERE user_id = ? AND comment_id IN (' . $placeholders . ')');
+        $likedStmt->execute(array_merge([(int) $user['id']], $commentIds));
+        $likedCommentIds = array_map('intval', $likedStmt->fetchAll(PDO::FETCH_COLUMN));
+        $likedLookup = array_fill_keys($likedCommentIds, true);
+        foreach ($comments as &$commentRow) {
+            $commentRow['liked_by_current_user'] = isset($likedLookup[(int) $commentRow['id']]);
+        }
+        unset($commentRow);
+    }
 }
 
 $commentTree = [];
@@ -191,6 +233,7 @@ render_header('PulseNest · 帖子详情', $user, [
 function render_comment_item(array $comment, ?array $user, int $postId, bool $isReply = false): void {
     $avatarClass = $isReply ? 'avatar-sm' : 'avatar';
     $canManage = can_manage_comment($user, $comment);
+    $likedByCurrentUser = (bool) ($comment['liked_by_current_user'] ?? false);
     ?>
     <article class="comment-card <?= $isReply ? 'reply-card' : '' ?>">
       <div class="comment-head">
@@ -204,8 +247,18 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
       </div>
       <div class="comment-body"><?= nl2br(e($comment['content'])) ?></div>
 
+      <div class="comment-meta-row">
+        <span class="meta-pill">评论点赞 · <?= (int) ($comment['like_count'] ?? 0) ?></span>
+      </div>
+
       <?php if ($user): ?>
         <div class="comment-action-row">
+          <form method="post" class="inline-form">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+            <input type="hidden" name="action" value="toggle_comment_like">
+            <input type="hidden" name="comment_id" value="<?= (int) $comment['id'] ?>">
+            <button class="pill-btn <?= $likedByCurrentUser ? 'solid' : '' ?>" type="submit"><?= e(like_button_label($likedByCurrentUser, (int) ($comment['like_count'] ?? 0))) ?></button>
+          </form>
           <?php if (!$isReply): ?>
             <details class="reply-box inline-details">
               <summary>回复</summary>

@@ -91,6 +91,18 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_notifications_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS comment_likes (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        comment_id INT UNSIGNED NOT NULL,
+        user_id INT UNSIGNED NOT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_comment_likes_comment_user (comment_id, user_id),
+        KEY idx_comment_likes_user_id (user_id),
+        CONSTRAINT fk_comment_likes_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_comment_likes_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS moderation_logs (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         actor_user_id INT UNSIGNED NOT NULL,
@@ -123,6 +135,27 @@ function ensure_database_schema(PDO $pdo): void {
     }
     if (!foreign_key_exists($pdo, 'posts', 'fk_posts_board')) {
         $pdo->exec('ALTER TABLE posts ADD CONSTRAINT fk_posts_board FOREIGN KEY (board_id) REFERENCES forum_boards(id) ON DELETE SET NULL');
+    }
+    if (!index_exists($pdo, 'posts', 'idx_posts_created_board')) {
+        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_created_board (board_id, created_at)');
+    }
+    if (!index_exists($pdo, 'comments', 'idx_comments_post_created')) {
+        $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_post_created (post_id, created_at)');
+    }
+    if (!index_exists($pdo, 'comments', 'idx_comments_user_created')) {
+        $pdo->exec('ALTER TABLE comments ADD KEY idx_comments_user_created (user_id, created_at)');
+    }
+    if (!index_exists($pdo, 'forum_categories', 'idx_forum_categories_sort')) {
+        $pdo->exec('ALTER TABLE forum_categories ADD KEY idx_forum_categories_sort (sort_order, id)');
+    }
+    if (!index_exists($pdo, 'forum_boards', 'idx_forum_boards_category_sort')) {
+        $pdo->exec('ALTER TABLE forum_boards ADD KEY idx_forum_boards_category_sort (category_id, sort_order, id)');
+    }
+    if (!index_exists($pdo, 'notifications', 'idx_notifications_type_created')) {
+        $pdo->exec('ALTER TABLE notifications ADD KEY idx_notifications_type_created (type, created_at)');
+    }
+    if (!index_exists($pdo, 'notifications', 'idx_notifications_recipient_created')) {
+        $pdo->exec('ALTER TABLE notifications ADD KEY idx_notifications_recipient_created (recipient_user_id, created_at)');
     }
 
     seed_forum_structure($pdo);
@@ -627,4 +660,38 @@ function create_reply_notifications(array $post, ?array $parentComment, int $act
     foreach ($recipients as $recipientId => $type) {
         create_notification($recipientId, $actorUserId, $type, (int) $post['id'], $newCommentId);
     }
+}
+
+function create_post_like_notification(array $post, int $actorUserId): void {
+    $recipientUserId = (int) ($post['user_id'] ?? 0);
+    if ($recipientUserId > 0) {
+        create_notification($recipientUserId, $actorUserId, 'post_like', (int) $post['id']);
+    }
+}
+
+function create_comment_like_notification(array $comment, int $postId, int $actorUserId): void {
+    $recipientUserId = (int) ($comment['user_id'] ?? 0);
+    if ($recipientUserId > 0) {
+        create_notification($recipientUserId, $actorUserId, 'comment_like', $postId, (int) $comment['id']);
+    }
+}
+
+function notification_type_label(string $type): string {
+    return match ($type) {
+        'comment_reply' => '评论回复',
+        'post_reply' => '帖子回复',
+        'post_like' => '帖子点赞',
+        'comment_like' => '评论点赞',
+        default => '站内提醒',
+    };
+}
+
+function notification_message(array $item): string {
+    $title = '《' . trim((string) ($item['title'] ?? '这篇帖子')) . '》';
+    return match ($item['type'] ?? '') {
+        'comment_reply' => '回复了你的评论：' . $title,
+        'post_like' => '点赞了你的帖子：' . $title,
+        'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
+        default => '回复了你的帖子：' . $title,
+    };
 }

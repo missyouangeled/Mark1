@@ -10,6 +10,9 @@ function admin_url(array $overrides = [], string $hash = ''): string {
     $query = [
         'post_id' => (int) ($_GET['post_id'] ?? 0),
         'author_id' => (int) ($_GET['author_id'] ?? 0),
+        'post_title_keyword' => trim((string) ($_GET['post_title_keyword'] ?? '')),
+        'author_keyword' => trim((string) ($_GET['author_keyword'] ?? '')),
+        'content_keyword' => trim((string) ($_GET['content_keyword'] ?? '')),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
         'log_target_type' => trim((string) ($_GET['log_target_type'] ?? '')),
         'log_actor_id' => (int) ($_GET['log_actor_id'] ?? 0),
@@ -127,6 +130,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to(admin_url([], '#comments'));
     }
 
+    if ($action === 'bulk_delete_comments') {
+        $commentIds = array_values(array_unique(array_filter(array_map('intval', $_POST['comment_ids'] ?? []))));
+        if (!$commentIds) {
+            flash_set('error', '请先勾选要删除的评论。');
+            redirect_to(admin_url([], '#comments'));
+        }
+
+        $placeholders = implode(',', array_fill(0, count($commentIds), '?'));
+        $stmt = db()->prepare(
+            'SELECT c.id, c.content, p.title, u.nickname, u.username
+             FROM comments c
+             INNER JOIN posts p ON p.id = c.post_id
+             INNER JOIN pulsenest_users u ON u.id = c.user_id
+             WHERE c.id IN (' . $placeholders . ')'
+        );
+        $stmt->execute($commentIds);
+        $rows = $stmt->fetchAll();
+
+        if (!$rows) {
+            flash_set('error', '没有找到可删除的评论记录。');
+            redirect_to(admin_url([], '#comments'));
+        }
+
+        $delete = db()->prepare('DELETE FROM comments WHERE id IN (' . $placeholders . ')');
+        $delete->execute($commentIds);
+        foreach ($rows as $row) {
+            log_moderation_action((int) $user['id'], 'comment_deleted_batch', 'comment', (int) $row['id'], ($row['nickname'] ?: $row['username']) . ' · 《' . $row['title'] . '》 · ' . excerpt($row['content'], 80));
+        }
+        flash_set('success', '已批量删除 ' . count($rows) . ' 条评论。');
+        redirect_to(admin_url([], '#comments'));
+    }
+
+    if ($action === 'move_category' && $canManageStructure) {
+        $categoryId = (int) ($_POST['category_id'] ?? 0);
+        $direction = trim((string) ($_POST['direction'] ?? ''));
+        $stmt = db()->prepare('SELECT id, name, sort_order FROM forum_categories WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $categoryId]);
+        $category = $stmt->fetch();
+        if ($category && in_array($direction, ['up', 'down'], true)) {
+            $operator = $direction === 'up' ? '<' : '>';
+            $order = $direction === 'up' ? 'DESC' : 'ASC';
+            $swapStmt = db()->prepare('SELECT id, name, sort_order FROM forum_categories WHERE sort_order ' . $operator . ' :sort_order ORDER BY sort_order ' . $order . ', id ' . $order . ' LIMIT 1');
+            $swapStmt->execute(['sort_order' => (int) $category['sort_order']]);
+            $swap = $swapStmt->fetch();
+            if ($swap) {
+                db()->prepare('UPDATE forum_categories SET sort_order = :sort_order WHERE id = :id')->execute(['sort_order' => (int) $swap['sort_order'], 'id' => $categoryId]);
+                db()->prepare('UPDATE forum_categories SET sort_order = :sort_order WHERE id = :id')->execute(['sort_order' => (int) $category['sort_order'], 'id' => (int) $swap['id']]);
+                log_moderation_action((int) $user['id'], 'category_reordered', 'category', $categoryId, $category['name'] . ' · ' . ($direction === 'up' ? '上移' : '下移'));
+                flash_set('success', '分类顺序已调整。');
+            }
+        }
+        redirect_to('/admin.php#categories');
+    }
+
     if ($action === 'create_category' && $canManageStructure) {
         $name = trim((string) ($_POST['name'] ?? ''));
         $slug = trim((string) ($_POST['slug'] ?? ''));
@@ -212,6 +269,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         log_moderation_action((int) $user['id'], 'category_deleted', 'category', $categoryId, $details);
         flash_set('success', $boardCount > 0 ? '分类已删除，版块已迁移。' : '分类已删除。');
         redirect_to('/admin.php#categories');
+    }
+
+    if ($action === 'move_board' && $canManageStructure) {
+        $boardId = (int) ($_POST['board_id'] ?? 0);
+        $direction = trim((string) ($_POST['direction'] ?? ''));
+        $stmt = db()->prepare('SELECT id, name, category_id, sort_order FROM forum_boards WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $boardId]);
+        $board = $stmt->fetch();
+        if ($board && in_array($direction, ['up', 'down'], true)) {
+            $operator = $direction === 'up' ? '<' : '>';
+            $order = $direction === 'up' ? 'DESC' : 'ASC';
+            $swapStmt = db()->prepare('SELECT id, name, sort_order FROM forum_boards WHERE category_id = :category_id AND sort_order ' . $operator . ' :sort_order ORDER BY sort_order ' . $order . ', id ' . $order . ' LIMIT 1');
+            $swapStmt->execute(['category_id' => (int) $board['category_id'], 'sort_order' => (int) $board['sort_order']]);
+            $swap = $swapStmt->fetch();
+            if ($swap) {
+                db()->prepare('UPDATE forum_boards SET sort_order = :sort_order WHERE id = :id')->execute(['sort_order' => (int) $swap['sort_order'], 'id' => $boardId]);
+                db()->prepare('UPDATE forum_boards SET sort_order = :sort_order WHERE id = :id')->execute(['sort_order' => (int) $board['sort_order'], 'id' => (int) $swap['id']]);
+                log_moderation_action((int) $user['id'], 'board_reordered', 'board', $boardId, $board['name'] . ' · ' . ($direction === 'up' ? '上移' : '下移'));
+                flash_set('success', '版块顺序已调整。');
+            }
+        }
+        redirect_to('/admin.php#boards');
     }
 
     if ($action === 'create_board' && $canManageStructure) {
@@ -323,6 +402,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $postFilterId = (int) ($_GET['post_id'] ?? 0);
 $authorFilterId = (int) ($_GET['author_id'] ?? 0);
+$postTitleKeyword = trim((string) ($_GET['post_title_keyword'] ?? ''));
+$authorKeyword = trim((string) ($_GET['author_keyword'] ?? ''));
+$contentKeyword = trim((string) ($_GET['content_keyword'] ?? ''));
 $commentWhere = [];
 $commentParams = [];
 if ($postFilterId > 0) {
@@ -332,6 +414,18 @@ if ($postFilterId > 0) {
 if ($authorFilterId > 0) {
     $commentWhere[] = 'c.user_id = :author_id';
     $commentParams['author_id'] = $authorFilterId;
+}
+if ($postTitleKeyword !== '') {
+    $commentWhere[] = 'p.title LIKE :post_title_keyword';
+    $commentParams['post_title_keyword'] = '%' . $postTitleKeyword . '%';
+}
+if ($authorKeyword !== '') {
+    $commentWhere[] = '(u.username LIKE :author_keyword OR u.nickname LIKE :author_keyword)';
+    $commentParams['author_keyword'] = '%' . $authorKeyword . '%';
+}
+if ($contentKeyword !== '') {
+    $commentWhere[] = 'c.content LIKE :content_keyword';
+    $commentParams['content_keyword'] = '%' . $contentKeyword . '%';
 }
 $commentSql =
     'SELECT c.id, c.post_id, c.user_id, c.content, c.created_at,
@@ -347,6 +441,7 @@ $commentSql =
 $commentStmt = db()->prepare($commentSql);
 $commentStmt->execute($commentParams);
 $commentRows = $commentStmt->fetchAll();
+$commentCount = count($commentRows);
 
 $userRows = db()->query(
     'SELECT u.id, u.username, u.nickname, u.email, u.role, u.is_admin, u.is_active, u.created_at,
@@ -398,6 +493,11 @@ $boardRows = db()->query(
      ) p ON p.board_id = b.id
      ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
 )->fetchAll();
+
+$notificationTotals = db()->query('SELECT COUNT(*) AS total_notifications, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_notifications FROM notifications')->fetch();
+$notificationTypeRows = db()->query('SELECT type, COUNT(*) AS total_count, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_count FROM notifications GROUP BY type ORDER BY total_count DESC, type ASC')->fetchAll();
+$notificationTodayCount = (int) db()->query('SELECT COUNT(*) FROM notifications WHERE created_at >= NOW() - INTERVAL 1 DAY')->fetchColumn();
+$notificationSevenDayCount = (int) db()->query('SELECT COUNT(*) FROM notifications WHERE created_at >= NOW() - INTERVAL 7 DAY')->fetchColumn();
 
 $logActionFilter = trim((string) ($_GET['log_action'] ?? ''));
 $logTargetTypeFilter = trim((string) ($_GET['log_target_type'] ?? ''));
@@ -487,6 +587,7 @@ render_header('PulseNest · 后台管理', $user, [
           <a class="quick-link" href="#posts"><strong>帖子管理</strong><span>管理员 / 版主可用</span></a>
           <?php if ($canManageUsers): ?><a class="quick-link" href="#users"><strong>角色 / 用户</strong><span>仅管理员可见</span></a><?php endif; ?>
           <?php if ($canManageStructure): ?><a class="quick-link" href="#categories"><strong>分类 / 版块</strong><span>仅管理员可见，支持迁移删除</span></a><?php endif; ?>
+          <a class="quick-link" href="#notifications-overview"><strong>通知概况</strong><span>类型分布 / 未读 / 7 日统计</span></a>
           <a class="quick-link" href="#logs"><strong>操作日志</strong><span>支持筛选与分页</span></a>
         </div>
       </aside>
@@ -537,51 +638,63 @@ render_header('PulseNest · 后台管理', $user, [
 
     <section id="comments" class="glass panel-card admin-panel-card">
       <div class="section-kicker">Comments</div>
-      <div class="side-head admin-head-row"><h3>评论管理</h3><span class="muted">支持按帖子或作者回看评论流</span></div>
+      <div class="side-head admin-head-row"><h3>评论管理</h3><span class="muted">支持按帖子 ID / 作者 ID / 帖子标题关键词 / 作者关键词 / 评论内容关键词筛选，并可批量删除。</span></div>
       <form class="admin-filter-row" method="get">
         <input class="input admin-filter-input" type="number" min="0" name="post_id" placeholder="按帖子 ID 查看" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
         <input class="input admin-filter-input" type="number" min="0" name="author_id" placeholder="按作者 ID 查看" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
+        <input class="input admin-filter-input" type="text" name="post_title_keyword" placeholder="帖子标题关键词" value="<?= e($postTitleKeyword) ?>">
+        <input class="input admin-filter-input" type="text" name="author_keyword" placeholder="作者昵称 / 用户名关键词" value="<?= e($authorKeyword) ?>">
+        <input class="input admin-filter-input" type="text" name="content_keyword" placeholder="评论内容关键词" value="<?= e($contentKeyword) ?>">
         <button class="pill-btn solid" type="submit">筛选</button>
         <a class="pill-btn" href="/admin.php#comments">清空</a>
       </form>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead><tr><th>ID</th><th>评论内容</th><th>作者</th><th>所属帖子</th><th>时间</th><th>操作</th></tr></thead>
-          <tbody>
-            <?php foreach ($commentRows as $row): ?>
-              <tr>
-                <td>#<?= (int) $row['id'] ?></td>
-                <td><?= e(excerpt($row['content'], 88)) ?></td>
-                <td>
-                  <strong><?= e($row['nickname']) ?></strong>
-                  <div class="muted">@<?= e($row['username']) ?></div>
-                  <div><a class="inline-link" href="<?= e(admin_url(['author_id' => (int) $row['user_id']], '#comments')) ?>">看该作者评论</a></div>
-                </td>
-                <td>
-                  <a class="inline-link" href="/post.php?id=<?= (int) $row['post_id'] ?>"><?= e($row['post_title']) ?></a>
-                  <div class="muted">楼主：<?= e($row['post_owner_nickname']) ?> @<?= e($row['post_owner_username']) ?></div>
-                  <div><a class="inline-link" href="<?= e(admin_url(['post_id' => (int) $row['post_id']], '#comments')) ?>">看该帖子评论</a></div>
-                </td>
-                <td><?= e(substr($row['created_at'], 0, 16)) ?></td>
-                <td>
-                  <div class="admin-action-stack">
-                    <a class="pill-btn" href="/post.php?id=<?= (int) $row['post_id'] ?>">前往原帖</a>
-                    <form method="post" class="inline-form" onsubmit="return confirm('确认删除这条评论？此操作会写入日志。');">
-                      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                      <input type="hidden" name="action" value="delete_comment_admin">
-                      <input type="hidden" name="comment_id" value="<?= (int) $row['id'] ?>">
-                      <button class="pill-btn danger" type="submit">删除</button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-            <?php if (!$commentRows): ?>
-              <tr><td colspan="6" class="muted">当前筛选条件下没有评论记录。</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
+      <div class="admin-log-meta muted">当前命中 <?= $commentCount ?> 条评论，单页最多展示 120 条。</div>
+      <form id="bulk-comments-form" method="post" onsubmit="return confirm('确认批量删除已勾选评论？此操作会逐条写入日志。');">
+        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+        <input type="hidden" name="action" value="bulk_delete_comments">
+      </form>
+      <div class="admin-bulk-bar">
+        <button class="pill-btn danger" type="submit" form="bulk-comments-form">批量删除勾选评论</button>
       </div>
+      <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.comment-select').forEach(el => el.checked = this.checked)"></th><th>ID</th><th>评论内容</th><th>作者</th><th>所属帖子</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <?php foreach ($commentRows as $row): ?>
+                <tr>
+                  <td><input class="comment-select" type="checkbox" name="comment_ids[]" value="<?= (int) $row['id'] ?>" form="bulk-comments-form"></td>
+                  <td>#<?= (int) $row['id'] ?></td>
+                  <td><?= e(excerpt($row['content'], 88)) ?></td>
+                  <td>
+                    <strong><?= e($row['nickname']) ?></strong>
+                    <div class="muted">@<?= e($row['username']) ?></div>
+                    <div><a class="inline-link" href="<?= e(admin_url(['author_id' => (int) $row['user_id'], 'author_keyword' => null], '#comments')) ?>">看该作者评论</a></div>
+                  </td>
+                  <td>
+                    <a class="inline-link" href="/post.php?id=<?= (int) $row['post_id'] ?>"><?= e($row['post_title']) ?></a>
+                    <div class="muted">楼主：<?= e($row['post_owner_nickname']) ?> @<?= e($row['post_owner_username']) ?></div>
+                    <div><a class="inline-link" href="<?= e(admin_url(['post_id' => (int) $row['post_id'], 'post_title_keyword' => null], '#comments')) ?>">看该帖子评论</a></div>
+                  </td>
+                  <td><?= e(substr($row['created_at'], 0, 16)) ?></td>
+                  <td>
+                    <div class="admin-action-stack">
+                      <a class="pill-btn" href="/post.php?id=<?= (int) $row['post_id'] ?>">前往原帖</a>
+                      <form method="post" class="inline-form" onsubmit="return confirm('确认删除这条评论？此操作会写入日志。');">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <input type="hidden" name="action" value="delete_comment_admin">
+                        <input type="hidden" name="comment_id" value="<?= (int) $row['id'] ?>">
+                        <button class="pill-btn danger" type="submit">删除</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+              <?php if (!$commentRows): ?>
+                <tr><td colspan="7" class="muted">当前筛选条件下没有评论记录。</td></tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
     </section>
 
     <section id="posts" class="glass panel-card admin-panel-card">
@@ -613,6 +726,35 @@ render_header('PulseNest · 后台管理', $user, [
                 </td>
               </tr>
             <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="notifications-overview" class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Notifications</div>
+      <div class="side-head admin-head-row"><h3>站内通知概况</h3><span class="muted">新增帖子点赞 / 评论点赞提醒后，后台可直接看通知量、未读量和类型分布。</span></div>
+      <div class="hero-stats compact-hero-stats admin-hero-stats">
+        <div class="hero-stat"><div class="label">通知总数</div><div class="num small-num"><?= (int) ($notificationTotals['total_notifications'] ?? 0) ?></div><div class="note">全站累计站内提醒</div></div>
+        <div class="hero-stat"><div class="label">全站未读</div><div class="num small-num"><?= (int) ($notificationTotals['unread_notifications'] ?? 0) ?></div><div class="note">尚未被用户消化</div></div>
+        <div class="hero-stat"><div class="label">24 小时</div><div class="num small-num"><?= $notificationTodayCount ?></div><div class="note">最近一天新增提醒</div></div>
+        <div class="hero-stat"><div class="label">7 天</div><div class="num small-num"><?= $notificationSevenDayCount ?></div><div class="note">最近七天新增提醒</div></div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table compact-table">
+          <thead><tr><th>提醒类型</th><th>总量</th><th>未读</th><th>说明</th></tr></thead>
+          <tbody>
+            <?php foreach ($notificationTypeRows as $row): ?>
+              <tr>
+                <td><span class="tiny-badge"><?= e(notification_type_label($row['type'])) ?></span><div class="muted"><?= e($row['type']) ?></div></td>
+                <td><?= (int) $row['total_count'] ?></td>
+                <td><?= (int) $row['unread_count'] ?></td>
+                <td><?= e(match ($row['type']) { 'post_like' => '有人点赞帖子', 'comment_like' => '有人点赞评论', 'comment_reply' => '有人回复评论', default => '有人回复帖子', }) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if (!$notificationTypeRows): ?>
+              <tr><td colspan="4" class="muted">当前还没有任何站内通知数据。</td></tr>
+            <?php endif; ?>
           </tbody>
         </table>
       </div>
@@ -674,7 +816,7 @@ render_header('PulseNest · 后台管理', $user, [
         <section id="categories" class="glass panel-card admin-panel-card">
           <div class="section-kicker">Categories</div>
           <div class="side-head"><h3>分类管理</h3></div>
-          <div class="notice subtle-notice">删除分类时，如果下面还有版块，可直接选择目标分类迁移后再删，不再只是硬性阻止。</div>
+          <div class="notice subtle-notice">删除分类时，如果下面还有版块，可直接选择目标分类迁移后再删；同时支持上移 / 下移快速调序。</div>
           <form class="admin-crud-form" method="post">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="action" value="create_category">
@@ -702,6 +844,9 @@ render_header('PulseNest · 后台管理', $user, [
                   <?php endforeach; ?>
                 </select>
                 <div class="admin-action-stack">
+                  <button class="pill-btn" type="submit" name="action" value="move_category" onclick="this.form.direction.value='up'">上移</button>
+                  <button class="pill-btn" type="submit" name="action" value="move_category" onclick="this.form.direction.value='down'">下移</button>
+                  <input type="hidden" name="direction" value="up">
                   <button class="pill-btn solid" type="submit" name="action" value="update_category">保存分类</button>
                   <button class="pill-btn danger" type="submit" name="action" value="delete_category" onclick="return confirm('确认删除这个分类？若已选迁移目标，会先迁移版块再删除。');">删除 / 迁移删除</button>
                 </div>
@@ -713,7 +858,7 @@ render_header('PulseNest · 后台管理', $user, [
         <section id="boards" class="glass panel-card admin-panel-card">
           <div class="section-kicker">Boards</div>
           <div class="side-head"><h3>版块管理</h3></div>
-          <div class="notice subtle-notice">删除版块时，可把原帖整体迁移到其他版块，链路不丢、访问更稳。</div>
+          <div class="notice subtle-notice">删除版块时，可把原帖整体迁移到其他版块，链路不丢、访问更稳；同分类内还支持上移 / 下移调序。</div>
           <form class="admin-crud-form" method="post">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="action" value="create_board">
@@ -753,6 +898,9 @@ render_header('PulseNest · 后台管理', $user, [
                   <?php endforeach; ?>
                 </select>
                 <div class="admin-action-stack">
+                  <button class="pill-btn" type="submit" name="action" value="move_board" onclick="this.form.direction.value='up'">上移</button>
+                  <button class="pill-btn" type="submit" name="action" value="move_board" onclick="this.form.direction.value='down'">下移</button>
+                  <input type="hidden" name="direction" value="up">
                   <button class="pill-btn solid" type="submit" name="action" value="update_board">保存版块</button>
                   <button class="pill-btn danger" type="submit" name="action" value="delete_board" onclick="return confirm('确认删除这个版块？若已选迁移目标，会先迁移帖子再删除。');">删除 / 迁移删除</button>
                 </div>
@@ -769,6 +917,9 @@ render_header('PulseNest · 后台管理', $user, [
       <form class="admin-filter-row admin-log-filter-row" method="get">
         <input type="hidden" name="post_id" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
         <input type="hidden" name="author_id" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
+        <input type="hidden" name="post_title_keyword" value="<?= e($postTitleKeyword) ?>">
+        <input type="hidden" name="author_keyword" value="<?= e($authorKeyword) ?>">
+        <input type="hidden" name="content_keyword" value="<?= e($contentKeyword) ?>">
         <select class="input admin-filter-input" name="log_action">
           <option value="">全部动作</option>
           <?php foreach ($logActionOptions as $actionType): ?>

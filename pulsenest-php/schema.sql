@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS forum_categories (
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uniq_forum_categories_slug (slug)
+  UNIQUE KEY uniq_forum_categories_slug (slug),
+  KEY idx_forum_categories_sort (sort_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS forum_boards (
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS forum_boards (
   PRIMARY KEY (id),
   UNIQUE KEY uniq_forum_boards_slug (slug),
   KEY idx_forum_boards_category_id (category_id),
+  KEY idx_forum_boards_category_sort (category_id, sort_order, id),
   CONSTRAINT fk_forum_boards_category FOREIGN KEY (category_id) REFERENCES forum_categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -54,6 +56,7 @@ CREATE TABLE IF NOT EXISTS posts (
   PRIMARY KEY (id),
   KEY idx_posts_user_id (user_id),
   KEY idx_posts_board_id (board_id),
+  KEY idx_posts_created_board (board_id, created_at),
   CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_posts_board FOREIGN KEY (board_id) REFERENCES forum_boards(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -70,6 +73,8 @@ CREATE TABLE IF NOT EXISTS comments (
   KEY idx_comments_post_id (post_id),
   KEY idx_comments_user_id (user_id),
   KEY idx_comments_parent_id (parent_id),
+  KEY idx_comments_post_created (post_id, created_at),
+  KEY idx_comments_user_created (user_id, created_at),
   CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_parent FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE
@@ -100,10 +105,24 @@ CREATE TABLE IF NOT EXISTS notifications (
   KEY idx_notifications_recipient_read (recipient_user_id, is_read),
   KEY idx_notifications_post_id (post_id),
   KEY idx_notifications_comment_id (comment_id),
+  KEY idx_notifications_type_created (type, created_at),
+  KEY idx_notifications_recipient_created (recipient_user_id, created_at),
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS comment_likes (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  comment_id INT UNSIGNED NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_comment_likes_comment_user (comment_id, user_id),
+  KEY idx_comment_likes_user_id (user_id),
+  CONSTRAINT fk_comment_likes_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comment_likes_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS moderation_logs (
