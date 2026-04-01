@@ -41,7 +41,10 @@ function render_header(string $title, ?array $user = null, array $options = []):
         <?php endif; ?>
 
         <?php if ($user): ?>
-          <a class="pill-btn" href="/account.php"><?= e($user['nickname']) ?></a>
+          <a class="header-user-chip" href="/account.php">
+            <?= render_avatar($user, 'mini-avatar') ?>
+            <span><?= e($user['nickname']) ?></span>
+          </a>
           <a class="pill-btn" href="/create-post.php">发帖</a>
           <a class="pill-btn solid" href="/logout.php">退出</a>
         <?php else: ?>

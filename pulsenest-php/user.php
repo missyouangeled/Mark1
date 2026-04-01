@@ -1,0 +1,129 @@
+<?php
+require __DIR__ . '/layout.php';
+start_session_if_needed();
+$currentViewer = refresh_current_user();
+$userId = (int) ($_GET['id'] ?? 0);
+
+$stmt = db()->prepare(
+    'SELECT u.id, u.username, u.nickname, u.email, u.avatar_path, u.bio, u.created_at,
+            COUNT(p.id) AS post_count
+     FROM pulsenest_users u
+     LEFT JOIN posts p ON p.user_id = u.id
+     WHERE u.id = :id
+     GROUP BY u.id, u.username, u.nickname, u.email, u.avatar_path, u.bio, u.created_at
+     LIMIT 1'
+);
+$stmt->execute(['id' => $userId]);
+$profile = $stmt->fetch();
+
+$recentPosts = [];
+if ($profile) {
+    $recentStmt = db()->prepare(
+        'SELECT p.id, p.title, p.content, p.image_path, p.created_at,
+                COALESCE(l.like_count, 0) AS like_count,
+                COALESCE(c.comment_count, 0) AS comment_count
+         FROM posts p
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.user_id = :id
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT 6'
+    );
+    $recentStmt->execute(['id' => $profile['id']]);
+    $recentPosts = $recentStmt->fetchAll();
+}
+
+if (!$profile) {
+    http_response_code(404);
+}
+
+render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest · 用户不存在', $currentViewer, [
+    'searchText' => '🔎 搜索作者、主页、最近帖子',
+]);
+?>
+  <main class="shell page-shell nebula-page-shell user-page">
+    <?php if (!$profile): ?>
+      <section class="glass panel-card empty-inline nebula-empty">没有找到这个用户。<a class="link" href="/posts.php">返回帖子列表</a></section>
+    <?php else: ?>
+      <section class="glass nebula-hero nebula-hero-split user-hero">
+        <div class="nebula-copy">
+          <div class="brand-chip">纳达尔星项目 · 星云初始01 · 用户主页</div>
+          <h1><?= e($profile['nickname']) ?> 的社区主页</h1>
+          <p class="page-desc nebula-desc"><?= e($profile['bio'] ?: '这个成员还没有写简介，但已经可以从这里查看他的发帖记录和社区存在感。') ?></p>
+          <div class="hero-stats compact-hero-stats">
+            <div class="hero-stat"><div class="label">用户名</div><div class="num small-num">@<?= e($profile['username']) ?></div><div class="note">公开社区身份</div></div>
+            <div class="hero-stat"><div class="label">发帖数</div><div class="num small-num"><?= (int) $profile['post_count'] ?></div><div class="note">累计公开内容</div></div>
+            <div class="hero-stat"><div class="label">加入时间</div><div class="num small-num"><?= e(substr((string) $profile['created_at'], 0, 10)) ?></div><div class="note"><?= e(human_time($profile['created_at'])) ?></div></div>
+          </div>
+        </div>
+        <aside class="profile-chip nebula-profile-chip user-profile-chip">
+          <?= render_avatar($profile, 'user-avatar large') ?>
+          <div>
+            <strong><?= e($profile['nickname']) ?></strong>
+            <span>@<?= e($profile['username']) ?></span>
+            <span><?= e($profile['email']) ?></span>
+            <span><?= e($profile['bio'] ?: '暂无个性签名') ?></span>
+          </div>
+        </aside>
+      </section>
+
+      <div class="nebula-section-grid user-grid">
+        <section class="right-col-stack">
+          <div class="glass panel-card">
+            <div class="section-kicker">Recent Posts</div>
+            <div class="side-head"><h3>最近发帖</h3></div>
+            <?php if (!$recentPosts): ?>
+              <div class="empty-inline nebula-empty">这个用户暂时还没有发过帖子。</div>
+            <?php else: ?>
+              <div class="list-stack profile-post-stack">
+                <?php foreach ($recentPosts as $post): ?>
+                  <article class="glass panel-card profile-post-card inner-card">
+                    <?php if (!empty($post['image_path'])): ?>
+                      <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+                    <?php endif; ?>
+                    <h3 class="post-title small"><a href="/post.php?id=<?= (int) $post['id'] ?>"><?= e($post['title']) ?></a></h3>
+                    <p class="post-text compact"><?= e(excerpt($post['content'], 140)) ?></p>
+                    <div class="list-card-footer">
+                      <div class="chips">
+                        <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
+                        <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                      </div>
+                      <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">查看详情 →</a>
+                    </div>
+                  </article>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <aside class="right-col-stack">
+          <section class="glass panel-card">
+            <div class="section-kicker">Profile Data</div>
+            <div class="detail-list">
+              <div class="detail-row"><span>昵称</span><strong><?= e($profile['nickname']) ?></strong></div>
+              <div class="detail-row"><span>用户名</span><strong>@<?= e($profile['username']) ?></strong></div>
+              <div class="detail-row"><span>发帖总数</span><strong><?= (int) $profile['post_count'] ?></strong></div>
+              <div class="detail-row"><span>加入时间</span><strong><?= e(substr((string) $profile['created_at'], 0, 16)) ?></strong></div>
+            </div>
+          </section>
+
+          <section class="glass panel-card">
+            <div class="section-kicker">Quick Jump</div>
+            <div class="quick-links">
+              <a class="quick-link" href="/posts.php">全部帖子</a>
+              <a class="quick-link" href="/">返回首页</a>
+              <?php if ($currentViewer && (int) $currentViewer['id'] === (int) $profile['id']): ?>
+                <a class="quick-link" href="/account.php">编辑我的资料</a>
+              <?php endif; ?>
+            </div>
+          </section>
+        </aside>
+      </div>
+    <?php endif; ?>
+  </main>
+<?php render_footer(); ?>

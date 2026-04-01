@@ -1,13 +1,58 @@
 <?php
 require __DIR__ . '/layout.php';
 $user = ensure_logged_in();
+$flash = flash_get();
+$profileError = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $bio = trim($_POST['bio'] ?? '');
+    if (mb_strlen($bio) > 280) {
+        $profileError = '个性签名请控制在 280 字以内。';
+    } else {
+        try {
+            $avatarPath = handle_image_upload($_FILES['avatar'] ?? [], AVATAR_UPLOAD_DIR);
+            if (!$avatarPath) {
+                $avatarPath = $user['avatar_path'] ?? null;
+            }
+
+            $stmt = db()->prepare('UPDATE pulsenest_users SET bio = :bio, avatar_path = :avatar_path WHERE id = :id');
+            $stmt->execute([
+                'bio' => $bio !== '' ? $bio : null,
+                'avatar_path' => $avatarPath,
+                'id' => $user['id'],
+            ]);
+            refresh_current_user();
+            flash_set('success', '会员资料已更新。');
+            redirect_to('/account.php');
+        } catch (RuntimeException $e) {
+            $profileError = $e->getMessage();
+            $user = refresh_current_user() ?? $user;
+        }
+    }
+}
+
+$user = refresh_current_user() ?? $user;
 $stmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE user_id = :id');
 $stmt->execute(['id' => $user['id']]);
 $postCount = (int) $stmt->fetchColumn();
 $totalPosts = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
 $memberCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
-$latestPostsStmt = db()->prepare('SELECT id, title, created_at FROM posts WHERE user_id = :id ORDER BY created_at DESC, id DESC LIMIT 5');
+$latestPostsStmt = db()->prepare(
+    'SELECT p.id, p.title, p.created_at,
+            COALESCE(l.like_count, 0) AS like_count,
+            COALESCE(c.comment_count, 0) AS comment_count
+     FROM posts p
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+     ) l ON l.post_id = p.id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
+     ) c ON c.post_id = p.id
+     WHERE p.user_id = :id
+     ORDER BY p.created_at DESC, p.id DESC
+     LIMIT 5'
+);
 $latestPostsStmt->execute(['id' => $user['id']]);
 $latestPosts = $latestPostsStmt->fetchAll();
 
@@ -16,19 +61,24 @@ render_header('PulseNest · 会员中心', $user, [
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell account-page">
+    <?php if ($flash): ?>
+      <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
+    <?php endif; ?>
+    <?php if ($profileError): ?><div class="notice error floating-notice"><?= e($profileError) ?></div><?php endif; ?>
+
     <section class="glass nebula-hero nebula-hero-split member-hero nebula-member-hero">
       <div class="nebula-copy">
         <div class="brand-chip">纳达尔星项目 · 星云初始01 · 会员中心</div>
         <h1>欢迎回来，<?= e($user['nickname']) ?>，你的社区身份卡已经并入星云主壳。</h1>
-        <p class="page-desc nebula-desc">会员中心继续保留原本登录保护、数据统计和快捷入口，但信息编排更靠近首页：先看状态，再决定继续发帖、回内容流或处理账号动作。</p>
+        <p class="page-desc nebula-desc">会员中心现在不只是统计页：你可以上传头像、更新一句个人介绍，并从这里直接跳进自己的主页。</p>
         <div class="hero-actions-row">
           <a class="pill-btn solid" href="/create-post.php">写一篇新帖子</a>
-          <a class="pill-btn" href="/posts.php">查看全部帖子</a>
+          <a class="pill-btn" href="<?= e(profile_url($user)) ?>">查看我的主页</a>
         </div>
       </div>
 
       <aside class="profile-chip nebula-profile-chip">
-        <div class="user-avatar large"></div>
+        <?= render_avatar($user, 'user-avatar large') ?>
         <div>
           <strong><?= e($user['nickname']) ?></strong>
           <span>@<?= e($user['username']) ?></span>
@@ -47,14 +97,24 @@ render_header('PulseNest · 会员中心', $user, [
     <div class="nebula-section-grid account-grid">
       <div class="right-col-stack">
         <section class="glass panel-card">
-          <div class="section-kicker">Member Data</div>
-          <div class="side-head"><h3>当前用户信息</h3></div>
-          <div class="detail-list">
-            <div class="detail-row"><span>昵称</span><strong><?= e($user['nickname']) ?></strong></div>
-            <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
-            <div class="detail-row"><span>邮箱</span><strong><?= e($user['email']) ?></strong></div>
-            <div class="detail-row"><span>加入时间</span><strong><?= e(substr((string) $user['created_at'], 0, 16)) ?></strong></div>
-          </div>
+          <div class="section-kicker">Profile Studio</div>
+          <div class="side-head"><h3>资料与头像</h3></div>
+          <form class="form" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+            <div class="avatar-upload-row">
+              <?= render_avatar($user, 'user-avatar large') ?>
+              <div class="field grow-field">
+                <label>上传头像</label>
+                <input class="input file-input" type="file" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp" />
+                <div class="field-tip">支持 JPG / PNG / GIF / WEBP，大小 5MB 内。</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>个人简介</label>
+              <textarea class="textarea small-textarea" name="bio" placeholder="写一句让别人认识你的话"><?= e($user['bio'] ?? '') ?></textarea>
+            </div>
+            <button class="submit" type="submit">保存资料</button>
+          </form>
         </section>
 
         <section class="glass panel-card">
@@ -67,7 +127,7 @@ render_header('PulseNest · 会员中心', $user, [
               <?php foreach ($latestPosts as $post): ?>
                 <a class="list-item" href="/post.php?id=<?= (int) $post['id'] ?>">
                   <strong><?= e($post['title']) ?></strong>
-                  <span><?= e(human_time($post['created_at'])) ?></span>
+                  <span><?= e(human_time($post['created_at'])) ?> · <?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</span>
                 </a>
               <?php endforeach; ?>
             </div>
@@ -77,21 +137,23 @@ render_header('PulseNest · 会员中心', $user, [
 
       <aside class="right-col-stack">
         <section class="glass panel-card">
+          <div class="section-kicker">Member Data</div>
+          <div class="side-head"><h3>当前用户信息</h3></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>昵称</span><strong><?= e($user['nickname']) ?></strong></div>
+            <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
+            <div class="detail-row"><span>邮箱</span><strong><?= e($user['email']) ?></strong></div>
+            <div class="detail-row"><span>签名</span><strong><?= e($user['bio'] ?: '还没写简介') ?></strong></div>
+          </div>
+        </section>
+
+        <section class="glass panel-card">
           <div class="section-kicker">Quick Actions</div>
           <div class="quick-links">
             <a class="quick-link" href="/create-post.php">写一篇新帖子</a>
             <a class="quick-link" href="/posts.php">查看全部帖子</a>
             <a class="quick-link" href="/forgot-password.php">发起密码重置</a>
             <a class="quick-link" href="/">返回首页内容流</a>
-          </div>
-        </section>
-
-        <section class="glass section-card">
-          <div class="section-kicker">Member Status</div>
-          <div class="rank-list compact-rank-list">
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">登录保护</div><div class="meta">未登录仍会跳转到 /login.php</div></div><div class="score">SAFE</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">数据同步</div><div class="meta">统计数字实时读取数据库</div></div><div class="score">LIVE</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">入口完整</div><div class="meta">发帖 / 浏览 / 找回密码 / 回首页</div></div><div class="score">OK</div></div></div>
           </div>
         </section>
       </aside>

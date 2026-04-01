@@ -5,6 +5,7 @@ $error = '';
 $form = ['title' => '', 'content' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $form['title'] = trim($_POST['title'] ?? '');
     $form['content'] = trim($_POST['content'] ?? '');
 
@@ -15,15 +16,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (mb_strlen($form['content']) < 10) {
         $error = '正文至少写满 10 个字，帖子才像回事。';
     } else {
-        $stmt = db()->prepare('INSERT INTO posts (user_id, title, content) VALUES (:user_id, :title, :content)');
-        $stmt->execute([
-            'user_id' => $user['id'],
-            'title' => $form['title'],
-            'content' => $form['content'],
-        ]);
-        $postId = (int) db()->lastInsertId();
-        flash_set('success', '帖子发布成功，已经写入数据库。');
-        redirect_to('/post.php?id=' . $postId);
+        try {
+            $imagePath = handle_image_upload($_FILES['cover_image'] ?? [], POST_UPLOAD_DIR);
+            $stmt = db()->prepare('INSERT INTO posts (user_id, title, content, image_path) VALUES (:user_id, :title, :content, :image_path)');
+            $stmt->execute([
+                'user_id' => $user['id'],
+                'title' => $form['title'],
+                'content' => $form['content'],
+                'image_path' => $imagePath,
+            ]);
+            $postId = (int) db()->lastInsertId();
+            flash_set('success', '帖子发布成功，已经写入数据库。');
+            redirect_to('/post.php?id=' . $postId);
+        } catch (RuntimeException $e) {
+            $error = $e->getMessage();
+        }
     }
 }
 
@@ -36,10 +43,10 @@ render_header('PulseNest · 发帖', $user, [
       <div class="nebula-copy">
         <div class="brand-chip">纳达尔星项目 · 星云初始01 · 发帖页</div>
         <h1>把你的内容直接抛进这片星云，发布后立即进入真实帖子链路。</h1>
-        <p class="page-desc nebula-desc">这一页仍然走原本的登录保护与 MySQL 入库逻辑，没有动发帖主流程；只是把表单包装成和首页更统一的深色玻璃工作台。</p>
+        <p class="page-desc nebula-desc">这一页继续走原本的登录保护与 MySQL 入库逻辑，但现在支持顺手上传一张帖子图片，让列表卡、首页卡和详情页都更像真社区。</p>
         <div class="hero-stats compact-hero-stats">
           <div class="hero-stat"><div class="label">发布后</div><div class="num small-num">跳详情页</div><div class="note">成功即重定向到 /post.php?id=xx</div></div>
-          <div class="hero-stat"><div class="label">数据源</div><div class="num small-num">MySQL</div><div class="note">写入 posts 表后首页和列表可见</div></div>
+          <div class="hero-stat"><div class="label">配图支持</div><div class="num small-num">单图上传</div><div class="note">保存到 uploads/posts，首页与列表同步显示</div></div>
           <div class="hero-stat"><div class="label">当前用户</div><div class="num small-num"><?= e($user['nickname']) ?></div><div class="note">@<?= e($user['username']) ?></div></div>
         </div>
       </div>
@@ -49,7 +56,7 @@ render_header('PulseNest · 发帖', $user, [
         <div class="quick-links">
           <div class="quick-link static-link">标题建议 4~120 字，能一眼看懂重点。</div>
           <div class="quick-link static-link">正文至少 10 字，方便在列表页展示摘要。</div>
-          <div class="quick-link static-link">发帖成功后，帖子会同时出现在首页、列表页和详情页链路里。</div>
+          <div class="quick-link static-link">帖子图片支持 JPG / PNG / GIF / WEBP，大小 5MB 内。</div>
         </div>
       </aside>
     </section>
@@ -57,11 +64,12 @@ render_header('PulseNest · 发帖', $user, [
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
       <div class="kicker">Create Post</div>
       <h2>发布一篇新帖子</h2>
-      <p class="desc">继续使用现有字段：标题、正文。提交后真实入库，并立刻能在内容流里验证结果。</p>
+      <p class="desc">继续使用现有标题 + 正文链路，并新增帖子图片上传。提交后真实入库，并立刻能在内容流里验证结果。</p>
 
       <?php if ($error): ?><div class="notice error"><?= e($error) ?></div><?php endif; ?>
 
-      <form class="form" method="post">
+      <form class="form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
         <div class="field">
           <label>标题</label>
           <input class="input" name="title" value="<?= e($form['title']) ?>" placeholder="给这篇帖子起个吸引人点开的标题" />
@@ -69,6 +77,11 @@ render_header('PulseNest · 发帖', $user, [
         <div class="field">
           <label>正文</label>
           <textarea class="textarea compose-textarea" name="content" placeholder="写下你想分享的内容、感受或推荐理由"><?= e($form['content']) ?></textarea>
+        </div>
+        <div class="field">
+          <label>帖子图片（可选）</label>
+          <input class="input file-input" type="file" name="cover_image" accept="image/jpeg,image/png,image/gif,image/webp" />
+          <div class="field-tip">上传后会在首页、列表页和详情页显示。</div>
         </div>
         <div class="compose-actions">
           <a class="pill-btn" href="/posts.php">先看看帖子列表</a>

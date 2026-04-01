@@ -508,6 +508,55 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
   .page-hero { flex-direction: column; align-items:flex-start; }
   .hero-points, .quick-icons, .tool-grid, .grid-2, .stat-grid.compact { grid-template-columns: repeat(2,1fr); }
 }
+.header-user-chip {
+  display:flex; align-items:center; gap:10px; padding: 8px 14px; border-radius: 999px;
+  border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.92);
+}
+.mini-avatar {
+  width: 34px; height: 34px; border-radius: 999px; object-fit: cover;
+  background: linear-gradient(135deg,#dff7ff,#b8fff2); display:flex; align-items:center; justify-content:center; color:#09111f; font-weight: 800;
+}
+.avatar-image { object-fit: cover; display:block; }
+.avatar-fallback {
+  display:flex; align-items:center; justify-content:center; color:#09111f; font-weight: 900; letter-spacing: .04em;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
+}
+.inline-link { color: #dff7ff; }
+.inline-link:hover { color: #6df0cf; }
+.file-input { padding: 12px 14px; }
+.field-tip { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,0.55); }
+.small-textarea { min-height: 130px; }
+.avatar-upload-row { display:flex; gap:18px; align-items:flex-start; margin-bottom: 22px; }
+.grow-field { flex:1; }
+.post-cover-wrap {
+  margin-top: 18px; border-radius: 24px; overflow: hidden; border:1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+.post-cover-image { width:100%; height: 320px; object-fit: cover; display:block; }
+.detail-cover { height: min(460px, 48vw); }
+.card-cover-image { height: 220px; }
+.image-cover { min-height: 220px; padding: 0; overflow: hidden; }
+.action-bar { margin-top: 28px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.meta-pill {
+  display:inline-flex; align-items:center; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.76);
+}
+.inline-form { margin:0; }
+.comment-panel, .comment-list, .detail-main-stack, .profile-post-stack { display:flex; flex-direction:column; gap:18px; }
+.comment-card {
+  padding: 18px; border-radius: 22px; background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+}
+.comment-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.comment-body { margin-top: 14px; color: rgba(255,255,255,0.84); line-height: 1.9; }
+.reply-box { margin-top: 14px; }
+.reply-box summary { cursor:pointer; color: var(--brand); }
+.reply-form { margin-top: 12px; }
+.reply-list { margin-top: 16px; display:flex; flex-direction:column; gap:12px; padding-left: 22px; border-left: 1px solid rgba(255,255,255,0.08); }
+.reply-card { background: rgba(255,255,255,0.03); }
+.detail-grid-wide { grid-template-columns: minmax(0, 1fr) 320px; }
+.user-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+.profile-post-card.inner-card { padding: 18px; }
+.user-profile-chip { min-height: 100%; }
 @media (max-width: 720px) {
   .shell { width: min(100%, calc(100% - 20px)); }
   .header-strip { flex-direction: column; align-items:flex-start; padding: 8px 0; }
@@ -520,6 +569,8 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
   .row-bottom { margin-top: 72px; }
   .auth-hero-inner, .auth-panel, .page-hero, .panel-card, .detail-card, .side-card, .post, .section-card, .nebula-hero { padding-left: 18px; padding-right: 18px; }
   .auth-copy h1, .auth-panel h2, .page-hero h1, .detail-hero h1 { font-size: 34px; }
-  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip, .detail-hero-head, .compose-actions { align-items:flex-start; flex-direction: column; }
+  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip, .detail-hero-head, .compose-actions, .avatar-upload-row, .action-bar { align-items:flex-start; flex-direction: column; }
   .narrow-post-shell { width: min(100%, calc(100% - 20px)); }
+  .post-cover-image, .detail-cover, .card-cover-image { height: auto; aspect-ratio: 16/10; }
+  .reply-list { padding-left: 12px; }
 }
