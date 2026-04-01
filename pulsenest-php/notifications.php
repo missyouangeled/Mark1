@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = trim((string) ($_POST['action'] ?? 'mark_all_read'));
     $filterType = trim((string) ($_POST['filter_type'] ?? ''));
-    $allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like'];
+    $allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated'];
     if ($filterType !== '' && !in_array($filterType, $allowedTypes, true)) {
         $filterType = '';
     }
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $flash = flash_get();
 $selectedType = trim((string) ($_GET['type'] ?? ''));
 $onlyUnread = (int) ($_GET['unread'] ?? 0) === 1;
-$allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like'];
+$allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated'];
 if ($selectedType !== '' && !in_array($selectedType, $allowedTypes, true)) {
     $selectedType = '';
 }
@@ -193,6 +193,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'post_like' => '有人点赞你的帖子',
                 'comment_like' => '有人点赞你的评论',
                 'comment_reply' => '有人回复你的评论',
+                'comment_moderated' => '你的评论被审核通过或隐藏时通知',
                 default => '有人回复你的帖子',
               }) ?></td>
             </tr>
@@ -233,6 +234,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'comment_reply' => '回复了你的评论：',
                 'post_like' => '点赞了你的帖子：',
                 'comment_like' => '点赞了你在这篇帖子下的评论：',
+                'comment_moderated' => '你的评论审核状态已更新，关联帖子：',
                 default => '回复了你的帖子：',
               }) ?>
               <a class="inline-link" href="/post.php?id=<?= (int) $item['post_id'] ?>"><?= e($item['title']) ?></a>

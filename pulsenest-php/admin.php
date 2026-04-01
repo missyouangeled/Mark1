@@ -14,6 +14,8 @@ function admin_url(array $overrides = [], string $hash = ''): string {
         'author_keyword' => trim((string) ($_GET['author_keyword'] ?? '')),
         'content_keyword' => trim((string) ($_GET['content_keyword'] ?? '')),
         'comment_status' => trim((string) ($_GET['comment_status'] ?? '')),
+        'post_page' => (int) ($_GET['post_page'] ?? 1),
+        'comment_page' => (int) ($_GET['comment_page'] ?? 1),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
         'log_target_type' => trim((string) ($_GET['log_target_type'] ?? '')),
         'log_actor_id' => (int) ($_GET['log_actor_id'] ?? 0),
@@ -45,8 +47,22 @@ function admin_notification_copy(string $type): string {
         'post_like' => '有人点赞帖子',
         'comment_like' => '有人点赞评论',
         'comment_reply' => '有人回复评论',
+        'comment_moderated' => '评论审核结果通知作者',
         default => '有人回复帖子',
     };
+}
+
+function admin_pagination(array $baseQuery, string $pageKey, int $page, int $totalPages, string $hash = ''): string {
+    $buildUrl = static function (int $targetPage) use ($baseQuery, $pageKey, $hash): string {
+        $query = array_merge($baseQuery, [$pageKey => $targetPage]);
+        return admin_url($query, $hash);
+    };
+
+    return '<div class="admin-pagination">'
+        . '<a class="pill-btn ' . ($page <= 1 ? 'is-disabled' : '') . '" ' . ($page <= 1 ? 'aria-disabled="true"' : 'href="' . e($buildUrl($page - 1)) . '"') . '>上一页</a>'
+        . '<div class="pagination-status">第 <strong>' . $page . '</strong> 页 / 共 <strong>' . $totalPages . '</strong> 页</div>'
+        . '<a class="pill-btn ' . ($page >= $totalPages ? 'is-disabled' : '') . '" ' . ($page >= $totalPages ? 'aria-disabled="true"' : 'href="' . e($buildUrl($page + 1)) . '"') . '>下一页</a>'
+        . '</div>';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -111,9 +127,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('/admin.php#users');
     }
 
+    if ($action === 'update_home_copy') {
+        $settings = [];
+        foreach (array_keys(default_home_copy_settings()) as $settingKey) {
+            $settings[$settingKey] = trim((string) ($_POST[$settingKey] ?? ''));
+        }
+        set_site_settings($settings);
+        log_moderation_action((int) $user['id'], 'home_copy_updated', 'site_settings', null, '首页 Hero / Focus 文案已更新');
+        flash_set('success', '首页运营卡文案已更新。');
+        redirect_to('/admin.php#home-copy');
+    }
+
     if ($action === 'update_post_ops') {
         $postId = (int) ($_POST['post_id'] ?? 0);
-        $stmt = db()->prepare('SELECT p.id, p.title, p.home_slot, u.nickname, u.username FROM posts p INNER JOIN pulsenest_users u ON u.id = p.user_id WHERE p.id = :id LIMIT 1');
+        $stmt = db()->prepare('SELECT p.id, p.title, p.home_slot, p.recommend_group, p.recommend_priority, u.nickname, u.username FROM posts p INNER JOIN pulsenest_users u ON u.id = p.user_id WHERE p.id = :id LIMIT 1');
         $stmt->execute(['id' => $postId]);
         $post = $stmt->fetch();
 
@@ -126,9 +153,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $isFeatured = isset($_POST['is_featured']) ? 1 : 0;
         $recommendLevel = max(0, min(9, (int) ($_POST['recommend_level'] ?? 0)));
         $homeSlot = trim((string) ($_POST['home_slot'] ?? ''));
+        $recommendGroup = trim((string) ($_POST['recommend_group'] ?? 'general'));
+        $recommendPriority = max(0, min(999, (int) ($_POST['recommend_priority'] ?? 0)));
         $allowedSlots = array_keys(home_slot_definitions());
+        $allowedGroups = array_keys(recommend_group_definitions());
         if ($homeSlot !== '' && !in_array($homeSlot, $allowedSlots, true)) {
             $homeSlot = '';
+        }
+        if (!in_array($recommendGroup, $allowedGroups, true)) {
+            $recommendGroup = 'general';
         }
 
         if ($homeSlot !== '') {
@@ -138,16 +171,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        db()->prepare('UPDATE posts SET is_sticky = :is_sticky, is_featured = :is_featured, recommend_level = :recommend_level, home_slot = :home_slot WHERE id = :id LIMIT 1')->execute([
+        db()->prepare('UPDATE posts SET is_sticky = :is_sticky, is_featured = :is_featured, recommend_level = :recommend_level, home_slot = :home_slot, recommend_group = :recommend_group, recommend_priority = :recommend_priority WHERE id = :id LIMIT 1')->execute([
             'is_sticky' => $isSticky,
             'is_featured' => $isFeatured,
             'recommend_level' => $recommendLevel,
             'home_slot' => $homeSlot !== '' ? $homeSlot : null,
+            'recommend_group' => $recommendGroup,
+            'recommend_priority' => $recommendPriority,
             'id' => $postId,
         ]);
 
         $slotLabel = $homeSlot !== '' ? (home_slot_definitions()[$homeSlot]['label'] ?? $homeSlot) : '未绑定';
-        log_moderation_action((int) $user['id'], 'post_ops_updated', 'post', $postId, '《' . $post['title'] . '》 · 置顶:' . $isSticky . ' · 精华:' . $isFeatured . ' · 推荐位:' . $recommendLevel . ' · 首页卡:' . $slotLabel);
+        $groupLabel = recommend_group_definitions()[$recommendGroup]['label'] ?? $recommendGroup;
+        log_moderation_action((int) $user['id'], 'post_ops_updated', 'post', $postId, '《' . $post['title'] . '》 · 置顶:' . $isSticky . ' · 精华:' . $isFeatured . ' · 推荐位:' . $recommendLevel . ' · 分组:' . $groupLabel . ' · 优先级:' . $recommendPriority . ' · 首页卡:' . $slotLabel);
         flash_set('success', '帖子运营位已更新。');
         redirect_to('/admin.php#posts');
     }
@@ -196,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $placeholders = implode(',', array_fill(0, count($commentIds), '?'));
         $stmt = db()->prepare(
-            'SELECT c.id, c.content, c.status, p.title, u.nickname, u.username
+            'SELECT c.id, c.post_id, c.user_id, c.content, c.status, p.title, u.nickname, u.username
              FROM comments c
              INNER JOIN posts p ON p.id = c.post_id
              INNER JOIN pulsenest_users u ON u.id = c.user_id
@@ -214,6 +250,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $update->execute(array_merge([$targetStatus], $commentIds));
         foreach ($rows as $row) {
             log_moderation_action((int) $user['id'], 'comment_status_updated', 'comment', (int) $row['id'], ($row['nickname'] ?: $row['username']) . ' · ' . comment_status_label($row['status']) . ' → ' . comment_status_label($targetStatus) . ' · 《' . $row['title'] . '》');
+            if (($row['status'] ?? '') !== $targetStatus) {
+                create_comment_moderation_notification($row, ['id' => (int) $row['post_id']], (int) $user['id'], $targetStatus);
+            }
         }
         flash_set('success', '已批量更新 ' . count($rows) . ' 条评论为“' . comment_status_label($targetStatus) . '”。');
         redirect_to(admin_url(['comment_status' => $targetStatus], '#comments'));
@@ -445,6 +484,11 @@ $postTitleKeyword = trim((string) ($_GET['post_title_keyword'] ?? ''));
 $authorKeyword = trim((string) ($_GET['author_keyword'] ?? ''));
 $contentKeyword = trim((string) ($_GET['content_keyword'] ?? ''));
 $commentStatusFilter = trim((string) ($_GET['comment_status'] ?? ''));
+$postPage = max(1, (int) ($_GET['post_page'] ?? 1));
+$commentPage = max(1, (int) ($_GET['comment_page'] ?? 1));
+$postPageSize = 12;
+$commentPageSize = 40;
+
 $commentWhere = [];
 $commentParams = [];
 if ($postFilterId > 0) {
@@ -471,6 +515,20 @@ if ($commentStatusFilter !== '' && in_array($commentStatusFilter, ['approved', '
     $commentWhere[] = 'c.status = :comment_status';
     $commentParams['comment_status'] = $commentStatusFilter;
 }
+$commentWhereSql = $commentWhere ? ' WHERE ' . implode(' AND ', $commentWhere) : '';
+$commentCountStmt = db()->prepare(
+    'SELECT COUNT(*)
+     FROM comments c
+     INNER JOIN posts p ON p.id = c.post_id
+     INNER JOIN pulsenest_users u ON u.id = c.user_id
+     INNER JOIN pulsenest_users owner ON owner.id = p.user_id'
+    . $commentWhereSql
+);
+$commentCountStmt->execute($commentParams);
+$commentTotal = (int) $commentCountStmt->fetchColumn();
+$commentTotalPages = max(1, (int) ceil($commentTotal / $commentPageSize));
+$commentPage = min($commentPage, $commentTotalPages);
+$commentOffset = ($commentPage - 1) * $commentPageSize;
 $commentSql =
     'SELECT c.id, c.post_id, c.user_id, c.content, c.status, c.created_at,
             p.title AS post_title,
@@ -480,10 +538,15 @@ $commentSql =
      INNER JOIN posts p ON p.id = c.post_id
      INNER JOIN pulsenest_users u ON u.id = c.user_id
      INNER JOIN pulsenest_users owner ON owner.id = p.user_id'
-    . ($commentWhere ? ' WHERE ' . implode(' AND ', $commentWhere) : '')
-    . ' ORDER BY c.created_at DESC, c.id DESC LIMIT 120';
+    . $commentWhereSql
+    . ' ORDER BY c.created_at DESC, c.id DESC LIMIT :limit OFFSET :offset';
 $commentStmt = db()->prepare($commentSql);
-$commentStmt->execute($commentParams);
+foreach ($commentParams as $key => $value) {
+    $commentStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+}
+$commentStmt->bindValue(':limit', $commentPageSize, PDO::PARAM_INT);
+$commentStmt->bindValue(':offset', $commentOffset, PDO::PARAM_INT);
+$commentStmt->execute();
 $commentRows = $commentStmt->fetchAll();
 $commentCount = count($commentRows);
 $commentStatusStats = db()->query('SELECT status, COUNT(*) AS total_count FROM comments GROUP BY status ORDER BY total_count DESC, status ASC')->fetchAll();
@@ -502,8 +565,12 @@ $userRows = db()->query(
      ORDER BY FIELD(u.role, "admin", "moderator", "member"), u.created_at DESC, u.id DESC'
 )->fetchAll();
 
-$postRows = db()->query(
-    'SELECT p.id, p.title, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot,
+$postCountTotal = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$postTotalPages = max(1, (int) ceil($postCountTotal / $postPageSize));
+$postPage = min($postPage, $postTotalPages);
+$postOffset = ($postPage - 1) * $postPageSize;
+$postStmt = db()->prepare(
+    'SELECT p.id, p.title, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
             u.nickname, u.username,
             fb.name AS board_name,
             fc.name AS category_name,
@@ -519,8 +586,13 @@ $postRows = db()->query(
      LEFT JOIN (
         SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
      ) l ON l.post_id = p.id
-     ORDER BY p.is_sticky DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC'
-)->fetchAll();
+     ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC
+     LIMIT :limit OFFSET :offset'
+);
+$postStmt->bindValue(':limit', $postPageSize, PDO::PARAM_INT);
+$postStmt->bindValue(':offset', $postOffset, PDO::PARAM_INT);
+$postStmt->execute();
+$postRows = $postStmt->fetchAll();
 
 $categoryRows = db()->query(
     'SELECT c.id, c.name, c.slug, c.description, c.sort_order,
@@ -544,6 +616,8 @@ $boardRows = db()->query(
 )->fetchAll();
 
 $homeSlotDefinitions = home_slot_definitions();
+$recommendGroups = recommend_group_definitions();
+$homeCopy = home_copy_config();
 $boundSlotRows = db()->query('SELECT id, title, home_slot FROM posts WHERE home_slot IS NOT NULL AND home_slot <> ""')->fetchAll();
 $boundSlots = [];
 foreach ($boundSlotRows as $row) {
@@ -691,7 +765,8 @@ render_header('PulseNest · 后台管理', $user, [
 
   <section id="posts" class="glass panel-card admin-panel-card">
     <div class="section-kicker">Posts</div>
-    <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐位等级、首页运营卡绑定。首页卡会自动保持唯一绑定。</span></div>
+    <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐分组、显示优先级、推荐位等级、首页运营卡绑定。首页卡会自动保持唯一绑定。</span></div>
+    <div class="admin-log-meta muted">共 <?= $postCountTotal ?> 篇帖子 · 第 <?= $postPage ?> / <?= $postTotalPages ?> 页</div>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>版块</th><th>热度</th><th>运营位</th><th>操作</th></tr></thead>
@@ -705,6 +780,8 @@ render_header('PulseNest · 后台管理', $user, [
                   <?php if ((int) $row['is_sticky'] === 1): ?><span class="chip">置顶</span><?php endif; ?>
                   <?php if ((int) $row['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
                   <?php if ((int) $row['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $row['recommend_level'] ?></span><?php endif; ?>
+                  <span class="chip"><?= e($recommendGroups[$row['recommend_group']]['label'] ?? ($row['recommend_group'] ?? '综合推荐')) ?></span>
+                  <span class="chip">优先级 <?= (int) ($row['recommend_priority'] ?? 0) ?></span>
                   <?php if (!empty($row['home_slot'])): ?><span class="chip">首页卡 · <?= e($homeSlotDefinitions[$row['home_slot']]['label'] ?? $row['home_slot']) ?></span><?php endif; ?>
                 </div>
               </td>
@@ -718,6 +795,12 @@ render_header('PulseNest · 后台管理', $user, [
                   <input type="hidden" name="post_id" value="<?= (int) $row['id'] ?>">
                   <label class="muted"><input type="checkbox" name="is_sticky" value="1" <?= (int) $row['is_sticky'] === 1 ? 'checked' : '' ?>> 置顶</label>
                   <label class="muted"><input type="checkbox" name="is_featured" value="1" <?= (int) $row['is_featured'] === 1 ? 'checked' : '' ?>> 精华</label>
+                  <select class="input slim-input" name="recommend_group">
+                    <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
+                      <option value="<?= e($groupKey) ?>" <?= ($row['recommend_group'] ?? 'general') === $groupKey ? 'selected' : '' ?>><?= e($groupMeta['label']) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <input class="input slim-input" type="number" min="0" max="999" name="recommend_priority" value="<?= (int) ($row['recommend_priority'] ?? 0) ?>" placeholder="优先级">
                   <select class="input slim-input" name="recommend_level">
                     <?php for ($level = 0; $level <= 5; $level++): ?>
                       <option value="<?= $level ?>" <?= (int) $row['recommend_level'] === $level ? 'selected' : '' ?>>推荐位 <?= $level ?></option>
@@ -750,6 +833,8 @@ render_header('PulseNest · 后台管理', $user, [
       </table>
     </div>
 
+    <?= admin_pagination([], 'post_page', $postPage, $postTotalPages, '#posts') ?>
+
     <div class="permission-grid" style="margin-top:20px;">
       <?php foreach ($homeSlotDefinitions as $slotKey => $slotMeta): ?>
         <article class="permission-card">
@@ -763,6 +848,37 @@ render_header('PulseNest · 后台管理', $user, [
         </article>
       <?php endforeach; ?>
     </div>
+  </section>
+
+  <section id="home-copy" class="glass panel-card admin-panel-card">
+    <div class="section-kicker">Home Copy</div>
+    <div class="side-head admin-head-row"><h3>首页运营卡文案</h3><span class="muted">Hero / Focus 三张卡的标题、副文案、标签都可直接编辑，前台首页会实时读取配置。</span></div>
+    <form class="admin-list-card" method="post">
+      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+      <input type="hidden" name="action" value="update_home_copy">
+      <div class="permission-grid">
+        <div>
+          <div class="admin-list-card-head"><strong>Hero 主视觉</strong><span class="tiny-badge">首页顶部</span></div>
+          <input class="input" name="home.hero.eyebrow" value="<?= e($homeCopy['home.hero.eyebrow']) ?>" placeholder="眉标">
+          <input class="input" name="home.hero.title" value="<?= e($homeCopy['home.hero.title']) ?>" placeholder="主标题">
+          <textarea class="input" name="home.hero.body" rows="4" placeholder="Hero 副文案"><?= e($homeCopy['home.hero.body']) ?></textarea>
+          <div class="admin-inline-stack">
+            <input class="input" name="home.hero.tag_primary" value="<?= e($homeCopy['home.hero.tag_primary']) ?>" placeholder="标签 1">
+            <input class="input" name="home.hero.tag_secondary" value="<?= e($homeCopy['home.hero.tag_secondary']) ?>" placeholder="标签 2">
+          </div>
+        </div>
+        <?php foreach (['focus_one' => '焦点卡 1', 'focus_two' => '焦点卡 2', 'focus_three' => '焦点卡 3'] as $slotKey => $slotLabel): ?>
+          <div>
+            <div class="admin-list-card-head"><strong><?= e($slotLabel) ?></strong><span class="tiny-badge"><?= e($slotKey) ?></span></div>
+            <input class="input" name="home.<?= e($slotKey) ?>.badge" value="<?= e($homeCopy['home.' . $slotKey . '.badge']) ?>" placeholder="顶部标签">
+            <input class="input" name="home.<?= e($slotKey) ?>.title" value="<?= e($homeCopy['home.' . $slotKey . '.title']) ?>" placeholder="标题">
+            <textarea class="input" name="home.<?= e($slotKey) ?>.body" rows="3" placeholder="副文案"><?= e($homeCopy['home.' . $slotKey . '.body']) ?></textarea>
+            <input class="input" name="home.<?= e($slotKey) ?>.tag" value="<?= e($homeCopy['home.' . $slotKey . '.tag']) ?>" placeholder="标签">
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <div class="admin-action-stack" style="margin-top:16px;"><button class="pill-btn solid" type="submit">保存首页文案</button></div>
+    </form>
   </section>
 
   <section id="comments" class="glass panel-card admin-panel-card">
@@ -788,7 +904,7 @@ render_header('PulseNest · 后台管理', $user, [
         <div class="hero-stat"><div class="label"><?= e(comment_status_label($stat['status'])) ?></div><div class="num small-num"><?= (int) $stat['total_count'] ?></div><div class="note">全站评论状态计数</div></div>
       <?php endforeach; ?>
     </div>
-    <div class="admin-log-meta muted">当前命中 <?= $commentCount ?> 条评论，单页最多展示 120 条。</div>
+    <div class="admin-log-meta muted">当前页命中 <?= $commentCount ?> 条评论 · 共 <?= $commentTotal ?> 条 · 第 <?= $commentPage ?> / <?= $commentTotalPages ?> 页</div>
     <form id="bulk-comments-form" method="post">
       <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
       <input type="hidden" name="action" value="bulk_comment_status">
@@ -860,6 +976,19 @@ render_header('PulseNest · 后台管理', $user, [
         </tbody>
       </table>
     </div>
+    <?= admin_pagination([
+      'post_id' => $postFilterId,
+      'author_id' => $authorFilterId,
+      'post_title_keyword' => $postTitleKeyword,
+      'author_keyword' => $authorKeyword,
+      'content_keyword' => $contentKeyword,
+      'comment_status' => $commentStatusFilter,
+      'post_page' => $postPage,
+      'log_action' => $logActionFilter,
+      'log_target_type' => $logTargetTypeFilter,
+      'log_actor_id' => $logActorIdFilter,
+      'log_page' => $logPage,
+    ], 'comment_page', $commentPage, $commentTotalPages, '#comments') ?>
   </section>
 
   <section id="notifications-overview" class="glass panel-card admin-panel-card">
@@ -1093,11 +1222,19 @@ render_header('PulseNest · 后台管理', $user, [
         </tbody>
       </table>
     </div>
-    <div class="admin-pagination">
-      <a class="pill-btn <?= $logPage <= 1 ? 'is-disabled' : '' ?>" <?= $logPage <= 1 ? 'aria-disabled="true"' : 'href="' . e(admin_url(['log_page' => $logPage - 1], '#logs')) . '"' ?>>上一页</a>
-      <div class="pagination-status">第 <strong><?= $logPage ?></strong> 页 / 共 <strong><?= $logTotalPages ?></strong> 页</div>
-      <a class="pill-btn <?= $logPage >= $logTotalPages ? 'is-disabled' : '' ?>" <?= $logPage >= $logTotalPages ? 'aria-disabled="true"' : 'href="' . e(admin_url(['log_page' => $logPage + 1], '#logs')) . '"' ?>>下一页</a>
-    </div>
+    <?= admin_pagination([
+      'post_id' => $postFilterId,
+      'author_id' => $authorFilterId,
+      'post_title_keyword' => $postTitleKeyword,
+      'author_keyword' => $authorKeyword,
+      'content_keyword' => $contentKeyword,
+      'comment_status' => $commentStatusFilter,
+      'post_page' => $postPage,
+      'comment_page' => $commentPage,
+      'log_action' => $logActionFilter,
+      'log_target_type' => $logTargetTypeFilter,
+      'log_actor_id' => $logActorIdFilter,
+    ], 'log_page', $logPage, $logTotalPages, '#logs') ?>
   </section>
 </main>
 <?php render_footer(); ?>

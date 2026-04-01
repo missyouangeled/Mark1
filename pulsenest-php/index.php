@@ -18,7 +18,7 @@ if ($selectedBoard !== '') {
     $params['board_slug'] = $selectedBoard;
 }
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
                u.nickname, u.username, u.avatar_path,
                fb.name AS board_name, fb.slug AS board_slug,
                fc.name AS category_name, fc.slug AS category_slug,
@@ -37,7 +37,7 @@ $sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, 
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT 18';
+$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT 18';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
@@ -46,6 +46,8 @@ $postCount = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
 $userCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
 $boardCount = (int) db()->query('SELECT COUNT(*) FROM forum_boards')->fetchColumn();
 $homeSlotDefs = home_slot_definitions();
+$recommendGroups = recommend_group_definitions();
+$homeCopy = home_copy_config();
 $homeSlotPosts = [];
 foreach ($posts as $post) {
     if (!empty($post['home_slot'])) {
@@ -60,24 +62,31 @@ $focusPosts = [
 ];
 $feedPosts = array_slice($posts, 0, 3);
 $trendingPosts = array_slice($posts, 0, 3);
+$recommendedPools = [];
+foreach (array_keys($recommendGroups) as $groupKey) {
+    $recommendedPools[$groupKey] = array_values(array_filter($posts, static fn (array $post): bool => ($post['recommend_group'] ?? 'general') === $groupKey && ((int) ($post['recommend_level'] ?? 0) > 0 || (int) ($post['recommend_priority'] ?? 0) > 0)));
+}
 $stickyCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_sticky = 1')->fetchColumn();
 $featuredCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_featured = 1')->fetchColumn();
 
-function render_focus_card(?array $post, string $slotKey, string $fallbackTitle, string $fallbackText): void {
+function render_focus_card(?array $post, string $slotKey, array $homeCopy, array $recommendGroups, string $fallbackTitle, string $fallbackText): void {
+    $badgeText = $homeCopy['home.' . $slotKey . '.badge'] ?? 'OPS SLOT';
     ?>
     <div class="focus-card <?= e(match ($slotKey) {
         'focus_one' => 'focus-1',
         'focus_two' => 'focus-2',
         default => 'focus-3',
     }) ?>">
-      <div class="focus-top-badge">OPS SLOT</div>
+      <div class="focus-top-badge"><?= e($badgeText) ?></div>
       <div class="focus-emoji"><?= $post ? '🛰️' : '✨' ?></div>
-      <div class="focus-title"><?= e($post['title'] ?? $fallbackTitle) ?></div>
-      <div class="focus-text"><?= e($post ? excerpt($post['content'], 72) : $fallbackText) ?></div>
+      <div class="focus-title"><?= e($post['title'] ?? ($homeCopy['home.' . $slotKey . '.title'] ?? $fallbackTitle)) ?></div>
+      <div class="focus-text"><?= e($post ? excerpt($post['content'], 72) : ($homeCopy['home.' . $slotKey . '.body'] ?? $fallbackText)) ?></div>
       <?php if ($post): ?>
         <div class="chips" style="margin-top:10px; gap:6px;">
           <?php if ((int) $post['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
           <?php if ((int) $post['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
+          <span class="chip"><?= e($recommendGroups[$post['recommend_group']]['label'] ?? ($post['recommend_group'] ?? '综合推荐')) ?></span>
+          <span class="chip">优先级 <?= (int) ($post['recommend_priority'] ?? 0) ?></span>
         </div>
         <div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $post['id'] ?>">进入帖子</a></div>
       <?php endif; ?>
@@ -99,9 +108,9 @@ render_header('PulseNest', $user, [
         <div class="hero-inner">
           <div class="hero-copy">
             <div>
-              <div class="brand-chip">星云初始01 · 首页升级到可运营的论坛首页</div>
-              <h1>保住这套星云观感的同时，把真正能运营的帖子位也接进来。</h1>
-              <p class="hero-text">首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。</p>
+              <div class="brand-chip"><?= e($homeCopy['home.hero.eyebrow']) ?></div>
+              <h1><?= e($homeCopy['home.hero.title']) ?></h1>
+              <p class="hero-text"><?= e($homeCopy['home.hero.body']) ?></p>
             </div>
             <div class="hero-actions-row">
               <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '开始分享内容' : '立即加入社区' ?></a>
@@ -131,8 +140,8 @@ render_header('PulseNest', $user, [
                   <span class="chip"><?= (int) $heroPost['comment_count'] ?> 回复</span>
                 <?php else: ?>
                   <span class="chip">分类 / 版块</span>
-                  <span class="chip">首页运营卡</span>
-                  <span class="chip">站内回复提醒</span>
+                  <span class="chip"><?= e($homeCopy['home.hero.tag_primary']) ?></span>
+                  <span class="chip"><?= e($homeCopy['home.hero.tag_secondary']) ?></span>
                 <?php endif; ?>
               </div>
               <?php if ($heroPost): ?><div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">查看主运营帖</a></div><?php endif; ?>
@@ -184,9 +193,20 @@ render_header('PulseNest', $user, [
         <div class="section-kicker">Focus Slots</div>
         <div class="section-title">首页焦点运营卡</div>
         <div class="focus-grid">
-          <?php render_focus_card($focusPosts['focus_one'], 'focus_one', '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
-          <?php render_focus_card($focusPosts['focus_two'], 'focus_two', '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
-          <?php render_focus_card($focusPosts['focus_three'], 'focus_three', '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
+          <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
+          <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
+          <?php render_focus_card($focusPosts['focus_three'], 'focus_three', $homeCopy, $recommendGroups, '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
+        </div>
+      </section>
+
+      <section class="glass section-card">
+        <div class="section-kicker">Recommendation Pools</div>
+        <div class="section-title">推荐位分组与优先级</div>
+        <div class="rank-list">
+          <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
+            <?php $leadPost = $recommendedPools[$groupKey][0] ?? null; ?>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= e(strtoupper(substr($groupKey, 0, 1))) ?></div><div class="rank-main"><div class="rank-name"><?= e($groupMeta['label']) ?></div><div class="meta"><?= e($leadPost ? $leadPost['title'] . ' · 优先级 ' . (int) ($leadPost['recommend_priority'] ?? 0) : $groupMeta['desc']) ?></div></div><div class="score"><?= count($recommendedPools[$groupKey]) ?>条</div></div></div>
+          <?php endforeach; ?>
         </div>
       </section>
 
@@ -236,6 +256,8 @@ render_header('PulseNest', $user, [
                     <?php if ((int) $post['is_sticky'] === 1): ?><span class="chip">置顶</span><?php endif; ?>
                     <?php if ((int) $post['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
                     <?php if ((int) $post['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
+          <span class="chip"><?= e($recommendGroups[$post['recommend_group']]['label'] ?? ($post['recommend_group'] ?? '综合推荐')) ?></span>
+          <span class="chip">优先级 <?= (int) ($post['recommend_priority'] ?? 0) ?></span>
                   </div>
                   <div class="game-meta"><div><?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</div><div style="color: var(--brand);"><a href="/post.php?id=<?= (int) $post['id'] ?>">查看详情</a></div></div>
                 </div>

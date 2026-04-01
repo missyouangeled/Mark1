@@ -25,7 +25,7 @@ if ($boardSlug !== '') {
     $params['board_slug'] = $boardSlug;
 }
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.recommend_group, p.recommend_priority,
                u.nickname, u.username, u.avatar_path,
                fb.id AS board_id, fb.name AS board_name, fb.slug AS board_slug,
                fc.id AS category_id, fc.name AS category_name, fc.slug AS category_slug,
@@ -46,12 +46,28 @@ if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
 
-$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC';
+$countSql = 'SELECT COUNT(*)
+        FROM posts p
+        LEFT JOIN forum_boards fb ON fb.id = p.board_id
+        LEFT JOIN forum_categories fc ON fc.id = fb.category_id' . ($where ? ' WHERE ' . implode(' AND ', $where) : '');
+$countStmt = db()->prepare($countSql);
+$countStmt->execute($params);
+$postCount = (int) $countStmt->fetchColumn();
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$pageSize = 12;
+$totalPages = max(1, (int) ceil($postCount / $pageSize));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $pageSize;
+$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT :limit OFFSET :offset';
 $stmt = db()->prepare($sql);
-$stmt->execute($params);
+foreach ($params as $key => $value) {
+    $stmt->bindValue(':' . $key, $value);
+}
+$stmt->bindValue(':limit', $pageSize, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $posts = $stmt->fetchAll();
 
-$postCount = count($posts);
 $authorCount = count(array_unique(array_map(static fn ($post) => $post['username'], $posts)));
 $latestPost = $posts[0] ?? null;
 $currentBoardLabel = '全站帖子';
@@ -172,6 +188,8 @@ render_header('PulseNest · 帖子列表', $user, [
                   <?php if ((int) ($post['is_sticky'] ?? 0) === 1): ?><span class="chip">置顶</span><?php endif; ?>
                   <?php if ((int) ($post['is_featured'] ?? 0) === 1): ?><span class="chip">精华</span><?php endif; ?>
                   <?php if ((int) ($post['recommend_level'] ?? 0) > 0): ?><span class="chip">推荐位 <?= (int) $post['recommend_level'] ?></span><?php endif; ?>
+                  <span class="chip"><?= e(recommend_group_definitions()[$post['recommend_group']]['label'] ?? ($post['recommend_group'] ?? '综合推荐')) ?></span>
+                  <span class="chip">优先级 <?= (int) ($post['recommend_priority'] ?? 0) ?></span>
                   <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                   <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
                   <span class="chip"><?= e(board_badge($post)) ?></span>
@@ -182,6 +200,7 @@ render_header('PulseNest · 帖子列表', $user, [
           <?php endforeach; ?>
         <?php endif; ?>
       </div>
+      <?= render_pagination('/posts.php', $page, $totalPages, ['q' => $search, 'category' => $categorySlug, 'board' => $boardSlug]) ?>
 
       <aside class="right-col-stack">
         <?php foreach ($forum as $category): ?>

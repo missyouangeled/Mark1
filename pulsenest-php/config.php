@@ -91,6 +91,13 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_notifications_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
+        setting_key VARCHAR(80) NOT NULL,
+        setting_value TEXT DEFAULT NULL,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (setting_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS comment_likes (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         comment_id INT UNSIGNED NOT NULL,
@@ -151,8 +158,17 @@ function ensure_database_schema(PDO $pdo): void {
     if (!column_exists($pdo, 'posts', 'home_slot')) {
         $pdo->exec('ALTER TABLE posts ADD COLUMN home_slot VARCHAR(40) DEFAULT NULL AFTER recommend_level');
     }
+    if (!column_exists($pdo, 'posts', 'recommend_group')) {
+        $pdo->exec("ALTER TABLE posts ADD COLUMN recommend_group VARCHAR(40) NOT NULL DEFAULT 'general' AFTER home_slot");
+    }
+    if (!column_exists($pdo, 'posts', 'recommend_priority')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN recommend_priority INT NOT NULL DEFAULT 0 AFTER recommend_group');
+    }
     if (!index_exists($pdo, 'posts', 'idx_posts_ops_sort')) {
         $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_ops_sort (is_sticky, recommend_level, is_featured, created_at)');
+    }
+    if (!index_exists($pdo, 'posts', 'idx_posts_recommend_group_priority')) {
+        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_recommend_group_priority (recommend_group, recommend_priority, recommend_level, created_at)');
     }
     if (!index_exists($pdo, 'posts', 'idx_posts_home_slot')) {
         $pdo->exec('ALTER TABLE posts ADD UNIQUE KEY idx_posts_home_slot (home_slot)');
@@ -187,6 +203,7 @@ function ensure_database_schema(PDO $pdo): void {
     }
 
     seed_forum_structure($pdo);
+    seed_site_settings($pdo);
 
     $defaultBoardId = (int) $pdo->query("SELECT id FROM forum_boards ORDER BY sort_order ASC, id ASC LIMIT 1")->fetchColumn();
     if ($defaultBoardId > 0) {
@@ -269,6 +286,17 @@ function seed_forum_structure(PDO $pdo): void {
                 'sort_order' => $board['sort_order'],
             ]);
         }
+    }
+}
+
+function seed_site_settings(PDO $pdo): void {
+    $defaults = default_home_copy_settings();
+    $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value) ON DUPLICATE KEY UPDATE setting_value = COALESCE(site_settings.setting_value, VALUES(setting_value))');
+    foreach ($defaults as $key => $value) {
+        $stmt->execute([
+            'setting_key' => $key,
+            'setting_value' => $value,
+        ]);
     }
 }
 
@@ -618,6 +646,92 @@ function home_slot_definitions(): array {
     ];
 }
 
+function recommend_group_definitions(): array {
+    return [
+        'general' => ['label' => '综合推荐', 'desc' => '默认全站推荐池'],
+        'event' => ['label' => '活动 / 公告', 'desc' => '适合活动帖、征集帖、版本通知'],
+        'guide' => ['label' => '攻略 / 深读', 'desc' => '更偏攻略、评测、长文'],
+    ];
+}
+
+function default_home_copy_settings(): array {
+    return [
+        'home.hero.eyebrow' => '星云初始01 · 首页升级到可运营的论坛首页',
+        'home.hero.title' => '保住这套星云观感的同时，把真正能运营的帖子位也接进来。',
+        'home.hero.body' => '首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。',
+        'home.hero.tag_primary' => '首页运营卡',
+        'home.hero.tag_secondary' => '站内回复提醒',
+        'home.focus_one.badge' => 'OPS SLOT',
+        'home.focus_one.title' => '焦点卡 1 待绑定',
+        'home.focus_one.body' => '后台可把重点帖子直接塞进这张中部卡位。',
+        'home.focus_one.tag' => '焦点卡 1',
+        'home.focus_two.badge' => 'OPS SLOT',
+        'home.focus_two.title' => '焦点卡 2 待绑定',
+        'home.focus_two.body' => '适合放活动帖、征集帖、版本说明帖。',
+        'home.focus_two.tag' => '焦点卡 2',
+        'home.focus_three.badge' => 'OPS SLOT',
+        'home.focus_three.title' => '焦点卡 3 待绑定',
+        'home.focus_three.body' => '维持视觉稳定，同时把中段内容改成可运营入口。',
+        'home.focus_three.tag' => '焦点卡 3',
+    ];
+}
+
+function get_site_setting(string $key, ?string $default = null): ?string {
+    $stmt = db()->prepare('SELECT setting_value FROM site_settings WHERE setting_key = :setting_key LIMIT 1');
+    $stmt->execute(['setting_key' => $key]);
+    $value = $stmt->fetchColumn();
+    return $value === false ? $default : (string) $value;
+}
+
+function set_site_settings(array $settings): void {
+    if (!$settings) {
+        return;
+    }
+    $stmt = db()->prepare('INSERT INTO site_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)');
+    foreach ($settings as $key => $value) {
+        $stmt->execute([
+            'setting_key' => $key,
+            'setting_value' => $value,
+        ]);
+    }
+}
+
+function home_copy_config(): array {
+    $defaults = default_home_copy_settings();
+    $keys = array_keys($defaults);
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $stmt = db()->prepare('SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN (' . $placeholders . ')');
+    $stmt->execute($keys);
+    $rows = $stmt->fetchAll();
+    $config = $defaults;
+    foreach ($rows as $row) {
+        $config[$row['setting_key']] = (string) $row['setting_value'];
+    }
+    return $config;
+}
+
+function render_pagination(string $basePath, int $page, int $totalPages, array $query = [], string $hash = ''): string {
+    $buildUrl = static function (int $targetPage) use ($basePath, $query, $hash): string {
+        $params = array_merge($query, ['page' => $targetPage]);
+        foreach ($params as $key => $value) {
+            if ($value === null || $value === '' || $value === 0 || $value === '0') {
+                unset($params[$key]);
+            }
+        }
+        $url = $basePath;
+        if ($params) {
+            $url .= '?' . http_build_query($params);
+        }
+        return $url . $hash;
+    };
+
+    return '<div class="admin-pagination">'
+        . '<a class="pill-btn ' . ($page <= 1 ? 'is-disabled' : '') . '" ' . ($page <= 1 ? 'aria-disabled="true"' : 'href="' . e($buildUrl($page - 1)) . '"') . '>上一页</a>'
+        . '<div class="pagination-status">第 <strong>' . $page . '</strong> 页 / 共 <strong>' . $totalPages . '</strong> 页</div>'
+        . '<a class="pill-btn ' . ($page >= $totalPages ? 'is-disabled' : '') . '" ' . ($page >= $totalPages ? 'aria-disabled="true"' : 'href="' . e($buildUrl($page + 1)) . '"') . '>下一页</a>'
+        . '</div>';
+}
+
 function fetch_forum_structure(): array {
     $categories = db()->query(
         'SELECT c.id, c.name, c.slug, c.description, c.sort_order,
@@ -721,12 +835,26 @@ function create_comment_like_notification(array $comment, int $postId, int $acto
     }
 }
 
+function create_comment_moderation_notification(array $comment, array $post, int $actorUserId, string $targetStatus): void {
+    $recipientUserId = (int) ($comment['user_id'] ?? 0);
+    $commentId = (int) ($comment['id'] ?? 0);
+    $postId = (int) ($post['id'] ?? 0);
+    if ($recipientUserId <= 0 || $commentId <= 0 || $postId <= 0) {
+        return;
+    }
+    if (!in_array($targetStatus, ['approved', 'hidden'], true)) {
+        return;
+    }
+    create_notification($recipientUserId, $actorUserId, 'comment_moderated', $postId, $commentId);
+}
+
 function notification_type_label(string $type): string {
     return match ($type) {
         'comment_reply' => '评论回复',
         'post_reply' => '帖子回复',
         'post_like' => '帖子点赞',
         'comment_like' => '评论点赞',
+        'comment_moderated' => '评论审核',
         default => '站内提醒',
     };
 }
@@ -737,6 +865,7 @@ function notification_message(array $item): string {
         'comment_reply' => '回复了你的评论：' . $title,
         'post_like' => '点赞了你的帖子：' . $title,
         'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
+        'comment_moderated' => '你的评论审核状态已更新：' . $title,
         default => '回复了你的帖子：' . $title,
     };
 }

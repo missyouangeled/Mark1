@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS posts (
   is_featured TINYINT(1) NOT NULL DEFAULT 0,
   recommend_level TINYINT UNSIGNED NOT NULL DEFAULT 0,
   home_slot VARCHAR(40) DEFAULT NULL,
+  recommend_group VARCHAR(40) NOT NULL DEFAULT 'general',
+  recommend_priority INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -62,6 +64,7 @@ CREATE TABLE IF NOT EXISTS posts (
   KEY idx_posts_board_id (board_id),
   KEY idx_posts_created_board (board_id, created_at),
   KEY idx_posts_ops_sort (is_sticky, recommend_level, is_featured, created_at),
+  KEY idx_posts_recommend_group_priority (recommend_group, recommend_priority, recommend_level, created_at),
   UNIQUE KEY idx_posts_home_slot (home_slot),
   CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_posts_board FOREIGN KEY (board_id) REFERENCES forum_boards(id) ON DELETE SET NULL
@@ -99,6 +102,13 @@ CREATE TABLE IF NOT EXISTS post_likes (
   KEY idx_post_likes_user_id (user_id),
   CONSTRAINT fk_post_likes_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
   CONSTRAINT fk_post_likes_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_settings (
+  setting_key VARCHAR(80) NOT NULL,
+  setting_value TEXT DEFAULT NULL,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS notifications (
