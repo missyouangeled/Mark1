@@ -4,6 +4,37 @@ $user = ensure_staff();
 $flash = flash_get();
 $canManageUsers = can_manage_users($user);
 $canManageStructure = can_manage_forum_structure($user);
+$role = user_role($user);
+
+function admin_url(array $overrides = [], string $hash = ''): string {
+    $query = [
+        'post_id' => (int) ($_GET['post_id'] ?? 0),
+        'author_id' => (int) ($_GET['author_id'] ?? 0),
+        'log_action' => trim((string) ($_GET['log_action'] ?? '')),
+        'log_target_type' => trim((string) ($_GET['log_target_type'] ?? '')),
+        'log_actor_id' => (int) ($_GET['log_actor_id'] ?? 0),
+        'log_page' => (int) ($_GET['log_page'] ?? 1),
+    ];
+
+    foreach ($overrides as $key => $value) {
+        $query[$key] = $value;
+    }
+
+    foreach ($query as $key => $value) {
+        if ($value === null || $value === '' || $value === 0 || $value === '0') {
+            unset($query[$key]);
+        }
+    }
+
+    $url = '/admin.php';
+    if ($query) {
+        $url .= '?' . http_build_query($query);
+    }
+    if ($hash !== '') {
+        $url .= $hash;
+    }
+    return $url;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -93,15 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_moderation_action((int) $user['id'], 'comment_deleted', 'comment', $commentId, ($comment['nickname'] ?: $comment['username']) . ' · 《' . $comment['title'] . '》 · ' . excerpt($comment['content'], 80));
             flash_set('success', '评论已删除。');
         }
-        $query = [];
-        if (!empty($_POST['filter_post_id'])) {
-            $query['post_id'] = (int) $_POST['filter_post_id'];
-        }
-        if (!empty($_POST['filter_author_id'])) {
-            $query['author_id'] = (int) $_POST['filter_author_id'];
-        }
-        $redirect = '/admin.php' . ($query ? '?' . http_build_query($query) : '') . '#comments';
-        redirect_to($redirect);
+        redirect_to(admin_url([], '#comments'));
     }
 
     if ($action === 'create_category' && $canManageStructure) {
@@ -140,24 +163,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete_category' && $canManageStructure) {
         $categoryId = (int) ($_POST['category_id'] ?? 0);
+        $targetCategoryId = (int) ($_POST['target_category_id'] ?? 0);
         $stmt = db()->prepare('SELECT id, name, slug FROM forum_categories WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $categoryId]);
         $category = $stmt->fetch();
+
         if (!$category) {
             flash_set('error', '没有找到要删除的分类。');
-        } else {
-            $countStmt = db()->prepare('SELECT COUNT(*) FROM forum_boards WHERE category_id = :id');
-            $countStmt->execute(['id' => $categoryId]);
-            $boardCount = (int) $countStmt->fetchColumn();
-            if ($boardCount > 0) {
-                flash_set('error', '该分类下还有 ' . $boardCount . ' 个版块，先清空或迁移版块后才能删除。');
-            } else {
-                $delete = db()->prepare('DELETE FROM forum_categories WHERE id = :id LIMIT 1');
-                $delete->execute(['id' => $categoryId]);
-                log_moderation_action((int) $user['id'], 'category_deleted', 'category', $categoryId, $category['name'] . ' · ' . $category['slug']);
-                flash_set('success', '分类已删除。');
+            redirect_to('/admin.php#categories');
+        }
+
+        $boardCountStmt = db()->prepare('SELECT COUNT(*) FROM forum_boards WHERE category_id = :id');
+        $boardCountStmt->execute(['id' => $categoryId]);
+        $boardCount = (int) $boardCountStmt->fetchColumn();
+
+        if ($boardCount > 0 && $targetCategoryId <= 0) {
+            flash_set('error', '该分类下还有 ' . $boardCount . ' 个版块，请先选择一个目标分类迁移版块。');
+            redirect_to('/admin.php#categories');
+        }
+
+        if ($boardCount > 0 && $targetCategoryId === $categoryId) {
+            flash_set('error', '迁移目标分类不能是当前分类本身。');
+            redirect_to('/admin.php#categories');
+        }
+
+        $targetCategory = null;
+        if ($targetCategoryId > 0) {
+            $targetStmt = db()->prepare('SELECT id, name FROM forum_categories WHERE id = :id LIMIT 1');
+            $targetStmt->execute(['id' => $targetCategoryId]);
+            $targetCategory = $targetStmt->fetch();
+            if (!$targetCategory) {
+                flash_set('error', '迁移目标分类不存在。');
+                redirect_to('/admin.php#categories');
             }
         }
+
+        if ($boardCount > 0) {
+            $move = db()->prepare('UPDATE forum_boards SET category_id = :target_category_id WHERE category_id = :category_id');
+            $move->execute(['target_category_id' => $targetCategoryId, 'category_id' => $categoryId]);
+        }
+
+        $delete = db()->prepare('DELETE FROM forum_categories WHERE id = :id LIMIT 1');
+        $delete->execute(['id' => $categoryId]);
+        $details = $category['name'] . ' · ' . $category['slug'];
+        if ($boardCount > 0 && $targetCategory) {
+            $details .= ' · 迁移 ' . $boardCount . ' 个版块到 ' . $targetCategory['name'];
+        }
+        log_moderation_action((int) $user['id'], 'category_deleted', 'category', $categoryId, $details);
+        flash_set('success', $boardCount > 0 ? '分类已删除，版块已迁移。' : '分类已删除。');
         redirect_to('/admin.php#categories');
     }
 
@@ -216,24 +269,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete_board' && $canManageStructure) {
         $boardId = (int) ($_POST['board_id'] ?? 0);
+        $targetBoardId = (int) ($_POST['target_board_id'] ?? 0);
         $stmt = db()->prepare('SELECT id, name, slug FROM forum_boards WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $boardId]);
         $board = $stmt->fetch();
+
         if (!$board) {
             flash_set('error', '没有找到要删除的版块。');
-        } else {
-            $countStmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE board_id = :id');
-            $countStmt->execute(['id' => $boardId]);
-            $postCount = (int) $countStmt->fetchColumn();
-            if ($postCount > 0) {
-                flash_set('error', '该版块下还有 ' . $postCount . ' 篇帖子，先迁移或删除帖子后才能删版块。');
-            } else {
-                $delete = db()->prepare('DELETE FROM forum_boards WHERE id = :id LIMIT 1');
-                $delete->execute(['id' => $boardId]);
-                log_moderation_action((int) $user['id'], 'board_deleted', 'board', $boardId, $board['name'] . ' · ' . $board['slug']);
-                flash_set('success', '版块已删除。');
+            redirect_to('/admin.php#boards');
+        }
+
+        $countStmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE board_id = :id');
+        $countStmt->execute(['id' => $boardId]);
+        $postCount = (int) $countStmt->fetchColumn();
+
+        if ($postCount > 0 && $targetBoardId <= 0) {
+            flash_set('error', '该版块下还有 ' . $postCount . ' 篇帖子，请先选择迁移目标版块。');
+            redirect_to('/admin.php#boards');
+        }
+
+        if ($postCount > 0 && $targetBoardId === $boardId) {
+            flash_set('error', '迁移目标版块不能是当前版块本身。');
+            redirect_to('/admin.php#boards');
+        }
+
+        $targetBoard = null;
+        if ($targetBoardId > 0) {
+            $targetStmt = db()->prepare('SELECT id, name FROM forum_boards WHERE id = :id LIMIT 1');
+            $targetStmt->execute(['id' => $targetBoardId]);
+            $targetBoard = $targetStmt->fetch();
+            if (!$targetBoard) {
+                flash_set('error', '迁移目标版块不存在。');
+                redirect_to('/admin.php#boards');
             }
         }
+
+        if ($postCount > 0) {
+            $move = db()->prepare('UPDATE posts SET board_id = :target_board_id WHERE board_id = :board_id');
+            $move->execute(['target_board_id' => $targetBoardId, 'board_id' => $boardId]);
+        }
+
+        $delete = db()->prepare('DELETE FROM forum_boards WHERE id = :id LIMIT 1');
+        $delete->execute(['id' => $boardId]);
+        $details = $board['name'] . ' · ' . $board['slug'];
+        if ($postCount > 0 && $targetBoard) {
+            $details .= ' · 迁移 ' . $postCount . ' 篇帖子到 ' . $targetBoard['name'];
+        }
+        log_moderation_action((int) $user['id'], 'board_deleted', 'board', $boardId, $details);
+        flash_set('success', $postCount > 0 ? '版块已删除，帖子已迁移。' : '版块已删除。');
         redirect_to('/admin.php#boards');
     }
 }
@@ -316,17 +399,68 @@ $boardRows = db()->query(
      ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
 )->fetchAll();
 
-$logRows = db()->query(
+$logActionFilter = trim((string) ($_GET['log_action'] ?? ''));
+$logTargetTypeFilter = trim((string) ($_GET['log_target_type'] ?? ''));
+$logActorIdFilter = (int) ($_GET['log_actor_id'] ?? 0);
+$logPage = max(1, (int) ($_GET['log_page'] ?? 1));
+$logPageSize = 20;
+$logWhere = [];
+$logParams = [];
+if ($logActionFilter !== '') {
+    $logWhere[] = 'l.action_type = :log_action';
+    $logParams['log_action'] = $logActionFilter;
+}
+if ($logTargetTypeFilter !== '') {
+    $logWhere[] = 'l.target_type = :log_target_type';
+    $logParams['log_target_type'] = $logTargetTypeFilter;
+}
+if ($logActorIdFilter > 0) {
+    $logWhere[] = 'l.actor_user_id = :log_actor_id';
+    $logParams['log_actor_id'] = $logActorIdFilter;
+}
+$logWhereSql = $logWhere ? ' WHERE ' . implode(' AND ', $logWhere) : '';
+$countStmt = db()->prepare('SELECT COUNT(*) FROM moderation_logs l' . $logWhereSql);
+$countStmt->execute($logParams);
+$logTotal = (int) $countStmt->fetchColumn();
+$logTotalPages = max(1, (int) ceil($logTotal / $logPageSize));
+$logPage = min($logPage, $logTotalPages);
+$logOffset = ($logPage - 1) * $logPageSize;
+$logStmt = db()->prepare(
     'SELECT l.id, l.action_type, l.target_type, l.target_id, l.details, l.created_at,
-            u.nickname, u.username
+            u.nickname, u.username, u.id AS actor_id
+     FROM moderation_logs l
+     INNER JOIN pulsenest_users u ON u.id = l.actor_user_id'
+    . $logWhereSql .
+    ' ORDER BY l.created_at DESC, l.id DESC LIMIT :limit OFFSET :offset'
+);
+foreach ($logParams as $key => $value) {
+    $logStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+}
+$logStmt->bindValue(':limit', $logPageSize, PDO::PARAM_INT);
+$logStmt->bindValue(':offset', $logOffset, PDO::PARAM_INT);
+$logStmt->execute();
+$logRows = $logStmt->fetchAll();
+
+$logActionOptions = db()->query('SELECT DISTINCT action_type FROM moderation_logs ORDER BY action_type ASC')->fetchAll(PDO::FETCH_COLUMN);
+$logTargetTypeOptions = db()->query('SELECT DISTINCT target_type FROM moderation_logs ORDER BY target_type ASC')->fetchAll(PDO::FETCH_COLUMN);
+$logActorOptions = db()->query(
+    'SELECT DISTINCT u.id, u.nickname, u.username
      FROM moderation_logs l
      INNER JOIN pulsenest_users u ON u.id = l.actor_user_id
-     ORDER BY l.created_at DESC, l.id DESC
-     LIMIT 30'
+     ORDER BY u.nickname ASC, u.username ASC'
 )->fetchAll();
 
+$availableCategoryTargets = $categoryRows;
+$availableBoardTargets = $boardRows;
+$staffCount = 0;
+foreach ($userRows as $row) {
+    if (can_access_admin($row)) {
+        $staffCount++;
+    }
+}
+
 render_header('PulseNest · 后台管理', $user, [
-    'searchText' => '🔎 后台：评论、帖子、角色、分类、版块、操作日志',
+    'searchText' => '🔎 后台：评论、帖子、角色边界、结构迁移、操作日志',
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell admin-page">
@@ -337,29 +471,73 @@ render_header('PulseNest · 后台管理', $user, [
     <section class="glass nebula-hero nebula-hero-split create-post-hero">
       <div class="nebula-copy">
         <div class="brand-chip">纳达尔星项目 · 星云初始01 · 后台增强版</div>
-        <h1>把管理能力补到能真正在社区里用。</h1>
-        <p class="page-desc nebula-desc">现在后台已经能做评论巡检、删帖删评、用户角色拆分、分类 / 版块增删改，以及最近操作日志留痕。版主只能管内容，管理员才能动用户和论坛结构。</p>
-        <div class="hero-stats compact-hero-stats">
-          <div class="hero-stat"><div class="label">当前身份</div><div class="num small-num"><?= e(role_label(user_role($user))) ?></div><div class="note"><?= is_admin($user) ? '拥有全量后台权限' : '仅限内容管理范围' ?></div></div>
-          <div class="hero-stat"><div class="label">评论</div><div class="num small-num"><?= count($commentRows) ?></div><div class="note">支持按帖子 / 作者筛选</div></div>
-          <div class="hero-stat"><div class="label">操作日志</div><div class="num small-num"><?= count($logRows) ?></div><div class="note">至少记录删帖删评与结构调整</div></div>
+        <h1>把角色边界、结构迁移和日志检索都补到能真用。</h1>
+        <p class="page-desc nebula-desc">后台现在把管理员 / 版主 / 普通用户的边界直接写在页面里：管理员可管用户与论坛结构，版主只处理内容巡检与删帖删评，普通用户没有后台入口。分类和版块删除也补成“先迁移再删除”，避免结构调整卡死。</p>
+        <div class="hero-stats compact-hero-stats admin-hero-stats">
+          <div class="hero-stat"><div class="label">当前身份</div><div class="num small-num"><?= e(role_label($role)) ?></div><div class="note"><?= $role === 'admin' ? '全量后台权限已解锁' : '当前仅开放内容管理范围' ?></div></div>
+          <div class="hero-stat"><div class="label">后台人员</div><div class="num small-num"><?= $staffCount ?></div><div class="note">管理员 + 版主共同维护</div></div>
+          <div class="hero-stat"><div class="label">操作日志</div><div class="num small-num"><?= $logTotal ?></div><div class="note">支持按动作 / 对象 / 操作者筛选分页</div></div>
         </div>
       </div>
       <aside class="glass side-card nebula-side-panel">
         <div class="section-kicker">Admin Scope</div>
         <div class="quick-links">
-          <a class="quick-link" href="#comments">评论管理</a>
-          <a class="quick-link" href="#posts">帖子管理</a>
-          <?php if ($canManageUsers): ?><a class="quick-link" href="#users">角色 / 用户</a><?php endif; ?>
-          <?php if ($canManageStructure): ?><a class="quick-link" href="#categories">分类 / 版块</a><?php endif; ?>
-          <a class="quick-link" href="#logs">操作日志</a>
+          <a class="quick-link" href="#permission-map"><strong>权限边界</strong><span>先看自己能动什么，不能动什么</span></a>
+          <a class="quick-link" href="#comments"><strong>评论管理</strong><span>管理员 / 版主可用</span></a>
+          <a class="quick-link" href="#posts"><strong>帖子管理</strong><span>管理员 / 版主可用</span></a>
+          <?php if ($canManageUsers): ?><a class="quick-link" href="#users"><strong>角色 / 用户</strong><span>仅管理员可见</span></a><?php endif; ?>
+          <?php if ($canManageStructure): ?><a class="quick-link" href="#categories"><strong>分类 / 版块</strong><span>仅管理员可见，支持迁移删除</span></a><?php endif; ?>
+          <a class="quick-link" href="#logs"><strong>操作日志</strong><span>支持筛选与分页</span></a>
         </div>
       </aside>
     </section>
 
+    <section id="permission-map" class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Permission Map</div>
+      <div class="side-head admin-head-row">
+        <h3>角色权限边界</h3>
+        <span class="muted">入口控制已同步：普通用户不显示后台入口，版主进入后不会看到用户 / 结构管理区。</span>
+      </div>
+      <div class="permission-grid">
+        <article class="permission-card <?= $role === 'admin' ? 'is-current' : '' ?>">
+          <div class="permission-card-head"><strong>管理员</strong><span class="tiny-badge badge-ok">全量</span></div>
+          <p class="muted">负责用户权限、论坛结构、内容巡检和日志留痕。</p>
+          <ul class="permission-list">
+            <li>可调整用户角色 / 启停账号</li>
+            <li>可新增、编辑、删除分类与版块</li>
+            <li>删除结构前可迁移版块 / 帖子</li>
+            <li>可删帖、删评、查看完整日志</li>
+          </ul>
+        </article>
+        <article class="permission-card <?= $role === 'moderator' ? 'is-current' : '' ?>">
+          <div class="permission-card-head"><strong>版主</strong><span class="tiny-badge">内容管理</span></div>
+          <p class="muted">专注内容巡检，不碰用户权限和社区结构。</p>
+          <ul class="permission-list">
+            <li>可删帖、删评、回看评论流</li>
+            <li>可查看操作日志与筛选记录</li>
+            <li>不可修改用户角色或状态</li>
+            <li>不可改分类 / 版块结构</li>
+          </ul>
+        </article>
+        <article class="permission-card">
+          <div class="permission-card-head"><strong>普通用户</strong><span class="tiny-badge">前台</span></div>
+          <p class="muted">不显示后台入口，只保留正常发帖、评论、资料维护等前台能力。</p>
+          <ul class="permission-list">
+            <li>可发帖、评论、查看通知</li>
+            <li>可维护头像与个人简介</li>
+            <li>不可进入后台管理页面</li>
+            <li>不可操作用户、结构和日志</li>
+          </ul>
+        </article>
+      </div>
+      <?php if (!$canManageUsers || !$canManageStructure): ?>
+        <div class="notice admin-scope-notice">你当前以<strong><?= e(role_label($role)) ?></strong>身份进入后台。可继续做内容巡检，但用户角色管理和分类 / 版块结构管理已在入口与页面层同时收口，不会对你开放。</div>
+      <?php endif; ?>
+    </section>
+
     <section id="comments" class="glass panel-card admin-panel-card">
       <div class="section-kicker">Comments</div>
-      <div class="side-head admin-head-row"><h3>评论管理</h3><span class="muted">支持直接按帖子或作者回看评论流</span></div>
+      <div class="side-head admin-head-row"><h3>评论管理</h3><span class="muted">支持按帖子或作者回看评论流</span></div>
       <form class="admin-filter-row" method="get">
         <input class="input admin-filter-input" type="number" min="0" name="post_id" placeholder="按帖子 ID 查看" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
         <input class="input admin-filter-input" type="number" min="0" name="author_id" placeholder="按作者 ID 查看" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
@@ -377,12 +555,12 @@ render_header('PulseNest · 后台管理', $user, [
                 <td>
                   <strong><?= e($row['nickname']) ?></strong>
                   <div class="muted">@<?= e($row['username']) ?></div>
-                  <div><a class="inline-link" href="/admin.php?author_id=<?= (int) $row['user_id'] ?>#comments">看该作者评论</a></div>
+                  <div><a class="inline-link" href="<?= e(admin_url(['author_id' => (int) $row['user_id']], '#comments')) ?>">看该作者评论</a></div>
                 </td>
                 <td>
                   <a class="inline-link" href="/post.php?id=<?= (int) $row['post_id'] ?>"><?= e($row['post_title']) ?></a>
                   <div class="muted">楼主：<?= e($row['post_owner_nickname']) ?> @<?= e($row['post_owner_username']) ?></div>
-                  <div><a class="inline-link" href="/admin.php?post_id=<?= (int) $row['post_id'] ?>#comments">看该帖子评论</a></div>
+                  <div><a class="inline-link" href="<?= e(admin_url(['post_id' => (int) $row['post_id']], '#comments')) ?>">看该帖子评论</a></div>
                 </td>
                 <td><?= e(substr($row['created_at'], 0, 16)) ?></td>
                 <td>
@@ -392,8 +570,6 @@ render_header('PulseNest · 后台管理', $user, [
                       <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                       <input type="hidden" name="action" value="delete_comment_admin">
                       <input type="hidden" name="comment_id" value="<?= (int) $row['id'] ?>">
-                      <input type="hidden" name="filter_post_id" value="<?= (int) $postFilterId ?>">
-                      <input type="hidden" name="filter_author_id" value="<?= (int) $authorFilterId ?>">
                       <button class="pill-btn danger" type="submit">删除</button>
                     </form>
                   </div>
@@ -426,7 +602,7 @@ render_header('PulseNest · 后台管理', $user, [
                 <td>
                   <div class="admin-action-stack">
                     <a class="pill-btn" href="/edit-post.php?id=<?= (int) $row['id'] ?>">编辑</a>
-                    <a class="pill-btn" href="/admin.php?post_id=<?= (int) $row['id'] ?>#comments">看评论</a>
+                    <a class="pill-btn" href="<?= e(admin_url(['post_id' => (int) $row['id']], '#comments')) ?>">看评论</a>
                     <form method="post" class="inline-form" onsubmit="return confirm('确认删除这篇帖子？帖子下评论也会一起删除，并写入日志。');">
                       <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                       <input type="hidden" name="action" value="delete_post_admin">
@@ -446,6 +622,7 @@ render_header('PulseNest · 后台管理', $user, [
       <section id="users" class="glass panel-card admin-panel-card">
         <div class="section-kicker">Users</div>
         <div class="side-head"><h3>用户 / 角色管理</h3></div>
+        <div class="notice subtle-notice">只有管理员可以调整用户角色与启停状态；版主进入后台时，这一整块不会显示。</div>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead><tr><th>ID</th><th>用户</th><th>邮箱</th><th>角色</th><th>状态</th><th>内容量</th><th>操作</th></tr></thead>
@@ -497,6 +674,7 @@ render_header('PulseNest · 后台管理', $user, [
         <section id="categories" class="glass panel-card admin-panel-card">
           <div class="section-kicker">Categories</div>
           <div class="side-head"><h3>分类管理</h3></div>
+          <div class="notice subtle-notice">删除分类时，如果下面还有版块，可直接选择目标分类迁移后再删，不再只是硬性阻止。</div>
           <form class="admin-crud-form" method="post">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="action" value="create_category">
@@ -516,9 +694,16 @@ render_header('PulseNest · 后台管理', $user, [
                 <input class="input" name="slug" value="<?= e($row['slug']) ?>">
                 <input class="input" name="description" value="<?= e($row['description']) ?>">
                 <input class="input" type="number" name="sort_order" value="<?= (int) $row['sort_order'] ?>">
+                <select class="input" name="target_category_id">
+                  <option value="0">删除时不迁移（仅空分类可直接删）</option>
+                  <?php foreach ($availableCategoryTargets as $target): ?>
+                    <?php if ((int) $target['id'] === (int) $row['id']) { continue; } ?>
+                    <option value="<?= (int) $target['id'] ?>">迁移版块到：<?= e($target['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
                 <div class="admin-action-stack">
                   <button class="pill-btn solid" type="submit" name="action" value="update_category">保存分类</button>
-                  <button class="pill-btn danger" type="submit" name="action" value="delete_category" onclick="return confirm('确认删除这个分类？只有空分类才能删除。');">删除</button>
+                  <button class="pill-btn danger" type="submit" name="action" value="delete_category" onclick="return confirm('确认删除这个分类？若已选迁移目标，会先迁移版块再删除。');">删除 / 迁移删除</button>
                 </div>
               </form>
             <?php endforeach; ?>
@@ -528,6 +713,7 @@ render_header('PulseNest · 后台管理', $user, [
         <section id="boards" class="glass panel-card admin-panel-card">
           <div class="section-kicker">Boards</div>
           <div class="side-head"><h3>版块管理</h3></div>
+          <div class="notice subtle-notice">删除版块时，可把原帖整体迁移到其他版块，链路不丢、访问更稳。</div>
           <form class="admin-crud-form" method="post">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="action" value="create_board">
@@ -559,9 +745,16 @@ render_header('PulseNest · 后台管理', $user, [
                 <input class="input" name="description" value="<?= e($row['description']) ?>">
                 <input class="input" name="accent_color" value="<?= e($row['accent_color']) ?>">
                 <input class="input" type="number" name="sort_order" value="<?= (int) $row['sort_order'] ?>">
+                <select class="input" name="target_board_id">
+                  <option value="0">删除时不迁移（仅空版块可直接删）</option>
+                  <?php foreach ($availableBoardTargets as $target): ?>
+                    <?php if ((int) $target['id'] === (int) $row['id']) { continue; } ?>
+                    <option value="<?= (int) $target['id'] ?>">迁移帖子到：<?= e($target['category_name']) ?> / <?= e($target['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
                 <div class="admin-action-stack">
                   <button class="pill-btn solid" type="submit" name="action" value="update_board">保存版块</button>
-                  <button class="pill-btn danger" type="submit" name="action" value="delete_board" onclick="return confirm('确认删除这个版块？只有空版块才能删除。');">删除</button>
+                  <button class="pill-btn danger" type="submit" name="action" value="delete_board" onclick="return confirm('确认删除这个版块？若已选迁移目标，会先迁移帖子再删除。');">删除 / 迁移删除</button>
                 </div>
               </form>
             <?php endforeach; ?>
@@ -572,7 +765,32 @@ render_header('PulseNest · 后台管理', $user, [
 
     <section id="logs" class="glass panel-card admin-panel-card">
       <div class="section-kicker">Logs</div>
-      <div class="side-head"><h3>最近操作日志</h3></div>
+      <div class="side-head admin-head-row"><h3>操作日志</h3><span class="muted">支持按动作、目标类型、操作者筛选，并做分页回看。</span></div>
+      <form class="admin-filter-row admin-log-filter-row" method="get">
+        <input type="hidden" name="post_id" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
+        <input type="hidden" name="author_id" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
+        <select class="input admin-filter-input" name="log_action">
+          <option value="">全部动作</option>
+          <?php foreach ($logActionOptions as $actionType): ?>
+            <option value="<?= e($actionType) ?>" <?= $logActionFilter === $actionType ? 'selected' : '' ?>><?= e($actionType) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <select class="input admin-filter-input" name="log_target_type">
+          <option value="">全部对象</option>
+          <?php foreach ($logTargetTypeOptions as $targetType): ?>
+            <option value="<?= e($targetType) ?>" <?= $logTargetTypeFilter === $targetType ? 'selected' : '' ?>><?= e($targetType) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <select class="input admin-filter-input" name="log_actor_id">
+          <option value="0">全部操作者</option>
+          <?php foreach ($logActorOptions as $actor): ?>
+            <option value="<?= (int) $actor['id'] ?>" <?= $logActorIdFilter === (int) $actor['id'] ? 'selected' : '' ?>><?= e($actor['nickname']) ?> @<?= e($actor['username']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <button class="pill-btn solid" type="submit">筛选</button>
+        <a class="pill-btn" href="<?= e(admin_url(['log_action' => null, 'log_target_type' => null, 'log_actor_id' => null, 'log_page' => null], '#logs')) ?>">清空</a>
+      </form>
+      <div class="admin-log-meta muted">共 <?= $logTotal ?> 条记录 · 第 <?= $logPage ?> / <?= $logTotalPages ?> 页</div>
       <div class="admin-table-wrap">
         <table class="admin-table compact-table">
           <thead><tr><th>时间</th><th>执行人</th><th>动作</th><th>对象</th><th>详情</th></tr></thead>
@@ -580,17 +798,22 @@ render_header('PulseNest · 后台管理', $user, [
             <?php foreach ($logRows as $row): ?>
               <tr>
                 <td><?= e(substr($row['created_at'], 0, 16)) ?></td>
-                <td><?= e($row['nickname']) ?><div class="muted">@<?= e($row['username']) ?></div></td>
-                <td><?= e($row['action_type']) ?></td>
+                <td><?= e($row['nickname']) ?><div class="muted">@<?= e($row['username']) ?> · #<?= (int) $row['actor_id'] ?></div></td>
+                <td><span class="tiny-badge"><?= e($row['action_type']) ?></span></td>
                 <td><?= e($row['target_type']) ?> #<?= (int) $row['target_id'] ?></td>
                 <td><?= e($row['details']) ?></td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$logRows): ?>
-              <tr><td colspan="5" class="muted">还没有操作日志。</td></tr>
+              <tr><td colspan="5" class="muted">当前筛选条件下没有操作日志。</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
+      </div>
+      <div class="admin-pagination">
+        <a class="pill-btn <?= $logPage <= 1 ? 'is-disabled' : '' ?>" <?= $logPage <= 1 ? 'aria-disabled="true"' : 'href="' . e(admin_url(['log_page' => $logPage - 1], '#logs')) . '"' ?>>上一页</a>
+        <div class="pagination-status">第 <strong><?= $logPage ?></strong> 页 / 共 <strong><?= $logTotalPages ?></strong> 页</div>
+        <a class="pill-btn <?= $logPage >= $logTotalPages ? 'is-disabled' : '' ?>" <?= $logPage >= $logTotalPages ? 'aria-disabled="true"' : 'href="' . e(admin_url(['log_page' => $logPage + 1], '#logs')) . '"' ?>>下一页</a>
       </div>
     </section>
   </main>

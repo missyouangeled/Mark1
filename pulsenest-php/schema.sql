@@ -117,6 +117,9 @@ CREATE TABLE IF NOT EXISTS moderation_logs (
   PRIMARY KEY (id),
   KEY idx_moderation_logs_actor_id (actor_user_id),
   KEY idx_moderation_logs_target (target_type, target_id),
+  KEY idx_moderation_logs_action_type (action_type),
+  KEY idx_moderation_logs_actor_created (actor_user_id, created_at),
+  KEY idx_moderation_logs_target_created (target_type, created_at),
   CONSTRAINT fk_moderation_logs_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

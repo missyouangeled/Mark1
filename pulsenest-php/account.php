@@ -143,8 +143,26 @@ render_header('PulseNest · 会员中心', $user, [
             <div class="detail-row"><span>昵称</span><strong><?= e($user['nickname']) ?></strong></div>
             <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
             <div class="detail-row"><span>邮箱</span><strong><?= e($user['email']) ?></strong></div>
+            <div class="detail-row"><span>角色</span><strong><?= e(role_label(user_role($user))) ?></strong></div>
             <div class="detail-row"><span>签名</span><strong><?= e($user['bio'] ?: '还没写简介') ?></strong></div>
-          <div class="detail-row"><span>未读提醒</span><strong><?= unread_notification_count((int) $user['id']) ?></strong></div>
+            <div class="detail-row"><span>未读提醒</span><strong><?= unread_notification_count((int) $user['id']) ?></strong></div>
+          </div>
+        </section>
+
+        <section class="glass panel-card">
+          <div class="section-kicker">Role Boundary</div>
+          <div class="side-head"><h3>权限边界说明</h3></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>普通用户</span><strong>发帖 / 评论 / 资料维护</strong></div>
+            <div class="detail-row"><span>版主</span><strong>额外获得删帖删评与日志查看</strong></div>
+            <div class="detail-row"><span>管理员</span><strong>额外获得用户 / 结构管理</strong></div>
+          </div>
+          <div class="notice subtle-notice member-role-notice">
+            <?php if (can_access_admin($user)): ?>
+              你当前可见后台入口；<?= is_admin($user) ? '管理员拥有全量后台权限。' : '当前为版主权限，后台里不会开放用户角色与分类 / 版块结构管理。' ?>
+            <?php else: ?>
+              你当前是普通用户，后台入口会被隐藏。这不是异常，而是正常的权限收口；如需协助处理内容，请联系管理员或版主。
+            <?php endif; ?>
           </div>
         </section>
 

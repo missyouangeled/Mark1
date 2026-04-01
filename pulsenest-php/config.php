@@ -105,6 +105,16 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_moderation_logs_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    if (!index_exists($pdo, 'moderation_logs', 'idx_moderation_logs_action_type')) {
+        $pdo->exec('ALTER TABLE moderation_logs ADD KEY idx_moderation_logs_action_type (action_type)');
+    }
+    if (!index_exists($pdo, 'moderation_logs', 'idx_moderation_logs_actor_created')) {
+        $pdo->exec('ALTER TABLE moderation_logs ADD KEY idx_moderation_logs_actor_created (actor_user_id, created_at)');
+    }
+    if (!index_exists($pdo, 'moderation_logs', 'idx_moderation_logs_target_created')) {
+        $pdo->exec('ALTER TABLE moderation_logs ADD KEY idx_moderation_logs_target_created (target_type, created_at)');
+    }
+
     if (!column_exists($pdo, 'posts', 'board_id')) {
         $pdo->exec('ALTER TABLE posts ADD COLUMN board_id INT UNSIGNED DEFAULT NULL AFTER user_id');
     }

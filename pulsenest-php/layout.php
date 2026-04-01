@@ -6,6 +6,14 @@ function render_header(string $title, ?array $user = null, array $options = []):
     $searchText = $options['searchText'] ?? '🔎 搜索榜单、话题、作者、游戏名';
     $headerMode = $options['headerMode'] ?? 'default';
     $unreadCount = $user ? unread_notification_count((int) $user['id']) : 0;
+    $headerStripText = '今日焦点：版块浏览 / 内容搜索 / 回复提醒';
+    if ($user) {
+        $headerStripText = match (user_role($user)) {
+            'admin' => '已登录 · ' . e($user['nickname']) . '，管理员入口已开启：内容、角色、结构与日志均可处理。',
+            'moderator' => '已登录 · ' . e($user['nickname']) . '，当前为版主权限：可巡检内容与日志，不开放用户和结构调整。',
+            default => '已登录 · ' . e($user['nickname']) . '，当前为普通用户：可发帖、评论、看提醒，后台入口不会显示。',
+        };
+    }
     ?>
 <!doctype html>
 <html lang="zh-CN">
@@ -20,7 +28,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
     <div class="header-glow">
       <div class="shell header-strip">
         <div class="header-pill">社区热度实时刷新中</div>
-        <div class="header-strip-text"><?= $user ? '已登录 · ' . e($user['nickname']) . '，版块、搜索、通知和后台入口都已接通。' : '今日焦点：版块浏览 / 内容搜索 / 回复提醒' ?></div>
+        <div class="header-strip-text"><?= $headerStripText ?></div>
       </div>
     </div>
     <div class="shell site-header-main">
