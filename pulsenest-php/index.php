@@ -185,7 +185,7 @@ render_header('PulseNest', $user, [
           </div>
         </section>
 
-        <section class="glass section-card">
+        <section class="glass section-card pulse-feed-card">
           <div class="section-kicker">Pulse Feed</div>
           <div class="feed-list">
             <?php if (!$feedPosts): ?>
