@@ -366,6 +366,47 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
 .page-hero h1 { margin: 10px 0 0; font-size: 42px; line-height: 1.08; }
 .member-hero { margin-bottom: 18px; }
 .profile-chip { padding:16px 18px; border-radius:22px; }
+.nebula-page-shell { display:flex; flex-direction:column; gap:24px; }
+.nebula-hero {
+  border-radius: 36px;
+  padding: 30px;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(35, 211, 162, 0.10), transparent 22%),
+    radial-gradient(circle at 88% 10%, rgba(122, 79, 243, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)),
+    var(--panel);
+}
+.nebula-hero-split, .nebula-section-grid { display:grid; grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr); gap:24px; align-items:start; }
+.nebula-copy { display:flex; flex-direction:column; gap:18px; }
+.nebula-desc { max-width: 780px; font-size: 15px; line-height: 1.95; }
+.nebula-side-panel { padding: 24px; }
+.compact-hero-stats .hero-stat { min-height: 100%; }
+.compact-hero-stats .num.small-num { font-size: 22px; line-height: 1.35; }
+.nebula-empty { padding: 22px; }
+.nebula-list-card { padding: 22px; }
+.list-card-topline, .list-card-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.list-card-topline { margin-bottom: 18px; }
+.list-card-footer { margin-top: 20px; }
+.user-name-line { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:700; }
+.compact-rank-list { margin-top: 18px; }
+.detail-hero { padding: 32px; }
+.detail-hero-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.detail-hero h1 { max-width: none; font-size: 48px; }
+.detail-hero-actions { justify-content:flex-end; }
+.detail-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+.nebula-detail-card { padding: 28px; }
+.detail-author-card p { margin: 14px 0 0; font-size: 14px; line-height: 1.85; color: var(--soft); }
+.nebula-member-hero { align-items:center; }
+.nebula-profile-chip { min-height: 100%; }
+.nebula-stat-grid .stat-card { border-radius: 28px; }
+.account-grid { grid-template-columns: minmax(0, 1fr) 360px; }
+.create-post-hero { align-items:stretch; }
+.nebula-compose-panel { max-width: 980px; width: 100%; margin: 0 auto; }
+.compose-textarea { min-height: 280px; }
+.compose-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.static-link { cursor:default; }
+.static-link:hover { transform:none; }
+.narrow-post-shell { width: min(1180px, calc(100% - 32px)); }
 .user-avatar, .avatar, .avatar-sm {
   border-radius:999px;
   background: linear-gradient(135deg,#dff7ff,#b8fff2);
@@ -456,7 +497,7 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
   .right { display:none; }
 }
 @media (max-width: 1100px) {
-  .hero-grid, .row-mid, .row-bottom, .focus-grid, .cards-3, .notes-grid, .supplement-grid, .page-grid-two, .page-grid-three, .auth-wrap { grid-template-columns: 1fr; }
+  .hero-grid, .row-mid, .row-bottom, .focus-grid, .cards-3, .notes-grid, .supplement-grid, .page-grid-two, .page-grid-three, .auth-wrap, .nebula-hero-split, .nebula-section-grid, .detail-grid, .account-grid { grid-template-columns: 1fr; }
   .hero-inner { grid-template-columns: 1fr; }
   .hero-art { min-height: 360px; }
   .right-stack { grid-template-rows: unset; }
@@ -477,7 +518,8 @@ h1 { margin: 0; max-width: 12ch; font-size: 56px; line-height: 1.04; letter-spac
   .hero-stats, .focus-grid, .cards-3, .page-grid-three, .hero-points, .grid-2, .quick-icons, .tool-grid, .post-grid, .stat-grid.compact { grid-template-columns: 1fr; }
   .row-mid { margin-top: 64px; }
   .row-bottom { margin-top: 72px; }
-  .auth-hero-inner, .auth-panel, .page-hero, .panel-card, .detail-card, .side-card, .post, .section-card { padding-left: 18px; padding-right: 18px; }
-  .auth-copy h1, .auth-panel h2, .page-hero h1 { font-size: 34px; }
-  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip { align-items:flex-start; flex-direction: column; }
+  .auth-hero-inner, .auth-panel, .page-hero, .panel-card, .detail-card, .side-card, .post, .section-card, .nebula-hero { padding-left: 18px; padding-right: 18px; }
+  .auth-copy h1, .auth-panel h2, .page-hero h1, .detail-hero h1 { font-size: 34px; }
+  .row, .compact-row, .post-head, .side-head, .detail-row, .list-item, .profile-chip, .detail-hero-head, .compose-actions { align-items:flex-start; flex-direction: column; }
+  .narrow-post-shell { width: min(100%, calc(100% - 20px)); }
 }
