@@ -26,6 +26,8 @@ function admin_url(array $overrides = [], string $hash = ''): string {
         'report_target_type' => trim((string) ($_GET['report_target_type'] ?? '')),
         'report_reason' => trim((string) ($_GET['report_reason'] ?? '')),
         'report_page' => (int) ($_GET['report_page'] ?? 1),
+        'governance_status' => trim((string) ($_GET['governance_status'] ?? '')),
+        'governance_high_risk_only' => trim((string) ($_GET['governance_high_risk_only'] ?? '')),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
         'log_target_type' => trim((string) ($_GET['log_target_type'] ?? '')),
         'log_actor_id' => (int) ($_GET['log_actor_id'] ?? 0),
@@ -105,6 +107,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_moderation_action((int) $user['id'], $targetStatus ? 'user_enabled' : 'user_disabled', 'user', $targetUserId, ($targetUser['nickname'] ?: $targetUser['username']) . ' · ' . role_label($targetUser['role'] ?? 'member'));
             flash_set('success', $targetStatus ? '用户已启用。' : '用户已停用。');
         }
+        redirect_to('/admin.php#users');
+    }
+
+    if ($action === 'add_governance_note') {
+        if (!$canManageUsers) {
+            http_response_code(403);
+            exit('Forbidden');
+        }
+        $targetUserId = (int) ($_POST['user_id'] ?? 0);
+        $noteType = trim((string) ($_POST['note_type'] ?? 'warning'));
+        $severity = trim((string) ($_POST['severity'] ?? 'medium'));
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        $detail = trim((string) ($_POST['detail'] ?? ''));
+        if (!in_array($noteType, ['warning', 'watch', 'ban'], true) || !in_array($severity, ['low', 'medium', 'high'], true) || $reason === '') {
+            flash_set('error', '治理记录参数不完整。');
+            redirect_to('/admin.php#users');
+        }
+        $stmt = db()->prepare('SELECT id, nickname, username FROM pulsenest_users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $targetUserId]);
+        $targetUser = $stmt->fetch();
+        if (!$targetUser) {
+            flash_set('error', '没有找到目标用户。');
+            redirect_to('/admin.php#users');
+        }
+        db()->prepare('INSERT INTO user_governance_notes (user_id, actor_user_id, note_type, severity, reason, detail) VALUES (:user_id, :actor_user_id, :note_type, :severity, :reason, :detail)')->execute([
+            'user_id' => $targetUserId,
+            'actor_user_id' => (int) $user['id'],
+            'note_type' => $noteType,
+            'severity' => $severity,
+            'reason' => mb_substr($reason, 0, 255),
+            'detail' => $detail !== '' ? $detail : null,
+        ]);
+        if ($noteType === 'ban') {
+            db()->prepare('UPDATE pulsenest_users SET is_active = 0 WHERE id = :id LIMIT 1')->execute(['id' => $targetUserId]);
+        }
+        log_moderation_action((int) $user['id'], 'user_governance_note_added', 'user', $targetUserId, ($targetUser['nickname'] ?: $targetUser['username']) . ' · ' . governance_note_type_label($noteType) . ' · 风险等级 ' . governance_severity_label($severity));
+        flash_set('success', '用户治理记录已添加。');
+        redirect_to('/admin.php#users');
+    }
+
+    if ($action === 'update_governance_note_status') {
+        if (!$canManageUsers) {
+            http_response_code(403);
+            exit('Forbidden');
+        }
+        $noteId = (int) ($_POST['note_id'] ?? 0);
+        $targetStatus = trim((string) ($_POST['target_status'] ?? 'resolved'));
+        if (!in_array($targetStatus, ['open', 'resolved', 'dismissed'], true)) {
+            flash_set('error', '治理记录状态无效。');
+            redirect_to('/admin.php#users');
+        }
+        $stmt = db()->prepare('SELECT id, user_id, note_type, severity, reason, status FROM user_governance_notes WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $noteId]);
+        $note = $stmt->fetch();
+        if (!$note) {
+            flash_set('error', '没有找到目标治理记录。');
+            redirect_to('/admin.php#users');
+        }
+        db()->prepare('UPDATE user_governance_notes SET status = :status WHERE id = :id LIMIT 1')->execute([
+            'status' => $targetStatus,
+            'id' => $noteId,
+        ]);
+        if (($note['note_type'] ?? '') === 'ban' && $targetStatus !== 'open') {
+            db()->prepare('UPDATE pulsenest_users SET is_active = 1 WHERE id = :id LIMIT 1')->execute(['id' => (int) $note['user_id']]);
+        }
+        log_moderation_action((int) $user['id'], 'user_governance_note_status_updated', 'user', (int) $note['user_id'], governance_note_type_label($note['note_type'] ?? 'warning') . ' · ' . governance_status_label($note['status'] ?? 'open') . ' → ' . governance_status_label($targetStatus));
+        flash_set('success', '治理记录状态已更新。');
         redirect_to('/admin.php#users');
     }
 
@@ -809,11 +878,114 @@ $dashboardStats = [
     'reports_resolved_today' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "resolved" AND resolved_at IS NOT NULL AND resolved_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
     'reports_dismissed_today' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "dismissed" AND resolved_at IS NOT NULL AND resolved_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
 ];
+$activeBoards = db()->query(
+    'SELECT fb.name AS board_name, fc.name AS category_name, COUNT(p.id) AS post_count
+     FROM posts p
+     INNER JOIN forum_boards fb ON fb.id = p.board_id
+     INNER JOIN forum_categories fc ON fc.id = fb.category_id
+     WHERE p.created_at >= NOW() - INTERVAL 7 DAY
+     GROUP BY fb.id, fb.name, fc.name
+     ORDER BY post_count DESC, fb.name ASC
+     LIMIT 5'
+)->fetchAll();
+$activeAuthors = db()->query(
+    'SELECT u.id, u.nickname, u.username,
+            COUNT(p.id) AS post_count,
+            COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views
+     FROM posts p
+     INNER JOIN pulsenest_users u ON u.id = p.user_id
+     WHERE p.created_at >= NOW() - INTERVAL 7 DAY
+     GROUP BY u.id, u.nickname, u.username
+     ORDER BY post_count DESC, total_views DESC, u.nickname ASC
+     LIMIT 5'
+)->fetchAll();
+$reportReasonStats = db()->query(
+    'SELECT reason, COUNT(*) AS total_count
+     FROM reports
+     GROUP BY reason
+     ORDER BY total_count DESC, reason ASC'
+)->fetchAll();
+$governanceStatusFilter = trim((string) ($_GET['governance_status'] ?? ''));
+$governanceHighRiskOnly = trim((string) ($_GET['governance_high_risk_only'] ?? '')) === '1';
+$governanceWhere = [];
+if ($governanceStatusFilter !== '' && in_array($governanceStatusFilter, ['open', 'resolved', 'dismissed'], true)) {
+    $governanceWhere[] = 'g.status = ' . db()->quote($governanceStatusFilter);
+}
+if ($governanceHighRiskOnly) {
+    $governanceWhere[] = 'g.severity = "high"';
+}
+$governanceWhereSql = $governanceWhere ? ' WHERE ' . implode(' AND ', $governanceWhere) : '';
+$governanceRows = db()->query(
+    'SELECT g.id, g.note_type, g.severity, g.status, g.reason, g.detail, g.created_at,
+            u.id AS user_id, u.nickname, u.username,
+            actor.nickname AS actor_nickname, actor.username AS actor_username
+     FROM user_governance_notes g
+     INNER JOIN pulsenest_users u ON u.id = g.user_id
+     INNER JOIN pulsenest_users actor ON actor.id = g.actor_user_id'
+     . $governanceWhereSql .
+    ' ORDER BY FIELD(g.status, "open", "resolved", "dismissed"), FIELD(g.severity, "high", "medium", "low"), g.created_at DESC, g.id DESC
+      LIMIT 20'
+)->fetchAll();
+$highRiskUsers = db()->query(
+    'SELECT u.id, u.nickname, u.username, u.is_active,
+            COUNT(g.id) AS note_count,
+            SUM(CASE WHEN g.status = "open" THEN 1 ELSE 0 END) AS open_count,
+            SUM(CASE WHEN g.severity = "high" THEN 1 ELSE 0 END) AS high_count,
+            COALESCE(r.report_count, 0) AS report_count
+     FROM pulsenest_users u
+     INNER JOIN user_governance_notes g ON g.user_id = u.id
+     LEFT JOIN (
+        SELECT owner_user_id AS user_id, COUNT(*) AS report_count
+        FROM (
+            SELECT p.user_id AS owner_user_id
+            FROM reports r
+            INNER JOIN posts p ON p.id = r.post_id
+            WHERE r.target_type = "post"
+            UNION ALL
+            SELECT c.user_id AS owner_user_id
+            FROM reports r
+            INNER JOIN comments c ON c.id = r.comment_id
+            WHERE r.target_type = "comment"
+        ) rr
+        GROUP BY owner_user_id
+     ) r ON r.user_id = u.id
+     GROUP BY u.id, u.nickname, u.username, u.is_active, r.report_count
+     HAVING high_count > 0 OR open_count > 0
+     ORDER BY high_count DESC, open_count DESC, note_count DESC, u.nickname ASC
+     LIMIT 10'
+)->fetchAll();
+$weeklyTrend = db()->query(
+    'SELECT day_label,
+            SUM(post_count) AS post_count,
+            SUM(comment_count) AS comment_count,
+            SUM(report_count) AS report_count
+     FROM (
+        SELECT DATE_FORMAT(created_at, "%m-%d") AS day_label, COUNT(*) AS post_count, 0 AS comment_count, 0 AS report_count
+        FROM posts
+        WHERE created_at >= NOW() - INTERVAL 7 DAY
+        GROUP BY DATE(created_at)
+        UNION ALL
+        SELECT DATE_FORMAT(created_at, "%m-%d") AS day_label, 0 AS post_count, COUNT(*) AS comment_count, 0 AS report_count
+        FROM comments
+        WHERE created_at >= NOW() - INTERVAL 7 DAY
+        GROUP BY DATE(created_at)
+        UNION ALL
+        SELECT DATE_FORMAT(created_at, "%m-%d") AS day_label, 0 AS post_count, 0 AS comment_count, COUNT(*) AS report_count
+        FROM reports
+        WHERE created_at >= NOW() - INTERVAL 7 DAY
+        GROUP BY DATE(created_at)
+     ) t
+     GROUP BY day_label
+     ORDER BY day_label ASC'
+)->fetchAll();
 
 $userRows = db()->query(
     'SELECT u.id, u.username, u.nickname, u.email, u.role, u.is_admin, u.is_active, u.created_at,
             COALESCE(p.post_count, 0) AS post_count,
-            COALESCE(c.comment_count, 0) AS comment_count
+            COALESCE(c.comment_count, 0) AS comment_count,
+            COALESCE(g.note_count, 0) AS governance_note_count,
+            COALESCE(g.open_note_count, 0) AS governance_open_count,
+            COALESCE(g.high_risk_count, 0) AS governance_high_risk_count
      FROM pulsenest_users u
      LEFT JOIN (
         SELECT user_id, COUNT(*) AS post_count FROM posts GROUP BY user_id
@@ -821,7 +993,15 @@ $userRows = db()->query(
      LEFT JOIN (
         SELECT user_id, COUNT(*) AS comment_count FROM comments GROUP BY user_id
      ) c ON c.user_id = u.id
-     ORDER BY FIELD(u.role, "admin", "moderator", "member"), u.created_at DESC, u.id DESC'
+     LEFT JOIN (
+        SELECT user_id,
+               COUNT(*) AS note_count,
+               SUM(CASE WHEN status = "open" THEN 1 ELSE 0 END) AS open_note_count,
+               SUM(CASE WHEN severity = "high" THEN 1 ELSE 0 END) AS high_risk_count
+        FROM user_governance_notes
+        GROUP BY user_id
+     ) g ON g.user_id = u.id
+     ORDER BY g.high_risk_count DESC, g.open_note_count DESC, FIELD(u.role, "admin", "moderator", "member"), u.created_at DESC, u.id DESC'
 )->fetchAll();
 
 $recommendGroups = recommend_group_definitions();
@@ -1104,6 +1284,64 @@ render_header('PulseNest · 后台管理', $user, [
       <div class="hero-stat"><div class="label">今日已驳回</div><div class="num small-num"><?= $dashboardStats['reports_dismissed_today'] ?></div><div class="note">24 小时内驳回的举报</div></div>
     </div>
   </section>
+
+  <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
+    <section class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Top Activity</div>
+      <div class="side-head admin-head-row"><h3>最近 7 天最活跃版块</h3><span class="muted">按近 7 天发帖量排序，帮助判断社区讨论中心。</span></div>
+      <div class="rank-list">
+        <?php foreach ($activeBoards as $index => $row): ?>
+          <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><?= e($row['category_name']) ?> / <?= e($row['board_name']) ?></div><div class="meta">近 7 天发帖活跃度</div></div><div class="score"><?= (int) $row['post_count'] ?>帖</div></div></div>
+        <?php endforeach; ?>
+        <?php if (!$activeBoards): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃版块数据</div><div class="meta">等近 7 天帖子积累后自动出现</div></div><div class="score">--</div></div></div><?php endif; ?>
+      </div>
+    </section>
+
+    <section class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Top Creators</div>
+      <div class="side-head admin-head-row"><h3>最近 7 天最活跃作者</h3><span class="muted">按近 7 天发帖数 + 浏览量排序。</span></div>
+      <div class="rank-list">
+        <?php foreach ($activeAuthors as $index => $row): ?>
+          <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/user.php?id=<?= (int) $row['id'] ?>"><?= e($row['nickname']) ?></a></div><div class="meta">@<?= e($row['username']) ?> · 近 7 天累计浏览 <?= (int) $row['total_views'] ?></div></div><div class="score"><?= (int) $row['post_count'] ?>帖</div></div></div>
+        <?php endforeach; ?>
+        <?php if (!$activeAuthors): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃作者数据</div><div class="meta">等近 7 天帖子积累后自动出现</div></div><div class="score">--</div></div></div><?php endif; ?>
+      </div>
+    </section>
+  </div>
+
+  <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
+    <section class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Report Reasons</div>
+      <div class="side-head admin-head-row"><h3>举报理由分布</h3><span class="muted">帮助判断当前社区主要风险类型。</span></div>
+      <div class="rank-list">
+        <?php foreach ($reportReasonStats as $index => $row): ?>
+          <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><?= e(report_reason_label($row['reason'] ?? 'other')) ?></div><div class="meta">原始值：<?= e($row['reason'] ?? 'other') ?></div></div><div class="score"><?= (int) $row['total_count'] ?></div></div></div>
+        <?php endforeach; ?>
+        <?php if (!$reportReasonStats): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无举报理由数据</div><div class="meta">等举报发生后自动汇总</div></div><div class="score">--</div></div></div><?php endif; ?>
+      </div>
+    </section>
+
+    <section class="glass panel-card admin-panel-card">
+      <div class="section-kicker">7 Day Trend</div>
+      <div class="side-head admin-head-row"><h3>最近 7 天新增趋势</h3><span class="muted">帖子、评论、举报的每日新增量。</span></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table compact-table">
+          <thead><tr><th>日期</th><th>新帖</th><th>新评</th><th>新举报</th></tr></thead>
+          <tbody>
+            <?php foreach ($weeklyTrend as $row): ?>
+              <tr>
+                <td><?= e($row['day_label']) ?></td>
+                <td><?= (int) $row['post_count'] ?></td>
+                <td><?= (int) $row['comment_count'] ?></td>
+                <td><?= (int) $row['report_count'] ?></td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if (!$weeklyTrend): ?><tr><td colspan="4" class="muted">最近 7 天还没有新增数据。</td></tr><?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <section id="permission-map" class="glass panel-card admin-panel-card">
     <div class="section-kicker">Permission Map</div>
@@ -1708,13 +1946,74 @@ render_header('PulseNest · 后台管理', $user, [
   </section>
 
   <?php if ($canManageUsers): ?>
+    <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
+      <section class="glass panel-card admin-panel-card">
+        <div class="section-kicker">High Risk Users</div>
+        <div class="side-head admin-head-row"><h3>高风险用户榜单</h3><span class="muted">按高风险记录数、开放中记录数排序，帮助 staff 快速定位重点用户。</span></div>
+        <div class="rank-list">
+          <?php foreach ($highRiskUsers as $index => $row): ?>
+            <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/user-governance.php?id=<?= (int) $row['id'] ?>"><?= e($row['nickname']) ?></a></div><div class="meta">@<?= e($row['username']) ?> · <?= (int) $row['note_count'] ?> 条记录 · <?= (int) $row['open_count'] ?> 条开放中 · 被举报 <?= (int) ($row['report_count'] ?? 0) ?> 次</div></div><div class="score"><?= (int) $row['high_count'] ?>高危</div></div></div>
+          <?php endforeach; ?>
+          <?php if (!$highRiskUsers): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无高风险用户</div><div class="meta">当前治理记录里没有高风险或开放中用户</div></div><div class="score">--</div></div></div><?php endif; ?>
+        </div>
+      </section>
+    </div>
+
+    <section class="glass panel-card admin-panel-card">
+      <div class="section-kicker">Governance Log</div>
+      <div class="side-head admin-head-row"><h3>用户治理记录</h3><span class="muted">封禁记录会自动停用账号；这里保留最近治理动作清单。</span></div>
+      <form class="admin-filter-row" method="get" action="/admin.php#users">
+        <select class="input admin-filter-input" name="governance_status">
+          <option value="">治理状态：全部</option>
+          <?php foreach (['open' => '开放中', 'resolved' => '已处理', 'dismissed' => '已关闭'] as $statusKey => $statusLabel): ?>
+            <option value="<?= e($statusKey) ?>" <?= $governanceStatusFilter === $statusKey ? 'selected' : '' ?>><?= e($statusLabel) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <label class="muted"><input type="checkbox" name="governance_high_risk_only" value="1" <?= $governanceHighRiskOnly ? 'checked' : '' ?>> 仅看高风险</label>
+        <button class="pill-btn solid" type="submit">筛选</button>
+        <a class="pill-btn" href="<?= e(admin_url(['governance_status' => null, 'governance_high_risk_only' => null], '#users')) ?>">清空</a>
+      </form>
+      <div class="admin-table-wrap">
+        <table class="admin-table compact-table">
+          <thead><tr><th>ID</th><th>目标用户</th><th>类型</th><th>风险等级</th><th>记录状态</th><th>原因</th><th>记录人</th><th>操作</th></tr></thead>
+          <tbody>
+            <?php foreach ($governanceRows as $row): ?>
+              <tr>
+                <td>#<?= (int) $row['id'] ?></td>
+                <td><a class="inline-link" href="/user-governance.php?id=<?= (int) $row['user_id'] ?>"><?= e($row['nickname']) ?></a><div class="muted">@<?= e($row['username']) ?></div></td>
+                <td><span class="tiny-badge"><?= e(governance_note_type_label($row['note_type'] ?? 'warning')) ?></span></td>
+                <td><span class="tiny-badge"><?= e(governance_severity_label($row['severity'] ?? 'medium')) ?></span></td>
+                <td><span class="tiny-badge"><?= e(governance_status_label($row['status'] ?? 'open')) ?></span></td>
+                <td><?= e($row['reason']) ?><div class="muted"><?= e(excerpt((string) ($row['detail'] ?? ''), 72)) ?></div></td>
+                <td><?= e($row['actor_nickname']) ?><div class="muted">@<?= e($row['actor_username']) ?> · <?= e(substr((string) $row['created_at'], 0, 16)) ?></div></td>
+                <td>
+                  <form method="post" class="admin-inline-stack">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="update_governance_note_status">
+                    <input type="hidden" name="note_id" value="<?= (int) $row['id'] ?>">
+                    <select class="input slim-input" name="target_status">
+                      <?php foreach (['open' => '开放中', 'resolved' => '已处理', 'dismissed' => '已关闭'] as $statusKey => $statusLabel): ?>
+                        <option value="<?= e($statusKey) ?>" <?= ($row['status'] ?? 'open') === $statusKey ? 'selected' : '' ?>><?= e($statusLabel) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <button class="pill-btn" type="submit">更新</button>
+                  </form>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if (!$governanceRows): ?><tr><td colspan="8" class="muted">当前还没有任何用户治理记录。</td></tr><?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="users" class="glass panel-card admin-panel-card">
       <div class="section-kicker">Users</div>
       <div class="side-head"><h3>用户 / 角色管理</h3></div>
       <div class="notice subtle-notice">只有管理员可以调整用户角色与启停状态；版主进入后台时，这一整块不会显示。</div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>ID</th><th>用户</th><th>邮箱</th><th>角色</th><th>状态</th><th>内容量</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>用户</th><th>邮箱</th><th>角色</th><th>状态</th><th>内容量</th><th>风险档案</th><th>操作</th></tr></thead>
           <tbody>
             <?php foreach ($userRows as $row): ?>
               <tr>
@@ -1724,6 +2023,31 @@ render_header('PulseNest · 后台管理', $user, [
                 <td><span class="tiny-badge"><?= e(role_label($row['role'] ?? 'member')) ?></span></td>
                 <td><span class="tiny-badge <?= (int) $row['is_active'] === 1 ? 'badge-ok' : 'badge-danger' ?>"><?= (int) $row['is_active'] === 1 ? '启用中' : '已停用' ?></span></td>
                 <td><?= (int) $row['post_count'] ?> 帖 / <?= (int) $row['comment_count'] ?> 评</td>
+                <td>
+                  <div class="chips" style="gap:6px;">
+                    <span class="chip">总记录 <?= (int) ($row['governance_note_count'] ?? 0) ?></span>
+                    <span class="chip">开放中 <?= (int) ($row['governance_open_count'] ?? 0) ?></span>
+                    <span class="chip">高风险 <?= (int) ($row['governance_high_risk_count'] ?? 0) ?></span>
+                  </div>
+                  <form method="post" class="admin-inline-stack" style="margin-top:10px; align-items:flex-start;">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="add_governance_note">
+                    <input type="hidden" name="user_id" value="<?= (int) $row['id'] ?>">
+                    <select class="input slim-input" name="note_type">
+                      <option value="warning">警告</option>
+                      <option value="watch">观察</option>
+                      <option value="ban">封禁记录</option>
+                    </select>
+                    <select class="input slim-input" name="severity">
+                      <option value="low">低风险</option>
+                      <option value="medium">中风险</option>
+                      <option value="high">高风险</option>
+                    </select>
+                    <input class="input slim-input" name="reason" placeholder="原因摘要">
+                    <input class="input slim-input" name="detail" placeholder="补充说明（可选）">
+                    <button class="pill-btn" type="submit">记一条</button>
+                  </form>
+                </td>
                 <td>
                   <div class="admin-inline-stack">
                     <form method="post" class="inline-form inline-select-form">

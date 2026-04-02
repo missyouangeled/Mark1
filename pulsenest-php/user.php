@@ -18,7 +18,44 @@ $profile = $stmt->fetch();
 
 $recentPosts = [];
 $profileStats = [];
+$governanceSummary = null;
+$governanceRecentRows = [];
+$reportSummary = null;
 if ($profile) {
+    if ($currentViewer && can_access_admin($currentViewer)) {
+        $govStmt = db()->prepare(
+            'SELECT COUNT(*) AS total_notes,
+                    SUM(CASE WHEN status = "open" THEN 1 ELSE 0 END) AS open_notes,
+                    SUM(CASE WHEN severity = "high" THEN 1 ELSE 0 END) AS high_risk_notes
+             FROM user_governance_notes
+             WHERE user_id = :id'
+        );
+        $govStmt->execute(['id' => $profile['id']]);
+        $governanceSummary = $govStmt->fetch() ?: null;
+        $govRecentStmt = db()->prepare(
+            'SELECT g.note_type, g.severity, g.status, g.reason, g.detail, g.created_at,
+                    actor.nickname AS actor_nickname, actor.username AS actor_username
+             FROM user_governance_notes g
+             INNER JOIN pulsenest_users actor ON actor.id = g.actor_user_id
+             WHERE g.user_id = :id
+             ORDER BY g.created_at DESC, g.id DESC
+             LIMIT 5'
+        );
+        $govRecentStmt->execute(['id' => $profile['id']]);
+        $governanceRecentRows = $govRecentStmt->fetchAll();
+        $reportSummaryStmt = db()->prepare(
+            'SELECT COUNT(*) AS total_reports,
+                    SUM(CASE WHEN r.status = "open" THEN 1 ELSE 0 END) AS open_reports,
+                    SUM(CASE WHEN r.status = "resolved" THEN 1 ELSE 0 END) AS resolved_reports
+             FROM reports r
+             LEFT JOIN posts p ON p.id = r.post_id
+             LEFT JOIN comments c ON c.id = r.comment_id
+             WHERE (r.target_type = "post" AND p.user_id = :id)
+                OR (r.target_type = "comment" AND c.user_id = :id)'
+        );
+        $reportSummaryStmt->execute(['id' => $profile['id']]);
+        $reportSummary = $reportSummaryStmt->fetch() ?: null;
+    }
     $statsStmt = db()->prepare(
         'SELECT
             COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
@@ -137,6 +174,30 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
               <div class="detail-row"><span>加入时间</span><strong><?= e(substr((string) $profile['created_at'], 0, 16)) ?></strong></div>
             </div>
           </section>
+
+          <?php if ($governanceSummary): ?>
+            <section class="glass panel-card">
+              <div class="section-kicker">Governance</div>
+              <div class="detail-list">
+                <div class="detail-row"><span>治理记录总数</span><strong><?= (int) ($governanceSummary['total_notes'] ?? 0) ?></strong></div>
+                <div class="detail-row"><span>开放中记录</span><strong><?= (int) ($governanceSummary['open_notes'] ?? 0) ?></strong></div>
+                <div class="detail-row"><span>高风险记录</span><strong><?= (int) ($governanceSummary['high_risk_notes'] ?? 0) ?></strong></div>
+                <div class="detail-row"><span>累计被举报</span><strong><?= (int) ($reportSummary['total_reports'] ?? 0) ?></strong></div>
+                <div class="detail-row"><span>未结举报</span><strong><?= (int) ($reportSummary['open_reports'] ?? 0) ?></strong></div>
+                <div class="detail-row"><span>已处理举报</span><strong><?= (int) ($reportSummary['resolved_reports'] ?? 0) ?></strong></div>
+              </div>
+              <div class="list-stack" style="margin-top:16px;">
+                <?php foreach ($governanceRecentRows as $gov): ?>
+                  <div class="list-item">
+                    <strong><?= e(governance_note_type_label($gov['note_type'] ?? 'warning')) ?> · <?= e(governance_severity_label($gov['severity'] ?? 'medium')) ?>风险 · <?= e(governance_status_label($gov['status'] ?? 'open')) ?></strong>
+                    <span><?= e($gov['reason']) ?> · <?= e($gov['actor_nickname']) ?> @<?= e($gov['actor_username']) ?> · <?= e(substr((string) $gov['created_at'], 0, 16)) ?></span>
+                    <?php if (!empty($gov['detail'])): ?><span class="muted"><?= e(excerpt((string) $gov['detail'], 96)) ?></span><?php endif; ?>
+                  </div>
+                <?php endforeach; ?>
+                <?php if (!$governanceRecentRows): ?><div class="empty-inline nebula-empty">当前没有可展示的治理明细。</div><?php endif; ?>
+              </div>
+            </section>
+          <?php endif; ?>
 
           <section class="glass panel-card">
             <div class="section-kicker">Quick Jump</div>

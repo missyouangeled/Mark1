@@ -152,6 +152,23 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_reports_resolved_by FOREIGN KEY (resolved_by_user_id) REFERENCES pulsenest_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_governance_notes (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id INT UNSIGNED NOT NULL,
+        actor_user_id INT UNSIGNED NOT NULL,
+        note_type VARCHAR(30) NOT NULL DEFAULT 'warning',
+        severity VARCHAR(20) NOT NULL DEFAULT 'medium',
+        status VARCHAR(20) NOT NULL DEFAULT 'open',
+        reason VARCHAR(255) NOT NULL,
+        detail TEXT DEFAULT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_user_governance_user_created (user_id, created_at),
+        KEY idx_user_governance_status (status, created_at),
+        CONSTRAINT fk_user_governance_user FOREIGN KEY (user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_user_governance_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     if (!index_exists($pdo, 'moderation_logs', 'idx_moderation_logs_action_type')) {
         $pdo->exec('ALTER TABLE moderation_logs ADD KEY idx_moderation_logs_action_type (action_type)');
     }
@@ -512,6 +529,30 @@ function report_status_label(string $status): string {
 function report_reason_label(string $reason): string {
     $options = report_reason_options();
     return $options[$reason] ?? '其他问题';
+}
+
+function governance_note_type_label(string $type): string {
+    return match ($type) {
+        'ban' => '封禁记录',
+        'watch' => '观察名单',
+        default => '警告记录',
+    };
+}
+
+function governance_severity_label(string $severity): string {
+    return match ($severity) {
+        'high' => '高',
+        'low' => '低',
+        default => '中',
+    };
+}
+
+function governance_status_label(string $status): string {
+    return match ($status) {
+        'resolved' => '已处理',
+        'dismissed' => '已关闭',
+        default => '开放中',
+    };
 }
 
 function log_moderation_action(int $actorUserId, string $actionType, string $targetType, ?int $targetId = null, ?string $details = null): void {

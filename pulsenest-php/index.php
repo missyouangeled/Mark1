@@ -113,6 +113,17 @@ $topPostsByViewsStmt = db()->query(
      LIMIT 4'
 );
 $topPostsByViews = $topPostsByViewsStmt->fetchAll();
+$activeBoardsHome = db()->query(
+    'SELECT fb.id, fb.name, fb.slug, fc.name AS category_name,
+            COUNT(p.id) AS post_count,
+            COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views
+     FROM forum_boards fb
+     INNER JOIN forum_categories fc ON fc.id = fb.category_id
+     LEFT JOIN posts p ON p.board_id = fb.id AND p.status = "published" AND p.created_at >= NOW() - INTERVAL 7 DAY
+     GROUP BY fb.id, fb.name, fb.slug, fc.name
+     ORDER BY post_count DESC, total_views DESC, fb.name ASC
+     LIMIT 4'
+)->fetchAll();
 $showRecommendedAuthors = site_setting_enabled('home.module.recommended_authors_enabled', true);
 $showTopViewed = site_setting_enabled('home.module.top_viewed_enabled', true);
 $showTimeHotlist = site_setting_enabled('home.module.time_hotlist_enabled', true);
@@ -276,61 +287,92 @@ render_header('PulseNest', $user, [
     </section>
 
     <section class="row-mid">
-      <section class="glass section-card">
-        <div class="section-kicker">Focus Slots</div>
-        <div class="section-title">首页焦点运营卡</div>
-        <div class="focus-grid">
-          <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
-          <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
-          <?php render_focus_card($focusPosts['focus_three'], 'focus_three', $homeCopy, $recommendGroups, '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
-        </div>
-      </section>
+      <div class="row-mid-main-stack">
+        <section class="glass section-card">
+          <div class="section-kicker">Focus Slots</div>
+          <div class="section-title">首页焦点运营卡</div>
+          <div class="focus-grid">
+            <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
+            <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
+            <?php render_focus_card($focusPosts['focus_three'], 'focus_three', $homeCopy, $recommendGroups, '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
+          </div>
+        </section>
 
-      <section class="glass section-card">
-        <div class="section-kicker">Recommendation Pools</div>
-        <div class="section-title">推荐位分组与优先级</div>
-        <div class="rank-list">
-          <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
-            <?php $leadPost = $recommendedPools[$groupKey][0] ?? null; ?>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= e(strtoupper(substr($groupKey, 0, 1))) ?></div><div class="rank-main"><div class="rank-name"><?= e($groupMeta['label']) ?></div><div class="meta"><?= e($leadPost ? $leadPost['title'] . ' · 优先级 ' . (int) ($leadPost['recommend_priority'] ?? 0) : $groupMeta['desc']) ?></div></div><div class="score"><?= count($recommendedPools[$groupKey]) ?>条</div></div></div>
-          <?php endforeach; ?>
-        </div>
-      </section>
-
-      <?php if ($showTimeHotlist): ?>
-      <section class="glass section-card tag-cloud-card">
-        <div class="section-kicker">Time Range Hotlist</div>
-        <div class="section-title">按时间窗口看热榜</div>
-        <div class="tag-cloud">
-          <span class="tag-cloud-item a">#24小时热榜</span>
-          <span class="tag-cloud-item b">#7天热榜</span>
-          <span class="tag-cloud-item c">#30天热榜</span>
-          <span class="tag-cloud-item a">#热度 = 点赞 + 回复 + 浏览</span>
-        </div>
-        <div class="list-stack">
-          <?php foreach ($timeRangeBoards as $rangeKey => $rangeMeta): ?>
-            <div class="author-item">
-              <div class="author-row">
-                <div class="author-badge">⏱️</div>
-                <div class="author-main">
-                  <div class="author-name"><?= e($rangeMeta['label']) ?></div>
-                  <div class="meta"><?= !empty($timeRangeHotPosts[$rangeKey]) ? '按时间窗口统计的实时热度结果' : '这个时间段内还没有足够内容' ?></div>
+        <?php if ($showTimeHotlist): ?>
+        <section class="glass section-card tag-cloud-card">
+          <div class="section-kicker">Time Range Hotlist</div>
+          <div class="section-title">按时间窗口看热榜</div>
+          <div class="tag-cloud">
+            <span class="tag-cloud-item a">#24小时热榜</span>
+            <span class="tag-cloud-item b">#7天热榜</span>
+            <span class="tag-cloud-item c">#30天热榜</span>
+            <span class="tag-cloud-item a">#热度 = 点赞 + 回复 + 浏览</span>
+          </div>
+          <div class="list-stack">
+            <?php foreach ($timeRangeBoards as $rangeKey => $rangeMeta): ?>
+              <div class="author-item">
+                <div class="author-row">
+                  <div class="author-badge">⏱️</div>
+                  <div class="author-main">
+                    <div class="author-name"><?= e($rangeMeta['label']) ?></div>
+                    <div class="meta"><?= !empty($timeRangeHotPosts[$rangeKey]) ? '按时间窗口统计的实时热度结果' : '这个时间段内还没有足够内容' ?></div>
+                  </div>
+                </div>
+                <div class="rank-list" style="margin-top:12px;">
+                  <?php if (empty($timeRangeHotPosts[$rangeKey])): ?>
+                    <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无热帖</div><div class="meta">等这个时间窗里积累真实互动</div></div><div class="score">--</div></div></div>
+                  <?php else: ?>
+                    <?php foreach ($timeRangeHotPosts[$rangeKey] as $index => $hotPost): ?>
+                      <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/post.php?id=<?= (int) $hotPost['id'] ?>"><?= e($hotPost['title']) ?></a></div><div class="meta">@<?= e($hotPost['username']) ?> · <?= (int) $hotPost['like_count'] ?> 赞 · <?= (int) $hotPost['comment_count'] ?> 回复 · <?= (int) ($hotPost['view_count'] ?? 0) ?> 浏览</div></div><div class="score"><?= (int) ($hotPost['like_count'] * ranking_weight('like') + $hotPost['comment_count'] * ranking_weight('comment') + $hotPost['view_count'] * ranking_weight('view')) ?></div></div></div>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
                 </div>
               </div>
-              <div class="rank-list" style="margin-top:12px;">
-                <?php if (empty($timeRangeHotPosts[$rangeKey])): ?>
-                  <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无热帖</div><div class="meta">等这个时间窗里积累真实互动</div></div><div class="score">--</div></div></div>
-                <?php else: ?>
-                  <?php foreach ($timeRangeHotPosts[$rangeKey] as $index => $hotPost): ?>
-                    <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/post.php?id=<?= (int) $hotPost['id'] ?>"><?= e($hotPost['title']) ?></a></div><div class="meta">@<?= e($hotPost['username']) ?> · <?= (int) $hotPost['like_count'] ?> 赞 · <?= (int) $hotPost['comment_count'] ?> 回复 · <?= (int) ($hotPost['view_count'] ?? 0) ?> 浏览</div></div><div class="score"><?= (int) ($hotPost['like_count'] * ranking_weight('like') + $hotPost['comment_count'] * ranking_weight('comment') + $hotPost['view_count'] * ranking_weight('view')) ?></div></div></div>
-                  <?php endforeach; ?>
-                <?php endif; ?>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      </section>
-      <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        </section>
+        <?php endif; ?>
+      </div>
+
+      <div class="row-mid-side-stack">
+        <section class="glass section-card">
+          <div class="section-kicker">Recommendation Pools</div>
+          <div class="section-title">推荐位分组与优先级</div>
+          <div class="rank-list">
+            <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
+              <?php $leadPost = $recommendedPools[$groupKey][0] ?? null; ?>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= e(strtoupper(substr($groupKey, 0, 1))) ?></div><div class="rank-main"><div class="rank-name"><?= e($groupMeta['label']) ?></div><div class="meta"><?= e($leadPost ? $leadPost['title'] . ' · 优先级 ' . (int) ($leadPost['recommend_priority'] ?? 0) : $groupMeta['desc']) ?></div></div><div class="score"><?= count($recommendedPools[$groupKey]) ?>条</div></div></div>
+            <?php endforeach; ?>
+          </div>
+        </section>
+
+        <section class="glass section-card">
+          <div class="section-kicker">Active Boards</div>
+          <div class="section-title">最近 7 天活跃版块</div>
+          <div class="rank-list">
+            <?php foreach ($activeBoardsHome as $index => $board): ?>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/posts.php?board=<?= e($board['slug']) ?>"><?= e($board['name']) ?></a></div><div class="meta"><?= e($board['category_name']) ?> · 近 7 天累计浏览 <?= (int) ($board['total_views'] ?? 0) ?></div></div><div class="score"><?= (int) ($board['post_count'] ?? 0) ?>帖</div></div></div>
+            <?php endforeach; ?>
+            <?php if (!$activeBoardsHome): ?>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃版块数据</div><div class="meta">等近 7 天发帖积累后自动出现</div></div><div class="score">--</div></div></div>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <section class="glass section-card">
+          <div class="section-kicker">Community Snapshot</div>
+          <div class="section-title">社区即时快照</div>
+          <div class="hero-stats compact-hero-stats admin-hero-stats" style="margin-top:16px;">
+            <div class="hero-stat"><div class="label">公开帖子</div><div class="num small-num"><?= $postCount ?></div><div class="note">当前首页读取的公开内容总量</div></div>
+            <div class="hero-stat"><div class="label">社区成员</div><div class="num small-num"><?= $userCount ?></div><div class="note">已注册成员数</div></div>
+            <div class="hero-stat"><div class="label">论坛版块</div><div class="num small-num"><?= $boardCount ?></div><div class="note">当前可浏览版块</div></div>
+          </div>
+          <div class="quick-links" style="margin-top:18px;">
+            <a class="quick-link" href="/posts.php?sort=hot"><strong>切到综合热度流</strong><span>直接看当前最值得继续扩散的帖子</span></a>
+            <a class="quick-link" href="/posts.php?sort=views"><strong>切到最多浏览流</strong><span>快速回看已经跑出阅读量的内容</span></a>
+          </div>
+        </section>
+      </div>
     </section>
 
     <section class="row-bottom">
