@@ -125,6 +125,33 @@ function ensure_database_schema(PDO $pdo): void {
         CONSTRAINT fk_moderation_logs_actor FOREIGN KEY (actor_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS reports (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        reporter_user_id INT UNSIGNED NOT NULL,
+        target_type VARCHAR(20) NOT NULL,
+        target_id INT UNSIGNED NOT NULL,
+        post_id INT UNSIGNED NOT NULL,
+        comment_id INT UNSIGNED DEFAULT NULL,
+        reason VARCHAR(40) NOT NULL,
+        detail VARCHAR(500) DEFAULT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'open',
+        resolution_note VARCHAR(255) DEFAULT NULL,
+        resolved_by_user_id INT UNSIGNED DEFAULT NULL,
+        resolved_at DATETIME DEFAULT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_reports_status_created (status, created_at),
+        KEY idx_reports_target (target_type, target_id),
+        KEY idx_reports_post_id (post_id),
+        KEY idx_reports_comment_id (comment_id),
+        KEY idx_reports_reporter_id (reporter_user_id),
+        KEY idx_reports_resolved_by (resolved_by_user_id),
+        CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_user_id) REFERENCES pulsenest_users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_reports_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_reports_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_reports_resolved_by FOREIGN KEY (resolved_by_user_id) REFERENCES pulsenest_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     if (!index_exists($pdo, 'moderation_logs', 'idx_moderation_logs_action_type')) {
         $pdo->exec('ALTER TABLE moderation_logs ADD KEY idx_moderation_logs_action_type (action_type)');
     }
@@ -304,7 +331,7 @@ function seed_forum_structure(PDO $pdo): void {
 }
 
 function seed_site_settings(PDO $pdo): void {
-    $defaults = default_home_copy_settings();
+    $defaults = array_merge(default_site_settings(), default_home_copy_settings());
     $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value) ON DUPLICATE KEY UPDATE setting_value = COALESCE(site_settings.setting_value, VALUES(setting_value))');
     foreach ($defaults as $key => $value) {
         $stmt->execute([
@@ -463,6 +490,30 @@ function can_manage_comment(?array $user, array $comment): bool {
     return $user && (can_moderate_content($user) || (int) $user['id'] === (int) ($comment['user_id'] ?? 0));
 }
 
+function report_reason_options(): array {
+    return [
+        'spam' => '垃圾信息 / 广告',
+        'abuse' => '辱骂 / 攻击性内容',
+        'illegal' => '违法 / 风险内容',
+        'nsfw' => '不适宜公开内容',
+        'other' => '其他问题',
+    ];
+}
+
+function report_status_label(string $status): string {
+    return match ($status) {
+        'reviewing' => '处理中',
+        'resolved' => '已处理',
+        'dismissed' => '已驳回',
+        default => '待处理',
+    };
+}
+
+function report_reason_label(string $reason): string {
+    $options = report_reason_options();
+    return $options[$reason] ?? '其他问题';
+}
+
 function log_moderation_action(int $actorUserId, string $actionType, string $targetType, ?int $targetId = null, ?string $details = null): void {
     $stmt = db()->prepare('INSERT INTO moderation_logs (actor_user_id, action_type, target_type, target_id, details) VALUES (:actor_user_id, :action_type, :target_type, :target_id, :details)');
     $stmt->execute([
@@ -472,6 +523,43 @@ function log_moderation_action(int $actorUserId, string $actionType, string $tar
         'target_id' => $targetId,
         'details' => $details ? mb_substr($details, 0, 255) : null,
     ]);
+}
+
+function create_report(int $reporterUserId, string $targetType, int $targetId, int $postId, ?int $commentId, string $reason, ?string $detail = null): array {
+    $allowedTargetTypes = ['post', 'comment'];
+    $allowedReasons = array_keys(report_reason_options());
+    if (!in_array($targetType, $allowedTargetTypes, true)) {
+        return ['ok' => false, 'message' => '举报对象类型无效。'];
+    }
+    if (!in_array($reason, $allowedReasons, true)) {
+        return ['ok' => false, 'message' => '举报理由无效。'];
+    }
+
+    $detail = trim((string) $detail);
+    $detail = $detail !== '' ? mb_substr($detail, 0, 500) : null;
+
+    $dedupeStmt = db()->prepare('SELECT id FROM reports WHERE reporter_user_id = :reporter_user_id AND target_type = :target_type AND target_id = :target_id AND status IN ("open", "reviewing") LIMIT 1');
+    $dedupeStmt->execute([
+        'reporter_user_id' => $reporterUserId,
+        'target_type' => $targetType,
+        'target_id' => $targetId,
+    ]);
+    if ($dedupeStmt->fetchColumn()) {
+        return ['ok' => false, 'message' => '你已经举报过这个内容了，先等处理结果。'];
+    }
+
+    $stmt = db()->prepare('INSERT INTO reports (reporter_user_id, target_type, target_id, post_id, comment_id, reason, detail) VALUES (:reporter_user_id, :target_type, :target_id, :post_id, :comment_id, :reason, :detail)');
+    $stmt->execute([
+        'reporter_user_id' => $reporterUserId,
+        'target_type' => $targetType,
+        'target_id' => $targetId,
+        'post_id' => $postId,
+        'comment_id' => $commentId,
+        'reason' => $reason,
+        'detail' => $detail,
+    ]);
+
+    return ['ok' => true, 'id' => (int) db()->lastInsertId(), 'message' => '举报已提交，后台会进入处理队列。'];
 }
 
 function e(?string $value): string {
@@ -693,6 +781,30 @@ function recommend_group_definitions(): array {
     ];
 }
 
+function default_site_settings(): array {
+    return [
+        'site.name' => 'PulseNest',
+        'site.tagline' => '像逛热门论坛一样找下一款会沉迷的游戏',
+        'site.announcement' => '',
+        'site.registration_enabled' => '1',
+        'site.login_enabled' => '1',
+        'site.readonly_mode_enabled' => '0',
+        'site.reporting_enabled' => '1',
+        'site.post_moderation_enabled' => '1',
+        'site.comment_moderation_enabled' => '0',
+        'site.post_title_min_length' => '4',
+        'site.post_title_max_length' => '120',
+        'site.post_content_min_length' => '10',
+        'site.comment_content_min_length' => '2',
+        'home.module.recommended_authors_enabled' => '1',
+        'home.module.top_viewed_enabled' => '1',
+        'home.module.time_hotlist_enabled' => '1',
+        'ranking.weight_like' => '3',
+        'ranking.weight_comment' => '4',
+        'ranking.weight_view' => '1',
+    ];
+}
+
 function default_home_copy_settings(): array {
     return [
         'home.hero.eyebrow' => '星云初始01 · 首页升级到可运营的论坛首页',
@@ -737,6 +849,41 @@ function set_site_settings(array $settings): void {
     }
 }
 
+function site_config(): array {
+    $defaults = default_site_settings();
+    $keys = array_keys($defaults);
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $stmt = db()->prepare('SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN (' . $placeholders . ')');
+    $stmt->execute($keys);
+    $rows = $stmt->fetchAll();
+    $config = $defaults;
+    foreach ($rows as $row) {
+        $config[$row['setting_key']] = (string) $row['setting_value'];
+    }
+    return $config;
+}
+
+function site_setting_enabled(string $key, bool $default = false): bool {
+    return get_site_setting($key, $default ? '1' : '0') === '1';
+}
+
+function site_name(): string {
+    return get_site_setting('site.name', 'PulseNest') ?: 'PulseNest';
+}
+
+function site_tagline(): string {
+    return get_site_setting('site.tagline', '像逛热门论坛一样找下一款会沉迷的游戏') ?: '像逛热门论坛一样找下一款会沉迷的游戏';
+}
+
+function site_announcement(): string {
+    return trim((string) get_site_setting('site.announcement', ''));
+}
+
+function site_int_setting(string $key, int $default): int {
+    $value = get_site_setting($key, (string) $default);
+    return is_numeric($value) ? (int) $value : $default;
+}
+
 function home_copy_config(): array {
     $defaults = default_home_copy_settings();
     $keys = array_keys($defaults);
@@ -749,6 +896,33 @@ function home_copy_config(): array {
         $config[$row['setting_key']] = (string) $row['setting_value'];
     }
     return $config;
+}
+
+function post_sort_options(): array {
+    return [
+        'latest' => ['label' => '最新发布', 'sql' => 'p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC'],
+        'hot' => ['label' => '综合热度', 'sql' => 'p.is_sticky DESC, ' . hot_score_sql() . ' DESC, p.recommend_priority DESC, p.created_at DESC, p.id DESC'],
+        'comments' => ['label' => '最多回复', 'sql' => 'p.is_sticky DESC, COALESCE(c.comment_count, 0) DESC, COALESCE(l.like_count, 0) DESC, p.created_at DESC, p.id DESC'],
+        'views' => ['label' => '最多浏览', 'sql' => 'p.is_sticky DESC, COALESCE(p.view_count, 0) DESC, COALESCE(c.comment_count, 0) DESC, p.created_at DESC, p.id DESC'],
+    ];
+}
+
+function ranking_weight(string $metric): int {
+    return match ($metric) {
+        'like' => max(0, site_int_setting('ranking.weight_like', 3)),
+        'comment' => max(0, site_int_setting('ranking.weight_comment', 4)),
+        'view' => max(0, site_int_setting('ranking.weight_view', 1)),
+        default => 0,
+    };
+}
+
+function hot_score_sql(string $likeExpr = 'COALESCE(l.like_count, 0)', string $commentExpr = 'COALESCE(c.comment_count, 0)', string $viewExpr = 'COALESCE(p.view_count, 0)'): string {
+    return '(' . $likeExpr . ' * ' . ranking_weight('like') . ' + ' . $commentExpr . ' * ' . ranking_weight('comment') . ' + ' . $viewExpr . ' * ' . ranking_weight('view') . ')';
+}
+
+function normalize_post_sort(?string $sort): string {
+    $sort = trim((string) $sort);
+    return array_key_exists($sort, post_sort_options()) ? $sort : 'latest';
 }
 
 function render_pagination(string $basePath, int $page, int $totalPages, array $query = [], string $hash = ''): string {
@@ -906,6 +1080,15 @@ function create_post_moderation_notification(array $post, int $actorUserId, stri
     ]);
 }
 
+function create_report_resolution_notification(int $recipientUserId, int $actorUserId, int $postId, ?int $commentId, string $status): void {
+    if (!in_array($status, ['resolved', 'dismissed', 'reviewing'], true)) {
+        return;
+    }
+    create_notification($recipientUserId, $actorUserId, 'report_processed', $postId, $commentId, [
+        'moderation_status' => $status,
+    ]);
+}
+
 function notification_type_label(string $type): string {
     return match ($type) {
         'comment_reply' => '评论回复',
@@ -914,6 +1097,7 @@ function notification_type_label(string $type): string {
         'comment_like' => '评论点赞',
         'comment_moderated' => '评论审核',
         'post_moderated' => '帖子审核',
+        'report_processed' => '举报处理',
         default => '站内提醒',
     };
 }
@@ -938,6 +1122,24 @@ function notification_moderation_copy(?string $status, string $target = 'comment
             'verb' => '待审核',
             'summary' => '你的' . $subject . '正在等待审核',
             'description' => '你的' . $subject . '已进入审核队列，暂时不会在前台公开展示。',
+        ],
+        'resolved' => [
+            'label' => '已处理',
+            'verb' => '已处理',
+            'summary' => '你提交的举报已处理',
+            'description' => '你提交的举报已被处理，相关内容可能已被处置。',
+        ],
+        'dismissed' => [
+            'label' => '已驳回',
+            'verb' => '已驳回',
+            'summary' => '你提交的举报已驳回',
+            'description' => '你提交的举报已被驳回，当前未触发内容处置。',
+        ],
+        'reviewing' => [
+            'label' => '处理中',
+            'verb' => '处理中',
+            'summary' => '你提交的举报正在处理',
+            'description' => '你提交的举报已进入处理流程，请稍后再看结果。',
         ],
         default => [
             'label' => '状态更新',
@@ -964,6 +1166,7 @@ function notification_message(array $item): string {
         'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
         'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'comment')['summary'] . '：' . $title,
         'post_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'post')['summary'] . '：' . $title,
+        'report_processed' => notification_moderation_copy($item['moderation_status'] ?? null, 'post')['summary'] . '：' . $title,
         default => '回复了你的帖子：' . $title,
     };
 }

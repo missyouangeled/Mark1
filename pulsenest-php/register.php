@@ -4,13 +4,16 @@ start_session_if_needed();
 ensure_guest_only();
 
 $error = '';
+if (!site_setting_enabled('site.registration_enabled', true)) {
+    $error = '当前站点暂时关闭新用户注册。';
+}
 $form = [
     'nickname' => '',
     'username' => '',
     'email' => '',
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && site_setting_enabled('site.registration_enabled', true)) {
     $form['nickname'] = trim($_POST['nickname'] ?? '');
     $form['username'] = trim($_POST['username'] ?? '');
     $form['email'] = trim($_POST['email'] ?? '');

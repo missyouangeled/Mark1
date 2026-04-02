@@ -3,10 +3,16 @@ require __DIR__ . '/layout.php';
 $user = ensure_logged_in();
 $error = '';
 $boards = fetch_board_options();
+$postTitleMin = max(1, site_int_setting('site.post_title_min_length', 4));
+$postTitleMax = max($postTitleMin, site_int_setting('site.post_title_max_length', 120));
+$postContentMin = max(1, site_int_setting('site.post_content_min_length', 10));
+if (site_setting_enabled('site.readonly_mode_enabled', false)) {
+    $error = '当前站点处于只读模式，暂时关闭发帖。';
+}
 $defaultBoardId = (int) ($boards[0]['id'] ?? 0);
 $form = ['title' => '', 'content' => '', 'board_id' => $defaultBoardId];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !site_setting_enabled('site.readonly_mode_enabled', false)) {
     verify_csrf();
     $form['title'] = trim($_POST['title'] ?? '');
     $form['content'] = trim($_POST['content'] ?? '');
@@ -24,14 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = '请选择一个有效版块。';
     } elseif ($form['title'] === '' || $form['content'] === '') {
         $error = '标题和正文都要填写。';
-    } elseif (mb_strlen($form['title']) < 4 || mb_strlen($form['title']) > 120) {
-        $error = '标题长度请控制在 4 到 120 个字符之间。';
-    } elseif (mb_strlen($form['content']) < 10) {
-        $error = '正文至少写满 10 个字，帖子才像回事。';
+    } elseif (mb_strlen($form['title']) < $postTitleMin || mb_strlen($form['title']) > $postTitleMax) {
+        $error = '标题长度请控制在 ' . $postTitleMin . ' 到 ' . $postTitleMax . ' 个字符之间。';
+    } elseif (mb_strlen($form['content']) < $postContentMin) {
+        $error = '正文至少写满 ' . $postContentMin . ' 个字，帖子才像回事。';
     } else {
         try {
             $imagePath = handle_image_upload($_FILES['cover_image'] ?? [], POST_UPLOAD_DIR);
-            $initialStatus = can_moderate_content($user) ? 'published' : 'pending';
+            $requiresModeration = site_setting_enabled('site.post_moderation_enabled', true);
+            $initialStatus = (can_moderate_content($user) || !$requiresModeration) ? 'published' : 'pending';
             $stmt = db()->prepare('INSERT INTO posts (user_id, board_id, title, content, image_path, status) VALUES (:user_id, :board_id, :title, :content, :image_path, :status)');
             $stmt->execute([
                 'user_id' => $user['id'],

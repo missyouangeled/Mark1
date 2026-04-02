@@ -5,9 +5,12 @@ ensure_guest_only();
 
 $error = '';
 $success = isset($_GET['reset']) ? '密码已更新，现在可以直接登录。' : '';
+if (!site_setting_enabled('site.login_enabled', true)) {
+    $error = '当前站点暂时关闭登录入口。';
+}
 $identifier = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && site_setting_enabled('site.login_enabled', true)) {
     $identifier = trim($_POST['identifier'] ?? '');
     $password = (string) ($_POST['password'] ?? '');
 

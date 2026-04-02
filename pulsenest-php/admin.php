@@ -22,6 +22,10 @@ function admin_url(array $overrides = [], string $hash = ''): string {
         'post_status' => trim((string) ($_GET['post_status'] ?? '')),
         'post_page' => (int) ($_GET['post_page'] ?? 1),
         'comment_page' => (int) ($_GET['comment_page'] ?? 1),
+        'report_status' => trim((string) ($_GET['report_status'] ?? '')),
+        'report_target_type' => trim((string) ($_GET['report_target_type'] ?? '')),
+        'report_reason' => trim((string) ($_GET['report_reason'] ?? '')),
+        'report_page' => (int) ($_GET['report_page'] ?? 1),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
         'log_target_type' => trim((string) ($_GET['log_target_type'] ?? '')),
         'log_actor_id' => (int) ($_GET['log_actor_id'] ?? 0),
@@ -136,6 +140,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('success', '用户角色已更新为“' . role_label($targetRole) . '”。');
         }
         redirect_to('/admin.php#users');
+    }
+
+    if ($action === 'update_site_settings') {
+        $settings = [];
+        foreach (array_keys(default_site_settings()) as $settingKey) {
+            $fieldName = site_setting_field_name($settingKey);
+            if (str_ends_with($settingKey, '_enabled')) {
+                $settings[$settingKey] = isset($_POST[$fieldName]) ? '1' : '0';
+            } else {
+                $settings[$settingKey] = trim((string) ($_POST[$fieldName] ?? ''));
+            }
+        }
+        set_site_settings($settings);
+        log_moderation_action((int) $user['id'], 'site_settings_updated', 'site_settings', null, '站点运营开关与公告已更新');
+        flash_set('success', '站点设置已更新。');
+        redirect_to('/admin.php#site-settings');
     }
 
     if ($action === 'update_home_copy') {
@@ -262,6 +282,166 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('success', '帖子已删除。');
         }
         redirect_to('/admin.php#posts');
+    }
+
+    if ($action === 'resolve_report') {
+        $reportId = (int) ($_POST['report_id'] ?? 0);
+        $targetStatus = trim((string) ($_POST['target_status'] ?? 'resolved'));
+        $resolutionNote = trim((string) ($_POST['resolution_note'] ?? ''));
+        $contentAction = trim((string) ($_POST['content_action'] ?? 'none'));
+        if (!in_array($targetStatus, ['reviewing', 'resolved', 'dismissed'], true)) {
+            flash_set('error', '举报状态无效。');
+            redirect_to('/admin.php#reports');
+        }
+        if (!in_array($contentAction, ['none', 'hide_post', 'restore_post', 'hide_comment', 'approve_comment', 'delete_comment'], true)) {
+            $contentAction = 'none';
+        }
+        $stmt = db()->prepare('SELECT id, reporter_user_id, target_type, target_id, post_id, comment_id, reason, status FROM reports WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $reportId]);
+        $report = $stmt->fetch();
+        if (!$report) {
+            flash_set('error', '没有找到目标举报。');
+            redirect_to('/admin.php#reports');
+        }
+
+        if ($contentAction === 'hide_post') {
+            $postOwnerStmt = db()->prepare('SELECT id, user_id FROM posts WHERE id = :id LIMIT 1');
+            $postOwnerStmt->execute(['id' => (int) $report['post_id']]);
+            $postRow = $postOwnerStmt->fetch();
+            db()->prepare('UPDATE posts SET status = "hidden" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['post_id']]);
+            if ($postRow) {
+                create_post_moderation_notification($postRow, (int) $user['id'], 'hidden');
+            }
+            log_moderation_action((int) $user['id'], 'post_hidden_via_report', 'post', (int) $report['post_id'], '举报 #' . $reportId . ' 联动隐藏帖子');
+        }
+        if ($contentAction === 'restore_post') {
+            $postOwnerStmt = db()->prepare('SELECT id, user_id FROM posts WHERE id = :id LIMIT 1');
+            $postOwnerStmt->execute(['id' => (int) $report['post_id']]);
+            $postRow = $postOwnerStmt->fetch();
+            db()->prepare('UPDATE posts SET status = "published" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['post_id']]);
+            if ($postRow) {
+                create_post_moderation_notification($postRow, (int) $user['id'], 'published');
+            }
+            log_moderation_action((int) $user['id'], 'post_restored_via_report', 'post', (int) $report['post_id'], '举报 #' . $reportId . ' 联动恢复帖子');
+        }
+        if ($contentAction === 'hide_comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+            $commentOwnerStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id LIMIT 1');
+            $commentOwnerStmt->execute(['id' => (int) $report['comment_id']]);
+            $commentRow = $commentOwnerStmt->fetch();
+            db()->prepare('UPDATE comments SET status = "hidden" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+            if ($commentRow) {
+                create_comment_moderation_notification($commentRow, ['id' => (int) $report['post_id']], (int) $user['id'], 'hidden');
+            }
+            log_moderation_action((int) $user['id'], 'comment_hidden_via_report', 'comment', (int) $report['comment_id'], '举报 #' . $reportId . ' 联动隐藏评论');
+        }
+        if ($contentAction === 'approve_comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+            $commentOwnerStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id LIMIT 1');
+            $commentOwnerStmt->execute(['id' => (int) $report['comment_id']]);
+            $commentRow = $commentOwnerStmt->fetch();
+            db()->prepare('UPDATE comments SET status = "approved" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+            if ($commentRow) {
+                create_comment_moderation_notification($commentRow, ['id' => (int) $report['post_id']], (int) $user['id'], 'approved');
+            }
+            log_moderation_action((int) $user['id'], 'comment_approved_via_report', 'comment', (int) $report['comment_id'], '举报 #' . $reportId . ' 联动恢复评论');
+        }
+        if ($contentAction === 'delete_comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+            db()->prepare('DELETE FROM comments WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+            log_moderation_action((int) $user['id'], 'comment_deleted_via_report', 'comment', (int) $report['comment_id'], '举报 #' . $reportId . ' 联动删除评论');
+        }
+
+        db()->prepare('UPDATE reports SET status = :status, resolution_note = :resolution_note, resolved_by_user_id = :resolved_by_user_id, resolved_at = :resolved_at WHERE id = :id LIMIT 1')->execute([
+            'status' => $targetStatus,
+            'resolution_note' => $resolutionNote !== '' ? mb_substr($resolutionNote, 0, 255) : null,
+            'resolved_by_user_id' => (int) $user['id'],
+            'resolved_at' => $targetStatus === 'reviewing' ? null : date('Y-m-d H:i:s'),
+            'id' => $reportId,
+        ]);
+        create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus);
+        log_moderation_action((int) $user['id'], 'report_status_updated', 'report', $reportId, ($report['target_type'] ?? 'content') . ' #' . (int) ($report['target_id'] ?? 0) . ' · ' . report_reason_label($report['reason'] ?? 'other') . ' · ' . report_status_label($report['status'] ?? 'open') . ' → ' . report_status_label($targetStatus) . ($contentAction !== 'none' ? ' · 联动:' . $contentAction : ''));
+        flash_set('success', '举报状态已更新为“' . report_status_label($targetStatus) . '”。');
+        redirect_to('/admin.php#reports');
+    }
+
+    if ($action === 'bulk_report_status') {
+        $reportIds = array_values(array_unique(array_filter(array_map('intval', $_POST['report_ids'] ?? []))));
+        $targetStatus = trim((string) ($_POST['target_status'] ?? 'resolved'));
+        $resolutionNote = trim((string) ($_POST['resolution_note'] ?? ''));
+        $contentAction = trim((string) ($_POST['content_action'] ?? 'none'));
+        if (!$reportIds) {
+            flash_set('error', '请先勾选要处理的举报。');
+            redirect_to('/admin.php#reports');
+        }
+        if (!in_array($targetStatus, ['reviewing', 'resolved', 'dismissed'], true)) {
+            flash_set('error', '举报状态无效。');
+            redirect_to('/admin.php#reports');
+        }
+        if (!in_array($contentAction, ['none', 'hide_post', 'restore_post', 'hide_comment', 'approve_comment', 'delete_comment'], true)) {
+            $contentAction = 'none';
+        }
+
+        $placeholders = implode(',', array_fill(0, count($reportIds), '?'));
+        $stmt = db()->prepare('SELECT id, reporter_user_id, target_type, target_id, post_id, comment_id, reason, status FROM reports WHERE id IN (' . $placeholders . ')');
+        $stmt->execute($reportIds);
+        $reports = $stmt->fetchAll();
+        if (!$reports) {
+            flash_set('error', '没有找到可处理的举报。');
+            redirect_to('/admin.php#reports');
+        }
+
+        foreach ($reports as $report) {
+            if ($contentAction === 'hide_post' && ($report['target_type'] ?? '') === 'post') {
+                $postOwnerStmt = db()->prepare('SELECT id, user_id FROM posts WHERE id = :id LIMIT 1');
+                $postOwnerStmt->execute(['id' => (int) $report['post_id']]);
+                $postRow = $postOwnerStmt->fetch();
+                db()->prepare('UPDATE posts SET status = "hidden" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['post_id']]);
+                if ($postRow) {
+                    create_post_moderation_notification($postRow, (int) $user['id'], 'hidden');
+                }
+            }
+            if ($contentAction === 'restore_post' && ($report['target_type'] ?? '') === 'post') {
+                $postOwnerStmt = db()->prepare('SELECT id, user_id FROM posts WHERE id = :id LIMIT 1');
+                $postOwnerStmt->execute(['id' => (int) $report['post_id']]);
+                $postRow = $postOwnerStmt->fetch();
+                db()->prepare('UPDATE posts SET status = "published" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['post_id']]);
+                if ($postRow) {
+                    create_post_moderation_notification($postRow, (int) $user['id'], 'published');
+                }
+            }
+            if ($contentAction === 'hide_comment' && ($report['target_type'] ?? '') === 'comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+                $commentOwnerStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id LIMIT 1');
+                $commentOwnerStmt->execute(['id' => (int) $report['comment_id']]);
+                $commentRow = $commentOwnerStmt->fetch();
+                db()->prepare('UPDATE comments SET status = "hidden" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+                if ($commentRow) {
+                    create_comment_moderation_notification($commentRow, ['id' => (int) $report['post_id']], (int) $user['id'], 'hidden');
+                }
+            }
+            if ($contentAction === 'approve_comment' && ($report['target_type'] ?? '') === 'comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+                $commentOwnerStmt = db()->prepare('SELECT id, user_id FROM comments WHERE id = :id LIMIT 1');
+                $commentOwnerStmt->execute(['id' => (int) $report['comment_id']]);
+                $commentRow = $commentOwnerStmt->fetch();
+                db()->prepare('UPDATE comments SET status = "approved" WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+                if ($commentRow) {
+                    create_comment_moderation_notification($commentRow, ['id' => (int) $report['post_id']], (int) $user['id'], 'approved');
+                }
+            }
+            if ($contentAction === 'delete_comment' && ($report['target_type'] ?? '') === 'comment' && (int) ($report['comment_id'] ?? 0) > 0) {
+                db()->prepare('DELETE FROM comments WHERE id = :id LIMIT 1')->execute(['id' => (int) $report['comment_id']]);
+            }
+
+            db()->prepare('UPDATE reports SET status = :status, resolution_note = :resolution_note, resolved_by_user_id = :resolved_by_user_id, resolved_at = :resolved_at WHERE id = :id LIMIT 1')->execute([
+                'status' => $targetStatus,
+                'resolution_note' => $resolutionNote !== '' ? mb_substr($resolutionNote, 0, 255) : null,
+                'resolved_by_user_id' => (int) $user['id'],
+                'resolved_at' => $targetStatus === 'reviewing' ? null : date('Y-m-d H:i:s'),
+                'id' => (int) $report['id'],
+            ]);
+            create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus);
+            log_moderation_action((int) $user['id'], 'report_status_updated', 'report', (int) $report['id'], ($report['target_type'] ?? 'content') . ' #' . (int) ($report['target_id'] ?? 0) . ' · ' . report_reason_label($report['reason'] ?? 'other') . ' · ' . report_status_label($report['status'] ?? 'open') . ' → ' . report_status_label($targetStatus) . ($contentAction !== 'none' ? ' · 联动:' . $contentAction : ''));
+        }
+
+        flash_set('success', '已批量处理 ' . count($reports) . ' 条举报。');
+        redirect_to(admin_url(['report_status' => $targetStatus], '#reports'));
     }
 
     if ($action === 'delete_comment_admin') {
@@ -617,6 +797,18 @@ $commentStmt->execute();
 $commentRows = $commentStmt->fetchAll();
 $commentCount = count($commentRows);
 $commentStatusStats = db()->query('SELECT status, COUNT(*) AS total_count FROM comments GROUP BY status ORDER BY total_count DESC, status ASC')->fetchAll();
+$dashboardStats = [
+    'posts_today' => (int) db()->query('SELECT COUNT(*) FROM posts WHERE created_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+    'comments_today' => (int) db()->query('SELECT COUNT(*) FROM comments WHERE created_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+    'reports_today' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE created_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+    'notifications_today' => (int) db()->query('SELECT COUNT(*) FROM notifications WHERE created_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+    'pending_posts' => (int) db()->query('SELECT COUNT(*) FROM posts WHERE status = "pending"')->fetchColumn(),
+    'pending_comments' => (int) db()->query('SELECT COUNT(*) FROM comments WHERE status = "pending"')->fetchColumn(),
+    'open_reports' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "open"')->fetchColumn(),
+    'reviewing_reports' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "reviewing"')->fetchColumn(),
+    'reports_resolved_today' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "resolved" AND resolved_at IS NOT NULL AND resolved_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+    'reports_dismissed_today' => (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "dismissed" AND resolved_at IS NOT NULL AND resolved_at >= NOW() - INTERVAL 1 DAY')->fetchColumn(),
+];
 
 $userRows = db()->query(
     'SELECT u.id, u.username, u.nickname, u.email, u.role, u.is_admin, u.is_active, u.created_at,
@@ -733,12 +925,66 @@ $boardRows = db()->query(
      ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
 )->fetchAll();
 
+$siteConfig = site_config();
 $homeCopy = home_copy_config();
 $boundSlotRows = db()->query('SELECT id, title, home_slot FROM posts WHERE home_slot IS NOT NULL AND home_slot <> ""')->fetchAll();
 $boundSlots = [];
 foreach ($boundSlotRows as $row) {
     $boundSlots[$row['home_slot']] = $row;
 }
+
+$reportStatusFilter = trim((string) ($_GET['report_status'] ?? ''));
+$reportTargetTypeFilter = trim((string) ($_GET['report_target_type'] ?? ''));
+$reportReasonFilter = trim((string) ($_GET['report_reason'] ?? ''));
+$reportPage = max(1, (int) ($_GET['report_page'] ?? 1));
+$reportPageSize = 12;
+$reportWhere = [];
+$reportParams = [];
+if ($reportStatusFilter !== '' && in_array($reportStatusFilter, ['open', 'reviewing', 'resolved', 'dismissed'], true)) {
+    $reportWhere[] = 'r.status = :report_status';
+    $reportParams['report_status'] = $reportStatusFilter;
+}
+if ($reportTargetTypeFilter !== '' && in_array($reportTargetTypeFilter, ['post', 'comment'], true)) {
+    $reportWhere[] = 'r.target_type = :report_target_type';
+    $reportParams['report_target_type'] = $reportTargetTypeFilter;
+}
+if ($reportReasonFilter !== '' && isset(report_reason_options()[$reportReasonFilter])) {
+    $reportWhere[] = 'r.reason = :report_reason';
+    $reportParams['report_reason'] = $reportReasonFilter;
+}
+$reportWhereSql = $reportWhere ? ' WHERE ' . implode(' AND ', $reportWhere) : '';
+$reportCountStmt = db()->prepare('SELECT COUNT(*) FROM reports r' . $reportWhereSql);
+foreach ($reportParams as $key => $value) {
+    $reportCountStmt->bindValue(':' . $key, $value, PDO::PARAM_STR);
+}
+$reportCountStmt->execute();
+$reportTotal = (int) $reportCountStmt->fetchColumn();
+$reportTotalPages = max(1, (int) ceil($reportTotal / $reportPageSize));
+$reportPage = min($reportPage, $reportTotalPages);
+$reportOffset = ($reportPage - 1) * $reportPageSize;
+$reportStmt = db()->prepare(
+    'SELECT r.id, r.target_type, r.target_id, r.post_id, r.comment_id, r.reason, r.detail, r.status, r.resolution_note, r.created_at, r.resolved_at,
+            reporter.nickname AS reporter_nickname, reporter.username AS reporter_username,
+            resolver.nickname AS resolver_nickname, resolver.username AS resolver_username,
+            p.title AS post_title,
+            c.content AS comment_content
+     FROM reports r
+     INNER JOIN pulsenest_users reporter ON reporter.id = r.reporter_user_id
+     LEFT JOIN pulsenest_users resolver ON resolver.id = r.resolved_by_user_id
+     INNER JOIN posts p ON p.id = r.post_id
+     LEFT JOIN comments c ON c.id = r.comment_id'
+     . $reportWhereSql .
+    ' ORDER BY FIELD(r.status, "open", "reviewing", "resolved", "dismissed"), r.created_at DESC, r.id DESC
+      LIMIT :limit OFFSET :offset'
+);
+foreach ($reportParams as $key => $value) {
+    $reportStmt->bindValue(':' . $key, $value, PDO::PARAM_STR);
+}
+$reportStmt->bindValue(':limit', $reportPageSize, PDO::PARAM_INT);
+$reportStmt->bindValue(':offset', $reportOffset, PDO::PARAM_INT);
+$reportStmt->execute();
+$reportRows = $reportStmt->fetchAll();
+$openReportCount = (int) db()->query('SELECT COUNT(*) FROM reports WHERE status = "open"')->fetchColumn();
 
 $notificationTotals = db()->query('SELECT COUNT(*) AS total_notifications, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_notifications FROM notifications')->fetch();
 $notificationTypeRows = db()->query('SELECT type, COUNT(*) AS total_count, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_count FROM notifications GROUP BY type ORDER BY total_count DESC, type ASC')->fetchAll();
@@ -829,15 +1075,34 @@ render_header('PulseNest · 后台管理', $user, [
       <div class="section-kicker">Admin Scope</div>
       <div class="quick-links">
         <a class="quick-link" href="#permission-map"><strong>权限边界</strong><span>先看自己能动什么</span></a>
+        <a class="quick-link" href="#site-settings"><strong>站点设置</strong><span>注册 / 举报 / 审核规则</span></a>
         <a class="quick-link" href="#posts"><strong>帖子运营</strong><span>置顶 / 精华 / 推荐位 / 首页卡</span></a>
         <a class="quick-link" href="<?= e(admin_url(['post_status' => 'pending', 'post_page' => 1], '#posts')) ?>"><strong>待审核队列</strong><span>当前 <?= $pendingPostCount ?> 篇待处理</span></a>
         <a class="quick-link" href="#comments"><strong>评论管理</strong><span>批量审核 / 隐藏 / 恢复</span></a>
+        <a class="quick-link" href="#reports"><strong>举报队列</strong><span>帖子 / 评论举报统一处理</span></a>
         <?php if ($canManageUsers): ?><a class="quick-link" href="#users"><strong>角色 / 用户</strong><span>仅管理员可见</span></a><?php endif; ?>
         <?php if ($canManageStructure): ?><a class="quick-link" href="#categories"><strong>分类 / 版块</strong><span>仅管理员可见</span></a><?php endif; ?>
         <a class="quick-link" href="#notifications-overview"><strong>通知概况</strong><span>类型分布 / 未读 / 7 日统计</span></a>
         <a class="quick-link" href="#logs"><strong>操作日志</strong><span>支持筛选与分页</span></a>
       </div>
     </aside>
+  </section>
+
+  <section class="glass panel-card admin-panel-card">
+    <div class="section-kicker">Operations Dashboard</div>
+    <div class="side-head admin-head-row"><h3>运营数据看板</h3><span class="muted">先看新增量、积压量和今日处理量，再决定优先清哪一块。</span></div>
+    <div class="hero-stats compact-hero-stats admin-hero-stats">
+      <div class="hero-stat"><div class="label">今日新帖</div><div class="num small-num"><?= $dashboardStats['posts_today'] ?></div><div class="note">最近 24 小时新增帖子</div></div>
+      <div class="hero-stat"><div class="label">今日新评</div><div class="num small-num"><?= $dashboardStats['comments_today'] ?></div><div class="note">最近 24 小时新增评论</div></div>
+      <div class="hero-stat"><div class="label">今日新举报</div><div class="num small-num"><?= $dashboardStats['reports_today'] ?></div><div class="note">最近 24 小时新增举报</div></div>
+      <div class="hero-stat"><div class="label">今日提醒</div><div class="num small-num"><?= $dashboardStats['notifications_today'] ?></div><div class="note">最近 24 小时新增站内通知</div></div>
+      <div class="hero-stat"><div class="label">待审帖子</div><div class="num small-num"><?= $dashboardStats['pending_posts'] ?></div><div class="note">内容发布积压</div></div>
+      <div class="hero-stat"><div class="label">待审评论</div><div class="num small-num"><?= $dashboardStats['pending_comments'] ?></div><div class="note">评论审核积压</div></div>
+      <div class="hero-stat"><div class="label">待处理举报</div><div class="num small-num"><?= $dashboardStats['open_reports'] ?></div><div class="note">尚未进入处理流程</div></div>
+      <div class="hero-stat"><div class="label">处理中举报</div><div class="num small-num"><?= $dashboardStats['reviewing_reports'] ?></div><div class="note">已经在队列中推进</div></div>
+      <div class="hero-stat"><div class="label">今日已处理</div><div class="num small-num"><?= $dashboardStats['reports_resolved_today'] ?></div><div class="note">24 小时内处理完成的举报</div></div>
+      <div class="hero-stat"><div class="label">今日已驳回</div><div class="num small-num"><?= $dashboardStats['reports_dismissed_today'] ?></div><div class="note">24 小时内驳回的举报</div></div>
+    </div>
   </section>
 
   <section id="permission-map" class="glass panel-card admin-panel-card">
@@ -878,6 +1143,53 @@ render_header('PulseNest · 后台管理', $user, [
         </ul>
       </article>
     </div>
+  </section>
+
+  <section id="site-settings" class="glass panel-card admin-panel-card">
+    <div class="section-kicker">Site Settings</div>
+    <div class="side-head admin-head-row"><h3>站点设置中心</h3><span class="muted">把注册、举报、发帖审核、评论审核这些规则从写死代码改成后台可配。</span></div>
+    <form class="admin-list-card" method="post">
+      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+      <input type="hidden" name="action" value="update_site_settings">
+      <div class="permission-grid">
+        <div>
+          <div class="admin-list-card-head"><strong>站点基础信息</strong><span class="tiny-badge">Basic</span></div>
+          <input class="input" name="<?= e(site_setting_field_name('site.name')) ?>" value="<?= e($siteConfig['site.name'] ?? 'PulseNest') ?>" placeholder="站点名称">
+          <input class="input" name="<?= e(site_setting_field_name('site.tagline')) ?>" value="<?= e($siteConfig['site.tagline'] ?? '') ?>" placeholder="站点副标题">
+          <textarea class="input" name="<?= e(site_setting_field_name('site.announcement')) ?>" rows="4" placeholder="站点公告（可选）"><?= e($siteConfig['site.announcement'] ?? '') ?></textarea>
+        </div>
+        <div>
+          <div class="admin-list-card-head"><strong>开放策略</strong><span class="tiny-badge">Access</span></div>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.registration_enabled')) ?>" value="1" <?= ($siteConfig['site.registration_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 开放新用户注册</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.login_enabled')) ?>" value="1" <?= ($siteConfig['site.login_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 开放用户登录</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.reporting_enabled')) ?>" value="1" <?= ($siteConfig['site.reporting_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 开放举报入口</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.readonly_mode_enabled')) ?>" value="1" <?= ($siteConfig['site.readonly_mode_enabled'] ?? '0') === '1' ? 'checked' : '' ?>> 开启只读模式（普通用户禁发帖/评论/编辑）</label>
+        </div>
+        <div>
+          <div class="admin-list-card-head"><strong>审核策略</strong><span class="tiny-badge">Moderation</span></div>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.post_moderation_enabled')) ?>" value="1" <?= ($siteConfig['site.post_moderation_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 普通用户发帖默认进入审核</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('site.comment_moderation_enabled')) ?>" value="1" <?= ($siteConfig['site.comment_moderation_enabled'] ?? '0') === '1' ? 'checked' : '' ?>> 普通用户评论默认进入审核</label>
+          <div class="admin-inline-stack" style="margin-top:12px; align-items:flex-start;">
+            <input class="input slim-input" type="number" min="1" name="<?= e(site_setting_field_name('site.post_title_min_length')) ?>" value="<?= e($siteConfig['site.post_title_min_length'] ?? '4') ?>" placeholder="标题最小字数">
+            <input class="input slim-input" type="number" min="1" name="<?= e(site_setting_field_name('site.post_title_max_length')) ?>" value="<?= e($siteConfig['site.post_title_max_length'] ?? '120') ?>" placeholder="标题最大字数">
+            <input class="input slim-input" type="number" min="1" name="<?= e(site_setting_field_name('site.post_content_min_length')) ?>" value="<?= e($siteConfig['site.post_content_min_length'] ?? '10') ?>" placeholder="正文字数下限">
+            <input class="input slim-input" type="number" min="1" name="<?= e(site_setting_field_name('site.comment_content_min_length')) ?>" value="<?= e($siteConfig['site.comment_content_min_length'] ?? '2') ?>" placeholder="评论字数下限">
+          </div>
+        </div>
+        <div>
+          <div class="admin-list-card-head"><strong>首页模块与热度权重</strong><span class="tiny-badge">Home / Ranking</span></div>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('home.module.recommended_authors_enabled')) ?>" value="1" <?= ($siteConfig['home.module.recommended_authors_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 显示推荐作者模块</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('home.module.top_viewed_enabled')) ?>" value="1" <?= ($siteConfig['home.module.top_viewed_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 显示最高浏览模块</label>
+          <label class="muted"><input type="checkbox" name="<?= e(site_setting_field_name('home.module.time_hotlist_enabled')) ?>" value="1" <?= ($siteConfig['home.module.time_hotlist_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> 显示时间窗口热榜</label>
+          <div class="admin-inline-stack" style="margin-top:12px; align-items:flex-start;">
+            <input class="input slim-input" type="number" min="0" name="<?= e(site_setting_field_name('ranking.weight_like')) ?>" value="<?= e($siteConfig['ranking.weight_like'] ?? '3') ?>" placeholder="点赞权重">
+            <input class="input slim-input" type="number" min="0" name="<?= e(site_setting_field_name('ranking.weight_comment')) ?>" value="<?= e($siteConfig['ranking.weight_comment'] ?? '4') ?>" placeholder="回复权重">
+            <input class="input slim-input" type="number" min="0" name="<?= e(site_setting_field_name('ranking.weight_view')) ?>" value="<?= e($siteConfig['ranking.weight_view'] ?? '1') ?>" placeholder="浏览权重">
+          </div>
+        </div>
+      </div>
+      <div class="admin-action-stack" style="margin-top:16px;"><button class="pill-btn solid" type="submit">保存站点设置</button></div>
+    </form>
   </section>
 
   <section id="posts" class="glass panel-card admin-panel-card">
@@ -1216,6 +1528,154 @@ render_header('PulseNest · 后台管理', $user, [
       'log_actor_id' => $logActorIdFilter,
       'log_page' => $logPage,
     ], 'comment_page', $commentPage, $commentTotalPages, '#comments') ?>
+  </section>
+
+  <section id="reports" class="glass panel-card admin-panel-card">
+    <div class="section-kicker">Reports</div>
+    <div class="side-head admin-head-row"><h3>举报队列</h3><span class="muted">统一处理帖子 / 评论举报，先标记处理中，再决定已处理或驳回。</span></div>
+    <form class="admin-filter-row" method="get" action="/admin.php#reports">
+      <input type="hidden" name="post_id" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
+      <input type="hidden" name="author_id" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
+      <input type="hidden" name="post_title_keyword" value="<?= e($postTitleKeyword) ?>">
+      <input type="hidden" name="author_keyword" value="<?= e($authorKeyword) ?>">
+      <input type="hidden" name="content_keyword" value="<?= e($contentKeyword) ?>">
+      <input type="hidden" name="comment_status" value="<?= e($commentStatusFilter) ?>">
+      <input type="hidden" name="post_recommend_group" value="<?= e($postRecommendGroupFilter) ?>">
+      <input type="hidden" name="post_recommend_priority" value="<?= e($postRecommendPriorityFilterRaw) ?>">
+      <input type="hidden" name="post_is_sticky" value="<?= e($postStickyFilter) ?>">
+      <input type="hidden" name="post_is_featured" value="<?= e($postFeaturedFilter) ?>">
+      <input type="hidden" name="post_home_slot" value="<?= e($postHomeSlotFilter) ?>">
+      <input type="hidden" name="post_status" value="<?= e($postStatusFilter) ?>">
+      <input type="hidden" name="post_page" value="<?= $postPage ?>">
+      <input type="hidden" name="comment_page" value="<?= $commentPage ?>">
+      <input type="hidden" name="log_action" value="<?= e($logActionFilter) ?>">
+      <input type="hidden" name="log_target_type" value="<?= e($logTargetTypeFilter) ?>">
+      <input type="hidden" name="log_actor_id" value="<?= $logActorIdFilter ?>">
+      <input type="hidden" name="log_page" value="<?= $logPage ?>">
+      <select class="input admin-filter-input" name="report_status">
+        <option value="">举报状态：全部</option>
+        <?php foreach (['open' => '待处理', 'reviewing' => '处理中', 'resolved' => '已处理', 'dismissed' => '已驳回'] as $statusKey => $statusLabel): ?>
+          <option value="<?= e($statusKey) ?>" <?= $reportStatusFilter === $statusKey ? 'selected' : '' ?>><?= e($statusLabel) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select class="input admin-filter-input" name="report_target_type">
+        <option value="">举报对象：全部</option>
+        <option value="post" <?= $reportTargetTypeFilter === 'post' ? 'selected' : '' ?>>仅帖子举报</option>
+        <option value="comment" <?= $reportTargetTypeFilter === 'comment' ? 'selected' : '' ?>>仅评论举报</option>
+      </select>
+      <select class="input admin-filter-input" name="report_reason">
+        <option value="">举报理由：全部</option>
+        <?php foreach (report_reason_options() as $reasonKey => $reasonLabel): ?>
+          <option value="<?= e($reasonKey) ?>" <?= $reportReasonFilter === $reasonKey ? 'selected' : '' ?>><?= e($reasonLabel) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button class="pill-btn solid" type="submit">筛选</button>
+      <a class="pill-btn" href="<?= e(admin_url(['report_status' => null, 'report_target_type' => null, 'report_reason' => null, 'report_page' => null], '#reports')) ?>">清空</a>
+      <a class="pill-btn" href="<?= e(admin_url(['report_status' => 'open', 'report_page' => 1], '#reports')) ?>">只看待处理</a>
+    </form>
+    <div class="hero-stats compact-hero-stats admin-hero-stats" style="margin-top: 16px;">
+      <div class="hero-stat"><div class="label">待处理举报</div><div class="num small-num"><?= $openReportCount ?></div><div class="note">建议优先清理开放中的举报</div></div>
+      <div class="hero-stat"><div class="label">当前筛选结果</div><div class="num small-num"><?= count($reportRows) ?></div><div class="note">共 <?= $reportTotal ?> 条 · 第 <?= $reportPage ?> / <?= $reportTotalPages ?> 页</div></div>
+    </div>
+    <form id="bulk-reports-form" method="post">
+      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+      <input type="hidden" name="action" value="bulk_report_status">
+      <input type="hidden" name="target_status" id="bulk-report-status" value="reviewing">
+      <input type="hidden" name="content_action" id="bulk-report-content-action" value="none">
+      <input type="hidden" name="resolution_note" id="bulk-report-note" value="">
+    </form>
+    <div class="admin-bulk-bar">
+      <button class="pill-btn solid" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='reviewing'; document.getElementById('bulk-report-content-action').value='none'; return confirm('确认批量标记为处理中？');">批量处理中</button>
+      <button class="pill-btn" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='resolved'; document.getElementById('bulk-report-content-action').value='none'; return confirm('确认批量标记为已处理？');">批量已处理</button>
+      <button class="pill-btn danger" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='dismissed'; document.getElementById('bulk-report-content-action').value='none'; return confirm('确认批量驳回已勾选举报？');">批量驳回</button>
+    </div>
+    <div class="admin-bulk-bar" style="justify-content:flex-start; gap:12px; flex-wrap:wrap;">
+      <button class="pill-btn" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='resolved'; document.getElementById('bulk-report-content-action').value='hide_post'; return confirm('确认批量已处理并联动隐藏帖子？仅对帖子举报生效。');">批量隐藏帖子</button>
+      <button class="pill-btn" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='resolved'; document.getElementById('bulk-report-content-action').value='hide_comment'; return confirm('确认批量已处理并联动隐藏评论？仅对评论举报生效。');">批量隐藏评论</button>
+      <button class="pill-btn" type="submit" form="bulk-reports-form" onclick="document.getElementById('bulk-report-status').value='resolved'; document.getElementById('bulk-report-content-action').value='delete_comment'; return confirm('确认批量已处理并联动删除评论？仅对评论举报生效。');">批量删评论</button>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table compact-table">
+        <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.report-select').forEach(el => el.checked = this.checked)"></th><th>ID</th><th>举报内容</th><th>举报人</th><th>原因</th><th>状态</th><th>处理</th></tr></thead>
+        <tbody>
+          <?php foreach ($reportRows as $row): ?>
+            <tr>
+              <td><input class="report-select" type="checkbox" name="report_ids[]" value="<?= (int) $row['id'] ?>" form="bulk-reports-form"></td>
+              <td>#<?= (int) $row['id'] ?></td>
+              <td>
+                <span class="tiny-badge"><?= e($row['target_type'] === 'comment' ? '评论举报' : '帖子举报') ?></span>
+                <div style="margin-top:8px;"><a class="inline-link" href="/post.php?id=<?= (int) $row['post_id'] ?>"><?= e($row['post_title']) ?></a></div>
+                <?php if (($row['target_type'] ?? '') === 'comment' && !empty($row['comment_content'])): ?>
+                  <div class="muted" style="margin-top:6px;">评论：<?= e(excerpt($row['comment_content'], 72)) ?></div>
+                <?php endif; ?>
+                <?php if (!empty($row['detail'])): ?>
+                  <div class="muted" style="margin-top:6px;">补充：<?= e(excerpt($row['detail'], 90)) ?></div>
+                <?php endif; ?>
+              </td>
+              <td><?= e($row['reporter_nickname']) ?><div class="muted">@<?= e($row['reporter_username']) ?></div><div class="muted"><?= e(substr($row['created_at'], 0, 16)) ?></div></td>
+              <td><span class="tiny-badge"><?= e(report_reason_label($row['reason'] ?? 'other')) ?></span></td>
+              <td>
+                <span class="tiny-badge"><?= e(report_status_label($row['status'] ?? 'open')) ?></span>
+                <?php if (!empty($row['resolver_nickname'])): ?><div class="muted" style="margin-top:6px;">处理人：<?= e($row['resolver_nickname']) ?> @<?= e($row['resolver_username']) ?></div><?php endif; ?>
+                <?php if (!empty($row['resolution_note'])): ?><div class="muted" style="margin-top:6px;">备注：<?= e($row['resolution_note']) ?></div><?php endif; ?>
+              </td>
+              <td>
+                <form method="post" class="admin-inline-stack" style="align-items:flex-start;">
+                  <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                  <input type="hidden" name="action" value="resolve_report">
+                  <input type="hidden" name="report_id" value="<?= (int) $row['id'] ?>">
+                  <select class="input slim-input" name="target_status">
+                    <?php foreach (['open' => '待处理', 'reviewing' => '处理中', 'resolved' => '已处理', 'dismissed' => '已驳回'] as $statusKey => $statusLabel): ?>
+                      <?php if ($statusKey === 'open') { continue; } ?>
+                      <option value="<?= e($statusKey) ?>"><?= e($statusLabel) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <select class="input slim-input" name="content_action">
+                    <option value="none">仅更新举报状态</option>
+                    <?php if (($row['target_type'] ?? '') === 'comment'): ?>
+                      <option value="hide_comment">联动隐藏评论</option>
+                      <option value="approve_comment">联动恢复评论</option>
+                      <option value="delete_comment">联动删除评论</option>
+                    <?php else: ?>
+                      <option value="hide_post">联动隐藏帖子</option>
+                      <option value="restore_post">联动恢复帖子</option>
+                    <?php endif; ?>
+                  </select>
+                  <input class="input slim-input" name="resolution_note" placeholder="处理备注（可选）">
+                  <button class="pill-btn solid" type="submit">保存</button>
+                </form>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if (!$reportRows): ?>
+            <tr><td colspan="7" class="muted">当前还没有任何举报记录。</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+    <?= admin_pagination([
+      'post_id' => $postFilterId,
+      'author_id' => $authorFilterId,
+      'post_title_keyword' => $postTitleKeyword,
+      'author_keyword' => $authorKeyword,
+      'content_keyword' => $contentKeyword,
+      'comment_status' => $commentStatusFilter,
+      'post_recommend_group' => $postRecommendGroupFilter,
+      'post_recommend_priority' => $postRecommendPriorityFilterRaw,
+      'post_is_sticky' => $postStickyFilter,
+      'post_is_featured' => $postFeaturedFilter,
+      'post_home_slot' => $postHomeSlotFilter,
+      'post_status' => $postStatusFilter,
+      'post_page' => $postPage,
+      'comment_page' => $commentPage,
+      'report_status' => $reportStatusFilter,
+      'report_target_type' => $reportTargetTypeFilter,
+      'report_reason' => $reportReasonFilter,
+      'log_action' => $logActionFilter,
+      'log_target_type' => $logTargetTypeFilter,
+      'log_actor_id' => $logActorIdFilter,
+      'log_page' => $logPage,
+    ], 'report_page', $reportPage, $reportTotalPages, '#reports') ?>
   </section>
 
   <section id="notifications-overview" class="glass panel-card admin-panel-card">

@@ -17,7 +17,25 @@ $stmt->execute(['id' => $userId]);
 $profile = $stmt->fetch();
 
 $recentPosts = [];
+$profileStats = [];
 if ($profile) {
+    $statsStmt = db()->prepare(
+        'SELECT
+            COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
+            COALESCE(SUM(COALESCE(c.comment_count, 0)), 0) AS total_comments,
+            COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views,
+            MAX(p.created_at) AS latest_post_at
+         FROM posts p
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.user_id = :id AND p.status = "published"'
+    );
+    $statsStmt->execute(['id' => $profile['id']]);
+    $profileStats = $statsStmt->fetch() ?: [];
     $recentStmt = db()->prepare(
         'SELECT p.id, p.title, p.content, p.image_path, p.view_count, p.created_at,
                 COALESCE(l.like_count, 0) AS like_count,
@@ -57,6 +75,9 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
           <div class="hero-stats compact-hero-stats">
             <div class="hero-stat"><div class="label">用户名</div><div class="num small-num">@<?= e($profile['username']) ?></div><div class="note">公开社区身份</div></div>
             <div class="hero-stat"><div class="label">发帖数</div><div class="num small-num"><?= (int) $profile['post_count'] ?></div><div class="note">累计公开内容</div></div>
+            <div class="hero-stat"><div class="label">累计获赞</div><div class="num small-num"><?= (int) ($profileStats['total_likes'] ?? 0) ?></div><div class="note">作者公开帖累计点赞</div></div>
+            <div class="hero-stat"><div class="label">累计浏览</div><div class="num small-num"><?= (int) ($profileStats['total_views'] ?? 0) ?></div><div class="note">作者公开帖累计浏览</div></div>
+            <div class="hero-stat"><div class="label">累计回复</div><div class="num small-num"><?= (int) ($profileStats['total_comments'] ?? 0) ?></div><div class="note">作者公开帖收到的回复数</div></div>
             <div class="hero-stat"><div class="label">加入时间</div><div class="num small-num"><?= e(substr((string) $profile['created_at'], 0, 10)) ?></div><div class="note"><?= e(human_time($profile['created_at'])) ?></div></div>
           </div>
         </div>
@@ -109,6 +130,10 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
               <div class="detail-row"><span>昵称</span><strong><?= e($profile['nickname']) ?></strong></div>
               <div class="detail-row"><span>用户名</span><strong>@<?= e($profile['username']) ?></strong></div>
               <div class="detail-row"><span>发帖总数</span><strong><?= (int) $profile['post_count'] ?></strong></div>
+              <div class="detail-row"><span>累计获赞</span><strong><?= (int) ($profileStats['total_likes'] ?? 0) ?></strong></div>
+              <div class="detail-row"><span>累计浏览</span><strong><?= (int) ($profileStats['total_views'] ?? 0) ?></strong></div>
+              <div class="detail-row"><span>累计回复</span><strong><?= (int) ($profileStats['total_comments'] ?? 0) ?></strong></div>
+              <div class="detail-row"><span>最近发帖</span><strong><?= !empty($profileStats['latest_post_at']) ? e(human_time($profileStats['latest_post_at'])) : '暂无公开帖子' ?></strong></div>
               <div class="detail-row"><span>加入时间</span><strong><?= e(substr((string) $profile['created_at'], 0, 16)) ?></strong></div>
             </div>
           </section>

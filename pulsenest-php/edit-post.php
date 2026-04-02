@@ -3,6 +3,12 @@ require __DIR__ . '/layout.php';
 $user = ensure_logged_in();
 $error = '';
 $boards = fetch_board_options();
+$postTitleMin = max(1, site_int_setting('site.post_title_min_length', 4));
+$postTitleMax = max($postTitleMin, site_int_setting('site.post_title_max_length', 120));
+$postContentMin = max(1, site_int_setting('site.post_content_min_length', 10));
+if (site_setting_enabled('site.readonly_mode_enabled', false) && !can_moderate_content($user)) {
+    $error = '当前站点处于只读模式，暂时关闭普通用户发帖编辑。';
+}
 $postId = (int) ($_GET['id'] ?? 0);
 
 $stmt = db()->prepare('SELECT id, user_id, board_id, title, content, image_path, status FROM posts WHERE id = :id LIMIT 1');
@@ -24,7 +30,7 @@ $form = [
     'remove_image' => false,
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !(site_setting_enabled('site.readonly_mode_enabled', false) && !can_moderate_content($user))) {
     verify_csrf();
     $form['title'] = trim($_POST['title'] ?? '');
     $form['content'] = trim($_POST['content'] ?? '');
@@ -43,10 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = '请选择一个有效版块。';
     } elseif ($form['title'] === '' || $form['content'] === '') {
         $error = '标题和正文都要填写。';
-    } elseif (mb_strlen($form['title']) < 4 || mb_strlen($form['title']) > 120) {
-        $error = '标题长度请控制在 4 到 120 个字符之间。';
-    } elseif (mb_strlen($form['content']) < 10) {
-        $error = '正文至少写满 10 个字，帖子才像回事。';
+    } elseif (mb_strlen($form['title']) < $postTitleMin || mb_strlen($form['title']) > $postTitleMax) {
+        $error = '标题长度请控制在 ' . $postTitleMin . ' 到 ' . $postTitleMax . ' 个字符之间。';
+    } elseif (mb_strlen($form['content']) < $postContentMin) {
+        $error = '正文至少写满 ' . $postContentMin . ' 个字，帖子才像回事。';
     } else {
         try {
             $imagePath = $post['image_path'] ?: null;

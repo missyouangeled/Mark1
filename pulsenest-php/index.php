@@ -6,6 +6,8 @@ $flash = flash_get();
 $forum = fetch_forum_structure();
 $selectedCategory = trim($_GET['category'] ?? '');
 $selectedBoard = trim($_GET['board'] ?? '');
+$sort = normalize_post_sort($_GET['sort'] ?? 'latest');
+$sortSql = post_sort_options()[$sort]['sql'];
 
 $where = [];
 $params = [];
@@ -38,7 +40,7 @@ $where[] = 'p.status = "published"';
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT 18';
+$sql .= ' ORDER BY ' . $sortSql . ' LIMIT 18';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
@@ -73,6 +75,72 @@ foreach (array_keys($recommendGroups) as $groupKey) {
 }
 $stickyCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_sticky = 1')->fetchColumn();
 $featuredCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_featured = 1')->fetchColumn();
+$topAuthorsStmt = db()->query(
+    'SELECT u.id, u.nickname, u.username, u.avatar_path,
+            COUNT(p.id) AS post_count,
+            COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
+            COALESCE(SUM(COALESCE(c.comment_count, 0)), 0) AS total_comments,
+            COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views,
+            MAX(p.created_at) AS latest_post_at
+     FROM pulsenest_users u
+     INNER JOIN posts p ON p.user_id = u.id AND p.status = "published"
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+     ) l ON l.post_id = p.id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+     ) c ON c.post_id = p.id
+     GROUP BY u.id, u.nickname, u.username, u.avatar_path
+     ORDER BY total_likes DESC, total_views DESC, total_comments DESC, latest_post_at DESC
+     LIMIT 5'
+);
+$topAuthors = $topAuthorsStmt->fetchAll();
+$topPostsByViewsStmt = db()->query(
+    'SELECT p.id, p.title, p.view_count, p.created_at,
+            u.nickname, u.username,
+            COALESCE(l.like_count, 0) AS like_count,
+            COALESCE(c.comment_count, 0) AS comment_count
+     FROM posts p
+     INNER JOIN pulsenest_users u ON u.id = p.user_id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+     ) l ON l.post_id = p.id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+     ) c ON c.post_id = p.id
+     WHERE p.status = "published"
+     ORDER BY p.view_count DESC, c.comment_count DESC, l.like_count DESC, p.created_at DESC
+     LIMIT 4'
+);
+$topPostsByViews = $topPostsByViewsStmt->fetchAll();
+$showRecommendedAuthors = site_setting_enabled('home.module.recommended_authors_enabled', true);
+$showTopViewed = site_setting_enabled('home.module.top_viewed_enabled', true);
+$showTimeHotlist = site_setting_enabled('home.module.time_hotlist_enabled', true);
+$timeRangeBoards = [
+    '24h' => ['label' => '24 小时热榜', 'interval' => '1 DAY'],
+    '7d' => ['label' => '7 天热榜', 'interval' => '7 DAY'],
+    '30d' => ['label' => '30 天热榜', 'interval' => '30 DAY'],
+];
+$timeRangeHotPosts = [];
+foreach ($timeRangeBoards as $rangeKey => $rangeMeta) {
+    $stmt = db()->query(
+        'SELECT p.id, p.title, p.view_count, p.created_at, u.username,
+                COALESCE(l.like_count, 0) AS like_count,
+                COALESCE(c.comment_count, 0) AS comment_count
+         FROM posts p
+         INNER JOIN pulsenest_users u ON u.id = p.user_id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.status = "published" AND p.created_at >= NOW() - INTERVAL ' . $rangeMeta['interval'] . '
+         ORDER BY ' . hot_score_sql() . ' DESC, p.created_at DESC
+         LIMIT 3'
+    );
+    $timeRangeHotPosts[$rangeKey] = $stmt->fetchAll();
+}
 
 function render_focus_card(?array $post, string $slotKey, array $homeCopy, array $recommendGroups, string $fallbackTitle, string $fallbackText): void {
     $badgeText = $homeCopy['home.' . $slotKey . '.badge'] ?? 'OPS SLOT';
@@ -100,7 +168,7 @@ function render_focus_card(?array $post, string $slotKey, array $homeCopy, array
 }
 
 render_header('PulseNest', $user, [
-    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定 / Hero 混合文案',
+    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定 / Hero 混合文案 / 排序切换',
 ]);
 ?>
   <main class="shell home-page">
@@ -126,8 +194,13 @@ render_header('PulseNest', $user, [
             </div>
             <div class="hero-actions-row">
               <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '开始分享内容' : '立即加入社区' ?></a>
-              <a class="pill-btn" href="/posts.php">去看内容流</a>
+              <a class="pill-btn" href="/posts.php?sort=<?= e($sort) ?>">去看内容流</a>
               <a class="pill-btn" href="/notifications.php">我的提醒</a>
+            </div>
+            <div class="chips">
+              <?php foreach (post_sort_options() as $sortKey => $sortMeta): ?>
+                <a class="chip" href="/?sort=<?= e($sortKey) ?><?= $selectedCategory !== '' ? '&category=' . urlencode($selectedCategory) : '' ?><?= $selectedBoard !== '' ? '&board=' . urlencode($selectedBoard) : '' ?>"><?= $sort === $sortKey ? '● ' : '' ?><?= e($sortMeta['label']) ?></a>
+              <?php endforeach; ?>
             </div>
             <div class="hero-stats">
               <div class="hero-stat"><div class="label">社区成员</div><div class="num"><?= $userCount ?></div><div class="note">头像与用户主页已启用</div></div>
@@ -151,6 +224,7 @@ render_header('PulseNest', $user, [
                   <span class="chip"><?= e(board_badge($heroPost)) ?></span>
                   <span class="chip"><?= (int) $heroPost['like_count'] ?> 赞</span>
                   <span class="chip"><?= (int) $heroPost['comment_count'] ?> 回复</span>
+                  <span class="chip"><?= (int) ($heroPost['view_count'] ?? 0) ?> 浏览</span>
                 <?php else: ?>
                   <span class="chip">分类 / 版块</span>
                   <span class="chip"><?= e($homeCopy['home.hero.tag_primary']) ?></span>
@@ -223,25 +297,40 @@ render_header('PulseNest', $user, [
         </div>
       </section>
 
+      <?php if ($showTimeHotlist): ?>
       <section class="glass section-card tag-cloud-card">
-        <div class="section-kicker">Tag Cloud</div>
-        <div class="section-title">当前可直接体验的入口</div>
+        <div class="section-kicker">Time Range Hotlist</div>
+        <div class="section-title">按时间窗口看热榜</div>
         <div class="tag-cloud">
-          <span class="tag-cloud-item a">#星云初始01</span>
-          <span class="tag-cloud-item b">#论坛分类</span>
-          <span class="tag-cloud-item c">#论坛版块</span>
-          <span class="tag-cloud-item a">#帖子置顶</span>
-          <span class="tag-cloud-item b">#帖子精华</span>
-          <span class="tag-cloud-item c">#首页运营卡</span>
-          <span class="tag-cloud-item a">#通知筛选</span>
-          <span class="tag-cloud-item b">#评论审核</span>
+          <span class="tag-cloud-item a">#24小时热榜</span>
+          <span class="tag-cloud-item b">#7天热榜</span>
+          <span class="tag-cloud-item c">#30天热榜</span>
+          <span class="tag-cloud-item a">#热度 = 点赞 + 回复 + 浏览</span>
         </div>
-        <div class="mood-box">
-          <div class="section-kicker mood-kicker">今日社区情绪</div>
-          <div class="progress"><div></div></div>
-          <p><?= $user ? '现在最适合走完整运营链路：后台给一篇帖子打上置顶 / 首页卡 → 前台刷新首页确认卡位 → 用另一个账号评论 / 点赞验证提醒和审核流。' : '这版已经不只是皮肤样机，注册后能直接体验首页运营卡、帖子流、评论和提醒。' ?></p>
+        <div class="list-stack">
+          <?php foreach ($timeRangeBoards as $rangeKey => $rangeMeta): ?>
+            <div class="author-item">
+              <div class="author-row">
+                <div class="author-badge">⏱️</div>
+                <div class="author-main">
+                  <div class="author-name"><?= e($rangeMeta['label']) ?></div>
+                  <div class="meta"><?= !empty($timeRangeHotPosts[$rangeKey]) ? '按时间窗口统计的实时热度结果' : '这个时间段内还没有足够内容' ?></div>
+                </div>
+              </div>
+              <div class="rank-list" style="margin-top:12px;">
+                <?php if (empty($timeRangeHotPosts[$rangeKey])): ?>
+                  <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无热帖</div><div class="meta">等这个时间窗里积累真实互动</div></div><div class="score">--</div></div></div>
+                <?php else: ?>
+                  <?php foreach ($timeRangeHotPosts[$rangeKey] as $index => $hotPost): ?>
+                    <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/post.php?id=<?= (int) $hotPost['id'] ?>"><?= e($hotPost['title']) ?></a></div><div class="meta">@<?= e($hotPost['username']) ?> · <?= (int) $hotPost['like_count'] ?> 赞 · <?= (int) $hotPost['comment_count'] ?> 回复 · <?= (int) ($hotPost['view_count'] ?? 0) ?> 浏览</div></div><div class="score"><?= (int) ($hotPost['like_count'] * ranking_weight('like') + $hotPost['comment_count'] * ranking_weight('comment') + $hotPost['view_count'] * ranking_weight('view')) ?></div></div></div>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
         </div>
       </section>
+      <?php endif; ?>
     </section>
 
     <section class="row-bottom">
@@ -281,40 +370,47 @@ render_header('PulseNest', $user, [
       </section>
 
       <div class="right-col-stack">
+        <?php if ($showRecommendedAuthors): ?>
         <section class="glass section-card authors-card-shell">
           <div class="section-kicker">Recommended Authors</div>
           <div class="section-title">真实成员速览</div>
           <div class="author-list">
-            <?php if (!$posts): ?>
+            <?php if (!$topAuthors): ?>
               <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批成员</div><div class="meta">注册后这里会跟着内容一起活过来</div></div><div class="score">NEW</div></div><p>现在的重点已经不是占位图，而是让第一批真实用户行为能映射回首页。</p></div>
             <?php else: ?>
-              <?php foreach (array_slice($posts, 0, 3) as $post): ?>
+              <?php foreach (array_slice($topAuthors, 0, 3) as $author): ?>
                 <div class="author-item">
                   <div class="author-row">
                     <div class="author-badge">🏅</div>
                     <div class="author-main">
-                      <div class="author-name"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><?= e($post['nickname']) ?></a> <span class="tiny-badge">真实用户</span></div>
-                      <div class="meta">@<?= e($post['username']) ?> · <?= e(board_badge($post)) ?></div>
+                      <div class="author-name"><a class="inline-link" href="/user.php?id=<?= (int) $author['id'] ?>"><?= e($author['nickname']) ?></a> <span class="tiny-badge">创作者</span></div>
+                      <div class="meta">@<?= e($author['username']) ?> · <?= (int) $author['post_count'] ?> 帖 · <?= (int) $author['total_views'] ?> 浏览</div>
                     </div>
-                    <div class="score"><?= (int) $post['like_count'] ?>赞</div>
+                    <div class="score"><?= (int) $author['total_likes'] ?>赞</div>
                   </div>
-                  <p>最近一次发帖：<?= e(excerpt($post['title'], 26)) ?></p>
+                  <p>累计回复 <?= (int) $author['total_comments'] ?> · 最近发帖 <?= !empty($author['latest_post_at']) ? e(human_time($author['latest_post_at'])) : '暂无' ?></p>
                 </div>
               <?php endforeach; ?>
             <?php endif; ?>
           </div>
         </section>
+        <?php endif; ?>
 
+        <?php if ($showTopViewed): ?>
         <section class="glass section-card top-rated-card-shell">
           <div class="section-kicker">Top Rated</div>
-          <div class="section-title">功能验收清单</div>
+          <div class="section-title">当前最高浏览帖子</div>
           <div class="rank-list">
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#1</div><div class="rank-main"><div class="rank-name">帖子运营位</div><div class="meta">后台支持置顶 / 精华 / 推荐位 / 首页卡 / Hero 混合文案</div></div><div class="score">OK</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#2</div><div class="rank-main"><div class="rank-name">评论管理</div><div class="meta">评论支持 approved / pending / hidden</div></div><div class="score">OK</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#3</div><div class="rank-main"><div class="rank-name">通知筛选</div><div class="meta">支持未读 / 类型筛选与批量处理</div></div><div class="score">OK</div></div></div>
-            <div class="rank-item"><div class="rank-row"><div class="rank-index">#4</div><div class="rank-main"><div class="rank-name">既有功能保留</div><div class="meta">点赞、评论、用户主页、上传均未破坏</div></div><div class="score">OK</div></div></div>
+            <?php if (!$topPostsByViews): ?>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">等待首批帖子</div><div class="meta">等真实浏览量把这里点亮</div></div><div class="score">NEW</div></div></div>
+            <?php else: ?>
+              <?php foreach ($topPostsByViews as $index => $topPost): ?>
+                <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/post.php?id=<?= (int) $topPost['id'] ?>"><?= e($topPost['title']) ?></a></div><div class="meta">@<?= e($topPost['username']) ?> · <?= (int) $topPost['like_count'] ?> 赞 · <?= (int) $topPost['comment_count'] ?> 回复</div></div><div class="score"><?= (int) ($topPost['view_count'] ?? 0) ?>阅</div></div></div>
+              <?php endforeach; ?>
+            <?php endif; ?>
           </div>
         </section>
+        <?php endif; ?>
       </div>
     </section>
   </main>

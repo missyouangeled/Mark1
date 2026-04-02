@@ -38,6 +38,23 @@ $stmt->execute(['id' => $user['id']]);
 $postCount = (int) $stmt->fetchColumn();
 $totalPosts = (int) db()->query('SELECT COUNT(*) FROM posts WHERE status = "published"')->fetchColumn();
 $memberCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
+$creatorStatsStmt = db()->prepare(
+    'SELECT
+        COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
+        COALESCE(SUM(COALESCE(c.comment_count, 0)), 0) AS total_comments,
+        COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views,
+        MAX(p.created_at) AS latest_post_at
+     FROM posts p
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+     ) l ON l.post_id = p.id
+     LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+     ) c ON c.post_id = p.id
+     WHERE p.user_id = :id AND p.status = "published"'
+);
+$creatorStatsStmt->execute(['id' => $user['id']]);
+$creatorStats = $creatorStatsStmt->fetch() ?: [];
 $latestPostsStmt = db()->prepare(
     'SELECT p.id, p.title, p.status, p.view_count, p.created_at,
             COALESCE(l.like_count, 0) AS like_count,
@@ -90,6 +107,9 @@ render_header('PulseNest · 会员中心', $user, [
 
     <section class="stat-grid page-grid-three nebula-stat-grid">
       <div class="glass stat-card"><strong><?= $postCount ?></strong><span>我的帖子</span></div>
+      <div class="glass stat-card"><strong><?= (int) ($creatorStats['total_likes'] ?? 0) ?></strong><span>累计获赞</span></div>
+      <div class="glass stat-card"><strong><?= (int) ($creatorStats['total_views'] ?? 0) ?></strong><span>累计浏览</span></div>
+      <div class="glass stat-card"><strong><?= (int) ($creatorStats['total_comments'] ?? 0) ?></strong><span>累计回复</span></div>
       <div class="glass stat-card"><strong><?= $memberCount ?></strong><span>社区成员</span></div>
       <div class="glass stat-card"><strong><?= $totalPosts ?></strong><span>全站内容</span></div>
     </section>
@@ -146,6 +166,10 @@ render_header('PulseNest · 会员中心', $user, [
             <div class="detail-row"><span>角色</span><strong><?= e(role_label(user_role($user))) ?></strong></div>
             <div class="detail-row"><span>签名</span><strong><?= e($user['bio'] ?: '还没写简介') ?></strong></div>
             <div class="detail-row"><span>未读提醒</span><strong><?= unread_notification_count((int) $user['id']) ?></strong></div>
+            <div class="detail-row"><span>累计获赞</span><strong><?= (int) ($creatorStats['total_likes'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>累计浏览</span><strong><?= (int) ($creatorStats['total_views'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>累计回复</span><strong><?= (int) ($creatorStats['total_comments'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>最近发帖</span><strong><?= !empty($creatorStats['latest_post_at']) ? e(human_time($creatorStats['latest_post_at'])) : '暂无公开帖子' ?></strong></div>
           </div>
         </section>
 

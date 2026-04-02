@@ -26,6 +26,7 @@ $postStmt = db()->prepare(
 );
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $commentMinLength = max(1, site_int_setting('site.comment_content_min_length', 2));
     verify_csrf();
     $action = $_POST['action'] ?? '';
     $actor = ensure_logged_in();
@@ -40,10 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'comment') {
         $content = trim($_POST['content'] ?? '');
         $parentId = (int) ($_POST['parent_id'] ?? 0);
-        if ($content === '') {
+        if (site_setting_enabled('site.readonly_mode_enabled', false) && !can_moderate_content($actor)) {
+            flash_set('error', '当前站点处于只读模式，暂时关闭普通用户评论。');
+        } elseif ($content === '') {
             flash_set('error', '回复内容不能为空。');
-        } elseif (mb_strlen($content) < 2) {
-            flash_set('error', '回复至少写 2 个字。');
+        } elseif (mb_strlen($content) < $commentMinLength) {
+            flash_set('error', '回复至少写 ' . $commentMinLength . ' 个字。');
         } else {
             $parentComment = null;
             $validParentId = null;
@@ -54,17 +57,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $validParentId = $parentComment ? $parentId : null;
             }
 
+            $commentStatus = (can_moderate_content($actor) || !site_setting_enabled('site.comment_moderation_enabled', false)) ? 'approved' : 'pending';
             $stmt = db()->prepare('INSERT INTO comments (post_id, user_id, parent_id, content, status) VALUES (:post_id, :user_id, :parent_id, :content, :status)');
             $stmt->execute([
                 'post_id' => $postId,
                 'user_id' => $actor['id'],
                 'parent_id' => $validParentId,
                 'content' => $content,
-                'status' => 'approved',
+                'status' => $commentStatus,
             ]);
             $newCommentId = (int) db()->lastInsertId();
-            create_reply_notifications($post, $parentComment, (int) $actor['id'], $newCommentId);
-            flash_set('success', $validParentId ? '回复已发送，并已推送站内提醒。' : '评论已发布，并已推送站内提醒。');
+            if ($commentStatus === 'approved') {
+                create_reply_notifications($post, $parentComment, (int) $actor['id'], $newCommentId);
+            }
+            flash_set('success', $commentStatus === 'approved'
+                ? ($validParentId ? '回复已发送，并已推送站内提醒。' : '评论已发布，并已推送站内提醒。')
+                : '评论已提交审核，审核通过后才会公开显示。');
         }
     }
 
@@ -108,6 +116,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'report_post') {
+        if (!site_setting_enabled('site.reporting_enabled', true)) {
+            flash_set('error', '当前站点暂时关闭举报入口。');
+        } elseif ((int) $actor['id'] === (int) ($post['user_id'] ?? 0)) {
+            flash_set('error', '不能举报自己发布的帖子。');
+        } else {
+            $reason = trim((string) ($_POST['reason'] ?? 'other'));
+            $detail = trim((string) ($_POST['detail'] ?? ''));
+            $result = create_report((int) $actor['id'], 'post', (int) $post['id'], (int) $post['id'], null, $reason, $detail);
+            if ($result['ok']) {
+                log_moderation_action((int) $actor['id'], 'report_created', 'post_report', (int) ($result['id'] ?? 0), '帖子《' . $post['title'] . '》 · ' . report_reason_label($reason));
+                flash_set('success', $result['message']);
+            } else {
+                flash_set('error', $result['message']);
+            }
+        }
+    }
+
     if ($action === 'delete_post') {
         if (!can_manage_post($actor, $post)) {
             http_response_code(403);
@@ -138,6 +164,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt = db()->prepare('UPDATE comments SET content = :content WHERE id = :id');
             $updateStmt->execute(['content' => $content, 'id' => $commentId]);
             flash_set('success', '评论已更新。');
+        }
+    }
+
+    if ($action === 'report_comment') {
+        if (!site_setting_enabled('site.reporting_enabled', true)) {
+            flash_set('error', '当前站点暂时关闭举报入口。');
+        } else {
+            $commentId = (int) ($_POST['comment_id'] ?? 0);
+            $commentStmt = db()->prepare('SELECT id, post_id, user_id, content FROM comments WHERE id = :id AND post_id = :post_id LIMIT 1');
+            $commentStmt->execute(['id' => $commentId, 'post_id' => $postId]);
+            $comment = $commentStmt->fetch();
+            if (!$comment) {
+                flash_set('error', '没有找到要举报的评论。');
+            } elseif ((int) $actor['id'] === (int) ($comment['user_id'] ?? 0)) {
+                flash_set('error', '不能举报自己的评论。');
+            } else {
+                $reason = trim((string) ($_POST['reason'] ?? 'other'));
+                $detail = trim((string) ($_POST['detail'] ?? ''));
+                $result = create_report((int) $actor['id'], 'comment', (int) $comment['id'], $postId, (int) $comment['id'], $reason, $detail);
+                if ($result['ok']) {
+                    log_moderation_action((int) $actor['id'], 'report_created', 'comment_report', (int) ($result['id'] ?? 0), '评论 #' . (int) $comment['id'] . ' · ' . report_reason_label($reason));
+                    flash_set('success', $result['message']);
+                } else {
+                    flash_set('error', $result['message']);
+                }
+            }
         }
     }
 
@@ -282,6 +334,24 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </details>
           <?php endif; ?>
 
+          <?php if (!$canManage): ?>
+            <details class="reply-box inline-details">
+              <summary>举报</summary>
+              <form class="form reply-form" method="post">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="report_comment">
+                <input type="hidden" name="comment_id" value="<?= (int) $comment['id'] ?>">
+                <select class="input" name="reason">
+                  <?php foreach (report_reason_options() as $reasonKey => $reasonLabel): ?>
+                    <option value="<?= e($reasonKey) ?>"><?= e($reasonLabel) ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <textarea class="textarea small-textarea" name="detail" placeholder="补充说明（可选）"></textarea>
+                <button class="submit" type="submit">提交举报</button>
+              </form>
+            </details>
+          <?php endif; ?>
+
           <?php if ($canManage): ?>
             <details class="reply-box inline-details">
               <summary>编辑</summary>
@@ -379,6 +449,22 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
               <?php endif; ?>
               <span class="meta-pill"><?= (int) $post['comment_count'] ?> 条评论</span>
               <span class="meta-pill"><?= e(board_badge($post)) ?></span>
+              <?php if ($user && !can_manage_post($user, $post)): ?>
+                <details class="reply-box inline-details">
+                  <summary>举报帖子</summary>
+                  <form class="form reply-form" method="post">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="report_post">
+                    <select class="input" name="reason">
+                      <?php foreach (report_reason_options() as $reasonKey => $reasonLabel): ?>
+                        <option value="<?= e($reasonKey) ?>"><?= e($reasonLabel) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <textarea class="textarea small-textarea" name="detail" placeholder="补充说明（可选）"></textarea>
+                    <button class="submit" type="submit">提交举报</button>
+                  </form>
+                </details>
+              <?php endif; ?>
               <?php if (can_manage_post($user, $post)): ?>
                 <a class="pill-btn" href="/edit-post.php?id=<?= (int) $post['id'] ?>">编辑帖子</a>
                 <form method="post" class="inline-form danger-inline-form" onsubmit="return confirm('确认删除这篇帖子？此操作不可撤销。');">

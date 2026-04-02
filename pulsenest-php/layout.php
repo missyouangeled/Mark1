@@ -6,7 +6,7 @@ function render_header(string $title, ?array $user = null, array $options = []):
     $searchText = $options['searchText'] ?? '🔎 搜索榜单、话题、作者、游戏名';
     $headerMode = $options['headerMode'] ?? 'default';
     $unreadCount = $user ? unread_notification_count((int) $user['id']) : 0;
-    $headerStripText = '今日焦点：版块浏览 / 内容搜索 / 回复提醒';
+    $headerStripText = site_announcement() !== '' ? site_announcement() : '今日焦点：版块浏览 / 内容搜索 / 回复提醒';
     if ($user) {
         $headerStripText = match (user_role($user)) {
             'admin' => '已登录 · ' . e($user['nickname']) . '，管理员入口已开启：内容、角色、结构与日志均可处理。',
@@ -35,8 +35,8 @@ function render_header(string $title, ?array $user = null, array $options = []):
       <a class="brand" href="/">
         <div class="brand-mark">PN</div>
         <div>
-          <div class="brand-title">PulseNest</div>
-          <div class="brand-sub">像逛热门论坛一样找下一款会沉迷的游戏</div>
+          <div class="brand-title"><?= e(site_name()) ?></div>
+          <div class="brand-sub"><?= e(site_tagline()) ?></div>
         </div>
       </a>
       <nav class="nav">

@@ -8,6 +8,8 @@ $forum = fetch_forum_structure();
 $search = trim($_GET['q'] ?? '');
 $categorySlug = trim($_GET['category'] ?? '');
 $boardSlug = trim($_GET['board'] ?? '');
+$sort = normalize_post_sort($_GET['sort'] ?? 'latest');
+$sortSql = post_sort_options()[$sort]['sql'];
 
 $where = [];
 $params = [];
@@ -59,7 +61,7 @@ $pageSize = 12;
 $totalPages = max(1, (int) ceil($postCount / $pageSize));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $pageSize;
-$sql .= ' ORDER BY p.is_sticky DESC, p.recommend_priority DESC, p.recommend_level DESC, p.is_featured DESC, p.created_at DESC, p.id DESC LIMIT :limit OFFSET :offset';
+$sql .= ' ORDER BY ' . $sortSql . ' LIMIT :limit OFFSET :offset';
 $stmt = db()->prepare($sql);
 foreach ($params as $key => $value) {
     $stmt->bindValue(':' . $key, $value);
@@ -91,7 +93,7 @@ if ($boardSlug !== '') {
 }
 
 render_header('PulseNest · 帖子列表', $user, [
-    'searchText' => $search !== '' ? '🔎 正在搜索：' . $search : '🔎 可按标题 / 正文搜索，也可按分类 / 版块浏览',
+    'searchText' => $search !== '' ? '🔎 正在搜索：' . $search : '🔎 可按标题 / 正文搜索，也可按分类 / 版块浏览，还能切换排序方式',
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell posts-page">
@@ -130,6 +132,14 @@ render_header('PulseNest · 帖子列表', $user, [
                 <?php endforeach; ?>
               </select>
             </div>
+            <div class="field grow-field">
+              <label>排序</label>
+              <select class="input" name="sort">
+                <?php foreach (post_sort_options() as $sortKey => $sortMeta): ?>
+                  <option value="<?= e($sortKey) ?>" <?= $sort === $sortKey ? 'selected' : '' ?>><?= e($sortMeta['label']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
             <div class="filter-actions">
               <button class="pill-btn solid" type="submit">筛选 / 搜索</button>
               <a class="pill-btn" href="/posts.php">清空条件</a>
@@ -140,6 +150,7 @@ render_header('PulseNest · 帖子列表', $user, [
           <div class="hero-stat"><div class="label">当前视图</div><div class="num small-num"><?= e($currentBoardLabel) ?></div><div class="note">支持分类或版块钻取</div></div>
           <div class="hero-stat"><div class="label">结果数</div><div class="num"><?= $postCount ?></div><div class="note">符合当前筛选 / 搜索条件</div></div>
           <div class="hero-stat"><div class="label">活跃作者</div><div class="num"><?= $authorCount ?></div><div class="note">当前结果里出现的成员</div></div>
+          <div class="hero-stat"><div class="label">排序方式</div><div class="num small-num"><?= e(post_sort_options()[$sort]['label']) ?></div><div class="note">可切到热度、回复数、浏览量</div></div>
         </div>
       </div>
 
@@ -193,6 +204,7 @@ render_header('PulseNest · 帖子列表', $user, [
                   <span class="chip">优先级 <?= (int) ($post['recommend_priority'] ?? 0) ?></span>
                   <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                   <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                  <span class="chip"><?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
                   <span class="chip"><?= e(board_badge($post)) ?></span>
                 </div>
                 <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">继续阅读 →</a>
@@ -201,7 +213,7 @@ render_header('PulseNest · 帖子列表', $user, [
           <?php endforeach; ?>
         <?php endif; ?>
       </div>
-      <?= render_pagination('/posts.php', $page, $totalPages, ['q' => $search, 'category' => $categorySlug, 'board' => $boardSlug]) ?>
+      <?= render_pagination('/posts.php', $page, $totalPages, ['q' => $search, 'category' => $categorySlug, 'board' => $boardSlug, 'sort' => $sort]) ?>
 
       <aside class="right-col-stack">
         <?php foreach ($forum as $category): ?>

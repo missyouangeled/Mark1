@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = trim((string) ($_POST['action'] ?? 'mark_all_read'));
     $filterType = trim((string) ($_POST['filter_type'] ?? ''));
-    $allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated', 'post_moderated'];
+    $allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated', 'post_moderated', 'report_processed'];
     if ($filterType !== '' && !in_array($filterType, $allowedTypes, true)) {
         $filterType = '';
     }
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $flash = flash_get();
 $selectedType = trim((string) ($_GET['type'] ?? ''));
 $onlyUnread = (int) ($_GET['unread'] ?? 0) === 1;
-$allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated', 'post_moderated'];
+$allowedTypes = ['post_reply', 'comment_reply', 'post_like', 'comment_like', 'comment_moderated', 'post_moderated', 'report_processed'];
 if ($selectedType !== '' && !in_array($selectedType, $allowedTypes, true)) {
     $selectedType = '';
 }
@@ -195,6 +195,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'comment_reply' => '有人回复你的评论',
                 'comment_moderated' => '你的评论被审核后，会明确告诉你当前是已通过还是已隐藏',
                 'post_moderated' => '你的帖子被审核后，会明确告诉你当前是已发布、待审核还是已隐藏',
+                'report_processed' => '你提交的举报进入处理中、已处理或已驳回时，会收到明确回执',
                 default => '有人回复你的帖子',
               }) ?></td>
             </tr>
@@ -218,6 +219,7 @@ render_header('PulseNest · 我的提醒', $user, [
           <?php $moderationCopy = match ($item['type'] ?? '') {
             'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'comment'),
             'post_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'post'),
+            'report_processed' => notification_moderation_copy($item['moderation_status'] ?? null, 'post'),
             default => null,
           }; ?>
           <article class="notification-card <?= (int) $item['is_read'] === 0 ? 'unread' : '' ?>">
@@ -242,6 +244,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'comment_like' => '点赞了你在这篇帖子下的评论：',
                 'comment_moderated' => ($moderationCopy['summary'] ?? '你的评论审核状态已更新') . '，关联帖子：',
                 'post_moderated' => ($moderationCopy['summary'] ?? '你的帖子审核状态已更新') . '：',
+                'report_processed' => ($moderationCopy['summary'] ?? '你提交的举报状态已更新') . '：',
                 default => '回复了你的帖子：',
               }) ?>
               <a class="inline-link" href="/post.php?id=<?= (int) $item['post_id'] ?>"><?= e($item['title']) ?></a>
