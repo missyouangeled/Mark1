@@ -147,8 +147,15 @@ function ensure_database_schema(PDO $pdo): void {
     if (!index_exists($pdo, 'posts', 'idx_posts_created_board')) {
         $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_created_board (board_id, created_at)');
     }
+    if (!column_exists($pdo, 'posts', 'status')) {
+        $pdo->exec("ALTER TABLE posts ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'published' AFTER image_path");
+    }
+    $pdo->exec("UPDATE posts SET status = 'published' WHERE status IS NULL OR status = ''");
+    if (!column_exists($pdo, 'posts', 'view_count')) {
+        $pdo->exec('ALTER TABLE posts ADD COLUMN view_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER recommend_priority');
+    }
     if (!column_exists($pdo, 'posts', 'is_sticky')) {
-        $pdo->exec('ALTER TABLE posts ADD COLUMN is_sticky TINYINT(1) NOT NULL DEFAULT 0 AFTER image_path');
+        $pdo->exec('ALTER TABLE posts ADD COLUMN is_sticky TINYINT(1) NOT NULL DEFAULT 0 AFTER status');
     }
     if (!column_exists($pdo, 'posts', 'is_featured')) {
         $pdo->exec('ALTER TABLE posts ADD COLUMN is_featured TINYINT(1) NOT NULL DEFAULT 0 AFTER is_sticky');
@@ -165,8 +172,11 @@ function ensure_database_schema(PDO $pdo): void {
     if (!column_exists($pdo, 'posts', 'recommend_priority')) {
         $pdo->exec('ALTER TABLE posts ADD COLUMN recommend_priority INT NOT NULL DEFAULT 0 AFTER recommend_group');
     }
+    if (!index_exists($pdo, 'posts', 'idx_posts_status_sort')) {
+        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_status_sort (status, created_at, id)');
+    }
     if (!index_exists($pdo, 'posts', 'idx_posts_ops_sort')) {
-        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_ops_sort (is_sticky, recommend_level, is_featured, created_at)');
+        $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_ops_sort (status, is_sticky, recommend_level, is_featured, created_at)');
     }
     if (!index_exists($pdo, 'posts', 'idx_posts_recommend_group_priority')) {
         $pdo->exec('ALTER TABLE posts ADD KEY idx_posts_recommend_group_priority (recommend_group, recommend_priority, recommend_level, created_at)');
@@ -433,6 +443,22 @@ function can_manage_post(?array $user, array $post): bool {
     return $user && (can_moderate_content($user) || (int) $user['id'] === (int) ($post['user_id'] ?? 0));
 }
 
+function is_post_public(array $post): bool {
+    return ($post['status'] ?? 'published') === 'published';
+}
+
+function can_view_post(?array $user, array $post): bool {
+    if (is_post_public($post)) {
+        return true;
+    }
+
+    if (!$user) {
+        return false;
+    }
+
+    return can_moderate_content($user) || (int) $user['id'] === (int) ($post['user_id'] ?? 0);
+}
+
 function can_manage_comment(?array $user, array $comment): bool {
     return $user && (can_moderate_content($user) || (int) $user['id'] === (int) ($comment['user_id'] ?? 0));
 }
@@ -641,6 +667,15 @@ function comment_status_label(string $status): string {
     };
 }
 
+function post_status_label(string $status): string {
+    return match ($status) {
+        'draft' => '草稿',
+        'pending' => '待审核',
+        'hidden' => '已隐藏',
+        default => '已发布',
+    };
+}
+
 function home_slot_definitions(): array {
     return [
         'hero' => ['label' => '首页主视觉 Hero', 'desc' => '首页顶部主运营卡'],
@@ -746,7 +781,7 @@ function fetch_forum_structure(): array {
          FROM forum_categories c
          LEFT JOIN forum_boards b ON b.category_id = c.id
          LEFT JOIN (
-            SELECT board_id, COUNT(*) AS post_count FROM posts GROUP BY board_id
+            SELECT board_id, COUNT(*) AS post_count FROM posts WHERE status = "published" GROUP BY board_id
          ) pc ON pc.board_id = b.id
          ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
     )->fetchAll();
@@ -857,6 +892,20 @@ function create_comment_moderation_notification(array $comment, array $post, int
     ]);
 }
 
+function create_post_moderation_notification(array $post, int $actorUserId, string $targetStatus): void {
+    $recipientUserId = (int) ($post['user_id'] ?? 0);
+    $postId = (int) ($post['id'] ?? 0);
+    if ($recipientUserId <= 0 || $postId <= 0) {
+        return;
+    }
+    if (!in_array($targetStatus, ['published', 'pending', 'hidden'], true)) {
+        return;
+    }
+    create_notification($recipientUserId, $actorUserId, 'post_moderated', $postId, null, [
+        'moderation_status' => $targetStatus,
+    ]);
+}
+
 function notification_type_label(string $type): string {
     return match ($type) {
         'comment_reply' => '评论回复',
@@ -864,29 +913,37 @@ function notification_type_label(string $type): string {
         'post_like' => '帖子点赞',
         'comment_like' => '评论点赞',
         'comment_moderated' => '评论审核',
+        'post_moderated' => '帖子审核',
         default => '站内提醒',
     };
 }
 
-function notification_moderation_copy(?string $status): array {
+function notification_moderation_copy(?string $status, string $target = 'comment'): array {
+    $subject = $target === 'post' ? '帖子' : '评论';
     return match ($status ?: '') {
-        'approved' => [
-            'label' => '已通过',
-            'verb' => '已通过',
-            'summary' => '你的评论已审核通过',
-            'description' => '你的评论已审核通过，已重新对外展示。',
+        'approved', 'published' => [
+            'label' => $target === 'post' ? '已发布' : '已通过',
+            'verb' => $target === 'post' ? '已发布' : '已通过',
+            'summary' => '你的' . $subject . ($target === 'post' ? '已发布' : '已审核通过'),
+            'description' => '你的' . $subject . ($target === 'post' ? '已对外发布，其他用户现在可以看到。' : '已审核通过，已重新对外展示。'),
         ],
         'hidden' => [
             'label' => '已隐藏',
             'verb' => '已隐藏',
-            'summary' => '你的评论已被隐藏',
-            'description' => '你的评论已被隐藏，当前不会在前台公开展示。',
+            'summary' => '你的' . $subject . '已被隐藏',
+            'description' => '你的' . $subject . '已被隐藏，当前不会在前台公开展示。',
+        ],
+        'pending' => [
+            'label' => '待审核',
+            'verb' => '待审核',
+            'summary' => '你的' . $subject . '正在等待审核',
+            'description' => '你的' . $subject . '已进入审核队列，暂时不会在前台公开展示。',
         ],
         default => [
             'label' => '状态更新',
             'verb' => '已更新',
-            'summary' => '你的评论审核状态已更新',
-            'description' => '你的评论审核状态发生变化，请前往帖子查看。',
+            'summary' => '你的' . $subject . '审核状态已更新',
+            'description' => '你的' . $subject . '审核状态发生变化，请前往查看。',
         ],
     };
 }
@@ -905,7 +962,8 @@ function notification_message(array $item): string {
         'comment_reply' => '回复了你的评论：' . $title,
         'post_like' => '点赞了你的帖子：' . $title,
         'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
-        'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null)['summary'] . '：' . $title,
+        'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'comment')['summary'] . '：' . $title,
+        'post_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'post')['summary'] . '：' . $title,
         default => '回复了你的帖子：' . $title,
     };
 }

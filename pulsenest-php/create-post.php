@@ -31,16 +31,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $imagePath = handle_image_upload($_FILES['cover_image'] ?? [], POST_UPLOAD_DIR);
-            $stmt = db()->prepare('INSERT INTO posts (user_id, board_id, title, content, image_path) VALUES (:user_id, :board_id, :title, :content, :image_path)');
+            $initialStatus = can_moderate_content($user) ? 'published' : 'pending';
+            $stmt = db()->prepare('INSERT INTO posts (user_id, board_id, title, content, image_path, status) VALUES (:user_id, :board_id, :title, :content, :image_path, :status)');
             $stmt->execute([
                 'user_id' => $user['id'],
                 'board_id' => $form['board_id'],
                 'title' => $form['title'],
                 'content' => $form['content'],
                 'image_path' => $imagePath,
+                'status' => $initialStatus,
             ]);
             $postId = (int) db()->lastInsertId();
-            flash_set('success', '帖子发布成功，已经写入对应版块。');
+            flash_set('success', $initialStatus === 'published' ? '帖子发布成功，已经写入对应版块。' : '帖子已提交审核，审核通过后会对外显示。');
             redirect_to('/post.php?id=' . $postId);
         } catch (RuntimeException $e) {
             $error = $e->getMessage();

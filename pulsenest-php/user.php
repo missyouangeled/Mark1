@@ -8,7 +8,7 @@ $stmt = db()->prepare(
     'SELECT u.id, u.username, u.nickname, u.email, u.avatar_path, u.bio, u.created_at,
             COUNT(p.id) AS post_count
      FROM pulsenest_users u
-     LEFT JOIN posts p ON p.user_id = u.id
+     LEFT JOIN posts p ON p.user_id = u.id AND p.status = "published"
      WHERE u.id = :id
      GROUP BY u.id, u.username, u.nickname, u.email, u.avatar_path, u.bio, u.created_at
      LIMIT 1'
@@ -19,7 +19,7 @@ $profile = $stmt->fetch();
 $recentPosts = [];
 if ($profile) {
     $recentStmt = db()->prepare(
-        'SELECT p.id, p.title, p.content, p.image_path, p.created_at,
+        'SELECT p.id, p.title, p.content, p.image_path, p.view_count, p.created_at,
                 COALESCE(l.like_count, 0) AS like_count,
                 COALESCE(c.comment_count, 0) AS comment_count
          FROM posts p
@@ -29,7 +29,7 @@ if ($profile) {
          LEFT JOIN (
             SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id
          ) c ON c.post_id = p.id
-         WHERE p.user_id = :id
+         WHERE p.user_id = :id AND p.status = "published"
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT 6'
     );
@@ -91,6 +91,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
                       <div class="chips">
                         <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                         <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                        <span class="chip"><?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
                       </div>
                       <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">查看详情 →</a>
                     </div>

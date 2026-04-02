@@ -5,7 +5,7 @@ $user = refresh_current_user();
 $postId = (int) ($_GET['id'] ?? 0);
 
 $postStmt = db()->prepare(
-    'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.created_at, p.updated_at,
+    'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.status, p.view_count, p.created_at, p.updated_at,
             u.nickname, u.username, u.email, u.avatar_path, u.bio,
             fb.name AS board_name, fb.slug AS board_slug,
             fc.name AS category_name, fc.slug AS category_slug,
@@ -166,6 +166,15 @@ $flash = flash_get();
 $postStmt->execute(['id' => $postId]);
 $post = $postStmt->fetch();
 
+if ($post && !can_view_post($user, $post)) {
+    $post = null;
+}
+
+if ($post) {
+    db()->prepare('UPDATE posts SET view_count = view_count + 1 WHERE id = :id')->execute(['id' => $postId]);
+    $post['view_count'] = (int) ($post['view_count'] ?? 0) + 1;
+}
+
 $likedByCurrentUser = false;
 if ($post && $user) {
     $likedStmt = db()->prepare('SELECT 1 FROM post_likes WHERE post_id = :post_id AND user_id = :user_id LIMIT 1');
@@ -319,6 +328,12 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             <div class="brand-chip">纳达尔星项目 · 星云初始01 · 帖子详情页</div>
             <h1><?= e($post['title']) ?></h1>
             <p class="page-desc nebula-desc">详情页现在支持帖子编辑 / 删除、评论编辑 / 删除，权限至少收敛到作者本人和管理员。</p>
+            <?php if (($post['status'] ?? 'published') !== 'published'): ?>
+              <div class="chips" style="margin-top:12px; gap:6px;">
+                <span class="chip">当前状态：<?= e(post_status_label($post['status'])) ?></span>
+                <span class="chip">仅作者 / 管理人员可见</span>
+              </div>
+            <?php endif; ?>
           </div>
           <div class="hero-actions-row detail-hero-actions">
             <a class="pill-btn" href="/posts.php?board=<?= e($post['board_slug']) ?>">返回版块</a>
@@ -329,6 +344,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
           <div class="hero-stat"><div class="label">版块</div><div class="num small-num"><?= e(board_badge($post)) ?></div><div class="note">论坛归属已正式接入</div></div>
           <div class="hero-stat"><div class="label">点赞</div><div class="num small-num"><?= (int) $post['like_count'] ?></div><div class="note">已有成员为这篇内容加热</div></div>
           <div class="hero-stat"><div class="label">回复</div><div class="num small-num"><?= (int) $post['comment_count'] ?></div><div class="note"><?= $user ? '你现在可以直接参与讨论' : '登录后可评论和点赞' ?></div></div>
+          <div class="hero-stat"><div class="label">浏览</div><div class="num small-num"><?= (int) ($post['view_count'] ?? 0) ?></div><div class="note">帖子访问量累计</div></div>
         </div>
       </section>
 

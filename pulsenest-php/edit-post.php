@@ -5,7 +5,7 @@ $error = '';
 $boards = fetch_board_options();
 $postId = (int) ($_GET['id'] ?? 0);
 
-$stmt = db()->prepare('SELECT id, user_id, board_id, title, content, image_path FROM posts WHERE id = :id LIMIT 1');
+$stmt = db()->prepare('SELECT id, user_id, board_id, title, content, image_path, status FROM posts WHERE id = :id LIMIT 1');
 $stmt->execute(['id' => $postId]);
 $post = $stmt->fetch();
 if (!$post) {
@@ -59,16 +59,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $imagePath = null;
             }
 
-            $update = db()->prepare('UPDATE posts SET board_id = :board_id, title = :title, content = :content, image_path = :image_path WHERE id = :id');
+            $nextStatus = can_moderate_content($user) ? ($post['status'] ?? 'published') : 'pending';
+            $update = db()->prepare('UPDATE posts SET board_id = :board_id, title = :title, content = :content, image_path = :image_path, status = :status WHERE id = :id');
             $update->execute([
                 'board_id' => $form['board_id'],
                 'title' => $form['title'],
                 'content' => $form['content'],
                 'image_path' => $imagePath,
+                'status' => $nextStatus,
                 'id' => $postId,
             ]);
 
-            flash_set('success', '帖子已更新。');
+            flash_set('success', $nextStatus === 'published' ? '帖子已更新。' : '帖子已更新，并重新进入审核队列。');
             redirect_to('/post.php?id=' . $postId);
         } catch (RuntimeException $e) {
             $error = $e->getMessage();

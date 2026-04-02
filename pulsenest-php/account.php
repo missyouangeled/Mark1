@@ -33,13 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $user = refresh_current_user() ?? $user;
-$stmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE user_id = :id');
+$stmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE user_id = :id AND status = "published"');
 $stmt->execute(['id' => $user['id']]);
 $postCount = (int) $stmt->fetchColumn();
-$totalPosts = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$totalPosts = (int) db()->query('SELECT COUNT(*) FROM posts WHERE status = "published"')->fetchColumn();
 $memberCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
 $latestPostsStmt = db()->prepare(
-    'SELECT p.id, p.title, p.created_at,
+    'SELECT p.id, p.title, p.status, p.view_count, p.created_at,
             COALESCE(l.like_count, 0) AS like_count,
             COALESCE(c.comment_count, 0) AS comment_count
      FROM posts p
@@ -127,7 +127,7 @@ render_header('PulseNest · 会员中心', $user, [
               <?php foreach ($latestPosts as $post): ?>
                 <a class="list-item" href="/post.php?id=<?= (int) $post['id'] ?>">
                   <strong><?= e($post['title']) ?></strong>
-                  <span><?= e(human_time($post['created_at'])) ?> · <?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</span>
+                  <span><?= e(human_time($post['created_at'])) ?> · <?= e(post_status_label($post['status'] ?? 'published')) ?> · <?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复 · <?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
                 </a>
               <?php endforeach; ?>
             </div>

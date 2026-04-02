@@ -19,6 +19,7 @@ function admin_url(array $overrides = [], string $hash = ''): string {
         'post_is_sticky' => trim((string) ($_GET['post_is_sticky'] ?? '')),
         'post_is_featured' => trim((string) ($_GET['post_is_featured'] ?? '')),
         'post_home_slot' => trim((string) ($_GET['post_home_slot'] ?? '')),
+        'post_status' => trim((string) ($_GET['post_status'] ?? '')),
         'post_page' => (int) ($_GET['post_page'] ?? 1),
         'comment_page' => (int) ($_GET['comment_page'] ?? 1),
         'log_action' => trim((string) ($_GET['log_action'] ?? '')),
@@ -53,6 +54,7 @@ function admin_notification_copy(string $type): string {
         'comment_like' => '有人点赞评论',
         'comment_reply' => '有人回复评论',
         'comment_moderated' => '评论审核结果通知作者（区分已通过 / 已隐藏）',
+        'post_moderated' => '帖子审核结果通知作者（发布 / 待审 / 隐藏）',
         default => '有人回复帖子',
     };
 }
@@ -148,9 +150,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('/admin.php#home-copy');
     }
 
+    if ($action === 'bulk_post_status') {
+        $postIds = array_values(array_unique(array_filter(array_map('intval', $_POST['post_ids'] ?? []))));
+        $targetStatus = trim((string) ($_POST['target_status'] ?? ''));
+        $allowedStatuses = ['published', 'pending', 'hidden', 'draft'];
+        if (!$postIds) {
+            flash_set('error', '请先勾选要处理的帖子。');
+            redirect_to(admin_url([], '#posts'));
+        }
+        if (!in_array($targetStatus, $allowedStatuses, true)) {
+            flash_set('error', '目标帖子状态无效。');
+            redirect_to(admin_url([], '#posts'));
+        }
+
+        $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+        $stmt = db()->prepare(
+            'SELECT p.id, p.user_id, p.title, p.status, u.nickname, u.username
+             FROM posts p
+             INNER JOIN pulsenest_users u ON u.id = p.user_id
+             WHERE p.id IN (' . $placeholders . ')'
+        );
+        $stmt->execute($postIds);
+        $rows = $stmt->fetchAll();
+
+        if (!$rows) {
+            flash_set('error', '没有找到可处理的帖子。');
+            redirect_to(admin_url([], '#posts'));
+        }
+
+        $update = db()->prepare('UPDATE posts SET status = ? WHERE id IN (' . $placeholders . ')');
+        $update->execute(array_merge([$targetStatus], $postIds));
+        foreach ($rows as $row) {
+            log_moderation_action((int) $user['id'], 'post_status_updated', 'post', (int) $row['id'], ($row['nickname'] ?: $row['username']) . ' · ' . ($row['title'] ?: ('帖子 #' . (int) $row['id'])) . ' · ' . post_status_label($row['status'] ?? 'published') . ' → ' . post_status_label($targetStatus));
+            if (($row['status'] ?? 'published') !== $targetStatus) {
+                create_post_moderation_notification($row, (int) $user['id'], $targetStatus);
+            }
+        }
+        flash_set('success', '已批量更新 ' . count($rows) . ' 篇帖子为“' . post_status_label($targetStatus) . '”。');
+        redirect_to(admin_url(['post_status' => $targetStatus], '#posts'));
+    }
+
     if ($action === 'update_post_ops') {
         $postId = (int) ($_POST['post_id'] ?? 0);
-        $stmt = db()->prepare('SELECT p.id, p.title, p.home_slot, p.recommend_group, p.recommend_priority, u.nickname, u.username FROM posts p INNER JOIN pulsenest_users u ON u.id = p.user_id WHERE p.id = :id LIMIT 1');
+        $stmt = db()->prepare('SELECT p.id, p.user_id, p.title, p.status, p.home_slot, p.recommend_group, p.recommend_priority, u.nickname, u.username FROM posts p INNER JOIN pulsenest_users u ON u.id = p.user_id WHERE p.id = :id LIMIT 1');
         $stmt->execute(['id' => $postId]);
         $post = $stmt->fetch();
 
@@ -165,6 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $homeSlot = trim((string) ($_POST['home_slot'] ?? ''));
         $recommendGroup = trim((string) ($_POST['recommend_group'] ?? 'general'));
         $recommendPriority = max(0, min(999, (int) ($_POST['recommend_priority'] ?? 0)));
+        $postStatus = trim((string) ($_POST['status'] ?? 'published'));
         $allowedSlots = array_keys(home_slot_definitions());
         $allowedGroups = array_keys(recommend_group_definitions());
         if ($homeSlot !== '' && !in_array($homeSlot, $allowedSlots, true)) {
@@ -172,6 +215,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!in_array($recommendGroup, $allowedGroups, true)) {
             $recommendGroup = 'general';
+        }
+        if (!in_array($postStatus, ['published', 'pending', 'hidden', 'draft'], true)) {
+            $postStatus = 'published';
         }
 
         if ($homeSlot !== '') {
@@ -181,7 +227,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        db()->prepare('UPDATE posts SET is_sticky = :is_sticky, is_featured = :is_featured, recommend_level = :recommend_level, home_slot = :home_slot, recommend_group = :recommend_group, recommend_priority = :recommend_priority WHERE id = :id LIMIT 1')->execute([
+        db()->prepare('UPDATE posts SET status = :status, is_sticky = :is_sticky, is_featured = :is_featured, recommend_level = :recommend_level, home_slot = :home_slot, recommend_group = :recommend_group, recommend_priority = :recommend_priority WHERE id = :id LIMIT 1')->execute([
+            'status' => $postStatus,
             'is_sticky' => $isSticky,
             'is_featured' => $isFeatured,
             'recommend_level' => $recommendLevel,
@@ -191,9 +238,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id' => $postId,
         ]);
 
+        if (($post['status'] ?? 'published') !== $postStatus) {
+            create_post_moderation_notification($post, (int) $user['id'], $postStatus);
+        }
+
         $slotLabel = $homeSlot !== '' ? (home_slot_definitions()[$homeSlot]['label'] ?? $homeSlot) : '未绑定';
         $groupLabel = recommend_group_definitions()[$recommendGroup]['label'] ?? $recommendGroup;
-        log_moderation_action((int) $user['id'], 'post_ops_updated', 'post', $postId, '《' . $post['title'] . '》 · 置顶:' . $isSticky . ' · 精华:' . $isFeatured . ' · 推荐位:' . $recommendLevel . ' · 分组:' . $groupLabel . ' · 优先级:' . $recommendPriority . ' · 首页卡:' . $slotLabel);
+        log_moderation_action((int) $user['id'], 'post_ops_updated', 'post', $postId, '《' . $post['title'] . '》 · 状态:' . post_status_label($postStatus) . ' · 置顶:' . $isSticky . ' · 精华:' . $isFeatured . ' · 推荐位:' . $recommendLevel . ' · 分组:' . $groupLabel . ' · 优先级:' . $recommendPriority . ' · 首页卡:' . $slotLabel);
         flash_set('success', '帖子运营位已更新。');
         redirect_to('/admin.php#posts');
     }
@@ -499,6 +550,7 @@ $postRecommendPriorityFilterRaw = trim((string) ($_GET['post_recommend_priority'
 $postStickyFilter = trim((string) ($_GET['post_is_sticky'] ?? ''));
 $postFeaturedFilter = trim((string) ($_GET['post_is_featured'] ?? ''));
 $postHomeSlotFilter = trim((string) ($_GET['post_home_slot'] ?? ''));
+$postStatusFilter = trim((string) ($_GET['post_status'] ?? ''));
 $postPage = max(1, (int) ($_GET['post_page'] ?? 1));
 $commentPage = max(1, (int) ($_GET['comment_page'] ?? 1));
 $postPageSize = 12;
@@ -608,6 +660,10 @@ if ($postHomeSlotFilter === '__bound__') {
     $postWhere[] = 'p.home_slot = :post_home_slot';
     $postParams['post_home_slot'] = $postHomeSlotFilter;
 }
+if ($postStatusFilter !== '' && in_array($postStatusFilter, ['published', 'pending', 'hidden', 'draft'], true)) {
+    $postWhere[] = 'p.status = :post_status';
+    $postParams['post_status'] = $postStatusFilter;
+}
 $postWhereSql = $postWhere ? ' WHERE ' . implode(' AND ', $postWhere) : '';
 $postCountStmt = db()->prepare('SELECT COUNT(*) FROM posts p' . $postWhereSql);
 foreach ($postParams as $key => $value) {
@@ -619,7 +675,7 @@ $postTotalPages = max(1, (int) ceil($postCountTotal / $postPageSize));
 $postPage = min($postPage, $postTotalPages);
 $postOffset = ($postPage - 1) * $postPageSize;
 $postStmt = db()->prepare(
-    'SELECT p.id, p.title, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
+    'SELECT p.id, p.title, p.status, p.view_count, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
             u.nickname, u.username,
             fb.name AS board_name,
             fc.name AS category_name,
@@ -647,6 +703,15 @@ $postStmt->bindValue(':offset', $postOffset, PDO::PARAM_INT);
 $postStmt->execute();
 $postRows = $postStmt->fetchAll();
 
+$postStatusStats = db()->query('SELECT status, COUNT(*) AS total_count FROM posts GROUP BY status ORDER BY total_count DESC, status ASC')->fetchAll();
+$pendingPostCount = 0;
+foreach ($postStatusStats as $stat) {
+    if (($stat['status'] ?? '') === 'pending') {
+        $pendingPostCount = (int) $stat['total_count'];
+        break;
+    }
+}
+
 $categoryRows = db()->query(
     'SELECT c.id, c.name, c.slug, c.description, c.sort_order,
             COUNT(b.id) AS board_count
@@ -663,7 +728,7 @@ $boardRows = db()->query(
      FROM forum_boards b
      INNER JOIN forum_categories c ON c.id = b.category_id
      LEFT JOIN (
-        SELECT board_id, COUNT(*) AS post_count FROM posts GROUP BY board_id
+        SELECT board_id, COUNT(*) AS post_count FROM posts WHERE status = "published" GROUP BY board_id
      ) p ON p.board_id = b.id
      ORDER BY c.sort_order ASC, c.id ASC, b.sort_order ASC, b.id ASC'
 )->fetchAll();
@@ -765,6 +830,7 @@ render_header('PulseNest · 后台管理', $user, [
       <div class="quick-links">
         <a class="quick-link" href="#permission-map"><strong>权限边界</strong><span>先看自己能动什么</span></a>
         <a class="quick-link" href="#posts"><strong>帖子运营</strong><span>置顶 / 精华 / 推荐位 / 首页卡</span></a>
+        <a class="quick-link" href="<?= e(admin_url(['post_status' => 'pending', 'post_page' => 1], '#posts')) ?>"><strong>待审核队列</strong><span>当前 <?= $pendingPostCount ?> 篇待处理</span></a>
         <a class="quick-link" href="#comments"><strong>评论管理</strong><span>批量审核 / 隐藏 / 恢复</span></a>
         <?php if ($canManageUsers): ?><a class="quick-link" href="#users"><strong>角色 / 用户</strong><span>仅管理员可见</span></a><?php endif; ?>
         <?php if ($canManageStructure): ?><a class="quick-link" href="#categories"><strong>分类 / 版块</strong><span>仅管理员可见</span></a><?php endif; ?>
@@ -816,7 +882,7 @@ render_header('PulseNest · 后台管理', $user, [
 
   <section id="posts" class="glass panel-card admin-panel-card">
     <div class="section-kicker">Posts</div>
-    <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐分组、显示优先级、推荐位等级、首页运营卡绑定。首页卡会自动保持唯一绑定。</span></div>
+    <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐分组、显示优先级、推荐位等级、首页运营卡绑定。现在也支持帖子审核队列与批量处理。</span></div>
     <form class="admin-filter-row" method="get" action="/admin.php#posts">
       <input type="hidden" name="post_id" value="<?= $postFilterId > 0 ? (int) $postFilterId : '' ?>">
       <input type="hidden" name="author_id" value="<?= $authorFilterId > 0 ? (int) $authorFilterId : '' ?>">
@@ -854,20 +920,43 @@ render_header('PulseNest · 后台管理', $user, [
           <option value="<?= e($slotKey) ?>" <?= $postHomeSlotFilter === $slotKey ? 'selected' : '' ?>><?= e($slotMeta['label']) ?></option>
         <?php endforeach; ?>
       </select>
+      <select class="input admin-filter-input" name="post_status">
+        <option value="">帖子状态：全部</option>
+        <?php foreach (['published', 'pending', 'hidden', 'draft'] as $status): ?>
+          <option value="<?= e($status) ?>" <?= $postStatusFilter === $status ? 'selected' : '' ?>><?= e(post_status_label($status)) ?></option>
+        <?php endforeach; ?>
+      </select>
       <button class="pill-btn solid" type="submit">筛选</button>
-      <a class="pill-btn" href="<?= e(admin_url(['post_recommend_group' => null, 'post_recommend_priority' => null, 'post_is_sticky' => null, 'post_is_featured' => null, 'post_home_slot' => null, 'post_page' => null], '#posts')) ?>">清空</a>
+      <a class="pill-btn" href="<?= e(admin_url(['post_recommend_group' => null, 'post_recommend_priority' => null, 'post_is_sticky' => null, 'post_is_featured' => null, 'post_home_slot' => null, 'post_status' => null, 'post_page' => null], '#posts')) ?>">清空</a>
     </form>
-    <div class="admin-log-meta muted">当前筛选命中 <?= count($postRows) ?> 篇帖子 · 共 <?= $postCountTotal ?> 篇 · 第 <?= $postPage ?> / <?= $postTotalPages ?> 页</div>
+    <div class="hero-stats compact-hero-stats admin-hero-stats" style="margin-top: 16px;">
+      <?php foreach ($postStatusStats as $stat): ?>
+        <div class="hero-stat"><div class="label"><?= e(post_status_label($stat['status'])) ?></div><div class="num small-num"><?= (int) $stat['total_count'] ?></div><div class="note"><?= ($stat['status'] ?? '') === 'pending' ? '建议优先清理审核队列' : '全站帖子状态计数' ?></div></div>
+      <?php endforeach; ?>
+    </div>
+    <div class="admin-log-meta muted">当前筛选命中 <?= count($postRows) ?> 篇帖子 · 共 <?= $postCountTotal ?> 篇 · 第 <?= $postPage ?> / <?= $postTotalPages ?> 页<?= $postStatusFilter === 'pending' ? ' · 当前正处于待审核队列视图' : '' ?></div>
+    <form id="bulk-posts-form" method="post">
+      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+      <input type="hidden" name="action" value="bulk_post_status">
+      <input type="hidden" name="target_status" id="bulk-post-status" value="published">
+    </form>
+    <div class="admin-bulk-bar">
+      <button class="pill-btn solid" type="submit" form="bulk-posts-form" onclick="document.getElementById('bulk-post-status').value='published'; return confirm('确认批量发布已勾选帖子？');">批量发布</button>
+      <button class="pill-btn" type="submit" form="bulk-posts-form" onclick="document.getElementById('bulk-post-status').value='pending'; return confirm('确认批量恢复到待审核？');">批量恢复待审核</button>
+      <button class="pill-btn danger" type="submit" form="bulk-posts-form" onclick="document.getElementById('bulk-post-status').value='hidden'; return confirm('确认批量隐藏已勾选帖子？');">批量隐藏</button>
+    </div>
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>版块</th><th>热度</th><th>运营位</th><th>操作</th></tr></thead>
+        <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.post-select').forEach(el => el.checked = this.checked)"></th><th>ID</th><th>标题</th><th>作者</th><th>版块</th><th>热度</th><th>运营位</th><th>操作</th></tr></thead>
         <tbody>
           <?php foreach ($postRows as $row): ?>
             <tr>
+              <td><input class="post-select" type="checkbox" name="post_ids[]" value="<?= (int) $row['id'] ?>" form="bulk-posts-form"></td>
               <td>#<?= (int) $row['id'] ?></td>
               <td>
                 <a class="inline-link" href="/post.php?id=<?= (int) $row['id'] ?>"><?= e($row['title']) ?></a>
                 <div class="chips" style="margin-top:8px; gap:6px;">
+                  <span class="chip">状态 · <?= e(post_status_label($row['status'] ?? 'published')) ?></span>
                   <?php if ((int) $row['is_sticky'] === 1): ?><span class="chip">置顶</span><?php endif; ?>
                   <?php if ((int) $row['is_featured'] === 1): ?><span class="chip">精华</span><?php endif; ?>
                   <?php if ((int) $row['recommend_level'] > 0): ?><span class="chip">推荐位 <?= (int) $row['recommend_level'] ?></span><?php endif; ?>
@@ -878,12 +967,17 @@ render_header('PulseNest · 后台管理', $user, [
               </td>
               <td><?= e($row['nickname']) ?><div class="muted">@<?= e($row['username']) ?></div></td>
               <td><?= e(trim(($row['category_name'] ?? '公共区') . ' / ' . ($row['board_name'] ?? '未分区'))) ?></td>
-              <td><?= (int) $row['like_count'] ?> 赞 · <?= (int) $row['comment_count'] ?> 评</td>
+              <td><?= (int) $row['like_count'] ?> 赞 · <?= (int) $row['comment_count'] ?> 评 · <?= (int) ($row['view_count'] ?? 0) ?> 浏览</td>
               <td>
                 <form method="post" class="admin-inline-stack" style="align-items:flex-start;">
                   <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                   <input type="hidden" name="action" value="update_post_ops">
                   <input type="hidden" name="post_id" value="<?= (int) $row['id'] ?>">
+                  <select class="input slim-input" name="status">
+                    <?php foreach (['published', 'pending', 'hidden', 'draft'] as $status): ?>
+                      <option value="<?= e($status) ?>" <?= ($row['status'] ?? 'published') === $status ? 'selected' : '' ?>><?= e(post_status_label($status)) ?></option>
+                    <?php endforeach; ?>
+                  </select>
                   <label class="muted"><input type="checkbox" name="is_sticky" value="1" <?= (int) $row['is_sticky'] === 1 ? 'checked' : '' ?>> 置顶</label>
                   <label class="muted"><input type="checkbox" name="is_featured" value="1" <?= (int) $row['is_featured'] === 1 ? 'checked' : '' ?>> 精华</label>
                   <select class="input slim-input" name="recommend_group">
@@ -910,6 +1004,24 @@ render_header('PulseNest · 后台管理', $user, [
                 <div class="admin-action-stack">
                   <a class="pill-btn" href="/edit-post.php?id=<?= (int) $row['id'] ?>">编辑</a>
                   <a class="pill-btn" href="<?= e(admin_url(['post_id' => (int) $row['id']], '#comments')) ?>">看评论</a>
+                  <?php if (($row['status'] ?? 'published') !== 'published'): ?>
+                    <form method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                      <input type="hidden" name="action" value="bulk_post_status">
+                      <input type="hidden" name="post_ids[]" value="<?= (int) $row['id'] ?>">
+                      <input type="hidden" name="target_status" value="published">
+                      <button class="pill-btn solid" type="submit">发布</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if (($row['status'] ?? 'published') !== 'pending'): ?>
+                    <form method="post" class="inline-form">
+                      <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                      <input type="hidden" name="action" value="bulk_post_status">
+                      <input type="hidden" name="post_ids[]" value="<?= (int) $row['id'] ?>">
+                      <input type="hidden" name="target_status" value="pending">
+                      <button class="pill-btn" type="submit">转待审</button>
+                    </form>
+                  <?php endif; ?>
                   <form method="post" class="inline-form" onsubmit="return confirm('确认删除这篇帖子？帖子下评论也会一起删除，并写入日志。');">
                     <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                     <input type="hidden" name="action" value="delete_post_admin">
@@ -920,6 +1032,9 @@ render_header('PulseNest · 后台管理', $user, [
               </td>
             </tr>
           <?php endforeach; ?>
+          <?php if (!$postRows): ?>
+            <tr><td colspan="8" class="muted">当前筛选条件下没有帖子记录。</td></tr>
+          <?php endif; ?>
         </tbody>
       </table>
     </div>
@@ -936,6 +1051,7 @@ render_header('PulseNest · 后台管理', $user, [
       'post_is_sticky' => $postStickyFilter,
       'post_is_featured' => $postFeaturedFilter,
       'post_home_slot' => $postHomeSlotFilter,
+      'post_status' => $postStatusFilter,
       'comment_page' => $commentPage,
       'log_action' => $logActionFilter,
       'log_target_type' => $logTargetTypeFilter,

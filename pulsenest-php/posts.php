@@ -24,8 +24,9 @@ if ($boardSlug !== '') {
     $where[] = 'fb.slug = :board_slug';
     $params['board_slug'] = $boardSlug;
 }
+$where[] = 'p.status = "published"';
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.recommend_group, p.recommend_priority,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.status, p.view_count, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.recommend_group, p.recommend_priority,
                u.nickname, u.username, u.avatar_path,
                fb.id AS board_id, fb.name AS board_name, fb.slug AS board_slug,
                fc.id AS category_id, fc.name AS category_name, fc.slug AS category_slug,

@@ -18,7 +18,7 @@ if ($selectedBoard !== '') {
     $params['board_slug'] = $selectedBoard;
 }
 
-$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
+$sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.status, p.view_count, p.created_at, p.is_sticky, p.is_featured, p.recommend_level, p.home_slot, p.recommend_group, p.recommend_priority,
                u.nickname, u.username, u.avatar_path,
                fb.name AS board_name, fb.slug AS board_slug,
                fc.name AS category_name, fc.slug AS category_slug,
@@ -34,6 +34,7 @@ $sql = 'SELECT p.id, p.user_id, p.title, p.content, p.image_path, p.created_at, 
         LEFT JOIN (
            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
         ) c ON c.post_id = p.id';
+$where[] = 'p.status = "published"';
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
@@ -42,7 +43,7 @@ $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
 
-$postCount = (int) db()->query('SELECT COUNT(*) FROM posts')->fetchColumn();
+$postCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE status = "published"')->fetchColumn();
 $userCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
 $boardCount = (int) db()->query('SELECT COUNT(*) FROM forum_boards')->fetchColumn();
 $homeSlotDefs = home_slot_definitions();
