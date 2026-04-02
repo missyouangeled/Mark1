@@ -44,7 +44,7 @@
 - 恢复语义：以后如果用户说“恢复星云初始03”，默认恢复到当前这版状态。
 - 当前锚点范围：
   - `pulsenest-php/` 当前已实现的用户系统、论坛结构、通知、后台、运营控制、治理工作台与本轮首页结构调整结果
-  - 当前样式锚点包含：头部导航单行优先、Hero 标题缩小、中下区块间距微调、首页中段改为主列/侧列结构、Time Range Hotlist 与右侧信息栏重新编排、Active Boards / Community Snapshot / Recommended Authors / Top Rated 的纵向节奏重排
+  - 当前样式锚点包含：头部导航单行优先、Hero 标题缩小、中下区块间距微调、首页中段改为主列/侧列结构、Time Range Hotlist 与右侧信息栏重新编排、Active Boards / Community Snapshot / Recommended Authors / Top Rated 的纵向节奏重排、全站主体板块统一留白节奏、首页右下信息列位置微调（`row-bottom .right-col-stack { margin-top: -222px; }`）并经用户确认“非常完美”
   - 当前功能锚点新增：
     - 帖子状态流（已发布 / 待审核 / 已隐藏 / 草稿预留）、普通用户发帖默认进入待审核、编辑后可重新进入审核、前台首页/列表/公开主页仅展示已发布内容、帖子详情页加入浏览量统计
     - 后台待审核帖子队列、批量发布 / 批量隐藏 / 批量恢复待审、帖子状态筛选与状态切换、帖子审核通知
