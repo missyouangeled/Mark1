@@ -61,7 +61,13 @@ cd ~/.openclaw/workspace
 bash openclaw-env/restore-openclaw-env.sh
 ```
 
-### 3. 手动补私密项
+### 3. 执行恢复检查
+
+```bash
+bash openclaw-env/post-restore-check.sh
+```
+
+### 4. 手动补私密项
 
 至少检查并补这些：
 
@@ -69,7 +75,7 @@ bash openclaw-env/restore-openclaw-env.sh
 - OpenClaw provider 登录态 / token
 - `~/.openclaw/openclaw.json` 里的私密字段
 
-### 4. 启动 / 验证
+### 5. 启动 / 验证
 
 ```bash
 systemctl --user daemon-reload
@@ -79,6 +85,10 @@ systemctl --user status pulsenest-preview.service
 systemctl --user status openclaw-resume-watch.timer
 openclaw gateway status
 ```
+
+另见：
+- `openclaw-env/NEW_MACHINE_BOOTSTRAP.md`
+- `openclaw-env/secrets-checklist.example.md`
 
 ## openclaw.local.example.json 的用途
 
