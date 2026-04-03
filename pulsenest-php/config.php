@@ -47,6 +47,12 @@ function ensure_database_schema(PDO $pdo): void {
         $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'member' AFTER is_active");
         $pdo->exec("UPDATE pulsenest_users SET role = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'member' END");
     }
+    if (!column_exists($pdo, 'pulsenest_users', 'location')) {
+        $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN location VARCHAR(80) DEFAULT NULL AFTER bio");
+    }
+    if (!column_exists($pdo, 'pulsenest_users', 'website_url')) {
+        $pdo->exec("ALTER TABLE pulsenest_users ADD COLUMN website_url VARCHAR(255) DEFAULT NULL AFTER location");
+    }
     $pdo->exec("UPDATE pulsenest_users SET role = CASE WHEN role = '' OR role IS NULL THEN CASE WHEN is_admin = 1 THEN 'admin' ELSE 'member' END ELSE role END");
     $pdo->exec("UPDATE pulsenest_users SET is_admin = CASE WHEN role = 'admin' THEN 1 ELSE 0 END");
 
@@ -384,7 +390,7 @@ function refresh_current_user(): ?array {
         return null;
     }
 
-    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+    $stmt = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, location, website_url, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $user['id']]);
     $fresh = $stmt->fetch();
     if (!$fresh || (int) ($fresh['is_active'] ?? 1) !== 1) {
@@ -405,6 +411,8 @@ function login_user(array $user): void {
         'email' => $user['email'],
         'avatar_path' => $user['avatar_path'] ?? null,
         'bio' => $user['bio'] ?? null,
+        'location' => $user['location'] ?? null,
+        'website_url' => $user['website_url'] ?? null,
         'is_admin' => (int) ($user['is_admin'] ?? 0),
         'is_active' => (int) ($user['is_active'] ?? 1),
         'role' => $user['role'] ?? ((int) ($user['is_admin'] ?? 0) === 1 ? 'admin' : 'member'),
@@ -677,6 +685,321 @@ function excerpt(string $text, int $length = 140): string {
     return mb_substr($plain, 0, $length) . '…';
 }
 
+function profile_completion_summary(array $user, array $options = []): array {
+    $checks = [
+        'avatar' => [
+            'label' => '头像',
+            'done' => !empty($user['avatar_path']),
+            'hint' => '补一个头像，让公开页和互动提醒更有识别度。',
+        ],
+        'bio' => [
+            'label' => '简介',
+            'done' => trim((string) ($user['bio'] ?? '')) !== '',
+            'hint' => '写一句简介，让别人更快知道你是做什么的。',
+        ],
+        'location' => [
+            'label' => '所在地',
+            'done' => trim((string) ($user['location'] ?? '')) !== '',
+            'hint' => '补一个常驻城市、地区或线上身份。',
+        ],
+        'website' => [
+            'label' => '个人链接',
+            'done' => trim((string) ($user['website_url'] ?? '')) !== '',
+            'hint' => '挂一个主页、作品集或社媒入口。',
+        ],
+    ];
+
+    if (!empty($options['include_post'])) {
+        $postCount = isset($options['post_count']) ? (int) $options['post_count'] : 0;
+        $checks['post'] = [
+            'label' => '公开内容',
+            'done' => $postCount > 0,
+            'hint' => '发布第一篇公开内容，让主页真正开始运转。',
+        ];
+    }
+
+    $doneCount = 0;
+    $missing = [];
+    foreach ($checks as $key => $item) {
+        if (!empty($item['done'])) {
+            $doneCount++;
+        } else {
+            $missing[$key] = $item;
+        }
+    }
+
+    $total = count($checks);
+    $percent = $total > 0 ? (int) round(($doneCount / $total) * 100) : 0;
+    $tone = match (true) {
+        $percent >= 100 => '已完整',
+        $percent >= 80 => '已成型',
+        $percent >= 50 => '建设中',
+        default => '待完善',
+    };
+
+    return [
+        'checks' => $checks,
+        'missing' => $missing,
+        'done' => $doneCount,
+        'total' => $total,
+        'percent' => $percent,
+        'tone' => $tone,
+    ];
+}
+
+function account_age_days(?array $user): int {
+    $createdAt = trim((string) ($user['created_at'] ?? ''));
+    if ($createdAt === '') {
+        return 0;
+    }
+    $timestamp = strtotime($createdAt);
+    if (!$timestamp) {
+        return 0;
+    }
+    return max(0, (int) floor((time() - $timestamp) / 86400));
+}
+
+function profile_guidance_copy(?array $user, ?array $summary = null): array {
+    $summary = $summary ?? ($user ? profile_completion_summary($user) : null);
+    $missingCount = $summary ? count($summary['missing'] ?? []) : 0;
+    $ageDays = account_age_days($user);
+    $isNewUser = $user && $ageDays <= 3;
+
+    if (!$summary || $missingCount <= 0) {
+        return [
+            'header' => '公开资料已成型',
+            'subtle' => '你的头像、简介和公开资料已经足够完整，主页会以这套信息对外展示。',
+            'cta' => '查看我的主页',
+            'mode' => 'complete',
+        ];
+    }
+
+    if ($isNewUser) {
+        return [
+            'header' => '新账号先补资料',
+            'subtle' => '先把头像、简介和公开资料补起来，后面每篇内容的作者信息都会自然很多。',
+            'cta' => '开始完善资料',
+            'mode' => 'new',
+        ];
+    }
+
+    return [
+        'header' => '资料还差 ' . $missingCount . ' 项',
+        'subtle' => '补齐剩下的公开资料后，作者主页、帖子作者卡和提醒页里的身份信息会更完整。',
+        'cta' => '继续完善资料',
+        'mode' => 'returning',
+    ];
+}
+
+function creator_presence_summary(?array $user, array $options = []): array {
+    $postCount = max(0, (int) ($options['post_count'] ?? ($user['post_count'] ?? 0)));
+    $latestPostAt = trim((string) ($options['latest_post_at'] ?? ''));
+    $ageDays = account_age_days($user);
+    $latestPostTs = $latestPostAt !== '' ? strtotime($latestPostAt) : false;
+    $daysSinceLatest = $latestPostTs ? max(0, (int) floor((time() - $latestPostTs) / 86400)) : null;
+
+    if ($postCount <= 0) {
+        return [
+            'label' => '创作准备中',
+            'note' => '资料层已经开始成型，下一步只差第一篇公开内容把主页真正点亮。',
+            'meta' => $ageDays <= 7 ? '新成员阶段' : '资料已就位，等待首篇内容',
+            'compact' => '待发布首篇内容',
+        ];
+    }
+
+    if ($daysSinceLatest !== null && $daysSinceLatest <= 3) {
+        return [
+            'label' => '最近在更新',
+            'note' => '最近有新的公开内容，作者页、帖子页和互动入口会更像正在被认真维护的社区档案。',
+            'meta' => '最近更新于 ' . human_time($latestPostAt),
+            'compact' => '最近有公开更新',
+        ];
+    }
+
+    if ($daysSinceLatest !== null && $daysSinceLatest <= 14) {
+        return [
+            'label' => '稳定输出中',
+            'note' => '公开内容节奏比较稳定，资料页更适合承接新读者和后续互动。',
+            'meta' => '最近更新于 ' . human_time($latestPostAt),
+            'compact' => '近两周仍有更新',
+        ];
+    }
+
+    return [
+        'label' => '阶段性安静',
+        'note' => '这张主页仍然完整可读，只是最近没有新的公开更新，适合通过下一篇内容重新接上互动。',
+        'meta' => $latestPostAt !== '' ? '上次公开更新 ' . human_time($latestPostAt) : '暂无最近更新记录',
+        'compact' => '最近更新节奏放缓',
+    ];
+}
+
+function member_journey_summary(?array $user, array $options = []): array {
+    $postCount = max(0, (int) ($options['post_count'] ?? ($user['post_count'] ?? 0)));
+    $unreadCount = max(0, (int) ($options['unread_count'] ?? 0));
+    $summary = $options['profile_summary'] ?? ($user ? profile_completion_summary($user, [
+        'include_post' => true,
+        'post_count' => $postCount,
+    ]) : null);
+    $ageDays = account_age_days($user);
+
+    if ($postCount <= 0) {
+        return [
+            'label' => $ageDays <= 3 ? '新成员起步期' : '围观成员阶段',
+            'note' => $ageDays <= 3
+                ? '先补资料，再发出第一篇公开内容，账号会从注册完成自然过渡到真正上线。'
+                : '你已经在社区里留下账号痕迹，下一步更值得做的是发出第一篇内容，把公开身份真正点亮。',
+            'cta' => !empty($summary['missing']) ? '先补资料再发首帖' : '去写第一篇内容',
+            'accent' => '成员还在从“注册完成”过渡到“开始公开活动”。',
+        ];
+    }
+
+    if ($unreadCount > 0) {
+        return [
+            'label' => '互动承接阶段',
+            'note' => '已经有内容开始接住社区反馈，先处理提醒，再决定要不要继续补一篇新内容，节奏会更稳。',
+            'cta' => '先看提醒，再决定下一步',
+            'accent' => '系统在提醒你：不是继续堆动作，而是先接住已经发生的互动。',
+        ];
+    }
+
+    if (!empty($summary['missing'])) {
+        return [
+            'label' => '创作者档案补层期',
+            'note' => '内容已经开始公开流转，这时候把公开资料补完整，会让作者页和帖子作者卡更像正式运营中的社区档案。',
+            'cta' => '补齐资料，让作者页更完整',
+            'accent' => '这不是强推，而是把已有内容接到更完整的身份层上。',
+        ];
+    }
+
+    return [
+        'label' => '稳定运营节奏',
+        'note' => '资料层和内容层都已经成型，接下来更自然的动作是继续更新、回互动，或者安静观察主页观感。',
+        'cta' => '按自己的节奏继续',
+        'accent' => '当系统不再催你，说明账号已经进入比较自然的运营状态。',
+    ];
+}
+
+function post_feedback_summary(array $post): array {
+    $status = (string) ($post['status'] ?? 'published');
+    $likes = max(0, (int) ($post['like_count'] ?? 0));
+    $comments = max(0, (int) ($post['comment_count'] ?? 0));
+    $views = max(0, (int) ($post['view_count'] ?? 0));
+    $createdAt = trim((string) ($post['created_at'] ?? ''));
+    $createdTs = $createdAt !== '' ? strtotime($createdAt) : false;
+    $ageHours = $createdTs ? max(0, (int) floor((time() - $createdTs) / 3600)) : null;
+
+    if ($status !== 'published') {
+        return [
+            'label' => '流程中',
+            'note' => '这篇内容还在站内流程里，公开反馈会晚一些到来。',
+            'next' => '先不用频繁刷新，等它进入公开状态后再看互动。',
+        ];
+    }
+
+    if ($comments > 0) {
+        return [
+            'label' => '已接住讨论',
+            'note' => '内容已经开始承接公开回复，最值得做的不是重复发新帖，而是先接住评论区。',
+            'next' => '回评论区看看有没有值得继续展开的话题。',
+        ];
+    }
+
+    if ($likes > 0 || $views >= 20) {
+        return [
+            'label' => '已收到第一波反馈',
+            'note' => '这篇内容已经有人看见，说明分发链路在工作，接下来可以观察是否需要补充讨论切口。',
+            'next' => '如果想继续放大互动，可以在评论区先留下一个更具体的问题。',
+        ];
+    }
+
+    if ($ageHours !== null && $ageHours <= 12) {
+        return [
+            'label' => '刚发布',
+            'note' => '内容刚进入公开流转，短时间内没有互动是正常现象，不需要被系统推着追数。',
+            'next' => '先让它自然跑一会儿，再回来看看阅读和回复。',
+        ];
+    }
+
+    return [
+        'label' => '等待自然扩散',
+        'note' => '这篇内容已经上线，但当前互动还比较安静，更适合继续观察标题、作者页和评论切口是否顺手。',
+        'next' => '如果准备继续推进，优先补一条评论或更新下一篇内容。',
+    ];
+}
+
+function creator_loop_summary(?array $user, array $options = []): array {
+    $postCount = max(0, (int) ($options['post_count'] ?? ($user['post_count'] ?? 0)));
+    $unreadCount = max(0, (int) ($options['unread_count'] ?? 0));
+    $profileSummary = $options['profile_summary'] ?? ($user ? profile_completion_summary($user, [
+        'include_post' => true,
+        'post_count' => $postCount,
+    ]) : null);
+    $latestFeedback = $options['latest_feedback'] ?? null;
+
+    if ($postCount <= 0 && !empty($profileSummary['missing'])) {
+        return [
+            'label' => '名片起步中',
+            'note' => '账号已经建好，但更自然的节奏仍然是先把公开资料立起来，再发第一篇内容。',
+            'next' => '先补资料，再写首帖。',
+        ];
+    }
+
+    if ($postCount <= 0) {
+        return [
+            'label' => '首帖准备中',
+            'note' => '资料层已经足够承接公开身份，现在只差第一篇内容把主页真正点亮。',
+            'next' => '去写第一篇公开内容。',
+        ];
+    }
+
+    if ($unreadCount > 0) {
+        return [
+            'label' => '互动回流中',
+            'note' => '已经有反馈回到你这里，当前更像正式社区里的自然工作流：先接互动，再决定要不要继续加内容。',
+            'next' => '先看提醒中心，把回复和回执接住。',
+        ];
+    }
+
+    if (($latestFeedback['label'] ?? '') === '已接住讨论') {
+        return [
+            'label' => '讨论延续中',
+            'note' => '最近一篇内容已经长出讨论，接下来更值得做的是沿着评论区继续往下聊，而不是硬切新动作。',
+            'next' => '回最近内容的评论区接一句。',
+        ];
+    }
+
+    if (!empty($profileSummary['missing'])) {
+        return [
+            'label' => '档案补层中',
+            'note' => '内容已经开始流转，这时补齐公开资料会让作者页、帖子作者卡和提醒页里的身份层更稳。',
+            'next' => '顺手补完剩下的资料项。',
+        ];
+    }
+
+    return [
+        'label' => '创作闭环已接上',
+        'note' => '资料、内容和互动入口都已经开始互相承接，后面更自然的动作就是按自己的节奏继续更新。',
+        'next' => '继续写内容，或安静观察下一波反馈。',
+    ];
+}
+
+function notification_follow_up_hint(array $item): string {
+    return match ($item['type'] ?? '') {
+        'comment_reply', 'post_reply' => '回到帖子里接一句，互动会自然继续，不必额外制造动作感。',
+        'post_like', 'comment_like' => '这更像一个轻反馈信号；先观察要不要顺手补一句评论，不用急着追数据。',
+        'comment_moderated' => (($item['moderation_status'] ?? '') === 'approved')
+            ? '评论已经重新进入公开流转，可以回原帖看看有没有新的承接点。'
+            : '这条评论流程先到这里，下一步更适合回内容页或提醒中心继续看别的互动。',
+        'post_moderated' => (($item['moderation_status'] ?? '') === 'published')
+            ? '帖子已进入公开流转，接下来可以回内容页看看第一波读者会从哪里接上。'
+            : '这篇内容的流程状态已经明确下来，先不用反复刷新，等下一次节点再回来。',
+        'report_processed' => (($item['moderation_status'] ?? '') === 'reviewing')
+            ? '举报已进入处理流程，当前先让这条线自然推进，不必重复提交。'
+            : '这条处理链路已经给到回执，若还想继续观察，可以回原帖看看当前公开状态。',
+        default => '先把这条提醒读完，再决定是否回内容页继续接互动。',
+    };
+}
+
 function password_reset_token(): string {
     return bin2hex(random_bytes(16));
 }
@@ -883,6 +1206,36 @@ function asset_url(?string $path): ?string {
 
 function avatar_url(?array $user): ?string {
     return asset_url($user['avatar_path'] ?? null);
+}
+
+function normalize_external_url(?string $url): ?string {
+    $url = trim((string) $url);
+    if ($url === '') {
+        return null;
+    }
+    if (!preg_match('#^https?://#i', $url)) {
+        $url = 'https://' . $url;
+    }
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        throw new RuntimeException('个人链接格式不正确，请填写可访问的网址。');
+    }
+    $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        throw new RuntimeException('个人链接仅支持 http 或 https 地址。');
+    }
+    return $url;
+}
+
+function profile_link_label(?string $url): ?string {
+    $url = trim((string) $url);
+    if ($url === '') {
+        return null;
+    }
+    $host = (string) parse_url($url, PHP_URL_HOST);
+    if ($host === '') {
+        return $url;
+    }
+    return preg_replace('/^www\./i', '', $host) ?: $host;
 }
 
 function profile_url(array $user): string {

@@ -6,6 +6,8 @@ function render_header(string $title, ?array $user = null, array $options = []):
     $searchText = $options['searchText'] ?? '🔎 搜索榜单、话题、作者、游戏名';
     $headerMode = $options['headerMode'] ?? 'default';
     $unreadCount = $user ? unread_notification_count((int) $user['id']) : 0;
+    $profileSummary = $user ? profile_completion_summary($user) : null;
+    $profileGuidance = $user ? profile_guidance_copy($user, $profileSummary) : null;
     $headerStripText = site_announcement() !== '' ? site_announcement() : '今日焦点：版块浏览 / 内容搜索 / 回复提醒';
     if ($user) {
         $headerStripText = match (user_role($user)) {
@@ -60,6 +62,11 @@ function render_header(string $title, ?array $user = null, array $options = []):
           <a class="header-user-chip" href="/notifications.php">
             <span>提醒<?= $unreadCount ? ' · ' . $unreadCount : '' ?></span>
           </a>
+          <?php if ($profileSummary && !empty($profileSummary['missing'])): ?>
+            <a class="header-user-chip subtle-accent-chip" href="/account.php#profile-studio" title="<?= e($profileGuidance['subtle'] ?? '') ?>">
+              <span><?= e($profileGuidance['cta'] ?? '完善资料') ?> · 还差 <?= count($profileSummary['missing']) ?> 项</span>
+            </a>
+          <?php endif; ?>
           <a class="header-user-chip" href="/account.php">
             <?= render_avatar($user, 'mini-avatar') ?>
             <span><?= e($user['nickname']) ?></span>

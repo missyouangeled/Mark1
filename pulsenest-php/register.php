@@ -45,12 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && site_setting_enabled('site.registra
             ]);
 
             $userId = (int) db()->lastInsertId();
-            $select = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
+            $select = db()->prepare('SELECT id, username, nickname, email, avatar_path, bio, location, website_url, is_admin, is_active, role, created_at FROM pulsenest_users WHERE id = :id LIMIT 1');
             $select->execute(['id' => $userId]);
             $user = $select->fetch();
             login_user($user);
-            flash_set('success', '注册完成，已经自动帮你登录。');
-            redirect_to('/');
+            flash_set('success', '注册完成，已经自动帮你登录。下一步可以去会员中心补头像、简介和公开资料。');
+            redirect_to('/account.php?welcome=1#profile-studio');
         }
     }
 }
@@ -70,8 +70,8 @@ render_header('PulseNest · 注册', null, ['showSearch' => false, 'headerMode' 
 
         <div class="feature-list">
           <div class="feature"><div class="dot">01</div><div><strong>建立身份</strong><span>昵称、用户名、邮箱和密码都在这里一次完成，注册后可直接进入会员中心维护资料。</span></div></div>
-          <div class="feature"><div class="dot">02</div><div><strong>加入讨论</strong><span>注册完成即自动登录，内容流、提醒中心、发帖入口会立刻切到你的身份状态。</span></div></div>
-          <div class="feature"><div class="dot">03</div><div><strong>平滑进入</strong><span>注册页现在和首页、登录页共用同一套排版节奏，观感更像完整产品，而不是孤立表单。</span></div></div>
+          <div class="feature"><div class="dot">02</div><div><strong>补全名片</strong><span>完成注册后会直接引导你去补头像、简介、所在地和个人链接，公开主页会更像正式社区名片。</span></div></div>
+          <div class="feature"><div class="dot">03</div><div><strong>加入讨论</strong><span>注册完成即自动登录，内容流、提醒中心、发帖入口会立刻切到你的身份状态。</span></div></div>
         </div>
       </div>
     </section>
@@ -80,6 +80,12 @@ render_header('PulseNest · 注册', null, ['showSearch' => false, 'headerMode' 
       <div class="section-kicker">Create Account</div>
       <h2>创建你的 PulseNest 账号</h2>
       <p class="desc">注册成功后会自动建立 session 并跳回首页。顶部导航、首页主行动、提醒中心和会员中心会立刻切换到你的登录态。</p>
+
+      <div class="auth-route-strip">
+        <div class="auth-route-step"><strong>01 注册完成</strong><span>账号创建后会自动登录，不需要再走一次登录流程。</span></div>
+        <div class="auth-route-step"><strong>02 补齐名片</strong><span>系统会直接带你进入会员中心，把头像、简介、所在地和个人链接补成公开资料层。</span></div>
+        <div class="auth-route-step"><strong>03 开始创作</strong><span>资料补好后就能顺着发帖、接提醒、回互动进入创作者状态，不会只停在“有个账号”。</span></div>
+      </div>
 
       <div class="tabs-auth">
         <a class="tab" href="/login.php">登录</a>

@@ -103,7 +103,37 @@ $weekStmt = db()->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_us
 $weekStmt->execute(['user_id' => $user['id']]);
 $weekCount = (int) $weekStmt->fetchColumn();
 
+$userPostCountStmt = db()->prepare('SELECT COUNT(*) FROM posts WHERE user_id = :user_id AND status = "published"');
+$userPostCountStmt->execute(['user_id' => $user['id']]);
+$userPostCount = (int) $userPostCountStmt->fetchColumn();
+
 $currentResultCount = count($notifications);
+$notificationFocus = match (true) {
+    $unreadCount > 0 && in_array($selectedType, ['comment_reply', 'post_reply'], true) => [
+        'label' => '优先接住回复',
+        'note' => '当前筛选已经聚焦到回复提醒，先把对话接住，比继续堆动作更像成熟社区里的正常节奏。',
+        'cta' => '处理完回复后，再决定要不要继续发内容。',
+    ],
+    $unreadCount > 0 => [
+        'label' => '先清掉未读压力',
+        'note' => '现在更自然的动作不是四处跳转，而是先把未读提醒处理掉，让互动链路在这里收口。',
+        'cta' => '可以从回复类提醒开始，再回到内容流或会员中心。',
+    ],
+    $todayCount > 0 || $weekCount > 0 => [
+        'label' => '互动已经落地',
+        'note' => '最近一段时间已经有新的点赞、回复或系统回执，提醒中心更像你的互动收纳层，而不是静态消息页。',
+        'cta' => '如果这里暂时清空了，可以回主页继续观察内容反馈。',
+    ],
+    default => [
+        'label' => '提醒还很安静',
+        'note' => '现在没有太多互动压力，适合回到资料页或内容流，把下一次公开动作准备好。',
+        'cta' => '先写内容或补资料，下一波提醒自然会回来。',
+    ],
+};
+$interactionClosure = creator_loop_summary($user, [
+    'post_count' => $userPostCount,
+    'unread_count' => $unreadCount,
+]);
 render_header('PulseNest · 我的提醒', $user, [
     'searchText' => '🔎 提醒支持未读筛选、类型筛选、批量已读和按类型清空',
 ]);
@@ -143,11 +173,37 @@ render_header('PulseNest · 我的提醒', $user, [
         <button class="submit" type="submit">全部标记为已读</button>
       </form>
       <div class="quick-links compact-link-stack">
-        <a class="quick-link" href="/posts.php">去看帖子流</a>
-        <a class="quick-link" href="/create-post.php">继续发帖</a>
-        <a class="quick-link" href="/account.php">回会员中心</a>
+        <a class="quick-link" href="/posts.php"><strong>去看帖子流</strong><span>回到公开内容流，看看互动是从哪些内容线接进来的。</span></a>
+        <a class="quick-link" href="/create-post.php"><strong>继续发帖</strong><span>当提醒已经接稳后，再顺着当前节奏补一篇新内容。</span></a>
+        <a class="quick-link" href="/account.php"><strong>回会员中心</strong><span>查看资料完成度、成员阶段和最近内容反馈。</span></a>
       </div>
     </aside>
+  </section>
+
+  <section class="glass panel-card surface-section notification-route-strip">
+    <div class="creator-route-copy">
+      <div class="section-kicker">Response Rhythm</div>
+      <h3><?= e($notificationFocus['label']) ?></h3>
+      <p class="muted"><?= e($notificationFocus['note']) ?></p>
+    </div>
+    <div class="creator-route-meta">
+      <div class="route-mini-card"><strong><?= $unreadCount ?></strong><span>当前未读</span></div>
+      <div class="route-mini-card"><strong><?= e($selectedType !== '' ? notification_type_label($selectedType) : '全部提醒') ?></strong><span>当前视角</span></div>
+      <div class="route-mini-card"><strong><?= e($notificationFocus['cta']) ?></strong><span>下一步建议</span></div>
+    </div>
+  </section>
+
+  <section class="glass panel-card surface-section interaction-closure-strip">
+    <div class="creator-route-copy">
+      <div class="section-kicker">After Interaction</div>
+      <h3><?= e($interactionClosure['label']) ?></h3>
+      <p class="muted"><?= e($interactionClosure['note']) ?></p>
+    </div>
+    <div class="creator-route-meta">
+      <div class="route-mini-card"><strong><?= e($interactionClosure['next']) ?></strong><span>自然下一步</span></div>
+      <div class="route-mini-card"><strong><?= $todayCount ?></strong><span>24h 内回流</span></div>
+      <div class="route-mini-card"><strong><?= $weekCount ?></strong><span>7 天内互动</span></div>
+    </div>
   </section>
 
   <section class="glass panel-card admin-panel-card surface-section surface-section-tight">
@@ -264,6 +320,7 @@ render_header('PulseNest · 我的提醒', $user, [
             <?php if (!empty($item['comment_content'])): ?>
               <div class="muted" style="margin-top: 8px;">关联评论：<?= e(excerpt($item['comment_content'], 72)) ?></div>
             <?php endif; ?>
+            <div class="notification-followup-note"><?= e(notification_follow_up_hint($item)) ?></div>
           </article>
         <?php endforeach; ?>
       <?php endif; ?>

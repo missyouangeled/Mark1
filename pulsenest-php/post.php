@@ -6,7 +6,7 @@ $postId = (int) ($_GET['id'] ?? 0);
 
 $postStmt = db()->prepare(
     'SELECT p.id, p.user_id, p.board_id, p.title, p.content, p.image_path, p.status, p.view_count, p.created_at, p.updated_at,
-            u.nickname, u.username, u.email, u.avatar_path, u.bio,
+            u.nickname, u.username, u.email, u.avatar_path, u.bio, u.location, u.website_url,
             fb.name AS board_name, fb.slug AS board_slug,
             fc.name AS category_name, fc.slug AS category_slug,
             COALESCE(l.like_count, 0) AS like_count,
@@ -237,6 +237,75 @@ if ($post && $user) {
 $relatedBoardPosts = [];
 $relatedAuthorPosts = [];
 $comments = [];
+$authorProfileSummary = $post ? profile_completion_summary($post) : null;
+$authorAccountAgeDays = $post ? account_age_days($post) : 0;
+$authorPresence = $post ? creator_presence_summary($post, [
+    'post_count' => 1,
+    'latest_post_at' => $post['created_at'] ?? null,
+]) : null;
+$postFeedback = $post ? post_feedback_summary($post) : null;
+$isAuthorViewing = $post && $user && (int) $user['id'] === (int) ($post['user_id'] ?? 0);
+$discussionGuide = null;
+$discussionAftercare = null;
+if ($post) {
+    if (!$user) {
+        $discussionGuide = [
+            'label' => '游客视角',
+            'note' => '先看内容和评论区氛围，觉得值得参与时再登录，不需要被系统强推。',
+            'cta' => '登录后即可接上讨论或点赞。',
+        ];
+    } elseif ($isAuthorViewing) {
+        $discussionGuide = [
+            'label' => ($postFeedback['label'] ?? '作者视角'),
+            'note' => ($post['comment_count'] ?? 0) > 0
+                ? '这篇内容已经开始承接回复，最自然的下一步是先接住评论区，而不是立刻再发一篇。'
+                : '这篇内容已经上线，当前更适合观察读者会从哪里接上讨论，再决定是否补一句引导评论。',
+            'cta' => ($postFeedback['next'] ?? '先观察，再决定要不要继续推进。'),
+        ];
+    } else {
+        $discussionGuide = [
+            'label' => '读者接入点',
+            'note' => ($post['comment_count'] ?? 0) > 0
+                ? '讨论已经开始了，你可以顺着已有回复补充观点，也可以单开一个新的角度。'
+                : '这里还比较安静，留下一条具体回复会比一句“路过支持”更能帮作者接住互动。',
+            'cta' => '优先写下看法、补充或问题，让互动更容易继续。',
+        ];
+    }
+
+    if (!$user) {
+        $discussionAftercare = [
+            'label' => '先看清楚这条内容线再决定是否加入',
+            'note' => '游客不用被系统催着注册；先看作者主页、同版块内容和评论区氛围，觉得值得参与时再登录就够了。',
+            'links' => [
+                ['href' => '/login.php', 'title' => '登录后接讨论', 'desc' => '准备好再进场，不强打断阅读。'],
+                ['href' => '/user.php?id=' . (int) ($post['user_id'] ?? 0), 'title' => '先看作者主页', 'desc' => '顺着作者档案继续判断这条内容线。'],
+            ],
+        ];
+    } elseif ($isAuthorViewing) {
+        $discussionAftercare = [
+            'label' => ($post['comment_count'] ?? 0) > 0 ? '评论区已经开始替你回流' : '这篇内容已经进入公开流转',
+            'note' => ($post['comment_count'] ?? 0) > 0
+                ? '最自然的下一步不是立刻跳去发新帖，而是先接住这里已经长出来的讨论，再看提醒中心有没有新的回流。'
+                : '当前还在等第一波读者落点，先观察半天到一天，再决定是否补一句引导评论会更自然。',
+            'links' => [
+                ['href' => '#discussion', 'title' => '留在评论区', 'desc' => '先把已经长出的互动接稳。'],
+                ['href' => '/notifications.php', 'title' => '回提醒中心', 'desc' => '看看有没有新的点赞、回复或系统回执。'],
+                ['href' => '/account.php', 'title' => '回会员中心', 'desc' => '把最近内容反馈和个人节奏放在一起看。'],
+            ],
+        ];
+    } else {
+        $discussionAftercare = [
+            'label' => '互动接上后，可以顺着这条内容线继续走',
+            'note' => ($post['comment_count'] ?? 0) > 0
+                ? '你已经能看到讨论是怎么展开的；回作者主页或同版块页继续看，会比随机跳转更有连续感。'
+                : '如果你准备留下第一条回复，顺着作者主页或同版块再看一眼，通常会更容易找到合适切口。',
+            'links' => [
+                ['href' => '/user.php?id=' . (int) ($post['user_id'] ?? 0), 'title' => '继续看作者主页', 'desc' => '从作者档案接回更多内容。'],
+                ['href' => '/posts.php?board=' . urlencode((string) ($post['board_slug'] ?? '')), 'title' => '去同版块继续看', 'desc' => '沿着当前讨论语境往下浏览。'],
+            ],
+        ];
+    }
+}
 if ($post) {
     $relatedBoardStmt = db()->prepare(
         'SELECT p.id, p.title, p.created_at,
@@ -488,6 +557,12 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
               <div class="post-cover-wrap"><img class="post-cover-image detail-cover" src="<?= e(image_variant_public_path($post['image_path'], 'detail')) ?>" alt="<?= e($post['title']) ?>" decoding="async" fetchpriority="low"></div>
             <?php endif; ?>
             <div class="article-meta"><span>作者邮箱：<?= e($post['email']) ?></span><span><a class="inline-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">查看同版块更多帖子</a></span></div>
+            <?php if (!empty($post['location']) || !empty($post['website_url'])): ?>
+              <div class="article-meta">
+                <?php if (!empty($post['location'])): ?><span>所在地：<?= e($post['location']) ?></span><?php endif; ?>
+                <?php if (!empty($post['website_url'])): ?><span><a class="inline-link" href="<?= e($post['website_url']) ?>" target="_blank" rel="noopener noreferrer">作者链接：<?= e(profile_link_label($post['website_url'])) ?></a></span><?php endif; ?>
+              </div>
+            <?php endif; ?>
             <?php if (!empty($post['bio'])): ?><div class="article-meta">作者简介：<?= e($post['bio']) ?></div><?php endif; ?>
             <div class="article-body"><?= nl2br(e($post['content'])) ?></div>
             <div class="action-bar action-bar-wrap">
@@ -562,9 +637,19 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </section>
 
-          <section class="glass panel-card comment-panel surface-section">
+          <section id="discussion" class="glass panel-card comment-panel surface-section">
             <div class="section-kicker">Discussion</div>
             <div class="side-head"><h3>评论区与回复区</h3></div>
+            <?php if ($discussionGuide): ?>
+              <div class="discussion-guide-card">
+                <div class="discussion-guide-head">
+                  <strong><?= e($discussionGuide['label']) ?></strong>
+                  <?php if ($postFeedback): ?><span><?= e($postFeedback['label']) ?></span><?php endif; ?>
+                </div>
+                <p><?= e($discussionGuide['note']) ?></p>
+                <div class="discussion-guide-cta"><?= e($discussionGuide['cta']) ?></div>
+              </div>
+            <?php endif; ?>
 
             <?php if ($user): ?>
               <form class="form" method="post">
@@ -590,6 +675,21 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 <?php endforeach; ?>
               <?php endif; ?>
             </div>
+
+            <?php if ($discussionAftercare): ?>
+              <div class="discussion-aftercare-card">
+                <div class="discussion-guide-head">
+                  <strong><?= e($discussionAftercare['label']) ?></strong>
+                  <?php if ($postFeedback): ?><span><?= e($postFeedback['label']) ?></span><?php endif; ?>
+                </div>
+                <p><?= e($discussionAftercare['note']) ?></p>
+                <div class="discussion-aftercare-links">
+                  <?php foreach ($discussionAftercare['links'] as $link): ?>
+                    <a class="quick-link" href="<?= e($link['href']) ?>"><strong><?= e($link['title']) ?></strong><span><?= e($link['desc']) ?></span></a>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            <?php endif; ?>
           </section>
         </div>
 
@@ -610,8 +710,21 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
               <div class="chips" style="margin-top: 12px; gap: 6px;">
                 <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                 <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                <?php if (!empty($post['location'])): ?><span class="chip"><?= e($post['location']) ?></span><?php endif; ?>
+                <?php if (!empty($post['website_url'])): ?><span class="chip"><?= e(profile_link_label($post['website_url'])) ?></span><?php endif; ?>
+                <?php if ($authorProfileSummary): ?><span class="chip">资料<?= e($authorProfileSummary['tone']) ?></span><?php endif; ?>
+                <span class="chip"><?= $authorAccountAgeDays <= 7 ? '新加入作者' : '稳定作者档案' ?></span>
                 <span class="chip"><?= e(human_time($post['created_at'])) ?></span>
               </div>
+              <?php if ($authorProfileSummary): ?>
+                <div class="author-presence-note">公开资料完成度 <?= (int) $authorProfileSummary['percent'] ?>% · <?= !empty($post['website_url']) ? '作者已挂出外部入口' : '当前未挂出外部入口' ?><?= !empty($post['location']) ? ' · 常驻 ' . e($post['location']) : '' ?></div>
+              <?php endif; ?>
+              <?php if ($authorPresence): ?>
+                <div class="author-presence-note subtle-secondary-note">创作者状态：<?= e($authorPresence['label']) ?> · <?= e($authorPresence['meta']) ?></div>
+              <?php endif; ?>
+              <?php if ($postFeedback): ?>
+                <div class="author-presence-note feedback-presence-note">发布反馈：<?= e($postFeedback['label']) ?> · <?= e($postFeedback['next']) ?></div>
+              <?php endif; ?>
             </div>
           </section>
 
@@ -620,7 +733,11 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             <div class="side-head"><h3>相关入口</h3></div>
             <div class="quick-links compact-link-stack">
               <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>"><strong>同版块帖子</strong><span>继续浏览当前版块的相关讨论。</span></a>
-              <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><strong>作者主页</strong><span>查看作者的公开资料与更多内容。</span></a>
+              <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><strong>作者主页</strong><span>查看作者的公开资料、创作者状态与更多内容。</span></a>
+              <a class="quick-link" href="#discussion"><strong>直接去评论区</strong><span>看完内容后直接接上讨论，不用再回头找互动入口。</span></a>
+              <?php if (!empty($post['website_url'])): ?>
+                <a class="quick-link" href="<?= e($post['website_url']) ?>" target="_blank" rel="noopener noreferrer"><strong>作者外部链接</strong><span>继续访问 <?= e($post['nickname']) ?> 挂出的主页或作品入口。</span></a>
+              <?php endif; ?>
               <a class="quick-link" href="/notifications.php"><strong>我的提醒</strong><span>回到通知页处理互动消息。</span></a>
               <?php if (can_manage_post($user, $post)): ?>
                 <a class="quick-link" href="/edit-post.php?id=<?= (int) $post['id'] ?>"><strong>编辑当前帖子</strong><span>继续维护标题、正文与封面。</span></a>
