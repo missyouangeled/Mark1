@@ -106,11 +106,12 @@ render_header('PulseNest · 帖子列表', $user, [
       <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
     <?php endif; ?>
 
-    <section class="glass nebula-hero nebula-hero-split">
+    <section class="glass nebula-hero nebula-hero-split refined-hero refined-hero-post">
       <div class="nebula-copy">
-        <div class="brand-chip">PulseNest · 内容流</div>
-        <h1>按分类、版块与排序浏览社区内容</h1>
-        <p class="page-desc nebula-desc">这里汇总全站公开帖子，支持分类筛选、版块钻取、关键词搜索与多种排序方式。</p>
+        <div class="brand-chip">纳达尔星项目 · 星云初始03 · 内容流</div>
+        <h1>按分类、版块与排序方式，稳定浏览整个社区内容</h1>
+        <p class="page-desc nebula-desc">这里把全站公开帖子收口成更成熟的发现页：先按分类与版块切范围，再用关键词和排序方式切视角，列表读感、筛选动作与右侧导览都统一到同一套节奏里。</p>
+        <div class="hero-editorial-note">发现页不只是“搜到结果”，还要让人愿意继续往下读、继续往下一层点。</div>
         <form class="filter-form" method="get" action="/posts.php">
           <div class="filter-grid two-up">
             <div class="field grow-field">
@@ -151,7 +152,7 @@ render_header('PulseNest · 帖子列表', $user, [
             </div>
           </div>
         </form>
-        <div class="hero-stats compact-hero-stats">
+        <div class="hero-stats compact-hero-stats refined-hero-stats">
           <div class="hero-stat"><div class="label">当前视图</div><div class="num small-num"><?= e($currentBoardLabel) ?></div><div class="note">分类、版块与搜索条件会共同生效。</div></div>
           <div class="hero-stat"><div class="label">结果数</div><div class="num"><?= $postCount ?></div><div class="note">当前条件下可浏览的公开帖子数量。</div></div>
           <div class="hero-stat"><div class="label">活跃作者</div><div class="num"><?= $authorCount ?></div><div class="note">当前结果中实际出现的作者数量。</div></div>
@@ -159,7 +160,7 @@ render_header('PulseNest · 帖子列表', $user, [
         </div>
       </div>
 
-      <aside class="glass side-card nebula-side-panel">
+      <aside class="glass side-card nebula-side-panel ops-side-panel">
         <div class="section-kicker">Forum Map</div>
         <div class="forum-pills">
           <?php foreach ($forum as $category): ?>
@@ -222,7 +223,7 @@ render_header('PulseNest · 帖子列表', $user, [
 
       <aside class="right-col-stack">
         <?php foreach ($forum as $category): ?>
-          <section class="glass section-card">
+          <section class="glass section-card surface-section">
             <div class="section-kicker">Category</div>
             <div class="section-title small-section-title"><?= e($category['name']) ?></div>
             <div class="list-stack compact-link-stack">

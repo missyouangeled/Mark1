@@ -32,11 +32,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-render_header('PulseNest · 找回密码', $user);
+render_header('PulseNest · 找回密码', $user, ['showSearch' => false, 'headerMode' => 'auth']);
 ?>
-  <div class="shell page-shell narrow">
-    <section class="card auth-panel standalone-panel">
-      <div class="kicker">Reset Password</div>
+  <div class="shell auth-wrap nebula-auth-wrap auth-wrap-single">
+    <section class="glass auth-hero nebula-panel auth-hero-compact">
+      <div class="auth-hero-inner">
+        <div>
+          <div class="auth-badge">纳达尔星项目 · 星云初始03 · 密码重置</div>
+          <div class="auth-copy auth-copy-wide">
+            <h1>把账号找回来，然后继续。</h1>
+            <p>找回密码页也按统一 auth 标准收口：先把这一步要做什么、为什么这样做讲清楚，再提供一个足够明确的恢复入口。</p>
+          </div>
+        </div>
+
+        <div class="hero-points">
+          <div class="hero-point"><strong>输入邮箱</strong><span>系统会验证这个邮箱是否已经注册，并为它生成新的本地重置凭据。</span></div>
+          <div class="hero-point"><strong>获取链接</strong><span>当前是原型阶段，不发真实邮件，而是直接给出可访问的重置入口。</span></div>
+          <div class="hero-point"><strong>继续登录</strong><span>完成重置后就能回到登录页，继续从内容流、提醒中心和会员中心接着用。</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass auth-panel nebula-form-panel standalone-panel">
+      <div class="section-kicker">Reset Password</div>
       <h2>忘记密码</h2>
       <p class="desc">输入注册邮箱，系统会生成一个本地可用的重置 token，并写入数据库。原型阶段不发真实邮件，但整个流程可以完整走通。</p>
 
@@ -50,6 +68,8 @@ render_header('PulseNest · 找回密码', $user);
         </div>
         <button class="submit" type="submit">生成重置链接</button>
       </form>
+
+      <div class="bottom-tip">想起密码了？<a class="link" href="/login.php">返回登录</a>。</div>
 
       <?php if ($resetToken): ?>
         <div class="result-box">

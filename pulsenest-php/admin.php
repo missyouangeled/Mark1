@@ -61,6 +61,7 @@ function admin_notification_copy(string $type): string {
         'comment_reply' => '有人回复评论',
         'comment_moderated' => '评论审核结果通知作者（区分已通过 / 已隐藏）',
         'post_moderated' => '帖子审核结果通知作者（发布 / 待审 / 隐藏）',
+        'report_processed' => '举报回执通知举报人（处理中 / 已处理 / 已驳回，并尽量写明联动处置）',
         default => '有人回复帖子',
     };
 }
@@ -425,7 +426,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'resolved_at' => $targetStatus === 'reviewing' ? null : date('Y-m-d H:i:s'),
             'id' => $reportId,
         ]);
-        create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus);
+        $reportNotificationNote = report_content_action_note($contentAction);
+        if ($resolutionNote !== '') {
+            $reportNotificationNote = trim(($reportNotificationNote ? $reportNotificationNote . ' ' : '') . '处理备注：' . mb_substr($resolutionNote, 0, 120));
+        }
+        create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus, $reportNotificationNote);
         log_moderation_action((int) $user['id'], 'report_status_updated', 'report', $reportId, ($report['target_type'] ?? 'content') . ' #' . (int) ($report['target_id'] ?? 0) . ' · ' . report_reason_label($report['reason'] ?? 'other') . ' · ' . report_status_label($report['status'] ?? 'open') . ' → ' . report_status_label($targetStatus) . ($contentAction !== 'none' ? ' · 联动:' . $contentAction : ''));
         flash_set('success', '举报状态已更新为“' . report_status_label($targetStatus) . '”。');
         redirect_to('/admin.php#reports');
@@ -505,7 +510,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'resolved_at' => $targetStatus === 'reviewing' ? null : date('Y-m-d H:i:s'),
                 'id' => (int) $report['id'],
             ]);
-            create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus);
+            $reportNotificationNote = report_content_action_note($contentAction);
+            if ($resolutionNote !== '') {
+                $reportNotificationNote = trim(($reportNotificationNote ? $reportNotificationNote . ' ' : '') . '处理备注：' . mb_substr($resolutionNote, 0, 120));
+            }
+            create_report_resolution_notification((int) ($report['reporter_user_id'] ?? 0), (int) $user['id'], (int) $report['post_id'], !empty($report['comment_id']) ? (int) $report['comment_id'] : null, $targetStatus, $reportNotificationNote);
             log_moderation_action((int) $user['id'], 'report_status_updated', 'report', (int) $report['id'], ($report['target_type'] ?? 'content') . ' #' . (int) ($report['target_id'] ?? 0) . ' · ' . report_reason_label($report['reason'] ?? 'other') . ' · ' . report_status_label($report['status'] ?? 'open') . ' → ' . report_status_label($targetStatus) . ($contentAction !== 'none' ? ' · 联动:' . $contentAction : ''));
         }
 
@@ -1236,24 +1245,29 @@ render_header('PulseNest · 后台管理', $user, [
 ]);
 ?>
 <main class="shell page-shell nebula-page-shell admin-page">
+  <?php render_breadcrumbs([
+      ['label' => '首页', 'href' => '/'],
+      ['label' => '后台中枢'],
+  ]); ?>
+
   <?php if ($flash): ?>
     <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
   <?php endif; ?>
 
-  <section class="glass nebula-hero nebula-hero-split create-post-hero">
+  <section class="glass nebula-hero nebula-hero-split create-post-hero refined-hero refined-hero-admin">
     <div class="nebula-copy">
-      <div class="brand-chip">纳达尔星项目 · 星云初始01 · 后台增强版</div>
-      <h1>运营位、评论审核流和通知概况，现在都能在后台闭环。</h1>
-      <p class="page-desc nebula-desc">这一版把后台继续往真运营场景补：帖子可做置顶 / 精华 / 推荐位 / 首页卡绑定；评论不再只有删除，补成可审核、隐藏、恢复；提醒系统也保留多类型概况，前台再配合做未读和类型筛选。</p>
-      <div class="hero-stats compact-hero-stats admin-hero-stats">
+      <div class="brand-chip">纳达尔星项目 · 星云初始03 · 后台中枢</div>
+      <h1>后台收口成更成熟的运营中枢：先判断，再处理，再留痕。</h1>
+      <p class="page-desc nebula-desc">这一轮不加新功能，只把已有能力做成更像成品的界面秩序：运营位、审核流、举报队列、通知概况与治理记录统一为同一套层级语言，读起来更稳，处理起来也更有节奏。</p>
+      <div class="hero-stats compact-hero-stats admin-hero-stats refined-hero-stats">
         <div class="hero-stat"><div class="label">当前身份</div><div class="num small-num"><?= e(role_label($role)) ?></div><div class="note"><?= $role === 'admin' ? '全量后台权限已解锁' : '当前仅开放内容管理范围' ?></div></div>
         <div class="hero-stat"><div class="label">后台人员</div><div class="num small-num"><?= $staffCount ?></div><div class="note">管理员 + 版主共同维护</div></div>
         <div class="hero-stat"><div class="label">操作日志</div><div class="num small-num"><?= $logTotal ?></div><div class="note">运营动作 / 状态变更都会留痕</div></div>
       </div>
     </div>
-    <aside class="glass side-card nebula-side-panel">
+    <aside class="glass side-card nebula-side-panel ops-side-panel admin-side-rail">
       <div class="section-kicker">Admin Scope</div>
-      <div class="quick-links">
+      <div class="quick-links curated-stack">
         <a class="quick-link" href="#permission-map"><strong>权限边界</strong><span>先看自己能动什么</span></a>
         <a class="quick-link" href="#site-settings"><strong>站点设置</strong><span>注册 / 举报 / 审核规则</span></a>
         <a class="quick-link" href="#posts"><strong>帖子运营</strong><span>置顶 / 精华 / 推荐位 / 首页卡</span></a>
@@ -1268,7 +1282,7 @@ render_header('PulseNest · 后台管理', $user, [
     </aside>
   </section>
 
-  <section class="glass panel-card admin-panel-card">
+  <section class="glass panel-card admin-panel-card surface-section admin-dashboard-section">
     <div class="section-kicker">Operations Dashboard</div>
     <div class="side-head admin-head-row"><h3>运营数据看板</h3><span class="muted">先看新增量、积压量和今日处理量，再决定优先清哪一块。</span></div>
     <div class="hero-stats compact-hero-stats admin-hero-stats">
@@ -1285,8 +1299,8 @@ render_header('PulseNest · 后台管理', $user, [
     </div>
   </section>
 
-  <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
-    <section class="glass panel-card admin-panel-card">
+  <div class="nebula-section-grid admin-grid-two surface-grid-row" style="margin-top:24px;">
+    <section class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">Top Activity</div>
       <div class="side-head admin-head-row"><h3>最近 7 天最活跃版块</h3><span class="muted">按近 7 天发帖量排序，帮助判断社区讨论中心。</span></div>
       <div class="rank-list">
@@ -1297,7 +1311,7 @@ render_header('PulseNest · 后台管理', $user, [
       </div>
     </section>
 
-    <section class="glass panel-card admin-panel-card">
+    <section class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">Top Creators</div>
       <div class="side-head admin-head-row"><h3>最近 7 天最活跃作者</h3><span class="muted">按近 7 天发帖数 + 浏览量排序。</span></div>
       <div class="rank-list">
@@ -1309,8 +1323,8 @@ render_header('PulseNest · 后台管理', $user, [
     </section>
   </div>
 
-  <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
-    <section class="glass panel-card admin-panel-card">
+  <div class="nebula-section-grid admin-grid-two surface-grid-row" style="margin-top:24px;">
+    <section class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">Report Reasons</div>
       <div class="side-head admin-head-row"><h3>举报理由分布</h3><span class="muted">帮助判断当前社区主要风险类型。</span></div>
       <div class="rank-list">
@@ -1321,7 +1335,7 @@ render_header('PulseNest · 后台管理', $user, [
       </div>
     </section>
 
-    <section class="glass panel-card admin-panel-card">
+    <section class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">7 Day Trend</div>
       <div class="side-head admin-head-row"><h3>最近 7 天新增趋势</h3><span class="muted">帖子、评论、举报的每日新增量。</span></div>
       <div class="admin-table-wrap">
@@ -1343,7 +1357,7 @@ render_header('PulseNest · 后台管理', $user, [
     </section>
   </div>
 
-  <section id="permission-map" class="glass panel-card admin-panel-card">
+  <section id="permission-map" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Permission Map</div>
     <div class="side-head admin-head-row">
       <h3>角色权限边界</h3>
@@ -1383,7 +1397,7 @@ render_header('PulseNest · 后台管理', $user, [
     </div>
   </section>
 
-  <section id="site-settings" class="glass panel-card admin-panel-card">
+  <section id="site-settings" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Site Settings</div>
     <div class="side-head admin-head-row"><h3>站点设置中心</h3><span class="muted">把注册、举报、发帖审核、评论审核这些规则从写死代码改成后台可配。</span></div>
     <form class="admin-list-card" method="post">
@@ -1430,7 +1444,7 @@ render_header('PulseNest · 后台管理', $user, [
     </form>
   </section>
 
-  <section id="posts" class="glass panel-card admin-panel-card">
+  <section id="posts" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Posts</div>
     <div class="side-head admin-head-row"><h3>帖子运营工具</h3><span class="muted">支持置顶、精华、推荐分组、显示优先级、推荐位等级、首页运营卡绑定。现在也支持帖子审核队列与批量处理。</span></div>
     <form class="admin-filter-row" method="get" action="/admin.php#posts">
@@ -1658,7 +1672,7 @@ render_header('PulseNest · 后台管理', $user, [
     </form>
   </section>
 
-  <section id="comments" class="glass panel-card admin-panel-card">
+  <section id="comments" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Comments</div>
     <div class="side-head admin-head-row"><h3>评论管理</h3><span class="muted">支持按帖子 / 作者 / 关键词 / 状态筛选，并可批量审核、隐藏、恢复。</span></div>
     <form class="admin-filter-row" method="get">
@@ -1768,7 +1782,7 @@ render_header('PulseNest · 后台管理', $user, [
     ], 'comment_page', $commentPage, $commentTotalPages, '#comments') ?>
   </section>
 
-  <section id="reports" class="glass panel-card admin-panel-card">
+  <section id="reports" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Reports</div>
     <div class="side-head admin-head-row"><h3>举报队列</h3><span class="muted">统一处理帖子 / 评论举报，先标记处理中，再决定已处理或驳回。</span></div>
     <form class="admin-filter-row" method="get" action="/admin.php#reports">
@@ -1916,7 +1930,7 @@ render_header('PulseNest · 后台管理', $user, [
     ], 'report_page', $reportPage, $reportTotalPages, '#reports') ?>
   </section>
 
-  <section id="notifications-overview" class="glass panel-card admin-panel-card">
+  <section id="notifications-overview" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Notifications</div>
     <div class="side-head admin-head-row"><h3>站内通知概况</h3><span class="muted">前台已支持未读筛选、按类型筛选和批量处理，这里保留全站分布看板。</span></div>
     <div class="hero-stats compact-hero-stats admin-hero-stats">
@@ -1947,7 +1961,7 @@ render_header('PulseNest · 后台管理', $user, [
 
   <?php if ($canManageUsers): ?>
     <div class="nebula-section-grid admin-grid-two" style="margin-top:24px;">
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">High Risk Users</div>
         <div class="side-head admin-head-row"><h3>高风险用户榜单</h3><span class="muted">按高风险记录数、开放中记录数排序，帮助 staff 快速定位重点用户。</span></div>
         <div class="rank-list">
@@ -1959,7 +1973,7 @@ render_header('PulseNest · 后台管理', $user, [
       </section>
     </div>
 
-    <section class="glass panel-card admin-panel-card">
+    <section class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">Governance Log</div>
       <div class="side-head admin-head-row"><h3>用户治理记录</h3><span class="muted">封禁记录会自动停用账号；这里保留最近治理动作清单。</span></div>
       <form class="admin-filter-row" method="get" action="/admin.php#users">
@@ -2007,7 +2021,7 @@ render_header('PulseNest · 后台管理', $user, [
       </div>
     </section>
 
-    <section id="users" class="glass panel-card admin-panel-card">
+    <section id="users" class="glass panel-card admin-panel-card surface-section">
       <div class="section-kicker">Users</div>
       <div class="side-head"><h3>用户 / 角色管理</h3></div>
       <div class="notice subtle-notice">只有管理员可以调整用户角色与启停状态；版主进入后台时，这一整块不会显示。</div>
@@ -2084,7 +2098,7 @@ render_header('PulseNest · 后台管理', $user, [
 
   <?php if ($canManageStructure): ?>
     <div class="nebula-section-grid admin-grid-two">
-      <section id="categories" class="glass panel-card admin-panel-card">
+      <section id="categories" class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Categories</div>
         <div class="side-head"><h3>分类管理</h3></div>
         <div class="notice subtle-notice">删除分类时，如果下面还有版块，可直接选择目标分类迁移后再删；同时支持上移 / 下移快速调序。</div>
@@ -2126,7 +2140,7 @@ render_header('PulseNest · 后台管理', $user, [
         </div>
       </section>
 
-      <section id="boards" class="glass panel-card admin-panel-card">
+      <section id="boards" class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Boards</div>
         <div class="side-head"><h3>版块管理</h3></div>
         <div class="notice subtle-notice">删除版块时，可把原帖整体迁移到其他版块；同分类内还支持上移 / 下移调序。</div>
@@ -2182,7 +2196,7 @@ render_header('PulseNest · 后台管理', $user, [
     </div>
   <?php endif; ?>
 
-  <section id="logs" class="glass panel-card admin-panel-card">
+  <section id="logs" class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Logs</div>
     <div class="side-head admin-head-row"><h3>操作日志</h3><span class="muted">支持按动作、目标类型、操作者筛选，并做分页回看。</span></div>
     <form class="admin-filter-row admin-log-filter-row" method="get">

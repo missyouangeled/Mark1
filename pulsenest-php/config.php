@@ -80,6 +80,7 @@ function ensure_database_schema(PDO $pdo): void {
         comment_id INT UNSIGNED DEFAULT NULL,
         type VARCHAR(40) NOT NULL,
         moderation_status VARCHAR(20) DEFAULT NULL,
+        note VARCHAR(255) DEFAULT NULL,
         is_read TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -252,6 +253,9 @@ function ensure_database_schema(PDO $pdo): void {
     }
     if (!column_exists($pdo, 'notifications', 'moderation_status')) {
         $pdo->exec('ALTER TABLE notifications ADD COLUMN moderation_status VARCHAR(20) DEFAULT NULL AFTER type');
+    }
+    if (!column_exists($pdo, 'notifications', 'note')) {
+        $pdo->exec('ALTER TABLE notifications ADD COLUMN note VARCHAR(255) DEFAULT NULL AFTER moderation_status');
     }
     if (!index_exists($pdo, 'notifications', 'idx_notifications_type_created')) {
         $pdo->exec('ALTER TABLE notifications ADD KEY idx_notifications_type_created (type, created_at)');
@@ -1051,7 +1055,7 @@ function create_notification(int $recipientUserId, int $actorUserId, string $typ
         return;
     }
 
-    $stmt = db()->prepare('INSERT INTO notifications (recipient_user_id, actor_user_id, post_id, comment_id, type, moderation_status) VALUES (:recipient_user_id, :actor_user_id, :post_id, :comment_id, :type, :moderation_status)');
+    $stmt = db()->prepare('INSERT INTO notifications (recipient_user_id, actor_user_id, post_id, comment_id, type, moderation_status, note) VALUES (:recipient_user_id, :actor_user_id, :post_id, :comment_id, :type, :moderation_status, :note)');
     $stmt->execute([
         'recipient_user_id' => $recipientUserId,
         'actor_user_id' => $actorUserId,
@@ -1059,6 +1063,7 @@ function create_notification(int $recipientUserId, int $actorUserId, string $typ
         'comment_id' => $commentId,
         'type' => $type,
         'moderation_status' => $meta['moderation_status'] ?? null,
+        'note' => isset($meta['note']) && trim((string) $meta['note']) !== '' ? mb_substr(trim((string) $meta['note']), 0, 255) : null,
     ]);
 }
 
@@ -1121,13 +1126,61 @@ function create_post_moderation_notification(array $post, int $actorUserId, stri
     ]);
 }
 
-function create_report_resolution_notification(int $recipientUserId, int $actorUserId, int $postId, ?int $commentId, string $status): void {
+function create_report_resolution_notification(int $recipientUserId, int $actorUserId, int $postId, ?int $commentId, string $status, ?string $note = null): void {
     if (!in_array($status, ['resolved', 'dismissed', 'reviewing'], true)) {
         return;
     }
     create_notification($recipientUserId, $actorUserId, 'report_processed', $postId, $commentId, [
         'moderation_status' => $status,
+        'note' => $note,
     ]);
+}
+
+function report_content_action_note(string $contentAction): ?string {
+    return match ($contentAction) {
+        'hide_post' => '已联动隐藏被举报帖子。',
+        'restore_post' => '已联动恢复帖子展示。',
+        'hide_comment' => '已联动隐藏被举报评论。',
+        'approve_comment' => '已联动恢复评论展示。',
+        'delete_comment' => '已联动删除被举报评论。',
+        default => null,
+    };
+}
+
+function notification_report_copy(?string $status, ?string $note = null): array {
+    $base = match ($status ?: '') {
+        'resolved' => [
+            'label' => '已处理',
+            'verb' => '已处理',
+            'summary' => '你提交的举报已处理',
+            'description' => '你提交的举报已被处理。',
+        ],
+        'dismissed' => [
+            'label' => '已驳回',
+            'verb' => '已驳回',
+            'summary' => '你提交的举报已驳回',
+            'description' => '你提交的举报已被驳回，当前未触发内容处置。',
+        ],
+        'reviewing' => [
+            'label' => '处理中',
+            'verb' => '处理中',
+            'summary' => '你提交的举报正在处理',
+            'description' => '你提交的举报已进入处理流程，请稍后再看结果。',
+        ],
+        default => [
+            'label' => '状态更新',
+            'verb' => '已更新',
+            'summary' => '你提交的举报状态已更新',
+            'description' => '你提交的举报状态发生变化，请前往查看。',
+        ],
+    };
+
+    $note = trim((string) $note);
+    if ($note !== '') {
+        $base['description'] .= ' ' . $note;
+    }
+
+    return $base;
 }
 
 function notification_type_label(string $type): string {
@@ -1207,7 +1260,7 @@ function notification_message(array $item): string {
         'comment_like' => '点赞了你在 ' . $title . ' 下的评论',
         'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'comment')['summary'] . '：' . $title,
         'post_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'post')['summary'] . '：' . $title,
-        'report_processed' => notification_moderation_copy($item['moderation_status'] ?? null, 'post')['summary'] . '：' . $title,
+        'report_processed' => notification_report_copy($item['moderation_status'] ?? null, $item['note'] ?? null)['summary'] . '：' . $title,
         default => '回复了你的帖子：' . $title,
     };
 }

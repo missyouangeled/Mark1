@@ -185,26 +185,34 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
     'searchText' => '🔎 staff 视角：用户治理档案、被举报记录、最近治理动作',
 ]);
 ?>
-<main class="shell page-shell nebula-page-shell user-page">
+<main class="shell page-shell nebula-page-shell user-page governance-page">
+  <?php if ($profile): ?>
+    <?php render_breadcrumbs([
+        ['label' => '后台', 'href' => '/admin.php#users'],
+        ['label' => '用户治理'],
+        ['label' => $profile['nickname']],
+    ]); ?>
+  <?php endif; ?>
+
   <?php if ($flash): ?>
     <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
   <?php endif; ?>
   <?php if (!$profile): ?>
     <section class="glass panel-card empty-inline nebula-empty">没有找到这个用户治理档案。<a class="link" href="/admin.php#users">返回用户管理</a></section>
   <?php else: ?>
-    <section class="glass nebula-hero nebula-hero-split user-hero">
+    <section class="glass nebula-hero nebula-hero-split user-hero refined-hero refined-hero-governance">
       <div class="nebula-copy">
-        <div class="brand-chip">Staff Only · 用户治理档案</div>
+        <div class="brand-chip">纳达尔星项目 · 星云初始03 · Staff 档案</div>
         <h1><?= e($profile['nickname']) ?> 的治理档案</h1>
-        <p class="page-desc nebula-desc">这里汇总账号状态、风险记录、被举报情况与最近治理上下文，方便 staff 快速做判断。</p>
-        <div class="hero-stats compact-hero-stats">
+        <p class="page-desc nebula-desc">这里把账号状态、风险记录、被举报情况与近期内容轨迹收束为一张更易读的档案页，staff 不需要在多个表之间来回跳，就能先看风险，再读上下文，再决定动作。</p>
+        <div class="hero-stats compact-hero-stats refined-hero-stats">
           <div class="hero-stat"><div class="label">账号状态</div><div class="num small-num"><?= (int) ($profile['is_active'] ?? 1) === 1 ? '启用' : '停用' ?></div><div class="note">角色：<?= e(role_label($profile['role'] ?? 'member')) ?></div></div>
           <div class="hero-stat"><div class="label">治理记录</div><div class="num small-num"><?= (int) ($governanceSummary['total_notes'] ?? 0) ?></div><div class="note">开放中 <?= (int) ($governanceSummary['open_notes'] ?? 0) ?></div></div>
           <div class="hero-stat"><div class="label">高风险</div><div class="num small-num"><?= (int) ($governanceSummary['high_risk_notes'] ?? 0) ?></div><div class="note">累计高风险治理记录</div></div>
           <div class="hero-stat"><div class="label">被举报</div><div class="num small-num"><?= (int) ($reportSummary['total_reports'] ?? 0) ?></div><div class="note">未结 <?= (int) ($reportSummary['open_reports'] ?? 0) ?> · 已处理 <?= (int) ($reportSummary['resolved_reports'] ?? 0) ?></div></div>
         </div>
       </div>
-      <aside class="profile-chip nebula-profile-chip user-profile-chip">
+      <aside class="profile-chip nebula-profile-chip user-profile-chip ops-side-panel governance-profile-panel">
         <?= render_avatar($profile, 'user-avatar large') ?>
         <div>
           <strong><?= e($profile['nickname']) ?></strong>
@@ -229,7 +237,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
     </section>
 
     <div class="nebula-section-grid admin-grid-two">
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Quick Action</div>
         <div class="side-head admin-head-row"><h3>直接追加治理记录</h3><span class="muted">在这个档案页内就能补警告、观察、封禁记录。</span></div>
         <form method="post" class="admin-inline-stack" style="align-items:flex-start; flex-wrap:wrap;">
@@ -252,7 +260,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
         </form>
       </section>
 
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Recent Posts</div>
         <div class="side-head admin-head-row"><h3>最近帖子</h3><span class="muted">直接看用户最近发了什么，配合治理记录判断上下文。</span></div>
         <div class="list-stack">
@@ -270,7 +278,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
     </div>
 
     <div class="nebula-section-grid admin-grid-two">
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Recent Comments</div>
         <div class="side-head admin-head-row"><h3>最近评论</h3><span class="muted">补齐用户最近评论上下文，方便判断问题是否持续发生。</span></div>
         <div class="list-stack">
@@ -288,7 +296,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
     </div>
 
     <div class="nebula-section-grid admin-grid-two">
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Governance Notes</div>
         <div class="side-head admin-head-row"><h3>完整治理记录</h3><span class="muted">这里按时间倒序列出当前用户的所有治理动作，并可直接更新状态。</span></div>
         <div class="admin-table-wrap">
@@ -325,7 +333,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
         </div>
       </section>
 
-      <section class="glass panel-card admin-panel-card">
+      <section class="glass panel-card admin-panel-card surface-section">
         <div class="section-kicker">Reported Content</div>
         <div class="side-head admin-head-row"><h3>最近被举报内容</h3><span class="muted">帖子举报与评论举报统一收口在这里，方便 staff 快速回看。</span></div>
         <div class="admin-table-wrap">
@@ -351,9 +359,9 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
       </section>
     </div>
 
-    <section class="glass panel-card">
+    <section class="glass panel-card surface-section">
       <div class="section-kicker">Quick Jump</div>
-      <div class="quick-links">
+      <div class="quick-links curated-stack">
         <a class="quick-link" href="/admin.php#users">返回用户管理</a>
         <a class="quick-link" href="/user.php?id=<?= (int) $profile['id'] ?>">切回普通用户主页视图</a>
         <a class="quick-link" href="/posts.php">查看全部帖子</a>

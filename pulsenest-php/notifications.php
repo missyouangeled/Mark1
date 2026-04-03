@@ -70,7 +70,7 @@ if ($onlyUnread) {
 }
 
 $stmt = db()->prepare(
-    'SELECT n.id, n.type, n.moderation_status, n.is_read, n.created_at,
+    'SELECT n.id, n.type, n.moderation_status, n.note, n.is_read, n.created_at,
             p.id AS post_id, p.title,
             c.content AS comment_content,
             actor.id AS actor_id, actor.nickname AS actor_nickname, actor.username AS actor_username, actor.avatar_path AS actor_avatar_path
@@ -109,23 +109,28 @@ render_header('PulseNest · 我的提醒', $user, [
 ]);
 ?>
 <main class="shell page-shell nebula-page-shell notifications-page">
+  <?php render_breadcrumbs([
+      ['label' => '首页', 'href' => '/'],
+      ['label' => '提醒中心'],
+  ]); ?>
+
   <?php if ($flash): ?>
     <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
   <?php endif; ?>
 
-  <section class="glass nebula-hero nebula-hero-split">
+  <section class="glass nebula-hero nebula-hero-split refined-hero refined-hero-notifications">
     <div class="nebula-copy">
-      <div class="brand-chip">纳达尔星项目 · 星云初始01 · 站内提醒</div>
-      <h1>提醒流继续细化：未读、类型、批量已读、按类型清空，以及更明确的审核结果，都能自己收拾。</h1>
-      <p class="page-desc nebula-desc">通知系统现在不只会聚合回复 / 帖子点赞 / 评论点赞；评论审核提醒也会明确区分“已通过 / 已隐藏”，再配合未读和类型筛选，用户能更快读懂每一条运营动作。</p>
-      <div class="hero-stats compact-hero-stats">
+      <div class="brand-chip">纳达尔星项目 · 星云初始03 · 站内提醒</div>
+      <h1>提醒中心已经从“消息列表”，收口成更接近成品的个人工作台。</h1>
+      <p class="page-desc nebula-desc">现在这里会把回复、点赞、审核结果与举报回执统一编排成更清晰的节奏：先看未读压力，再看类型分布，最后处理具体提醒，阅读路径更稳定，状态也更好懂。</p>
+      <div class="hero-stats compact-hero-stats refined-hero-stats">
         <div class="hero-stat"><div class="label">未读提醒</div><div class="num"><?= $unreadCount ?></div><div class="note">头部导航同步显示</div></div>
         <div class="hero-stat"><div class="label">当前结果</div><div class="num"><?= $currentResultCount ?></div><div class="note"><?= $onlyUnread ? '当前仅看未读' : '当前为全部状态' ?></div></div>
         <div class="hero-stat"><div class="label">24 小时</div><div class="num"><?= $todayCount ?></div><div class="note">最近一天新增提醒</div></div>
         <div class="hero-stat"><div class="label">7 天</div><div class="num"><?= $weekCount ?></div><div class="note">最近七天互动节奏</div></div>
       </div>
     </div>
-    <aside class="glass side-card nebula-side-panel">
+    <aside class="glass side-card nebula-side-panel ops-side-panel">
       <div class="section-kicker">Quick Action</div>
       <form method="get" class="form compact-form">
         <input type="hidden" name="type" value="<?= e($selectedType) ?>">
@@ -145,7 +150,7 @@ render_header('PulseNest · 我的提醒', $user, [
     </aside>
   </section>
 
-  <section class="glass panel-card admin-panel-card">
+  <section class="glass panel-card admin-panel-card surface-section surface-section-tight">
     <div class="section-kicker">Filter</div>
     <div class="side-head admin-head-row"><h3>提醒筛选与批量操作</h3><span class="muted">先筛，再一键处理当前类型。</span></div>
     <form class="admin-filter-row" method="get" action="/notifications.php">
@@ -177,7 +182,7 @@ render_header('PulseNest · 我的提醒', $user, [
     </div>
   </section>
 
-  <section class="glass panel-card admin-panel-card">
+  <section class="glass panel-card admin-panel-card surface-section">
     <div class="section-kicker">Type Snapshot</div>
     <div class="side-head admin-head-row"><h3>提醒类型分布</h3><span class="muted">你能快速看出最近更多是被回复，还是被点赞。</span></div>
     <div class="admin-table-wrap">
@@ -195,7 +200,7 @@ render_header('PulseNest · 我的提醒', $user, [
                 'comment_reply' => '有人回复你的评论',
                 'comment_moderated' => '你的评论被审核后，会明确告诉你当前是已通过还是已隐藏',
                 'post_moderated' => '你的帖子被审核后，会明确告诉你当前是已发布、待审核还是已隐藏',
-                'report_processed' => '你提交的举报进入处理中、已处理或已驳回时，会收到明确回执',
+                'report_processed' => '你提交的举报进入处理中、已处理或已驳回时，会收到明确回执，并尽量附带联动处置说明',
                 default => '有人回复你的帖子',
               }) ?></td>
             </tr>
@@ -208,10 +213,10 @@ render_header('PulseNest · 我的提醒', $user, [
     </div>
   </section>
 
-  <section class="glass panel-card">
+  <section class="glass panel-card surface-section notification-feed-section">
     <div class="section-kicker">Notification Feed</div>
     <div class="side-head admin-head-row"><h3>提醒列表</h3><span class="muted">评论审核通知会直接标出“已通过 / 已隐藏”，不再只给一个模糊的状态更新。</span></div>
-    <div class="list-stack notification-stack">
+    <div class="list-stack notification-stack curated-stack">
       <?php if (!$notifications): ?>
         <div class="empty-inline nebula-empty">当前筛选条件下没有提醒。换个类型，或者等下一次互动把这里点亮。</div>
       <?php else: ?>
@@ -219,7 +224,7 @@ render_header('PulseNest · 我的提醒', $user, [
           <?php $moderationCopy = match ($item['type'] ?? '') {
             'comment_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'comment'),
             'post_moderated' => notification_moderation_copy($item['moderation_status'] ?? null, 'post'),
-            'report_processed' => notification_moderation_copy($item['moderation_status'] ?? null, 'post'),
+            'report_processed' => notification_report_copy($item['moderation_status'] ?? null, $item['note'] ?? null),
             default => null,
           }; ?>
           <article class="notification-card <?= (int) $item['is_read'] === 0 ? 'unread' : '' ?>">
@@ -251,7 +256,7 @@ render_header('PulseNest · 我的提醒', $user, [
             </div>
             <?php if ($moderationCopy): ?>
               <div class="chips" style="margin-top: 10px; gap: 6px;">
-                <span class="chip">审核结果 · <?= e($moderationCopy['label']) ?></span>
+                <span class="chip"><?= e(($item['type'] ?? '') === 'report_processed' ? '处理结果' : '审核结果') ?> · <?= e($moderationCopy['label']) ?></span>
                 <?php if (!empty($item['comment_content'])): ?><span class="chip">评论已留痕</span><?php endif; ?>
               </div>
               <div class="muted" style="margin-top: 8px;"><?= e($moderationCopy['description']) ?></div>

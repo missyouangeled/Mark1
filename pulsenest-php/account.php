@@ -87,18 +87,19 @@ render_header('PulseNest · 会员中心', $user, [
     <?php endif; ?>
     <?php if ($profileError): ?><div class="notice error floating-notice"><?= e($profileError) ?></div><?php endif; ?>
 
-    <section class="glass nebula-hero nebula-hero-split member-hero nebula-member-hero">
+    <section class="glass nebula-hero nebula-hero-split member-hero nebula-member-hero refined-hero refined-hero-profile">
       <div class="nebula-copy">
-        <div class="brand-chip">PulseNest · 会员中心</div>
+        <div class="brand-chip">纳达尔星项目 · 星云初始03 · 会员中心</div>
         <h1>欢迎回来，<?= e($user['nickname']) ?></h1>
-        <p class="page-desc nebula-desc">在这里维护资料、查看个人数据，并快速回到你的主页与最近发布的内容。</p>
+        <p class="page-desc nebula-desc">会员中心现在不只是资料页，而是更接近成品的个人工作台：资料维护、个人数据、最近内容与权限边界被整理进同一套阅读顺序里，回来之后能更快知道自己接下来该做什么。</p>
+        <div class="hero-editorial-note">个人面板该像控制台，而不是一堆松散入口的堆叠。</div>
         <div class="hero-actions-row">
           <a class="pill-btn solid" href="/create-post.php">写一篇新帖子</a>
           <a class="pill-btn" href="<?= e(profile_url($user)) ?>">查看我的主页</a>
         </div>
       </div>
 
-      <aside class="profile-chip nebula-profile-chip">
+      <aside class="profile-chip nebula-profile-chip ops-side-panel">
         <?= render_avatar($user, 'user-avatar large') ?>
         <div>
           <strong><?= e($user['nickname']) ?></strong>
@@ -120,7 +121,7 @@ render_header('PulseNest · 会员中心', $user, [
 
     <div class="nebula-section-grid account-grid">
       <div class="right-col-stack">
-        <section class="glass panel-card">
+        <section class="glass panel-card surface-section">
           <div class="section-kicker">Profile Studio</div>
           <div class="side-head"><h3>资料与头像</h3></div>
           <form class="form" method="post" enctype="multipart/form-data">
@@ -141,9 +142,9 @@ render_header('PulseNest · 会员中心', $user, [
           </form>
         </section>
 
-        <section class="glass panel-card">
+        <section class="glass panel-card surface-section">
           <div class="section-kicker">My Recent Posts</div>
-          <div class="side-head"><h3>我最近发布的内容</h3></div>
+          <div class="side-head"><h3>最近发布与当前状态</h3></div>
           <?php if (!$latestPosts): ?>
             <div class="empty-inline nebula-empty">你还没有发帖，先去写第一篇吧。</div>
           <?php else: ?>
@@ -160,9 +161,9 @@ render_header('PulseNest · 会员中心', $user, [
       </div>
 
       <aside class="right-col-stack">
-        <section class="glass panel-card">
+        <section class="glass panel-card surface-section">
           <div class="section-kicker">Member Data</div>
-          <div class="side-head"><h3>当前用户信息</h3></div>
+          <div class="side-head"><h3>当前账号信息</h3></div>
           <div class="detail-list">
             <div class="detail-row"><span>昵称</span><strong><?= e($user['nickname']) ?></strong></div>
             <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
@@ -177,9 +178,9 @@ render_header('PulseNest · 会员中心', $user, [
           </div>
         </section>
 
-        <section class="glass panel-card">
+        <section class="glass panel-card surface-section">
           <div class="section-kicker">Role Boundary</div>
-          <div class="side-head"><h3>权限边界说明</h3></div>
+          <div class="side-head"><h3>当前权限边界</h3></div>
           <div class="detail-list">
             <div class="detail-row"><span>普通用户</span><strong>发帖 / 评论 / 资料维护</strong></div>
             <div class="detail-row"><span>版主</span><strong>额外获得删帖删评与日志查看</strong></div>
@@ -194,9 +195,10 @@ render_header('PulseNest · 会员中心', $user, [
           </div>
         </section>
 
-        <section class="glass panel-card">
+        <section class="glass panel-card surface-section">
           <div class="section-kicker">Quick Actions</div>
-          <div class="quick-links">
+          <div class="side-head"><h3>继续操作</h3></div>
+          <div class="quick-links curated-stack">
             <a class="quick-link" href="/create-post.php"><strong>写一篇新帖子</strong><span>进入发布页，继续补充你的公开内容。</span></a>
             <a class="quick-link" href="/notifications.php"><strong>查看我的提醒</strong><span>查看点赞、回复和系统通知。</span></a>
             <a class="quick-link" href="/posts.php"><strong>查看全部帖子</strong><span>回到内容流继续浏览社区动态。</span></a>

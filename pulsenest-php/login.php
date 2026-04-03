@@ -39,17 +39,17 @@ render_header('PulseNest · 登录', null, ['showSearch' => false, 'headerMode' 
     <section class="glass auth-hero nebula-panel">
       <div class="auth-hero-inner">
         <div>
-          <div class="auth-badge">社区身份同步 · 登录后继续逛论坛与内容流</div>
+          <div class="auth-badge">纳达尔星项目 · 星云初始03 · 登录入口</div>
           <div class="auth-copy auth-copy-wide">
             <h1>回来就好，继续从你上次停下的地方开始。</h1>
-            <p>登录页不再像后台入口，而是延续“星云初始01”的玻璃层次、暗色宇宙底和论坛感信息组织。你登录之后，首页右上角、主行动按钮和会员中心都会直接进入真实状态。</p>
+            <p>登录页现在也按整站统一标准收口：标题层级、说明文字、表单节奏和左侧导览信息都更像正式产品，不再只是一个能提交账号密码的原型页。</p>
           </div>
         </div>
 
         <div class="hero-points">
-          <div class="hero-point"><strong>同步</strong><span>刷新当前用户资料，避免旧 session 卡住昵称和邮箱。</span></div>
-          <div class="hero-point"><strong>参与</strong><span>登录后可发帖、进入会员中心，并继续完整测试功能链路。</span></div>
-          <div class="hero-point"><strong>延续</strong><span>视觉贴近已确认首页，不用再在功能页和首页之间来回跳戏。</span></div>
+          <div class="hero-point"><strong>同步身份</strong><span>登录后会立即恢复你的个人状态、提醒入口和内容权限，不再需要额外跳转确认。</span></div>
+          <div class="hero-point"><strong>继续参与</strong><span>回到内容流、帖子详情和会员中心时，所有主操作都会直接进入可用状态。</span></div>
+          <div class="hero-point"><strong>保持一致</strong><span>这一页和首页、提醒中心、会员中心共用同一套成品化语言，不再有“入口页掉档”的感觉。</span></div>
         </div>
       </div>
     </section>
@@ -57,7 +57,7 @@ render_header('PulseNest · 登录', null, ['showSearch' => false, 'headerMode' 
     <section class="glass auth-panel nebula-form-panel">
       <div class="section-kicker">Sign In</div>
       <h2>登录你的 PulseNest 账号</h2>
-      <p class="desc">支持邮箱或用户名登录，密码使用 PHP 原生哈希校验，登录成功后回首页并立即看到登录态变化。</p>
+      <p class="desc">支持邮箱或用户名登录。登录成功后会立即回到首页，并同步你在内容流、提醒中心与会员中心的身份状态。</p>
 
       <div class="tabs-auth">
         <a class="tab active" href="/login.php">登录</a>
@@ -76,7 +76,7 @@ render_header('PulseNest · 登录', null, ['showSearch' => false, 'headerMode' 
           <label>密码</label>
           <input class="input" type="password" name="password" placeholder="输入密码" />
         </div>
-        <div class="row compact-row">
+        <div class="row compact-row auth-utility-row">
           <div class="checkbox"><span class="box"></span><span>记住当前设备（原型展示）</span></div>
           <a class="link" href="/forgot-password.php">忘记密码？</a>
         </div>

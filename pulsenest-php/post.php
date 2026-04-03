@@ -444,12 +444,13 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
     <?php if (!$post): ?>
       <section class="glass panel-card empty-inline nebula-empty">没有找到这篇帖子。<a class="link" href="/posts.php">返回帖子列表</a></section>
     <?php else: ?>
-      <section class="glass nebula-hero detail-hero">
+      <section class="glass nebula-hero detail-hero refined-hero refined-hero-post">
         <div class="detail-hero-head">
           <div>
-            <div class="brand-chip">PulseNest · 帖子详情</div>
+            <div class="brand-chip">纳达尔星项目 · 星云初始03 · 帖子详情</div>
             <h1><?= e($post['title']) ?></h1>
             <p class="page-desc nebula-desc">查看正文、参与讨论，并在同一页完成点赞、回复与内容管理。</p>
+            <div class="hero-editorial-note">把一篇内容真正变成作品，不只是把正文贴出来，还要让上下文、作者与讨论都站得住。</div>
             <?php if (($post['status'] ?? 'published') !== 'published'): ?>
               <div class="chips" style="margin-top:12px; gap:6px;">
                 <span class="chip">当前状态：<?= e(post_status_label($post['status'])) ?></span>
@@ -528,9 +529,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </article>
 
-          <section class="glass panel-card">
+          <section class="glass panel-card surface-section">
             <div class="section-kicker">Continue Reading</div>
-            <div class="side-head"><h3>继续浏览相关内容</h3></div>
+            <div class="side-head"><h3>继续沿着这条内容线往下看</h3></div>
             <div class="nebula-section-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px;">
               <div class="glass panel-card inner-card">
                 <div class="section-kicker">Same Board</div>
@@ -561,9 +562,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </section>
 
-          <section class="glass panel-card comment-panel">
+          <section class="glass panel-card comment-panel surface-section">
             <div class="section-kicker">Discussion</div>
-            <div class="side-head"><h3>评论区 / 回复区</h3></div>
+            <div class="side-head"><h3>评论区与回复区</h3></div>
 
             <?php if ($user): ?>
               <form class="form" method="post">
@@ -593,8 +594,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
         </div>
 
         <aside class="right-col-stack">
-          <section class="glass section-card">
+          <section class="glass section-card surface-section post-side-card">
             <div class="section-kicker">Author Snapshot</div>
+            <div class="side-head"><h3>作者名片</h3></div>
             <div class="author-item detail-author-card">
               <div class="author-row">
                 <div class="author-badge">🌌</div>
@@ -613,8 +615,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </section>
 
-          <section class="glass section-card">
+          <section class="glass section-card surface-section post-side-card">
             <div class="section-kicker">Quick Jump</div>
+            <div class="side-head"><h3>相关入口</h3></div>
             <div class="quick-links compact-link-stack">
               <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>"><strong>同版块帖子</strong><span>继续浏览当前版块的相关讨论。</span></a>
               <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><strong>作者主页</strong><span>查看作者的公开资料与更多内容。</span></a>

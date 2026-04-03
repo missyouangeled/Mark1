@@ -196,12 +196,13 @@ render_header('PulseNest', $user, [
               <h1><?= e($heroDisplayTitle) ?></h1>
               <p class="hero-text"><?= e($heroDisplayBody) ?></p>
              <?php if ($heroPost): ?>
-              <div class="chips" style="margin-top: 14px; gap: 6px;">
+              <div class="chips hero-status-chips" style="margin-top: 14px; gap: 6px;">
                 <span class="chip">Hero 已绑定</span>
                 <span class="chip">标题<?= $heroUsesCustomTitle ? '已覆盖' : '跟随帖子' ?></span>
                 <span class="chip">副文案<?= $heroUsesCustomBody ? '已覆盖' : '跟随摘要' ?></span>
               </div>
              <?php endif; ?>
+             <div class="hero-editorial-note">把社区里最值得被看见的内容，稳定地摆在第一眼。</div>
             </div>
             <div class="hero-actions-row">
               <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '发布内容' : '加入社区' ?></a>
@@ -229,8 +230,8 @@ render_header('PulseNest', $user, [
               <div class="kicker"><?= e($homeSlotDefs['hero']['label']) ?></div>
               <div class="title"><?= e($heroPost['title'] ?? 'Starfall Zero') ?></div>
               <div class="text"><?= e($heroPost ? excerpt($heroPost['content'], 56) : '沉浸式星际探索 + 高强度战斗循环') ?></div>
-              <?php if ($heroPost): ?><div class="muted" style="margin-top:10px;">当前 Hero 文案<?= $heroUsesCustomTitle || $heroUsesCustomBody ? '做了轻量覆盖' : '跟随当前绑定帖子' ?>。</div><?php endif; ?>
-              <div class="chips">
+              <?php if ($heroPost): ?><div class="muted hero-art-note" style="margin-top:10px;">当前 Hero 文案<?= $heroUsesCustomTitle || $heroUsesCustomBody ? '做了轻量覆盖' : '跟随当前绑定帖子' ?>。</div><?php endif; ?>
+              <div class="chips hero-art-chips">
                 <?php if ($heroPost): ?>
                   <span class="chip"><?= e(board_badge($heroPost)) ?></span>
                   <span class="chip"><?= (int) $heroPost['like_count'] ?> 赞</span>
@@ -242,16 +243,18 @@ render_header('PulseNest', $user, [
                   <span class="chip"><?= e($homeCopy['home.hero.tag_secondary']) ?></span>
                 <?php endif; ?>
               </div>
-              <?php if ($heroPost): ?><div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">进入 Hero 帖子</a></div><?php endif; ?>
+              <?php if ($heroPost): ?>
+                <div class="hero-art-link-row" style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">进入 Hero 帖子</a></div>
+              <?php endif; ?>
             </div>
           </div>
         </div>
       </div>
 
       <div class="right-stack">
-        <section class="glass section-card">
+        <section class="glass section-card home-side-card home-forum-map-card">
           <div class="section-kicker">Forum Categories</div>
-          <div class="section-title">可直接下钻版块</div>
+          <div class="section-title">从这里进入社区地图</div>
           <div class="category-stack">
             <?php foreach ($forum as $category): ?>
               <div class="category-card">
@@ -271,8 +274,9 @@ render_header('PulseNest', $user, [
           </div>
         </section>
 
-        <section class="glass section-card pulse-feed-card">
+        <section class="glass section-card pulse-feed-card home-side-card">
           <div class="section-kicker">Pulse Feed</div>
+          <div class="section-title">刚刚发生了什么</div>
           <div class="feed-list">
             <?php if (!$feedPosts): ?>
               <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">刚刚</div><div class="text">社区还在等待第一批真正把讨论点亮的内容。</div></div></div>
@@ -288,9 +292,9 @@ render_header('PulseNest', $user, [
 
     <section class="row-mid">
       <div class="row-mid-main-stack">
-        <section class="glass section-card">
+        <section class="glass section-card home-feature-block">
           <div class="section-kicker">Focus Slots</div>
-          <div class="section-title">首页焦点内容位</div>
+          <div class="section-title">今天最值得先看的内容</div>
           <div class="focus-grid">
             <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点内容位 1', '适合承接当前最值得优先展示的重点帖子。'); ?>
             <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点内容位 2', '适合放活动帖、征集帖或版本说明帖。'); ?>
@@ -299,9 +303,9 @@ render_header('PulseNest', $user, [
         </section>
 
         <?php if ($showTimeHotlist): ?>
-        <section class="glass section-card tag-cloud-card">
+        <section class="glass section-card tag-cloud-card home-feature-block">
           <div class="section-kicker">Time Range Hotlist</div>
-          <div class="section-title">按时间窗口看热榜</div>
+          <div class="section-title">热度，不只看一瞬间</div>
           <div class="tag-cloud">
             <span class="tag-cloud-item a">#24小时热榜</span>
             <span class="tag-cloud-item b">#7天热榜</span>
@@ -335,9 +339,9 @@ render_header('PulseNest', $user, [
       </div>
 
       <div class="row-mid-side-stack">
-        <section class="glass section-card">
+        <section class="glass section-card home-side-card">
           <div class="section-kicker">Recommendation Pools</div>
-          <div class="section-title">推荐位分组</div>
+          <div class="section-title">运营推荐分层</div>
           <div class="rank-list">
             <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
               <?php $leadPost = $recommendedPools[$groupKey][0] ?? null; ?>
@@ -346,9 +350,9 @@ render_header('PulseNest', $user, [
           </div>
         </section>
 
-        <section class="glass section-card">
+        <section class="glass section-card home-side-card">
           <div class="section-kicker">Active Boards</div>
-          <div class="section-title">近 7 天活跃版块</div>
+          <div class="section-title">近 7 天最活跃讨论区</div>
           <div class="rank-list">
             <?php foreach ($activeBoardsHome as $index => $board): ?>
               <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/posts.php?board=<?= e($board['slug']) ?>"><?= e($board['name']) ?></a></div><div class="meta"><?= e($board['category_name']) ?> · 近 7 天浏览 <?= (int) ($board['total_views'] ?? 0) ?></div></div><div class="score"><?= (int) ($board['post_count'] ?? 0) ?>帖</div></div></div>
@@ -359,9 +363,9 @@ render_header('PulseNest', $user, [
           </div>
         </section>
 
-        <section class="glass section-card">
+        <section class="glass section-card home-side-card home-snapshot-card">
           <div class="section-kicker">Community Snapshot</div>
-          <div class="section-title">社区快照</div>
+          <div class="section-title">当前社区状态</div>
           <div class="hero-stats compact-hero-stats admin-hero-stats" style="margin-top:16px;">
             <div class="hero-stat"><div class="label">公开帖子</div><div class="num small-num"><?= $postCount ?></div><div class="note">当前首页读取的公开内容总量</div></div>
             <div class="hero-stat"><div class="label">社区成员</div><div class="num small-num"><?= $userCount ?></div><div class="note">已注册成员数</div></div>
@@ -376,7 +380,7 @@ render_header('PulseNest', $user, [
     </section>
 
     <section class="row-bottom">
-      <section>
+      <section class="home-trending-zone">
         <div class="section-kicker">Trending Now</div>
         <div class="section-large-head">最近讨论度更高的公开内容</div>
         <div class="section-large-desc">这里会优先展示当前更值得继续浏览的帖子，并把版块、热度和运营权重一起带出来。</div>
@@ -413,9 +417,9 @@ render_header('PulseNest', $user, [
 
       <div class="right-col-stack">
         <?php if ($showRecommendedAuthors): ?>
-        <section class="glass section-card authors-card-shell">
+        <section class="glass section-card authors-card-shell home-side-card home-people-card">
           <div class="section-kicker">Recommended Authors</div>
-          <div class="section-title">成员速览</div>
+          <div class="section-title">值得继续关注的创作者</div>
           <div class="author-list">
             <?php if (!$topAuthors): ?>
               <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批成员</div><div class="meta">等真实创作者数据出现后，这里会自动更新。</div></div><div class="score">NEW</div></div><p>当前还没有足够内容形成推荐作者列表。</p></div>
@@ -439,9 +443,9 @@ render_header('PulseNest', $user, [
         <?php endif; ?>
 
         <?php if ($showTopViewed): ?>
-        <section class="glass section-card top-rated-card-shell">
+        <section class="glass section-card top-rated-card-shell home-side-card home-top-viewed-card">
           <div class="section-kicker">Top Rated</div>
-          <div class="section-title">最高浏览帖子</div>
+          <div class="section-title">被最多人点开的内容</div>
           <div class="rank-list">
             <?php if (!$topPostsByViews): ?>
               <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">等待首批帖子</div><div class="meta">等真实浏览量把这里点亮</div></div><div class="score">NEW</div></div></div>
