@@ -1,0 +1,15 @@
+[Unit]
+Description=PulseNest PHP preview server
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=__WORKSPACE__
+ExecStart=__WORKSPACE__/scripts/pulsenest-preview.sh
+Restart=always
+RestartSec=2
+StandardOutput=append:__WORKSPACE__/.run/pulsenest-preview.log
+StandardError=append:__WORKSPACE__/.run/pulsenest-preview.log
+
+[Install]
+WantedBy=default.target

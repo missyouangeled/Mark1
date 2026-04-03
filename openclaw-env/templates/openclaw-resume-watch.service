@@ -1,0 +1,9 @@
+[Unit]
+Description=Recover OpenClaw gateway after suspend/resume gaps
+
+[Service]
+Type=oneshot
+WorkingDirectory=__WORKSPACE__
+ExecStart=__WORKSPACE__/scripts/openclaw-resume-watch.sh
+Environment=HOME=__HOME__
+Environment=PATH=__HOME__/.local/bin:__HOME__/.npm-global/bin:__HOME__/bin:__HOME__/.volta/bin:__HOME__/.asdf/shims:__HOME__/.bun/bin:__HOME__/.nvm/current/bin:__HOME__/.fnm/current/bin:__HOME__/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin

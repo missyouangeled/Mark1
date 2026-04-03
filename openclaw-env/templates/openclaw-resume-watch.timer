@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch for sleep/resume gaps and recover OpenClaw
+
+[Timer]
+Unit=openclaw-resume-watch.service
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
