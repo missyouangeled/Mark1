@@ -2,3 +2,7 @@
 proto-tide/node_modules/
 proto-tide/.next/
 pulsenest-php/uploads/
+skills/**/.git/
+skills/**/node_modules/
+skills/**/memory/
+skills/**/.DS_Store

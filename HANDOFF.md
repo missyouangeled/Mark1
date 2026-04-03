@@ -42,6 +42,7 @@
    - `PROJECT_VERSIONS.md`
    - `HANDOFF.md`
    - 项目代码目录 `pulsenest-php/`
+4. 再应用 `openclaw-env/restore-skills.sh`，按清单恢复 Skills 本体，而不是依赖旧机器本地残留目录
 
 ### 这个“全量工作备份”当前不包含什么
 

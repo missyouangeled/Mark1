@@ -39,13 +39,19 @@ cd ~/.openclaw/workspace
 bash openclaw-env/restore-openclaw-env.sh
 ```
 
-### 3. 检查依赖与路径
+### 3. 恢复 Skills
+
+```bash
+bash openclaw-env/restore-skills.sh
+```
+
+### 4. 检查依赖与路径
 
 ```bash
 bash openclaw-env/post-restore-check.sh
 ```
 
-### 4. 合并 OpenClaw 配置样板
+### 5. 合并 OpenClaw 配置样板
 
 参考：
 
@@ -62,7 +68,7 @@ bash openclaw-env/post-restore-check.sh
 - identity
 - private auth fields
 
-### 5. 恢复 hooks / 服务
+### 6. 恢复 hooks / 服务
 
 ```bash
 systemctl --user daemon-reload
@@ -71,7 +77,7 @@ systemctl --user enable --now openclaw-resume-watch.timer
 openclaw hooks enable self-improvement
 ```
 
-### 6. 验证
+### 7. 验证
 
 ```bash
 systemctl --user status pulsenest-preview.service
@@ -92,7 +98,7 @@ openclaw gateway status
 - `memory/*.md` 和 `.learnings/*.md` 在仓库中可见
 - `pulsenest-preview.service` 已可启动
 - `openclaw-resume-watch.timer` 已可启动
-- `skills/self-improving-agent`、`skills/skill-vetter`、`skills/evolver` 已在仓库内
+- `restore-skills.sh` 可以按清单恢复：`self-improving-agent`、`skill-vetter`、`evolver`、`creaa-ai`
 
 ## 仍然需要手动处理的内容
 
