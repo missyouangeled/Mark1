@@ -97,15 +97,20 @@ render_header('PulseNest · 帖子列表', $user, [
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell posts-page">
+    <?php render_breadcrumbs([
+      ['label' => '首页', 'href' => '/'],
+      ['label' => '发现', 'href' => '/posts.php'],
+      ['label' => $currentBoardLabel],
+    ]); ?>
     <?php if ($flash): ?>
       <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
     <?php endif; ?>
 
     <section class="glass nebula-hero nebula-hero-split">
       <div class="nebula-copy">
-        <div class="brand-chip">纳达尔星项目 · 星云初始01 · 内容流列表页</div>
-        <h1>按分类 / 版块浏览，也能直接搜标题和正文，把内容流做成真正的论坛面。</h1>
-        <p class="page-desc nebula-desc">现在列表页已经不只是倒序发帖流：支持按论坛分类、版块筛选，也支持标题 / 正文关键词搜索。</p>
+        <div class="brand-chip">PulseNest · 内容流</div>
+        <h1>按分类、版块与排序浏览社区内容</h1>
+        <p class="page-desc nebula-desc">这里汇总全站公开帖子，支持分类筛选、版块钻取、关键词搜索与多种排序方式。</p>
         <form class="filter-form" method="get" action="/posts.php">
           <div class="filter-grid two-up">
             <div class="field grow-field">
@@ -147,10 +152,10 @@ render_header('PulseNest · 帖子列表', $user, [
           </div>
         </form>
         <div class="hero-stats compact-hero-stats">
-          <div class="hero-stat"><div class="label">当前视图</div><div class="num small-num"><?= e($currentBoardLabel) ?></div><div class="note">支持分类或版块钻取</div></div>
-          <div class="hero-stat"><div class="label">结果数</div><div class="num"><?= $postCount ?></div><div class="note">符合当前筛选 / 搜索条件</div></div>
-          <div class="hero-stat"><div class="label">活跃作者</div><div class="num"><?= $authorCount ?></div><div class="note">当前结果里出现的成员</div></div>
-          <div class="hero-stat"><div class="label">排序方式</div><div class="num small-num"><?= e(post_sort_options()[$sort]['label']) ?></div><div class="note">可切到热度、回复数、浏览量</div></div>
+          <div class="hero-stat"><div class="label">当前视图</div><div class="num small-num"><?= e($currentBoardLabel) ?></div><div class="note">分类、版块与搜索条件会共同生效。</div></div>
+          <div class="hero-stat"><div class="label">结果数</div><div class="num"><?= $postCount ?></div><div class="note">当前条件下可浏览的公开帖子数量。</div></div>
+          <div class="hero-stat"><div class="label">活跃作者</div><div class="num"><?= $authorCount ?></div><div class="note">当前结果中实际出现的作者数量。</div></div>
+          <div class="hero-stat"><div class="label">排序方式</div><div class="num small-num"><?= e(post_sort_options()[$sort]['label']) ?></div><div class="note">可切换到热度、回复数或浏览量视角。</div></div>
         </div>
       </div>
 
@@ -177,7 +182,7 @@ render_header('PulseNest · 帖子列表', $user, [
           <?php foreach ($posts as $index => $post): ?>
             <article class="glass panel-card list-card nebula-list-card">
               <div class="list-card-topline">
-                <span class="small-chip a">#<?= $index + 1 ?> 内容位</span>
+                <span class="small-chip a">内容卡 #<?= $index + 1 ?></span>
                 <span class="small-chip b"><?= e(human_time($post['created_at'])) ?></span>
               </div>
               <div class="post-head">
@@ -188,7 +193,7 @@ render_header('PulseNest · 帖子列表', $user, [
                     <div class="muted" style="margin-top: 4px; font-size: 14px;"><?= e(board_badge($post)) ?> · 发布于 <?= e(substr($post['created_at'], 0, 16)) ?></div>
                   </div>
                 </div>
-                <a class="pill-btn" href="/post.php?id=<?= (int) $post['id'] ?>">查看详情</a>
+                <a class="pill-btn" href="/post.php?id=<?= (int) $post['id'] ?>">阅读全文</a>
               </div>
               <?php if (!empty($post['image_path'])): ?>
                 <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
@@ -207,7 +212,7 @@ render_header('PulseNest · 帖子列表', $user, [
                   <span class="chip"><?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
                   <span class="chip"><?= e(board_badge($post)) ?></span>
                 </div>
-                <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">继续阅读 →</a>
+                <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">阅读全文 →</a>
               </div>
             </article>
           <?php endforeach; ?>
@@ -224,7 +229,7 @@ render_header('PulseNest · 帖子列表', $user, [
               <?php foreach ($category['boards'] as $board): ?>
                 <a class="quick-link" href="/posts.php?board=<?= e($board['slug']) ?>">
                   <strong><?= e($board['name']) ?></strong>
-                  <span><?= e($board['description']) ?> · <?= (int) $board['post_count'] ?> 帖</span>
+                  <span><?= e($board['description']) ?> · 当前已有 <?= (int) $board['post_count'] ?> 篇公开帖子。</span>
                 </a>
               <?php endforeach; ?>
             </div>

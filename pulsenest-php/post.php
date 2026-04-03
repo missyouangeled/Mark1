@@ -234,8 +234,52 @@ if ($post && $user) {
     $likedByCurrentUser = (bool) $likedStmt->fetchColumn();
 }
 
+$relatedBoardPosts = [];
+$relatedAuthorPosts = [];
 $comments = [];
 if ($post) {
+    $relatedBoardStmt = db()->prepare(
+        'SELECT p.id, p.title, p.created_at,
+                COALESCE(l.like_count, 0) AS like_count,
+                COALESCE(c.comment_count, 0) AS comment_count
+         FROM posts p
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.status = "published" AND p.board_id = :board_id AND p.id <> :post_id
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT 4'
+    );
+    $relatedBoardStmt->execute([
+        'board_id' => (int) ($post['board_id'] ?? 0),
+        'post_id' => $postId,
+    ]);
+    $relatedBoardPosts = $relatedBoardStmt->fetchAll();
+
+    $relatedAuthorStmt = db()->prepare(
+        'SELECT p.id, p.title, p.created_at,
+                COALESCE(l.like_count, 0) AS like_count,
+                COALESCE(c.comment_count, 0) AS comment_count
+         FROM posts p
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.status = "published" AND p.user_id = :user_id AND p.id <> :post_id
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT 4'
+    );
+    $relatedAuthorStmt->execute([
+        'user_id' => (int) ($post['user_id'] ?? 0),
+        'post_id' => $postId,
+    ]);
+    $relatedAuthorPosts = $relatedAuthorStmt->fetchAll();
+
     $commentsStmt = db()->prepare(
         'SELECT c.id, c.parent_id, c.content, c.status, c.created_at, c.updated_at,
                 u.id AS user_id, u.nickname, u.username, u.avatar_path,
@@ -385,6 +429,14 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
 }
 ?>
   <main class="shell page-shell nebula-page-shell narrow-post-shell">
+    <?php if ($post): ?>
+      <?php render_breadcrumbs([
+        ['label' => '首页', 'href' => '/'],
+        ['label' => '发现', 'href' => '/posts.php'],
+        ['label' => board_badge($post), 'href' => '/posts.php?board=' . urlencode((string) ($post['board_slug'] ?? ''))],
+        ['label' => $post['title']],
+      ]); ?>
+    <?php endif; ?>
     <?php if ($flash): ?>
       <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
     <?php endif; ?>
@@ -395,9 +447,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
       <section class="glass nebula-hero detail-hero">
         <div class="detail-hero-head">
           <div>
-            <div class="brand-chip">纳达尔星项目 · 星云初始01 · 帖子详情页</div>
+            <div class="brand-chip">PulseNest · 帖子详情</div>
             <h1><?= e($post['title']) ?></h1>
-            <p class="page-desc nebula-desc">详情页现在支持帖子编辑 / 删除、评论编辑 / 删除，权限至少收敛到作者本人和管理员。</p>
+            <p class="page-desc nebula-desc">查看正文、参与讨论，并在同一页完成点赞、回复与内容管理。</p>
             <?php if (($post['status'] ?? 'published') !== 'published'): ?>
               <div class="chips" style="margin-top:12px; gap:6px;">
                 <span class="chip">当前状态：<?= e(post_status_label($post['status'])) ?></span>
@@ -476,6 +528,39 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </article>
 
+          <section class="glass panel-card">
+            <div class="section-kicker">Continue Reading</div>
+            <div class="side-head"><h3>继续浏览相关内容</h3></div>
+            <div class="nebula-section-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px;">
+              <div class="glass panel-card inner-card">
+                <div class="section-kicker">Same Board</div>
+                <div class="small-section-title"><?= e($post['board_name'] ?? '当前版块') ?></div>
+                <div class="list-stack compact-link-stack">
+                  <?php foreach ($relatedBoardPosts as $item): ?>
+                    <a class="quick-link" href="/post.php?id=<?= (int) $item['id'] ?>">
+                      <strong><?= e($item['title']) ?></strong>
+                      <span><?= (int) $item['like_count'] ?> 赞 · <?= (int) $item['comment_count'] ?> 回复 · <?= e(human_time($item['created_at'])) ?></span>
+                    </a>
+                  <?php endforeach; ?>
+                  <?php if (!$relatedBoardPosts): ?><div class="empty-inline nebula-empty">当前版块暂时没有更多公开帖子。</div><?php endif; ?>
+                </div>
+              </div>
+              <div class="glass panel-card inner-card">
+                <div class="section-kicker">More From Author</div>
+                <div class="small-section-title"><?= e($post['nickname']) ?> 的更多内容</div>
+                <div class="list-stack compact-link-stack">
+                  <?php foreach ($relatedAuthorPosts as $item): ?>
+                    <a class="quick-link" href="/post.php?id=<?= (int) $item['id'] ?>">
+                      <strong><?= e($item['title']) ?></strong>
+                      <span><?= (int) $item['like_count'] ?> 赞 · <?= (int) $item['comment_count'] ?> 回复 · <?= e(human_time($item['created_at'])) ?></span>
+                    </a>
+                  <?php endforeach; ?>
+                  <?php if (!$relatedAuthorPosts): ?><div class="empty-inline nebula-empty">这个作者暂时没有更多公开内容。</div><?php endif; ?>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="glass panel-card comment-panel">
             <div class="section-kicker">Discussion</div>
             <div class="side-head"><h3>评论区 / 回复区</h3></div>
@@ -515,22 +600,27 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 <div class="author-badge">🌌</div>
                 <div class="author-main">
                   <div class="author-name"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><?= e($post['nickname']) ?></a></div>
-                  <div class="meta">@<?= e($post['username']) ?></div>
+                  <div class="meta">@<?= e($post['username']) ?> · <?= e(board_badge($post)) ?></div>
                 </div>
-                <div class="score">LIVE</div>
+                <div class="score">作者</div>
               </div>
-              <p><?= e($post['bio'] ?: '这个作者还没有写简介，但主页已经可以点进去看最近帖子。') ?></p>
+              <p><?= e($post['bio'] ?: '这个作者还没有写简介，但你已经可以继续查看他的公开内容。') ?></p>
+              <div class="chips" style="margin-top: 12px; gap: 6px;">
+                <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
+                <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                <span class="chip"><?= e(human_time($post['created_at'])) ?></span>
+              </div>
             </div>
           </section>
 
           <section class="glass section-card">
             <div class="section-kicker">Quick Jump</div>
-            <div class="quick-links">
-              <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">同版块帖子</a>
-              <a class="quick-link" href="/notifications.php">我的提醒</a>
-              <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>">作者主页</a>
+            <div class="quick-links compact-link-stack">
+              <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>"><strong>同版块帖子</strong><span>继续浏览当前版块的相关讨论。</span></a>
+              <a class="quick-link" href="/user.php?id=<?= (int) $post['user_id'] ?>"><strong>作者主页</strong><span>查看作者的公开资料与更多内容。</span></a>
+              <a class="quick-link" href="/notifications.php"><strong>我的提醒</strong><span>回到通知页处理互动消息。</span></a>
               <?php if (can_manage_post($user, $post)): ?>
-                <a class="quick-link" href="/edit-post.php?id=<?= (int) $post['id'] ?>">编辑当前帖子</a>
+                <a class="quick-link" href="/edit-post.php?id=<?= (int) $post['id'] ?>"><strong>编辑当前帖子</strong><span>继续维护标题、正文与封面。</span></a>
               <?php endif; ?>
             </div>
           </section>

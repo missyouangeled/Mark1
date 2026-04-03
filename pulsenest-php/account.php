@@ -78,6 +78,10 @@ render_header('PulseNest · 会员中心', $user, [
 ]);
 ?>
   <main class="shell page-shell nebula-page-shell account-page">
+    <?php render_breadcrumbs([
+      ['label' => '首页', 'href' => '/'],
+      ['label' => '会员中心'],
+    ]); ?>
     <?php if ($flash): ?>
       <div class="notice <?= e($flash['type']) ?> floating-notice"><?= e($flash['message']) ?></div>
     <?php endif; ?>
@@ -85,9 +89,9 @@ render_header('PulseNest · 会员中心', $user, [
 
     <section class="glass nebula-hero nebula-hero-split member-hero nebula-member-hero">
       <div class="nebula-copy">
-        <div class="brand-chip">纳达尔星项目 · 星云初始01 · 会员中心</div>
-        <h1>欢迎回来，<?= e($user['nickname']) ?>，你的社区身份卡已经并入星云主壳。</h1>
-        <p class="page-desc nebula-desc">会员中心现在不只是统计页：你可以上传头像、更新一句个人介绍，并从这里直接跳进自己的主页。</p>
+        <div class="brand-chip">PulseNest · 会员中心</div>
+        <h1>欢迎回来，<?= e($user['nickname']) ?></h1>
+        <p class="page-desc nebula-desc">在这里维护资料、查看个人数据，并快速回到你的主页与最近发布的内容。</p>
         <div class="hero-actions-row">
           <a class="pill-btn solid" href="/create-post.php">写一篇新帖子</a>
           <a class="pill-btn" href="<?= e(profile_url($user)) ?>">查看我的主页</a>
@@ -193,11 +197,11 @@ render_header('PulseNest · 会员中心', $user, [
         <section class="glass panel-card">
           <div class="section-kicker">Quick Actions</div>
           <div class="quick-links">
-            <a class="quick-link" href="/create-post.php">写一篇新帖子</a>
-            <a class="quick-link" href="/notifications.php">查看我的提醒</a>
-            <a class="quick-link" href="/posts.php">查看全部帖子</a>
-            <a class="quick-link" href="/forgot-password.php">发起密码重置</a>
-            <a class="quick-link" href="/">返回首页内容流</a>
+            <a class="quick-link" href="/create-post.php"><strong>写一篇新帖子</strong><span>进入发布页，继续补充你的公开内容。</span></a>
+            <a class="quick-link" href="/notifications.php"><strong>查看我的提醒</strong><span>查看点赞、回复和系统通知。</span></a>
+            <a class="quick-link" href="/posts.php"><strong>查看全部帖子</strong><span>回到内容流继续浏览社区动态。</span></a>
+            <a class="quick-link" href="/forgot-password.php"><strong>发起密码重置</strong><span>在需要时更新当前账号密码。</span></a>
+            <a class="quick-link" href="/"><strong>返回首页内容流</strong><span>回到首页查看推荐内容和运营位。</span></a>
           </div>
         </section>
       </aside>

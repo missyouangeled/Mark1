@@ -76,6 +76,29 @@ function render_header(string $title, ?array $user = null, array $options = []):
 <?php
 }
 
+function render_breadcrumbs(array $items): void {
+    if (!$items) {
+        return;
+    }
+    echo '<nav class="breadcrumbs" aria-label="breadcrumb">';
+    $lastIndex = count($items) - 1;
+    foreach (array_values($items) as $index => $item) {
+        $label = e((string) ($item['label'] ?? ''));
+        $href = trim((string) ($item['href'] ?? ''));
+        echo '<span class="crumb">';
+        if ($href !== '' && $index !== $lastIndex) {
+            echo '<a href="' . e($href) . '">' . $label . '</a>';
+        } else {
+            echo '<span>' . $label . '</span>';
+        }
+        echo '</span>';
+        if ($index !== $lastIndex) {
+            echo '<span class="crumb-sep">/</span>';
+        }
+    }
+    echo '</nav>';
+}
+
 function render_footer(): void {
     echo "\n</body>\n</html>";
 }

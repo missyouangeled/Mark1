@@ -179,7 +179,7 @@ function render_focus_card(?array $post, string $slotKey, array $homeCopy, array
 }
 
 render_header('PulseNest', $user, [
-    'searchText' => '🔎 首页已接通运营位：置顶 / 精华 / 推荐位 / 首页卡绑定 / Hero 混合文案 / 排序切换',
+    'searchText' => '🔎 首页支持推荐内容、分类下钻、排序切换与实时热榜浏览',
 ]);
 ?>
   <main class="shell home-page">
@@ -197,16 +197,16 @@ render_header('PulseNest', $user, [
               <p class="hero-text"><?= e($heroDisplayBody) ?></p>
              <?php if ($heroPost): ?>
               <div class="chips" style="margin-top: 14px; gap: 6px;">
-                <span class="chip">Hero 已绑定帖子</span>
-                <span class="chip">标题<?= $heroUsesCustomTitle ? '使用自定义覆盖' : '跟随帖子' ?></span>
-                <span class="chip">副文案<?= $heroUsesCustomBody ? '使用自定义覆盖' : '跟随帖子摘要' ?></span>
+                <span class="chip">Hero 已绑定</span>
+                <span class="chip">标题<?= $heroUsesCustomTitle ? '已覆盖' : '跟随帖子' ?></span>
+                <span class="chip">副文案<?= $heroUsesCustomBody ? '已覆盖' : '跟随摘要' ?></span>
               </div>
              <?php endif; ?>
             </div>
             <div class="hero-actions-row">
-              <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '开始分享内容' : '立即加入社区' ?></a>
-              <a class="pill-btn" href="/posts.php?sort=<?= e($sort) ?>">去看内容流</a>
-              <a class="pill-btn" href="/notifications.php">我的提醒</a>
+              <a class="pill-btn solid" href="<?= $user ? '/create-post.php' : '/register.php' ?>"><?= $user ? '发布内容' : '加入社区' ?></a>
+              <a class="pill-btn" href="/posts.php?sort=<?= e($sort) ?>">浏览内容流</a>
+              <a class="pill-btn" href="/notifications.php">查看提醒</a>
             </div>
             <div class="chips">
               <?php foreach (post_sort_options() as $sortKey => $sortMeta): ?>
@@ -214,10 +214,10 @@ render_header('PulseNest', $user, [
               <?php endforeach; ?>
             </div>
             <div class="hero-stats">
-              <div class="hero-stat"><div class="label">社区成员</div><div class="num"><?= $userCount ?></div><div class="note">头像与用户主页已启用</div></div>
-              <div class="hero-stat"><div class="label">置顶帖子</div><div class="num"><?= $stickyCount ?></div><div class="note">优先抬到首页前列</div></div>
-              <div class="hero-stat"><div class="label">精华帖子</div><div class="num"><?= $featuredCount ?></div><div class="note">可给内容质感做背书</div></div>
-              <div class="hero-stat"><div class="label">论坛版块</div><div class="num"><?= $boardCount ?></div><div class="note">首页可按分类或版块浏览</div></div>
+              <div class="hero-stat"><div class="label">社区成员</div><div class="num"><?= $userCount ?></div><div class="note">公开资料与用户主页已经完整启用。</div></div>
+              <div class="hero-stat"><div class="label">置顶帖子</div><div class="num"><?= $stickyCount ?></div><div class="note">优先进入首页前列与重点曝光位。</div></div>
+              <div class="hero-stat"><div class="label">精华帖子</div><div class="num"><?= $featuredCount ?></div><div class="note">为更高质量的内容提供额外背书。</div></div>
+              <div class="hero-stat"><div class="label">论坛版块</div><div class="num"><?= $boardCount ?></div><div class="note">支持按分类或版块继续浏览。</div></div>
             </div>
           </div>
           <div class="hero-art">
@@ -229,7 +229,7 @@ render_header('PulseNest', $user, [
               <div class="kicker"><?= e($homeSlotDefs['hero']['label']) ?></div>
               <div class="title"><?= e($heroPost['title'] ?? 'Starfall Zero') ?></div>
               <div class="text"><?= e($heroPost ? excerpt($heroPost['content'], 56) : '沉浸式星际探索 + 高强度战斗循环') ?></div>
-              <?php if ($heroPost): ?><div class="muted" style="margin-top:10px;">左侧主文案当前<?= $heroUsesCustomTitle || $heroUsesCustomBody ? '已启用部分覆盖模式' : '完全跟随绑定帖子' ?>。</div><?php endif; ?>
+              <?php if ($heroPost): ?><div class="muted" style="margin-top:10px;">当前 Hero 文案<?= $heroUsesCustomTitle || $heroUsesCustomBody ? '做了轻量覆盖' : '跟随当前绑定帖子' ?>。</div><?php endif; ?>
               <div class="chips">
                 <?php if ($heroPost): ?>
                   <span class="chip"><?= e(board_badge($heroPost)) ?></span>
@@ -242,7 +242,7 @@ render_header('PulseNest', $user, [
                   <span class="chip"><?= e($homeCopy['home.hero.tag_secondary']) ?></span>
                 <?php endif; ?>
               </div>
-              <?php if ($heroPost): ?><div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">查看主运营帖</a></div><?php endif; ?>
+              <?php if ($heroPost): ?><div style="margin-top:12px;"><a class="inline-link" href="/post.php?id=<?= (int) $heroPost['id'] ?>">进入 Hero 帖子</a></div><?php endif; ?>
             </div>
           </div>
         </div>
@@ -251,7 +251,7 @@ render_header('PulseNest', $user, [
       <div class="right-stack">
         <section class="glass section-card">
           <div class="section-kicker">Forum Categories</div>
-          <div class="section-title">首页可直接下钻版块</div>
+          <div class="section-title">可直接下钻版块</div>
           <div class="category-stack">
             <?php foreach ($forum as $category): ?>
               <div class="category-card">
@@ -275,7 +275,7 @@ render_header('PulseNest', $user, [
           <div class="section-kicker">Pulse Feed</div>
           <div class="feed-list">
             <?php if (!$feedPosts): ?>
-              <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">刚刚</div><div class="text">数据库已经接通，但还缺第一条真正把气氛点亮的帖子。</div></div></div>
+              <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">刚刚</div><div class="text">社区还在等待第一批真正把讨论点亮的内容。</div></div></div>
             <?php else: ?>
               <?php foreach ($feedPosts as $post): ?>
                 <div class="feed-item"><div class="pulse-dot"></div><div><div class="time"><?= e(human_time($post['created_at'])) ?></div><div class="text"><a class="inline-link" href="/user.php?id=<?= (int) $post['user_id'] ?>">@<?= e($post['username']) ?></a> 在 <?= e(board_badge($post)) ?> 发布了「<?= e($post['title']) ?>」</div></div></div>
@@ -290,11 +290,11 @@ render_header('PulseNest', $user, [
       <div class="row-mid-main-stack">
         <section class="glass section-card">
           <div class="section-kicker">Focus Slots</div>
-          <div class="section-title">首页焦点运营卡</div>
+          <div class="section-title">首页焦点内容位</div>
           <div class="focus-grid">
-            <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点卡 1 待绑定', '后台可把重点帖子直接塞进这张中部卡位。'); ?>
-            <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点卡 2 待绑定', '适合放活动帖、征集帖、版本说明帖。'); ?>
-            <?php render_focus_card($focusPosts['focus_three'], 'focus_three', $homeCopy, $recommendGroups, '焦点卡 3 待绑定', '维持视觉稳定，同时把中段内容改成可运营入口。'); ?>
+            <?php render_focus_card($focusPosts['focus_one'], 'focus_one', $homeCopy, $recommendGroups, '焦点内容位 1', '适合承接当前最值得优先展示的重点帖子。'); ?>
+            <?php render_focus_card($focusPosts['focus_two'], 'focus_two', $homeCopy, $recommendGroups, '焦点内容位 2', '适合放活动帖、征集帖或版本说明帖。'); ?>
+            <?php render_focus_card($focusPosts['focus_three'], 'focus_three', $homeCopy, $recommendGroups, '焦点内容位 3', '适合补充首页中段的持续浏览入口。'); ?>
           </div>
         </section>
 
@@ -337,21 +337,21 @@ render_header('PulseNest', $user, [
       <div class="row-mid-side-stack">
         <section class="glass section-card">
           <div class="section-kicker">Recommendation Pools</div>
-          <div class="section-title">推荐位分组与优先级</div>
+          <div class="section-title">推荐位分组</div>
           <div class="rank-list">
             <?php foreach ($recommendGroups as $groupKey => $groupMeta): ?>
               <?php $leadPost = $recommendedPools[$groupKey][0] ?? null; ?>
-              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= e(strtoupper(substr($groupKey, 0, 1))) ?></div><div class="rank-main"><div class="rank-name"><?= e($groupMeta['label']) ?></div><div class="meta"><?= e($leadPost ? $leadPost['title'] . ' · 优先级 ' . (int) ($leadPost['recommend_priority'] ?? 0) : $groupMeta['desc']) ?></div></div><div class="score"><?= count($recommendedPools[$groupKey]) ?>条</div></div></div>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= e(strtoupper(substr($groupKey, 0, 1))) ?></div><div class="rank-main"><div class="rank-name"><?= e($groupMeta['label']) ?></div><div class="meta"><?= e($leadPost ? $leadPost['title'] . ' · 优先级 ' . (int) ($leadPost['recommend_priority'] ?? 0) : '当前暂无优先内容') ?></div></div><div class="score"><?= count($recommendedPools[$groupKey]) ?>条</div></div></div>
             <?php endforeach; ?>
           </div>
         </section>
 
         <section class="glass section-card">
           <div class="section-kicker">Active Boards</div>
-          <div class="section-title">最近 7 天活跃版块</div>
+          <div class="section-title">近 7 天活跃版块</div>
           <div class="rank-list">
             <?php foreach ($activeBoardsHome as $index => $board): ?>
-              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/posts.php?board=<?= e($board['slug']) ?>"><?= e($board['name']) ?></a></div><div class="meta"><?= e($board['category_name']) ?> · 近 7 天累计浏览 <?= (int) ($board['total_views'] ?? 0) ?></div></div><div class="score"><?= (int) ($board['post_count'] ?? 0) ?>帖</div></div></div>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/posts.php?board=<?= e($board['slug']) ?>"><?= e($board['name']) ?></a></div><div class="meta"><?= e($board['category_name']) ?> · 近 7 天浏览 <?= (int) ($board['total_views'] ?? 0) ?></div></div><div class="score"><?= (int) ($board['post_count'] ?? 0) ?>帖</div></div></div>
             <?php endforeach; ?>
             <?php if (!$activeBoardsHome): ?>
               <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃版块数据</div><div class="meta">等近 7 天发帖积累后自动出现</div></div><div class="score">--</div></div></div>
@@ -361,15 +361,15 @@ render_header('PulseNest', $user, [
 
         <section class="glass section-card">
           <div class="section-kicker">Community Snapshot</div>
-          <div class="section-title">社区即时快照</div>
+          <div class="section-title">社区快照</div>
           <div class="hero-stats compact-hero-stats admin-hero-stats" style="margin-top:16px;">
             <div class="hero-stat"><div class="label">公开帖子</div><div class="num small-num"><?= $postCount ?></div><div class="note">当前首页读取的公开内容总量</div></div>
             <div class="hero-stat"><div class="label">社区成员</div><div class="num small-num"><?= $userCount ?></div><div class="note">已注册成员数</div></div>
             <div class="hero-stat"><div class="label">论坛版块</div><div class="num small-num"><?= $boardCount ?></div><div class="note">当前可浏览版块</div></div>
           </div>
           <div class="quick-links" style="margin-top:18px;">
-            <a class="quick-link" href="/posts.php?sort=hot"><strong>切到综合热度流</strong><span>直接看当前最值得继续扩散的帖子</span></a>
-            <a class="quick-link" href="/posts.php?sort=views"><strong>切到最多浏览流</strong><span>快速回看已经跑出阅读量的内容</span></a>
+            <a class="quick-link" href="/posts.php?sort=hot"><strong>综合热度内容流</strong><span>优先查看当前互动更强的公开内容。</span></a>
+            <a class="quick-link" href="/posts.php?sort=views"><strong>最多浏览内容流</strong><span>回看已经跑出阅读量的公开内容。</span></a>
           </div>
         </section>
       </div>
@@ -378,13 +378,13 @@ render_header('PulseNest', $user, [
     <section class="row-bottom">
       <section>
         <div class="section-kicker">Trending Now</div>
-        <div class="section-large-head">最近讨论度最高的内容卡</div>
-        <div class="section-large-desc">卡片区继续沿用“星云初始01”的首页观感，但现在会优先考虑置顶 / 推荐位 / 精华逻辑，再把帖子所属版块一起带出来。</div>
-        <div class="ticker">🔥 已接通：置顶 / 精华 / 推荐位 / 首页卡绑定 / 评论审核状态 / 通知筛选 / 站内回复提醒 / 发帖 / 点赞 / 用户主页</div>
+        <div class="section-large-head">最近讨论度更高的公开内容</div>
+        <div class="section-large-desc">这里会优先展示当前更值得继续浏览的帖子，并把版块、热度和运营权重一起带出来。</div>
+        <div class="ticker">🔥 当前内容流会综合参考推荐权重、互动热度与公开可见状态。</div>
         <div class="cards-3">
           <?php if (!$trendingPosts): ?>
             <?php for ($i = 1; $i <= 3; $i++): ?>
-              <article class="glass game-card"><div class="game-cover alt<?= $i ?>"><div class="game-cover-top"><span class="small-chip a">等待新帖</span><span class="small-chip b">占位卡</span></div><div class="game-cover-bottom"><div class="game-title">等待第 <?= $i ?> 篇内容</div><div class="game-sub">现在注册后就能把这里顶起来</div></div></div><div class="game-body"><p>当前没有足够帖子，所以先展示功能占位卡。数据库一有内容，这里会立即变成真实帖子卡片。</p><div class="game-meta"><div>★ 实时读取</div><div style="color: var(--brand);">去注册</div></div></div></article>
+              <article class="glass game-card"><div class="game-cover alt<?= $i ?>"><div class="game-cover-top"><span class="small-chip a">等待新帖</span><span class="small-chip b">占位卡</span></div><div class="game-cover-bottom"><div class="game-title">等待第 <?= $i ?> 篇内容</div><div class="game-sub">等第一批讨论把这里点亮</div></div></div><div class="game-body"><p>当前公开内容还不够多，这里会先保留内容位，等真实帖子积累后自动替换成社区卡片。</p><div class="game-meta"><div>★ 实时读取</div><div style="color: var(--brand);">浏览首页</div></div></div></article>
             <?php endfor; ?>
           <?php else: ?>
             <?php foreach ($trendingPosts as $index => $post): ?>
@@ -403,7 +403,7 @@ render_header('PulseNest', $user, [
           <span class="chip"><?= e($recommendGroups[$post['recommend_group']]['label'] ?? ($post['recommend_group'] ?? '综合推荐')) ?></span>
           <span class="chip">优先级 <?= (int) ($post['recommend_priority'] ?? 0) ?></span>
                   </div>
-                  <div class="game-meta"><div><?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</div><div style="color: var(--brand);"><a href="/post.php?id=<?= (int) $post['id'] ?>">查看详情</a></div></div>
+                  <div class="game-meta"><div><?= (int) $post['like_count'] ?> 赞 · <?= (int) $post['comment_count'] ?> 回复</div><div style="color: var(--brand);"><a href="/post.php?id=<?= (int) $post['id'] ?>">继续阅读</a></div></div>
                 </div>
               </article>
             <?php endforeach; ?>
@@ -415,10 +415,10 @@ render_header('PulseNest', $user, [
         <?php if ($showRecommendedAuthors): ?>
         <section class="glass section-card authors-card-shell">
           <div class="section-kicker">Recommended Authors</div>
-          <div class="section-title">真实成员速览</div>
+          <div class="section-title">成员速览</div>
           <div class="author-list">
             <?php if (!$topAuthors): ?>
-              <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批成员</div><div class="meta">注册后这里会跟着内容一起活过来</div></div><div class="score">NEW</div></div><p>现在的重点已经不是占位图，而是让第一批真实用户行为能映射回首页。</p></div>
+              <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批成员</div><div class="meta">等真实创作者数据出现后，这里会自动更新。</div></div><div class="score">NEW</div></div><p>当前还没有足够内容形成推荐作者列表。</p></div>
             <?php else: ?>
               <?php foreach (array_slice($topAuthors, 0, 3) as $author): ?>
                 <div class="author-item">
@@ -441,7 +441,7 @@ render_header('PulseNest', $user, [
         <?php if ($showTopViewed): ?>
         <section class="glass section-card top-rated-card-shell">
           <div class="section-kicker">Top Rated</div>
-          <div class="section-title">当前最高浏览帖子</div>
+          <div class="section-title">最高浏览帖子</div>
           <div class="rank-list">
             <?php if (!$topPostsByViews): ?>
               <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">等待首批帖子</div><div class="meta">等真实浏览量把这里点亮</div></div><div class="score">NEW</div></div></div>
