@@ -64,7 +64,7 @@ render_header('PulseNest · 发帖', $user, [
   <main class="shell page-shell nebula-page-shell create-post-page">
     <section class="glass nebula-hero nebula-hero-split create-post-hero">
       <div class="nebula-copy">
-        <div class="brand-chip">纳达尔星项目 · 星云初始01 · 发帖页</div>
+        <div class="brand-chip">纳达尔星项目 · 星云初始03 · 发帖页</div>
         <h1>把你的内容准确投进对应版块，发出去就能进入真实论坛链路。</h1>
         <p class="page-desc nebula-desc">现在发帖除了标题、正文和配图，还必须归属到版块。首页、列表页、搜索和通知都会围着这条论坛骨架联动。</p>
         <div class="hero-stats compact-hero-stats">
@@ -87,7 +87,7 @@ render_header('PulseNest · 发帖', $user, [
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
       <div class="kicker">Create Post</div>
       <h2>发布一篇新帖子</h2>
-      <p class="desc">继续沿用星云初始01的深色玻璃面板，但帖子已正式接入分类 / 版块系统。</p>
+      <p class="desc">继续沿用星云初始03的轻玻璃面板，但帖子已正式接入分类 / 版块系统。</p>
 
       <?php if ($error): ?><div class="notice error"><?= e($error) ?></div><?php endif; ?>
 
@@ -112,7 +112,7 @@ render_header('PulseNest · 发帖', $user, [
         <div class="field">
           <label>帖子图片（可选）</label>
           <input class="input file-input" type="file" name="cover_image" accept="image/jpeg,image/png,image/gif,image/webp" />
-          <div class="field-tip">上传后会在首页、列表页和详情页显示。</div>
+          <div class="field-tip">上传后会自动压到更适合前台展示的尺寸，并生成列表 / 详情所需版本。</div>
         </div>
         <div class="compose-actions">
           <a class="pill-btn" href="/posts.php">先看看帖子列表</a>

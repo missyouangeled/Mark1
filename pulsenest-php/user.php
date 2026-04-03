@@ -149,7 +149,7 @@ render_header($profile ? ('PulseNest Â· ' . $profile['nickname']) : 'PulseNest Â
                 <?php foreach ($recentPosts as $post): ?>
                   <article class="glass panel-card profile-post-card inner-card">
                     <?php if (!empty($post['image_path'])): ?>
-                      <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+                      <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'card')) ?>" alt="<?= e($post['title']) ?>" loading="lazy" decoding="async" fetchpriority="low"></div>
                     <?php endif; ?>
                     <h3 class="post-title small"><a href="/post.php?id=<?= (int) $post['id'] ?>"><?= e($post['title']) ?></a></h3>
                     <p class="post-text compact"><?= e(excerpt($post['content'], 140)) ?></p>

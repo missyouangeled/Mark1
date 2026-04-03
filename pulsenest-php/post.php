@@ -485,7 +485,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
               <span class="small-chip a">文章详情</span>
             </div>
             <?php if (!empty($post['image_path'])): ?>
-              <div class="post-cover-wrap"><img class="post-cover-image detail-cover" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+              <div class="post-cover-wrap"><img class="post-cover-image detail-cover" src="<?= e(image_variant_public_path($post['image_path'], 'detail')) ?>" alt="<?= e($post['title']) ?>" decoding="async" fetchpriority="low"></div>
             <?php endif; ?>
             <div class="article-meta"><span>作者邮箱：<?= e($post['email']) ?></span><span><a class="inline-link" href="/posts.php?board=<?= e($post['board_slug']) ?>">查看同版块更多帖子</a></span></div>
             <?php if (!empty($post['bio'])): ?><div class="article-meta">作者简介：<?= e($post['bio']) ?></div><?php endif; ?>

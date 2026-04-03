@@ -91,7 +91,7 @@ render_header('PulseNest · 编辑帖子', $user, [
   <main class="shell page-shell nebula-page-shell create-post-page">
     <section class="glass nebula-hero nebula-hero-split create-post-hero">
       <div class="nebula-copy">
-        <div class="brand-chip">纳达尔星项目 · 星云初始01 · 帖子编辑页</div>
+        <div class="brand-chip">纳达尔星项目 · 星云初始03 · 帖子编辑页</div>
         <h1>不重做视觉外壳，直接把帖子编辑链路补齐。</h1>
         <p class="page-desc nebula-desc">这里沿用发帖页的玻璃卡和深色氛围，但动作从“创建”切到“维护”：作者本人或管理员可以改标题、正文、版块和配图。</p>
         <div class="hero-stats compact-hero-stats">
@@ -114,7 +114,7 @@ render_header('PulseNest · 编辑帖子', $user, [
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
       <div class="kicker">Edit Post</div>
       <h2>编辑当前帖子</h2>
-      <p class="desc">继续沿用星云初始01的深色玻璃面板，把“可维护”补到内容生产链路里。</p>
+      <p class="desc">继续沿用星云初始03的轻玻璃语言，把“可维护”补到内容生产链路里。</p>
 
       <?php if ($error): ?><div class="notice error"><?= e($error) ?></div><?php endif; ?>
 
@@ -139,7 +139,7 @@ render_header('PulseNest · 编辑帖子', $user, [
         <?php if (!empty($post['image_path'])): ?>
           <div class="field">
             <label>当前配图</label>
-            <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+            <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'detail')) ?>" alt="<?= e($post['title']) ?>" decoding="async" fetchpriority="low"></div>
             <label class="checkbox-inline"><input type="checkbox" name="remove_image" value="1"> <span>移除当前配图</span></label>
           </div>
         <?php endif; ?>

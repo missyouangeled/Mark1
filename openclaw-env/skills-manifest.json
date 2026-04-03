@@ -27,6 +27,35 @@
       "repo": "https://github.com/EvoMap/evolver",
       "zipUrl": "https://codeload.github.com/EvoMap/evolver/zip/refs/heads/main",
       "branch": "main"
+    },
+    {
+      "name": "openclaw-find-skills",
+      "type": "clawhub-download",
+      "slug": "openclaw-find-skills",
+      "version": "1.0.0",
+      "downloadUrl": "https://wry-manatee-359.convex.site/api/v1/download?slug=openclaw-find-skills"
+    },
+    {
+      "name": "proactive-agent-lite",
+      "type": "clawhub-download",
+      "slug": "proactive-agent-lite",
+      "version": "1.0.0",
+      "downloadUrl": "https://wry-manatee-359.convex.site/api/v1/download?slug=proactive-agent-lite"
+    },
+    {
+      "name": "openclaw-agent-browser",
+      "type": "clawhub-download",
+      "slug": "openclaw-agent-browser",
+      "version": "1.0.0",
+      "downloadUrl": "https://wry-manatee-359.convex.site/api/v1/download?slug=openclaw-agent-browser"
+    },
+    {
+      "name": "liang-tavily-search",
+      "type": "clawhub-download",
+      "slug": "liang-tavily-search",
+      "version": "1.0.1",
+      "downloadUrl": "https://wry-manatee-359.convex.site/api/v1/download?slug=liang-tavily-search",
+      "notes": "Requires TAVILY_API_KEY or equivalent local config on the target machine. Do not store real keys in git."
     }
   ]
 }

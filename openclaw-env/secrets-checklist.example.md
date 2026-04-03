@@ -9,6 +9,7 @@
 - [ ] OpenClaw provider 登录态已恢复
 - [ ] `~/.openclaw/openclaw.json` 中私密字段已人工核对
 - [ ] 如需设备控制/配对：相关 device pairing 已重新建立
+- [ ] 如需使用 Tavily：在目标机补好 `TAVILY_API_KEY`（不要把真实 key 提交进 Git）
 
 ## 建议核对
 

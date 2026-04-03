@@ -197,7 +197,7 @@ render_header('PulseNest · 帖子列表', $user, [
                 <a class="pill-btn" href="/post.php?id=<?= (int) $post['id'] ?>">阅读全文</a>
               </div>
               <?php if (!empty($post['image_path'])): ?>
-                <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+                <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'card')) ?>" alt="<?= e($post['title']) ?>" loading="lazy" decoding="async" fetchpriority="low"></div>
               <?php endif; ?>
               <h2 class="post-title small"><a href="/post.php?id=<?= (int) $post['id'] ?>"><?= e($post['title']) ?></a></h2>
               <p class="post-text compact"><?= nl2br(e(excerpt($post['content'], 220))) ?></p>

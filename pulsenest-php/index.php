@@ -40,14 +40,24 @@ $where[] = 'p.status = "published"';
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= ' ORDER BY ' . $sortSql . ' LIMIT 18';
+$sql .= ' ORDER BY ' . $sortSql . ' LIMIT 12';
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
 
-$postCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE status = "published"')->fetchColumn();
-$userCount = (int) db()->query('SELECT COUNT(*) FROM pulsenest_users')->fetchColumn();
-$boardCount = (int) db()->query('SELECT COUNT(*) FROM forum_boards')->fetchColumn();
+$overview = db()->query(
+    'SELECT
+        (SELECT COUNT(*) FROM posts WHERE status = "published") AS post_count,
+        (SELECT COUNT(*) FROM pulsenest_users) AS user_count,
+        (SELECT COUNT(*) FROM forum_boards) AS board_count,
+        (SELECT COUNT(*) FROM posts WHERE status = "published" AND is_sticky = 1) AS sticky_count,
+        (SELECT COUNT(*) FROM posts WHERE status = "published" AND is_featured = 1) AS featured_count'
+)->fetch();
+$postCount = (int) ($overview['post_count'] ?? 0);
+$userCount = (int) ($overview['user_count'] ?? 0);
+$boardCount = (int) ($overview['board_count'] ?? 0);
+$stickyCount = (int) ($overview['sticky_count'] ?? 0);
+$featuredCount = (int) ($overview['featured_count'] ?? 0);
 $homeSlotDefs = home_slot_definitions();
 $recommendGroups = recommend_group_definitions();
 $homeCopy = home_copy_config();
@@ -73,46 +83,55 @@ $recommendedPools = [];
 foreach (array_keys($recommendGroups) as $groupKey) {
     $recommendedPools[$groupKey] = array_values(array_filter($posts, static fn (array $post): bool => ($post['recommend_group'] ?? 'general') === $groupKey && ((int) ($post['recommend_level'] ?? 0) > 0 || (int) ($post['recommend_priority'] ?? 0) > 0)));
 }
-$stickyCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_sticky = 1')->fetchColumn();
-$featuredCount = (int) db()->query('SELECT COUNT(*) FROM posts WHERE is_featured = 1')->fetchColumn();
-$topAuthorsStmt = db()->query(
-    'SELECT u.id, u.nickname, u.username, u.avatar_path,
-            COUNT(p.id) AS post_count,
-            COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
-            COALESCE(SUM(COALESCE(c.comment_count, 0)), 0) AS total_comments,
-            COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views,
-            MAX(p.created_at) AS latest_post_at
-     FROM pulsenest_users u
-     INNER JOIN posts p ON p.user_id = u.id AND p.status = "published"
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
-     ) l ON l.post_id = p.id
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
-     ) c ON c.post_id = p.id
-     GROUP BY u.id, u.nickname, u.username, u.avatar_path
-     ORDER BY total_likes DESC, total_views DESC, total_comments DESC, latest_post_at DESC
-     LIMIT 5'
-);
-$topAuthors = $topAuthorsStmt->fetchAll();
-$topPostsByViewsStmt = db()->query(
-    'SELECT p.id, p.title, p.view_count, p.created_at,
-            u.nickname, u.username,
-            COALESCE(l.like_count, 0) AS like_count,
-            COALESCE(c.comment_count, 0) AS comment_count
-     FROM posts p
-     INNER JOIN pulsenest_users u ON u.id = p.user_id
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
-     ) l ON l.post_id = p.id
-     LEFT JOIN (
-        SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
-     ) c ON c.post_id = p.id
-     WHERE p.status = "published"
-     ORDER BY p.view_count DESC, c.comment_count DESC, l.like_count DESC, p.created_at DESC
-     LIMIT 4'
-);
-$topPostsByViews = $topPostsByViewsStmt->fetchAll();
+$topAuthors = [];
+$topPostsByViews = [];
+$activeBoardsHome = [];
+$showRecommendedAuthors = site_setting_enabled('home.module.recommended_authors_enabled', true);
+$showTopViewed = site_setting_enabled('home.module.top_viewed_enabled', true);
+$showTimeHotlist = site_setting_enabled('home.module.time_hotlist_enabled', true);
+
+if ($showRecommendedAuthors) {
+    $topAuthors = db()->query(
+        'SELECT u.id, u.nickname, u.username, u.avatar_path,
+                COUNT(p.id) AS post_count,
+                COALESCE(SUM(COALESCE(l.like_count, 0)), 0) AS total_likes,
+                COALESCE(SUM(COALESCE(c.comment_count, 0)), 0) AS total_comments,
+                COALESCE(SUM(COALESCE(p.view_count, 0)), 0) AS total_views,
+                MAX(p.created_at) AS latest_post_at
+         FROM pulsenest_users u
+         INNER JOIN posts p ON p.user_id = u.id AND p.status = "published"
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         GROUP BY u.id, u.nickname, u.username, u.avatar_path
+         ORDER BY total_likes DESC, total_views DESC, total_comments DESC, latest_post_at DESC
+         LIMIT 3'
+    )->fetchAll();
+}
+
+if ($showTopViewed) {
+    $topPostsByViews = db()->query(
+        'SELECT p.id, p.title, p.view_count, p.created_at,
+                u.nickname, u.username,
+                COALESCE(l.like_count, 0) AS like_count,
+                COALESCE(c.comment_count, 0) AS comment_count
+         FROM posts p
+         INNER JOIN pulsenest_users u ON u.id = p.user_id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+         ) l ON l.post_id = p.id
+         LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+         ) c ON c.post_id = p.id
+         WHERE p.status = "published"
+         ORDER BY p.view_count DESC, c.comment_count DESC, l.like_count DESC, p.created_at DESC
+         LIMIT 3'
+    )->fetchAll();
+}
+
 $activeBoardsHome = db()->query(
     'SELECT fb.id, fb.name, fb.slug, fc.name AS category_name,
             COUNT(p.id) AS post_count,
@@ -124,33 +143,32 @@ $activeBoardsHome = db()->query(
      ORDER BY post_count DESC, total_views DESC, fb.name ASC
      LIMIT 4'
 )->fetchAll();
-$showRecommendedAuthors = site_setting_enabled('home.module.recommended_authors_enabled', true);
-$showTopViewed = site_setting_enabled('home.module.top_viewed_enabled', true);
-$showTimeHotlist = site_setting_enabled('home.module.time_hotlist_enabled', true);
 $timeRangeBoards = [
     '24h' => ['label' => '24 小时热榜', 'interval' => '1 DAY'],
     '7d' => ['label' => '7 天热榜', 'interval' => '7 DAY'],
     '30d' => ['label' => '30 天热榜', 'interval' => '30 DAY'],
 ];
 $timeRangeHotPosts = [];
-foreach ($timeRangeBoards as $rangeKey => $rangeMeta) {
-    $stmt = db()->query(
-        'SELECT p.id, p.title, p.view_count, p.created_at, u.username,
-                COALESCE(l.like_count, 0) AS like_count,
-                COALESCE(c.comment_count, 0) AS comment_count
-         FROM posts p
-         INNER JOIN pulsenest_users u ON u.id = p.user_id
-         LEFT JOIN (
-            SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
-         ) l ON l.post_id = p.id
-         LEFT JOIN (
-            SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
-         ) c ON c.post_id = p.id
-         WHERE p.status = "published" AND p.created_at >= NOW() - INTERVAL ' . $rangeMeta['interval'] . '
-         ORDER BY ' . hot_score_sql() . ' DESC, p.created_at DESC
-         LIMIT 3'
-    );
-    $timeRangeHotPosts[$rangeKey] = $stmt->fetchAll();
+if ($showTimeHotlist) {
+    foreach ($timeRangeBoards as $rangeKey => $rangeMeta) {
+        $stmt = db()->query(
+            'SELECT p.id, p.title, p.view_count, p.created_at, u.username,
+                    COALESCE(l.like_count, 0) AS like_count,
+                    COALESCE(c.comment_count, 0) AS comment_count
+             FROM posts p
+             INNER JOIN pulsenest_users u ON u.id = p.user_id
+             LEFT JOIN (
+                SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id
+             ) l ON l.post_id = p.id
+             LEFT JOIN (
+                SELECT post_id, COUNT(*) AS comment_count FROM comments WHERE status = "approved" GROUP BY post_id
+             ) c ON c.post_id = p.id
+             WHERE p.status = "published" AND p.created_at >= NOW() - INTERVAL ' . $rangeMeta['interval'] . '
+             ORDER BY ' . hot_score_sql() . ' DESC, p.created_at DESC
+             LIMIT 2'
+        );
+        $timeRangeHotPosts[$rangeKey] = $stmt->fetchAll();
+    }
 }
 
 function render_focus_card(?array $post, string $slotKey, array $homeCopy, array $recommendGroups, string $fallbackTitle, string $fallbackText): void {
@@ -394,7 +412,7 @@ render_header('PulseNest', $user, [
             <?php foreach ($trendingPosts as $index => $post): ?>
               <article class="glass game-card">
                 <?php if (!empty($post['image_path'])): ?>
-                  <div class="game-cover image-cover"><img class="post-cover-image card-cover-image" src="<?= e(asset_url($post['image_path'])) ?>" alt="<?= e($post['title']) ?>"></div>
+                  <div class="game-cover image-cover"><img class="post-cover-image card-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'card')) ?>" alt="<?= e($post['title']) ?>" loading="lazy" decoding="async" fetchpriority="low"></div>
                 <?php else: ?>
                   <div class="game-cover alt<?= ($index % 3) + 1 ?>"><div class="game-cover-top"><span class="small-chip a"><?= e($post['board_name'] ?? '公共区') ?></span><span class="small-chip b">@<?= e($post['username']) ?></span></div><div class="game-cover-bottom"><div class="game-title"><?= e($post['title']) ?></div><div class="game-sub"><?= e(human_time($post['created_at'])) ?></div></div></div>
                 <?php endif; ?>

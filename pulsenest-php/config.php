@@ -7,6 +7,10 @@ const UPLOAD_ROOT = __DIR__ . '/uploads';
 const AVATAR_UPLOAD_DIR = 'avatars';
 const POST_UPLOAD_DIR = 'posts';
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const IMAGE_VARIANTS = [
+    'card' => ['max_width' => 960, 'max_height' => 720],
+    'detail' => ['max_width' => 1440, 'max_height' => 1440],
+];
 
 function db(): PDO {
     static $pdo = null;
@@ -696,6 +700,108 @@ function upload_relative_path(string $subDir, string $filename): string {
     return trim($subDir, '/') . '/' . $filename;
 }
 
+function image_variant_relative_path(string $relativePath, string $variant): string {
+    $relativePath = ltrim(str_replace('\\', '/', $relativePath), '/');
+    $ext = pathinfo($relativePath, PATHINFO_EXTENSION);
+    $base = $ext !== '' ? substr($relativePath, 0, -strlen($ext) - 1) : $relativePath;
+    return $base . '-' . $variant . ($ext !== '' ? '.' . $ext : '');
+}
+
+function image_variant_public_path(?string $path, string $variant = 'original'): ?string {
+    if (!$path) {
+        return null;
+    }
+    if ($variant === 'original' || !isset(IMAGE_VARIANTS[$variant])) {
+        return asset_url($path);
+    }
+    $normalized = ltrim(str_replace('\\', '/', $path), '/');
+    $variantRelative = image_variant_relative_path(preg_replace('#^uploads/#', '', $normalized), $variant);
+    $variantAbsolute = UPLOAD_ROOT . '/' . $variantRelative;
+    if (is_file($variantAbsolute)) {
+        return '/uploads/' . ltrim($variantRelative, '/');
+    }
+    return asset_url($path);
+}
+
+function open_uploaded_image_resource(string $path, string $mime) {
+    return match ($mime) {
+        'image/jpeg' => @imagecreatefromjpeg($path),
+        'image/png' => @imagecreatefrompng($path),
+        'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
+        default => false,
+    };
+}
+
+function orient_uploaded_image($source, string $path, string $mime) {
+    if (!$source || $mime !== 'image/jpeg' || !function_exists('exif_read_data')) {
+        return $source;
+    }
+    $exif = @exif_read_data($path);
+    $orientation = (int) ($exif['Orientation'] ?? 1);
+    return match ($orientation) {
+        3 => imagerotate($source, 180, 0),
+        6 => imagerotate($source, -90, 0),
+        8 => imagerotate($source, 90, 0),
+        default => $source,
+    };
+}
+
+function save_uploaded_image_resource($image, string $target, string $mime): bool {
+    return match ($mime) {
+        'image/jpeg' => imagejpeg($image, $target, 82),
+        'image/png' => imagepng($image, $target, 6),
+        'image/webp' => function_exists('imagewebp') ? imagewebp($image, $target, 82) : false,
+        default => false,
+    };
+}
+
+function resize_uploaded_image(string $sourcePath, string $targetPath, string $mime, int $maxWidth, int $maxHeight): bool {
+    $size = @getimagesize($sourcePath);
+    if (!$size) {
+        return false;
+    }
+    [$width, $height] = $size;
+    if ($width <= 0 || $height <= 0) {
+        return false;
+    }
+
+    $scale = min($maxWidth / $width, $maxHeight / $height, 1);
+    $targetWidth = max(1, (int) floor($width * $scale));
+    $targetHeight = max(1, (int) floor($height * $scale));
+
+    $source = open_uploaded_image_resource($sourcePath, $mime);
+    if (!$source) {
+        return false;
+    }
+    $source = orient_uploaded_image($source, $sourcePath, $mime);
+    if (!$source) {
+        return false;
+    }
+
+    $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+    if (in_array($mime, ['image/png', 'image/webp'], true)) {
+        imagealphablending($canvas, false);
+        imagesavealpha($canvas, true);
+        $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+        imagefilledrectangle($canvas, 0, 0, $targetWidth, $targetHeight, $transparent);
+    }
+
+    imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, imagesx($source), imagesy($source));
+    $saved = save_uploaded_image_resource($canvas, $targetPath, $mime);
+    imagedestroy($canvas);
+    imagedestroy($source);
+
+    return $saved;
+}
+
+function generate_post_image_variants(string $absolutePath, string $relativePath, string $mime): void {
+    foreach (IMAGE_VARIANTS as $variant => $options) {
+        $variantRelative = image_variant_relative_path($relativePath, $variant);
+        $variantAbsolute = UPLOAD_ROOT . '/' . $variantRelative;
+        resize_uploaded_image($absolutePath, $variantAbsolute, $mime, (int) $options['max_width'], (int) $options['max_height']);
+    }
+}
+
 function handle_image_upload(array $file, string $subDir): ?string {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
         return null;
@@ -732,8 +838,16 @@ function handle_image_upload(array $file, string $subDir): ?string {
     $relative = upload_relative_path($subDir, $filename);
     $target = UPLOAD_ROOT . '/' . $relative;
 
-    if (!move_uploaded_file($tmp, $target)) {
+    $saved = false;
+    if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+        $saved = resize_uploaded_image($tmp, $target, $mime, 1920, 1920);
+    }
+    if (!$saved && !move_uploaded_file($tmp, $target)) {
         throw new RuntimeException('图片保存失败，请稍后重试。');
+    }
+
+    if ($saved && $subDir === POST_UPLOAD_DIR && in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+        generate_post_image_variants($target, $relative, $mime);
     }
 
     return normalize_uploaded_relative_path($relative);
@@ -750,6 +864,13 @@ function delete_uploaded_asset(?string $path): void {
     $target = __DIR__ . '/' . $normalized;
     if (is_file($target)) {
         @unlink($target);
+    }
+    $relative = preg_replace('#^uploads/#', '', $normalized);
+    foreach (array_keys(IMAGE_VARIANTS) as $variant) {
+        $variantTarget = UPLOAD_ROOT . '/' . image_variant_relative_path($relative, $variant);
+        if (is_file($variantTarget)) {
+            @unlink($variantTarget);
+        }
     }
 }
 
@@ -875,10 +996,14 @@ function default_home_copy_settings(): array {
 }
 
 function get_site_setting(string $key, ?string $default = null): ?string {
-    $stmt = db()->prepare('SELECT setting_value FROM site_settings WHERE setting_key = :setting_key LIMIT 1');
-    $stmt->execute(['setting_key' => $key]);
-    $value = $stmt->fetchColumn();
-    return $value === false ? $default : (string) $value;
+    static $cache = null;
+    if ($cache === null) {
+        $cache = [];
+        foreach (db()->query('SELECT setting_key, setting_value FROM site_settings')->fetchAll() as $row) {
+            $cache[$row['setting_key']] = (string) $row['setting_value'];
+        }
+    }
+    return array_key_exists($key, $cache) ? $cache[$key] : $default;
 }
 
 function set_site_settings(array $settings): void {
@@ -895,15 +1020,13 @@ function set_site_settings(array $settings): void {
 }
 
 function site_config(): array {
-    $defaults = default_site_settings();
-    $keys = array_keys($defaults);
-    $placeholders = implode(',', array_fill(0, count($keys), '?'));
-    $stmt = db()->prepare('SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN (' . $placeholders . ')');
-    $stmt->execute($keys);
-    $rows = $stmt->fetchAll();
-    $config = $defaults;
-    foreach ($rows as $row) {
-        $config[$row['setting_key']] = (string) $row['setting_value'];
+    static $config = null;
+    if ($config !== null) {
+        return $config;
+    }
+    $config = default_site_settings();
+    foreach ($config as $key => $value) {
+        $config[$key] = get_site_setting($key, (string) $value) ?? (string) $value;
     }
     return $config;
 }
@@ -930,15 +1053,13 @@ function site_int_setting(string $key, int $default): int {
 }
 
 function home_copy_config(): array {
-    $defaults = default_home_copy_settings();
-    $keys = array_keys($defaults);
-    $placeholders = implode(',', array_fill(0, count($keys), '?'));
-    $stmt = db()->prepare('SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN (' . $placeholders . ')');
-    $stmt->execute($keys);
-    $rows = $stmt->fetchAll();
-    $config = $defaults;
-    foreach ($rows as $row) {
-        $config[$row['setting_key']] = (string) $row['setting_value'];
+    static $config = null;
+    if ($config !== null) {
+        return $config;
+    }
+    $config = default_home_copy_settings();
+    foreach ($config as $key => $value) {
+        $config[$key] = get_site_setting($key, (string) $value) ?? (string) $value;
     }
     return $config;
 }
@@ -993,6 +1114,11 @@ function render_pagination(string $basePath, int $page, int $totalPages, array $
 }
 
 function fetch_forum_structure(): array {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
     $categories = db()->query(
         'SELECT c.id, c.name, c.slug, c.description, c.sort_order,
                 b.id AS board_id, b.name AS board_name, b.slug AS board_slug, b.description AS board_description, b.accent_color, b.sort_order AS board_sort_order,
@@ -1029,7 +1155,8 @@ function fetch_forum_structure(): array {
         }
     }
 
-    return array_values($grouped);
+    $cached = array_values($grouped);
+    return $cached;
 }
 
 function fetch_board_options(): array {
@@ -1042,12 +1169,17 @@ function fetch_board_options(): array {
 }
 
 function unread_notification_count(?int $userId): int {
+    static $cache = [];
     if (!$userId) {
         return 0;
     }
+    if (array_key_exists($userId, $cache)) {
+        return $cache[$userId];
+    }
     $stmt = db()->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_user_id = :user_id AND is_read = 0');
     $stmt->execute(['user_id' => $userId]);
-    return (int) $stmt->fetchColumn();
+    $cache[$userId] = (int) $stmt->fetchColumn();
+    return $cache[$userId];
 }
 
 function create_notification(int $recipientUserId, int $actorUserId, string $type, int $postId, ?int $commentId = null, array $meta = []): void {
