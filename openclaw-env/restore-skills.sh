@@ -7,6 +7,10 @@ MANIFEST="${WORKSPACE_DIR}/openclaw-env/skills-manifest.json"
 
 mkdir -p "${SKILLS_DIR}"
 
+export WORKSPACE_DIR
+export SKILLS_DIR
+export MANIFEST
+
 python3 - <<'PY'
 import json, os, shutil, subprocess, tempfile, zipfile, pathlib, urllib.request
 
