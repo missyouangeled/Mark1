@@ -31,7 +31,8 @@ for path in \
   "$WORKSPACE_DIR/.learnings" \
   "$WORKSPACE_DIR/scripts/pulsenest-preview.sh" \
   "$WORKSPACE_DIR/scripts/openclaw-resume-watch.sh" \
-  "$WORKSPACE_DIR/openclaw-env/openclaw.local.example.json"
+  "$WORKSPACE_DIR/openclaw-env/openclaw.local.example.json" \
+  "$WORKSPACE_DIR/openclaw-env/restore-tooling.sh"
 do
   if [ -e "$path" ]; then
     pass "exists: $path"
@@ -64,6 +65,18 @@ if [ -d "$HOME/.openclaw/hooks/self-improvement" ]; then
   pass 'exists: ~/.openclaw/hooks/self-improvement'
 else
   warn 'missing: ~/.openclaw/hooks/self-improvement'
+fi
+
+if [ -f "$HOME/.openclaw/skills/cli-anything/SKILL.md" ]; then
+  pass 'exists: ~/.openclaw/skills/cli-anything/SKILL.md'
+else
+  warn 'missing: ~/.openclaw/skills/cli-anything/SKILL.md'
+fi
+
+if command -v cli-anything >/dev/null 2>&1; then
+  pass 'command available: cli-anything'
+else
+  warn 'missing command: cli-anything'
 fi
 
 printf '\nDone. Warnings usually mean: restore script not run yet, software not installed, or secrets not restored.\n'

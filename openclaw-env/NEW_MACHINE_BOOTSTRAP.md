@@ -45,13 +45,19 @@ bash openclaw-env/restore-openclaw-env.sh
 bash openclaw-env/restore-skills.sh
 ```
 
-### 4. 检查依赖与路径
+### 4. 恢复补充工具层（含 CLI-Anything）
+
+```bash
+bash openclaw-env/restore-tooling.sh
+```
+
+### 5. 检查依赖与路径
 
 ```bash
 bash openclaw-env/post-restore-check.sh
 ```
 
-### 5. 合并 OpenClaw 配置样板
+### 6. 合并 OpenClaw 配置样板
 
 参考：
 
@@ -68,7 +74,7 @@ bash openclaw-env/post-restore-check.sh
 - identity
 - private auth fields
 
-### 6. 恢复 hooks / 服务
+### 7. 恢复 hooks / 服务
 
 ```bash
 systemctl --user daemon-reload
@@ -77,7 +83,7 @@ systemctl --user enable --now openclaw-resume-watch.timer
 openclaw hooks enable self-improvement
 ```
 
-### 7. 验证
+### 8. 验证
 
 ```bash
 systemctl --user status pulsenest-preview.service
@@ -98,7 +104,8 @@ openclaw gateway status
 - `memory/*.md` 和 `.learnings/*.md` 在仓库中可见
 - `pulsenest-preview.service` 已可启动
 - `openclaw-resume-watch.timer` 已可启动
-- `restore-skills.sh` 可以按清单恢复：`self-improving-agent`、`skill-vetter`、`evolver`、`creaa-ai`
+- `restore-skills.sh` 可以按清单恢复 Skills
+- `restore-tooling.sh` 可以恢复 CLI-Anything 本地仓库、OpenClaw skill 和 `cli-anything` helper 命令
 
 ## 仍然需要手动处理的内容
 
@@ -107,6 +114,7 @@ openclaw gateway status
 - OpenClaw credentials
 - 设备配对信息
 - 浏览器 profile / 本机软件安装路径差异
+- 当前默认模型 / provider 登录态（本机当前锚点：`github-copilot/gpt-5.4`）
 
 ## 一句话理解
 

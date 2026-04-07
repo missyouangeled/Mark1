@@ -80,5 +80,9 @@
         "enabled": true
       }
     }
+  },
+  "notes": {
+    "currentDefaultModel": "github-copilot/gpt-5.4",
+    "upgradeRestoreHint": "Restore or relogin the provider for the default model after upgrade; do not copy private tokens from another machine blindly."
   }
 }
