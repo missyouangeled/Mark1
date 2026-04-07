@@ -109,6 +109,7 @@ openclaw gateway status
 ```
 
 另见：
+- `openclaw-env/QUICK_RECOVERY.md`
 - `openclaw-env/NEW_MACHINE_BOOTSTRAP.md`
 - `openclaw-env/secrets-checklist.example.md`
 - `openclaw-env/skills-manifest.json`
