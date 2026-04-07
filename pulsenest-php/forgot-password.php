@@ -54,7 +54,7 @@ render_header('PulseNest · 找回密码', $user, ['showSearch' => false, 'heade
     </section>
 
     <section class="glass auth-panel nebula-form-panel standalone-panel">
-      <div class="section-kicker">Reset Password</div>
+      <div class="section-kicker">密码找回</div>
       <h2>忘记密码</h2>
       <p class="desc">输入注册邮箱，系统会生成一个本地可用的重置 token，并写入数据库。原型阶段不发真实邮件，但整个流程可以完整走通。</p>
 

@@ -108,6 +108,13 @@ $userPostCountStmt->execute(['user_id' => $user['id']]);
 $userPostCount = (int) $userPostCountStmt->fetchColumn();
 
 $currentResultCount = count($notifications);
+$complexNotificationCount = 0;
+foreach ($notifications as $notificationRow) {
+    if (in_array($notificationRow['type'] ?? '', ['comment_moderated', 'post_moderated', 'report_processed'], true) || !empty($notificationRow['comment_content']) || !empty($notificationRow['note'])) {
+        $complexNotificationCount++;
+    }
+}
+$hasDenseNotificationFlow = $currentResultCount >= 8 || $complexNotificationCount >= 4;
 $notificationFocus = match (true) {
     $unreadCount > 0 && in_array($selectedType, ['comment_reply', 'post_reply'], true) => [
         'label' => '优先接住回复',
@@ -134,6 +141,7 @@ $interactionClosure = creator_loop_summary($user, [
     'post_count' => $userPostCount,
     'unread_count' => $unreadCount,
 ]);
+$notificationMix = notification_mix_summary($typeRows, $unreadCount, $todayCount, $weekCount);
 render_header('PulseNest · 我的提醒', $user, [
     'searchText' => '🔎 提醒支持未读筛选、类型筛选、批量已读和按类型清空',
 ]);
@@ -161,7 +169,7 @@ render_header('PulseNest · 我的提醒', $user, [
       </div>
     </div>
     <aside class="glass side-card nebula-side-panel ops-side-panel">
-      <div class="section-kicker">Quick Action</div>
+      <div class="section-kicker">快速操作</div>
       <form method="get" class="form compact-form">
         <input type="hidden" name="type" value="<?= e($selectedType) ?>">
         <label class="muted"><input type="checkbox" name="unread" value="1" <?= $onlyUnread ? 'checked' : '' ?>> 只看未读</label>
@@ -182,7 +190,7 @@ render_header('PulseNest · 我的提醒', $user, [
 
   <section class="glass panel-card surface-section notification-route-strip">
     <div class="creator-route-copy">
-      <div class="section-kicker">Response Rhythm</div>
+      <div class="section-kicker">提醒节奏</div>
       <h3><?= e($notificationFocus['label']) ?></h3>
       <p class="muted"><?= e($notificationFocus['note']) ?></p>
     </div>
@@ -195,7 +203,7 @@ render_header('PulseNest · 我的提醒', $user, [
 
   <section class="glass panel-card surface-section interaction-closure-strip">
     <div class="creator-route-copy">
-      <div class="section-kicker">After Interaction</div>
+      <div class="section-kicker">互动后续</div>
       <h3><?= e($interactionClosure['label']) ?></h3>
       <p class="muted"><?= e($interactionClosure['note']) ?></p>
     </div>
@@ -206,9 +214,22 @@ render_header('PulseNest · 我的提醒', $user, [
     </div>
   </section>
 
+  <section class="glass panel-card surface-section notification-mix-strip">
+    <div class="creator-route-copy">
+      <div class="section-kicker">当前信号</div>
+      <h3><?= e($notificationMix['label']) ?></h3>
+      <p class="muted"><?= e($notificationMix['note']) ?></p>
+    </div>
+    <div class="creator-route-meta">
+      <div class="route-mini-card"><strong><?= e($notificationMix['meta']) ?></strong><span>当前主信号</span></div>
+      <div class="route-mini-card"><strong><?= count($typeRows) ?></strong><span>活跃类型</span></div>
+      <div class="route-mini-card"><strong><?= $onlyUnread ? '未读视角' : '全部视角' ?></strong><span>当前筛选状态</span></div>
+    </div>
+  </section>
+
   <section class="glass panel-card admin-panel-card surface-section surface-section-tight">
-    <div class="section-kicker">Filter</div>
-    <div class="side-head admin-head-row"><h3>提醒筛选与批量操作</h3><span class="muted">先筛，再一键处理当前类型。</span></div>
+    <div class="section-kicker">筛选与处理</div>
+    <div class="side-head admin-head-row"><h3>提醒筛选与批量处理</h3><span class="muted">先缩小视角，再集中处理同一批提醒，读感会更稳。</span></div>
     <form class="admin-filter-row" method="get" action="/notifications.php">
       <select class="input admin-filter-input" name="type">
         <option value="">全部类型</option>
@@ -239,7 +260,7 @@ render_header('PulseNest · 我的提醒', $user, [
   </section>
 
   <section class="glass panel-card admin-panel-card surface-section">
-    <div class="section-kicker">Type Snapshot</div>
+    <div class="section-kicker">类型快照</div>
     <div class="side-head admin-head-row"><h3>提醒类型分布</h3><span class="muted">你能快速看出最近更多是被回复，还是被点赞。</span></div>
     <div class="admin-table-wrap">
       <table class="admin-table compact-table">
@@ -270,11 +291,11 @@ render_header('PulseNest · 我的提醒', $user, [
   </section>
 
   <section class="glass panel-card surface-section notification-feed-section">
-    <div class="section-kicker">Notification Feed</div>
+    <div class="section-kicker">提醒列表</div>
     <div class="side-head admin-head-row"><h3>提醒列表</h3><span class="muted">评论审核通知会直接标出“已通过 / 已隐藏”，不再只给一个模糊的状态更新。</span></div>
-    <div class="list-stack notification-stack curated-stack">
+    <div class="list-stack notification-stack curated-stack <?= $hasDenseNotificationFlow ? 'notification-stack--dense' : '' ?>">
       <?php if (!$notifications): ?>
-        <div class="empty-inline nebula-empty">当前筛选条件下没有提醒。换个类型，或者等下一次互动把这里点亮。</div>
+        <div class="empty-inline nebula-empty">当前这个视角下还没有提醒。可以换个筛选看看，或者先回内容流等下一次互动回来。</div>
       <?php else: ?>
         <?php foreach ($notifications as $item): ?>
           <?php $moderationCopy = match ($item['type'] ?? '') {
@@ -283,7 +304,7 @@ render_header('PulseNest · 我的提醒', $user, [
             'report_processed' => notification_report_copy($item['moderation_status'] ?? null, $item['note'] ?? null),
             default => null,
           }; ?>
-          <article class="notification-card <?= (int) $item['is_read'] === 0 ? 'unread' : '' ?>">
+          <article class="notification-card <?= implode(' ', array_filter([(int) $item['is_read'] === 0 ? 'unread' : null, $moderationCopy || !empty($item['comment_content']) ? 'notification-card--complex' : null])) ?>">
             <div class="post-head">
               <div class="user">
                 <?= render_avatar([
@@ -310,17 +331,30 @@ render_header('PulseNest · 我的提醒', $user, [
               }) ?>
               <a class="inline-link" href="/post.php?id=<?= (int) $item['post_id'] ?>"><?= e($item['title']) ?></a>
             </div>
-            <?php if ($moderationCopy): ?>
-              <div class="chips" style="margin-top: 10px; gap: 6px;">
-                <span class="chip"><?= e(($item['type'] ?? '') === 'report_processed' ? '处理结果' : '审核结果') ?> · <?= e($moderationCopy['label']) ?></span>
-                <?php if (!empty($item['comment_content'])): ?><span class="chip">评论已留痕</span><?php endif; ?>
+            <?php if ($moderationCopy || !empty($item['comment_content'])): ?>
+              <div class="notification-detail-stack">
+                <?php if ($moderationCopy): ?>
+                  <div class="chips" style="margin-top: 0; gap: 6px;">
+                    <span class="chip"><?= e(($item['type'] ?? '') === 'report_processed' ? '处理结果' : '审核结果') ?> · <?= e($moderationCopy['label']) ?></span>
+                    <?php if (!empty($item['comment_content'])): ?><span class="chip">评论已留痕</span><?php endif; ?>
+                  </div>
+                  <div class="notification-detail-line">
+                    <span class="notification-detail-label"><?= e(($item['type'] ?? '') === 'report_processed' ? '处理说明' : '审核说明') ?></span>
+                    <div class="notification-detail-text"><?= e($moderationCopy['description']) ?></div>
+                  </div>
+                <?php endif; ?>
+                <?php if (!empty($item['comment_content'])): ?>
+                  <div class="notification-detail-line notification-detail-line-secondary">
+                    <span class="notification-detail-label">关联正文</span>
+                    <div class="notification-detail-text"><?= e(excerpt($item['comment_content'], 120)) ?></div>
+                  </div>
+                <?php endif; ?>
               </div>
-              <div class="muted" style="margin-top: 8px;"><?= e($moderationCopy['description']) ?></div>
             <?php endif; ?>
-            <?php if (!empty($item['comment_content'])): ?>
-              <div class="muted" style="margin-top: 8px;">关联评论：<?= e(excerpt($item['comment_content'], 72)) ?></div>
-            <?php endif; ?>
-            <div class="notification-followup-note"><?= e(notification_follow_up_hint($item)) ?></div>
+            <div class="notification-followup-note">
+              <span class="notification-detail-label">后续动作</span>
+              <div class="notification-detail-text"><?= e(notification_follow_up_hint($item)) ?></div>
+            </div>
           </article>
         <?php endforeach; ?>
       <?php endif; ?>

@@ -21,6 +21,7 @@ $profileStats = [];
 $governanceSummary = null;
 $governanceRecentRows = [];
 $reportSummary = null;
+$recentPostsCoverMode = 'mixed';
 $publicProfileSummary = $profile ? profile_completion_summary($profile, [
     'include_post' => true,
     'post_count' => (int) ($profile['post_count'] ?? 0),
@@ -102,6 +103,14 @@ if ($profile) {
     );
     $recentStmt->execute(['id' => $profile['id']]);
     $recentPosts = $recentStmt->fetchAll();
+    if ($recentPosts) {
+        $coverCount = count(array_filter($recentPosts, static fn(array $post): bool => !empty($post['image_path'])));
+        if ($coverCount === count($recentPosts)) {
+            $recentPostsCoverMode = 'all-cover';
+        } elseif ($coverCount === 0) {
+            $recentPostsCoverMode = 'all-text';
+        }
+    }
 }
 
 if (!$profile) {
@@ -127,7 +136,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
         <div class="nebula-copy">
           <div class="brand-chip">纳达尔星项目 · 星云初始03 · 作者主页</div>
           <h1><?= e($profile['nickname']) ?> 的社区主页</h1>
-          <p class="page-desc nebula-desc"><?= e($profile['bio'] ?: '这里展示这个成员的公开发帖、社区数据与基本资料。') ?></p>
+          <p class="page-desc nebula-desc"><?= e($profile['bio'] ?: '这里展示这个成员的公开内容、社区数据与基本资料，让作者形象和内容入口能被一起读懂。') ?></p>
           <div class="hero-editorial-note">把一个创作者在社区里的公开痕迹，整理成一张可持续浏览的名片。</div>
           <div class="chips" style="gap:6px; margin-top: 4px;">
             <?php if (!empty($profile['location'])): ?><span class="chip">常驻：<?= e($profile['location']) ?></span><?php endif; ?>
@@ -161,26 +170,40 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
       <div class="nebula-section-grid user-grid">
         <section class="right-col-stack">
           <div class="glass panel-card surface-section">
-            <div class="section-kicker">Recent Posts</div>
+            <div class="section-kicker">最近内容</div>
             <div class="side-head"><h3>最近公开内容</h3></div>
+            <?php if ($recentPostsCoverMode !== 'mixed' && $recentPosts): ?>
+              <div class="profile-post-rhythm-note <?= e($recentPostsCoverMode === 'all-cover' ? 'all-cover' : 'all-text') ?>">
+                <?= e($recentPostsCoverMode === 'all-cover'
+                  ? '这一组最近内容当前全部带封面图，所以卡片节奏会刻意压得更整齐一些，避免连续六张图把页面压得太满。'
+                  : '这一组最近内容当前全部是纯文本入口，所以卡片补了一层更稳定的文字占位和轻节奏，避免整列像还没收完的草稿区。') ?>
+              </div>
+            <?php endif; ?>
             <?php if (!$recentPosts): ?>
-              <div class="empty-inline nebula-empty">这个用户暂时还没有发过帖子。</div>
+              <div class="empty-inline nebula-empty">这个作者暂时还没有公开内容，这张主页现在更像一张安静的名片。</div>
             <?php else: ?>
-              <div class="list-stack profile-post-stack">
+              <div class="list-stack profile-post-stack <?= e('profile-post-stack-' . $recentPostsCoverMode) ?>">
                 <?php foreach ($recentPosts as $post): ?>
-                  <article class="glass panel-card profile-post-card inner-card">
+                  <article class="glass panel-card profile-post-card inner-card <?= !empty($post['image_path']) ? 'has-cover' : 'no-cover' ?>">
                     <?php if (!empty($post['image_path'])): ?>
-                      <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'card')) ?>" alt="<?= e($post['title']) ?>" loading="lazy" decoding="async" fetchpriority="low"></div>
-                    <?php endif; ?>
-                    <h3 class="post-title small"><a href="/post.php?id=<?= (int) $post['id'] ?>"><?= e($post['title']) ?></a></h3>
-                    <p class="post-text compact"><?= e(excerpt($post['content'], 140)) ?></p>
-                    <div class="list-card-footer">
-                      <div class="chips">
-                        <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
-                        <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
-                        <span class="chip"><?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
+                      <div class="post-cover-wrap profile-post-cover"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'card')) ?>" alt="<?= e($post['title']) ?>" loading="lazy" decoding="async" fetchpriority="low"></div>
+                    <?php else: ?>
+                      <div class="profile-post-cover profile-post-cover-placeholder" aria-hidden="true">
+                        <span class="small-chip b">纯文本内容</span>
+                        <strong>这篇内容没有封面图，保持更安静的文字入口。</strong>
                       </div>
-                      <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">阅读全文 →</a>
+                    <?php endif; ?>
+                    <div class="profile-post-copy">
+                      <h3 class="post-title small"><a href="/post.php?id=<?= (int) $post['id'] ?>"><?= e($post['title']) ?></a></h3>
+                      <p class="post-text compact"><?= e(excerpt($post['content'], 140)) ?></p>
+                      <div class="list-card-footer">
+                        <div class="chips">
+                          <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
+                          <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
+                          <span class="chip"><?= (int) ($post['view_count'] ?? 0) ?> 浏览</span>
+                        </div>
+                        <a class="link" href="/post.php?id=<?= (int) $post['id'] ?>">阅读全文 →</a>
+                      </div>
                     </div>
                   </article>
                 <?php endforeach; ?>
@@ -191,7 +214,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
 
         <aside class="right-col-stack">
           <section class="glass panel-card surface-section">
-            <div class="section-kicker">Presence Layer</div>
+            <div class="section-kicker">公开名片状态</div>
             <div class="side-head"><h3>公开名片状态</h3></div>
             <?php if ($publicProfileSummary): ?>
               <div class="profile-progress-card compact-profile-progress">
@@ -229,7 +252,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
           </section>
 
           <section class="glass panel-card surface-section">
-            <div class="section-kicker">Profile Data</div>
+            <div class="section-kicker">公开资料</div>
             <div class="side-head"><h3>作者公开资料</h3></div>
             <div class="detail-list">
               <div class="detail-row"><span>昵称</span><strong><?= e($profile['nickname']) ?></strong></div>
@@ -247,7 +270,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
 
           <?php if ($governanceSummary): ?>
             <section class="glass panel-card surface-section">
-              <div class="section-kicker">Governance</div>
+              <div class="section-kicker">治理视图</div>
               <div class="side-head"><h3>治理与风险视图</h3></div>
               <div class="detail-list">
                 <div class="detail-row"><span>治理记录总数</span><strong><?= (int) ($governanceSummary['total_notes'] ?? 0) ?></strong></div>
@@ -271,7 +294,7 @@ render_header($profile ? ('PulseNest · ' . $profile['nickname']) : 'PulseNest �
           <?php endif; ?>
 
           <section class="glass panel-card surface-section">
-            <div class="section-kicker">Quick Jump</div>
+            <div class="section-kicker">继续浏览</div>
             <div class="side-head"><h3>继续浏览</h3></div>
             <div class="quick-links curated-stack">
               <a class="quick-link" href="/posts.php"><strong>全部帖子</strong><span>回到公开内容流，继续浏览社区讨论。</span></a>

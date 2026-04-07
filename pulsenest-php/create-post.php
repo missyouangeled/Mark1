@@ -75,17 +75,17 @@ render_header('PulseNest · 发帖', $user, [
       </div>
 
       <aside class="glass side-card nebula-side-panel">
-        <div class="section-kicker">Posting Guide</div>
+        <div class="section-kicker">发布提示</div>
         <div class="quick-links">
-          <div class="quick-link static-link">先选版块，再写标题和正文，内容结构会更像真论坛。</div>
-          <div class="quick-link static-link">标题建议 4~120 字，正文至少 10 字。</div>
-          <div class="quick-link static-link">图片支持 JPG / PNG / GIF / WEBP，大小 5MB 内。</div>
+          <div class="quick-link static-link">先选版块，再写标题和正文，内容落点会更准，后续也更容易接互动。</div>
+          <div class="quick-link static-link">标题建议 4~120 字，正文至少 10 字，尽量让读者一眼看懂你想聊什么。</div>
+          <div class="quick-link static-link">图片支持 JPG / PNG / GIF / WEBP，大小 5MB 内；上传后会自动生成前台展示版本。</div>
         </div>
       </aside>
     </section>
 
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
-      <div class="kicker">Create Post</div>
+      <div class="kicker">发布内容</div>
       <h2>发布一篇新帖子</h2>
       <p class="desc">继续沿用星云初始03的轻玻璃面板，但帖子已正式接入分类 / 版块系统。</p>
 
@@ -110,13 +110,13 @@ render_header('PulseNest · 发帖', $user, [
           <textarea class="textarea compose-textarea" name="content" placeholder="写下你想分享的内容、感受或推荐理由"><?= e($form['content']) ?></textarea>
         </div>
         <div class="field">
-          <label>帖子图片（可选）</label>
+          <label>帖子封面（可选）</label>
           <input class="input file-input" type="file" name="cover_image" accept="image/jpeg,image/png,image/gif,image/webp" />
-          <div class="field-tip">上传后会自动压到更适合前台展示的尺寸，并生成列表 / 详情所需版本。</div>
+          <div class="field-tip">上传后会自动压到更适合前台展示的尺寸，并生成列表页 / 详情页会用到的版本；建议优先使用主体清晰、边缘不过杂的横图。</div>
         </div>
         <div class="compose-actions">
           <a class="pill-btn" href="/posts.php">先看看帖子列表</a>
-          <button class="submit" type="submit">发布到 PulseNest</button>
+          <button class="submit" type="submit">发布这篇内容</button>
         </div>
       </form>
     </section>

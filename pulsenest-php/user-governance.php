@@ -238,7 +238,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
 
     <div class="nebula-section-grid admin-grid-two">
       <section class="glass panel-card admin-panel-card surface-section">
-        <div class="section-kicker">Quick Action</div>
+        <div class="section-kicker">快速操作</div>
         <div class="side-head admin-head-row"><h3>直接追加治理记录</h3><span class="muted">在这个档案页内就能补警告、观察、封禁记录。</span></div>
         <form method="post" class="admin-inline-stack" style="align-items:flex-start; flex-wrap:wrap;">
           <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
@@ -261,7 +261,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
       </section>
 
       <section class="glass panel-card admin-panel-card surface-section">
-        <div class="section-kicker">Recent Posts</div>
+        <div class="section-kicker">最近帖子</div>
         <div class="side-head admin-head-row"><h3>最近帖子</h3><span class="muted">直接看用户最近发了什么，配合治理记录判断上下文。</span></div>
         <div class="list-stack">
           <?php foreach ($recentPosts as $row): ?>
@@ -279,7 +279,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
 
     <div class="nebula-section-grid admin-grid-two">
       <section class="glass panel-card admin-panel-card surface-section">
-        <div class="section-kicker">Recent Comments</div>
+        <div class="section-kicker">最近评论</div>
         <div class="side-head admin-head-row"><h3>最近评论</h3><span class="muted">补齐用户最近评论上下文，方便判断问题是否持续发生。</span></div>
         <div class="list-stack">
           <?php foreach ($recentComments as $row): ?>
@@ -297,7 +297,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
 
     <div class="nebula-section-grid admin-grid-two">
       <section class="glass panel-card admin-panel-card surface-section">
-        <div class="section-kicker">Governance Notes</div>
+        <div class="section-kicker">治理记录</div>
         <div class="side-head admin-head-row"><h3>完整治理记录</h3><span class="muted">这里按时间倒序列出当前用户的所有治理动作，并可直接更新状态。</span></div>
         <div class="admin-table-wrap">
           <table class="admin-table compact-table">
@@ -334,7 +334,7 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
       </section>
 
       <section class="glass panel-card admin-panel-card surface-section">
-        <div class="section-kicker">Reported Content</div>
+        <div class="section-kicker">被举报内容</div>
         <div class="side-head admin-head-row"><h3>最近被举报内容</h3><span class="muted">帖子举报与评论举报统一收口在这里，方便 staff 快速回看。</span></div>
         <div class="admin-table-wrap">
           <table class="admin-table compact-table">
@@ -360,11 +360,11 @@ render_header($profile ? ('PulseNest · 治理档案 · ' . $profile['nickname']
     </div>
 
     <section class="glass panel-card surface-section">
-      <div class="section-kicker">Quick Jump</div>
+      <div class="section-kicker">相关入口</div>
       <div class="quick-links curated-stack">
-        <a class="quick-link" href="/admin.php#users">返回用户管理</a>
-        <a class="quick-link" href="/user.php?id=<?= (int) $profile['id'] ?>">切回普通用户主页视图</a>
-        <a class="quick-link" href="/posts.php">查看全部帖子</a>
+        <a class="quick-link" href="/admin.php#users"><strong>返回用户管理</strong><span>回到后台用户列表，继续处理账号与权限相关工作。</span></a>
+        <a class="quick-link" href="/user.php?id=<?= (int) $profile['id'] ?>"><strong>切回普通主页视图</strong><span>从公开侧重新查看这位成员的资料、内容和对外承接面。</span></a>
+        <a class="quick-link" href="/posts.php"><strong>查看全部帖子</strong><span>回到公开内容流，继续顺着帖子和互动看社区状态。</span></a>
       </div>
     </section>
   <?php endif; ?>

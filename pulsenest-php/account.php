@@ -125,6 +125,29 @@ $creatorLoop = creator_loop_summary($user, [
     'profile_summary' => $profileSummary,
     'latest_feedback' => $latestJourneyFeedback,
 ]);
+$profileSurfaceStatus = [
+    [
+        'label' => '公开主页',
+        'status' => $profileCompletion >= 80 ? '已成型' : '仍在补层',
+        'note' => $profileCompletion >= 80
+            ? '访客看到的作者名片已经比较完整。'
+            : '头像、简介和公开资料还可以再补一层。',
+    ],
+    [
+        'label' => '帖子作者卡',
+        'status' => $postCount > 0 ? '已接通' : '等待首帖',
+        'note' => $postCount > 0
+            ? '发帖后，资料会同步承接到详情页作者区。'
+            : '先发出第一篇内容，作者卡才会真正开始工作。',
+    ],
+    [
+        'label' => '提醒承接',
+        'status' => $unreadCount > 0 ? '有回流' : '当前安静',
+        'note' => $unreadCount > 0
+            ? '提醒中心已经有新的互动回到你这里。'
+            : '还没有新的提醒压力，可以按自己的节奏继续。',
+    ],
+];
 $accountNextAction = match (true) {
     $postCount <= 0 && !empty($profileSummary['missing']) => '先把公开资料补完整，再发出第一篇内容，账号会更自然地从注册完成过渡到真正上线。',
     $postCount <= 0 => '资料层已经够用，下一步最值得做的是发出第一篇公开内容，把主页和作者卡真正点亮。',
@@ -152,7 +175,7 @@ render_header('PulseNest · 会员中心', $user, [
     <?php if ($showProfileReminder): ?>
       <section class="glass panel-card surface-section profile-reminder-banner">
         <div>
-          <div class="section-kicker">Profile Reminder</div>
+          <div class="section-kicker">资料提醒</div>
           <h3>你的账号已经用了几天，顺手把资料再补一层会更像正式社区名片。</h3>
           <p class="muted"><?= $profilePrompt ? e($profilePrompt['hint']) : '补齐头像、简介和公开信息后，主页与作者卡会完整很多。'; ?></p>
         </div>
@@ -163,7 +186,7 @@ render_header('PulseNest · 会员中心', $user, [
     <?php if (!empty($profileSummary['missing'])): ?>
       <section class="glass panel-card surface-section profile-guide-strip <?= $isFreshMember ? 'is-new' : 'is-returning' ?>">
         <div class="profile-guide-copy">
-          <div class="section-kicker"><?= $isFreshMember ? 'New Member Route' : 'Profile Nudge' ?></div>
+          <div class="section-kicker"><?= $isFreshMember ? '新成员路径' : '资料补层提示' ?></div>
           <h3><?= e($profileGuidance['header']) ?></h3>
           <p class="muted"><?= e($profileGuidance['subtle']) ?></p>
         </div>
@@ -212,7 +235,7 @@ render_header('PulseNest · 会员中心', $user, [
 
     <section class="glass panel-card surface-section creator-route-strip">
       <div class="creator-route-copy">
-        <div class="section-kicker">Creator Route</div>
+        <div class="section-kicker">成员路径</div>
         <h3>把“注册完成 → 资料成型 → 发内容 → 接互动”收成一条更顺的个人路径。</h3>
         <p class="muted"><?= e($accountNextAction) ?></p>
       </div>
@@ -235,8 +258,8 @@ render_header('PulseNest · 会员中心', $user, [
     <div class="nebula-section-grid account-grid">
       <div class="right-col-stack">
         <section id="profile-studio" class="glass panel-card surface-section">
-          <div class="section-kicker">Profile Studio</div>
-          <div class="side-head"><h3>资料与头像</h3></div>
+          <div class="section-kicker">资料工作台</div>
+          <div class="side-head"><h3>资料与头像</h3><span class="muted">把公开名片会被看到的那几层信息一次收拾好。</span></div>
           <form class="form" method="post" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <div class="avatar-upload-row avatar-upload-row-enhanced">
@@ -244,14 +267,14 @@ render_header('PulseNest · 会员中心', $user, [
                 <div id="account-avatar-preview-root" data-fallback="<?= e(avatar_fallback_text($user)) ?>">
                   <?= render_avatar($user, 'user-avatar large account-avatar-preview') ?>
                 </div>
-                <div class="field-tip avatar-preview-tip">公开页、帖子页和提醒页都会同步使用这张头像。</div>
+                <div class="field-tip avatar-preview-tip">作者主页、帖子作者卡和提醒中心都会同步使用这张头像。</div>
                 <div id="avatar-preview-state" class="avatar-preview-state muted"><?= !empty($user['avatar_path']) ? '当前正在使用这张头像' : '当前为默认字母头像' ?></div>
               </div>
               <div class="field grow-field">
                 <label>上传头像</label>
                 <input id="avatar-input" class="input file-input" type="file" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp" />
-                <div class="field-tip">支持 JPG / PNG / GIF / WEBP，大小 5MB 内。上传新头像后会自动替换旧头像；本地会先显示预览，不需要先保存才能确认观感。</div>
-                <div class="field-tip">建议使用居中、清晰、接近方图的头像，这样在作者卡和小尺寸列表里会更稳。</div>
+                <div class="field-tip">支持 JPG / PNG / GIF / WEBP，大小 5MB 内。上传新头像后会自动替换旧头像；本地会先显示预览，不需要先保存就能先确认观感。</div>
+                <div class="field-tip">建议使用主体居中、边缘干净、接近方图的头像，这样在作者卡、小尺寸列表和提醒流里都会更稳、更清晰。</div>
                 <?php if (!empty($user['avatar_path'])): ?>
                   <label class="checkbox-inline"><input type="checkbox" name="remove_avatar" value="1">移除当前头像，改用默认字母头像</label>
                 <?php endif; ?>
@@ -283,8 +306,8 @@ render_header('PulseNest · 会员中心', $user, [
         </section>
 
         <section class="glass panel-card surface-section">
-          <div class="section-kicker">Profile Completion</div>
-          <div class="side-head"><h3>下一步建议</h3></div>
+          <div class="section-kicker">完善进度</div>
+          <div class="side-head"><h3>下一步建议</h3><span class="muted">不堆任务，只给当前阶段最自然的下一步。</span></div>
           <div class="profile-progress-card">
             <div class="profile-progress-head">
               <strong>资料完成度 <?= $profileCompletion ?>%</strong>
@@ -343,8 +366,8 @@ render_header('PulseNest · 会员中心', $user, [
         </section>
 
         <section class="glass panel-card surface-section">
-          <div class="section-kicker">My Recent Posts</div>
-          <div class="side-head"><h3>最近发布与当前状态</h3></div>
+          <div class="section-kicker">最近内容</div>
+          <div class="side-head"><h3>最近发布与当前状态</h3><span class="muted">把“发出去之后发生了什么”讲清楚，而不是只列时间。</span></div>
           <?php if (!$latestPosts): ?>
             <div class="empty-inline nebula-empty">你还没有发帖，先去写第一篇吧。</div>
           <?php else: ?>
@@ -365,8 +388,8 @@ render_header('PulseNest · 会员中心', $user, [
 
       <aside class="right-col-stack">
         <section class="glass panel-card surface-section">
-          <div class="section-kicker">Member Data</div>
-          <div class="side-head"><h3>当前账号信息</h3></div>
+          <div class="section-kicker">账号信息</div>
+          <div class="side-head"><h3>当前账号信息</h3><span class="muted">把对内信息、公开信息和当前阶段放在同一层读。</span></div>
           <div class="detail-list">
             <div class="detail-row"><span>昵称</span><strong><?= e($user['nickname']) ?></strong></div>
             <div class="detail-row"><span>用户名</span><strong>@<?= e($user['username']) ?></strong></div>
@@ -388,7 +411,21 @@ render_header('PulseNest · 会员中心', $user, [
         </section>
 
         <section class="glass panel-card surface-section">
-          <div class="section-kicker">Role Boundary</div>
+          <div class="section-kicker">公开承接面</div>
+          <div class="side-head"><h3>公开承接面</h3></div>
+          <div class="profile-next-step-list compact-surface-list">
+            <?php foreach ($profileSurfaceStatus as $surface): ?>
+              <div class="profile-next-step-item compact-surface-item">
+                <strong><?= e($surface['label']) ?> · <?= e($surface['status']) ?></strong>
+                <span><?= e($surface['note']) ?></span>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <div class="notice subtle-notice member-role-notice">这三个面会一起影响别人如何认识你：主页负责第一印象，作者卡负责内容承接，提醒中心负责把互动重新带回你这里。</div>
+        </section>
+
+        <section class="glass panel-card surface-section">
+          <div class="section-kicker">权限边界</div>
           <div class="side-head"><h3>当前权限边界</h3></div>
           <div class="detail-list">
             <div class="detail-row"><span>普通用户</span><strong>发帖 / 评论 / 资料维护</strong></div>
@@ -405,7 +442,7 @@ render_header('PulseNest · 会员中心', $user, [
         </section>
 
         <section class="glass panel-card surface-section">
-          <div class="section-kicker">Quick Actions</div>
+          <div class="section-kicker">继续操作</div>
           <div class="side-head"><h3>继续操作</h3></div>
           <div class="quick-links curated-stack">
             <a class="quick-link" href="/create-post.php"><strong>写一篇新帖子</strong><span>进入发布页，继续补充你的公开内容。</span></a>

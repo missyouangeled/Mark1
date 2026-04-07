@@ -1000,6 +1000,104 @@ function notification_follow_up_hint(array $item): string {
     };
 }
 
+function notification_mix_summary(array $typeRows, int $unreadCount = 0, int $todayCount = 0, int $weekCount = 0): array {
+    $rows = array_values(array_filter($typeRows, static fn ($row) => (int) ($row['total_count'] ?? 0) > 0));
+    usort($rows, static function (array $a, array $b): int {
+        return ((int) ($b['total_count'] ?? 0) <=> (int) ($a['total_count'] ?? 0))
+            ?: strcmp((string) ($a['type'] ?? ''), (string) ($b['type'] ?? ''));
+    });
+
+    $topRow = $rows[0] ?? null;
+    $topType = (string) ($topRow['type'] ?? '');
+    $systemHeavy = 0;
+    $conversationHeavy = 0;
+    foreach ($rows as $row) {
+        $type = (string) ($row['type'] ?? '');
+        $count = (int) ($row['total_count'] ?? 0);
+        if (in_array($type, ['post_moderated', 'comment_moderated', 'report_processed'], true)) {
+            $systemHeavy += $count;
+        }
+        if (in_array($type, ['post_reply', 'comment_reply'], true)) {
+            $conversationHeavy += $count;
+        }
+    }
+
+    if ($unreadCount > 0 && in_array($topType, ['post_reply', 'comment_reply'], true)) {
+        return [
+            'label' => '对话回流更明显',
+            'note' => '当前提醒里回复类占比更高，说明社区互动正在往对话层收束；先把回复接住，会比盯着数字更像正式运营中的自然动作。',
+            'meta' => notification_type_label($topType) . ' 当前最密集',
+        ];
+    }
+
+    if ($systemHeavy > $conversationHeavy && $systemHeavy > 0) {
+        return [
+            'label' => '系统回执比社交反馈更集中',
+            'note' => '这段时间提醒里更偏审核、举报和流程结果，当前重点更像把站内流程看清楚，而不是立刻追求更多互动动作。',
+            'meta' => '系统型提醒占比较高',
+        ];
+    }
+
+    if ($topRow && in_array($topType, ['post_like', 'comment_like'], true)) {
+        return [
+            'label' => '轻反馈正在累积',
+            'note' => '点赞类提醒更密集，说明内容已经被看见，但讨论还没完全长出来；现在更适合观察是否需要补一个更容易接话的切口。',
+            'meta' => notification_type_label($topType) . ' 最近最多',
+        ];
+    }
+
+    if ($todayCount <= 0 && $weekCount > 0) {
+        return [
+            'label' => '提醒节奏暂时放缓',
+            'note' => '最近一周有回流，但今天相对安静；这更像正常波动，不是系统失效，适合回内容页继续观察或准备下一次公开动作。',
+            'meta' => '今天较安静 / 7 天内仍有回流',
+        ];
+    }
+
+    return [
+        'label' => '提醒分布比较均衡',
+        'note' => '当前既有轻反馈也有流程回执，提醒中心已经更像一个稳定的互动收纳层，处理顺序按未读和类型自然推进就够了。',
+        'meta' => $topRow ? notification_type_label($topType) . ' 占比略高' : '当前提醒量不高',
+    ];
+}
+
+function operations_focus_summary(array $stats): array {
+    $pendingLoad = max(0, (int) ($stats['pending_posts'] ?? 0)) + max(0, (int) ($stats['pending_comments'] ?? 0));
+    $reportLoad = max(0, (int) ($stats['open_reports'] ?? 0)) + max(0, (int) ($stats['reviewing_reports'] ?? 0));
+    $resolvedToday = max(0, (int) ($stats['reports_resolved_today'] ?? 0)) + max(0, (int) ($stats['reports_dismissed_today'] ?? 0));
+    $notificationsToday = max(0, (int) ($stats['notifications_today'] ?? 0));
+
+    if ($reportLoad >= 6 && $reportLoad >= $pendingLoad) {
+        return [
+            'label' => '举报链路优先',
+            'note' => '当前举报积压比内容待审更值得先看，先把 open / reviewing 队列压下去，社区安全感会比继续堆运营位更重要。',
+            'cta' => '先处理举报，再回头看内容分发。',
+        ];
+    }
+
+    if ($pendingLoad >= 6) {
+        return [
+            'label' => '内容积压优先',
+            'note' => '待审帖子和评论已经形成明显积压，当前更像要先疏通发布链路，让内容和互动重新流起来，而不是继续叠新动作。',
+            'cta' => '先清审核队列，保持内容流转。',
+        ];
+    }
+
+    if ($notificationsToday >= 20 && $resolvedToday <= 2) {
+        return [
+            'label' => '互动回流上升中',
+            'note' => '最近 24 小时通知明显增加，说明前台正在形成更多互动回流；后台现在更适合盯通知质量、审核回执和互动承接是否顺。',
+            'cta' => '看通知概况与待审内容，确保回流不断档。',
+        ];
+    }
+
+    return [
+        'label' => '运营节奏相对平稳',
+        'note' => '当前没有明显爆点积压，后台更适合按“看数据 → 巡检内容 → 留痕”这条顺序安静推进，维持长期运营产品该有的稳定感。',
+        'cta' => '按面板顺序例行巡检即可。',
+    ];
+}
+
 function password_reset_token(): string {
     return bin2hex(random_bytes(16));
 }
@@ -1326,25 +1424,25 @@ function default_site_settings(): array {
 
 function default_home_copy_settings(): array {
     return [
-        'home.hero.eyebrow' => '星云初始01 · 首页升级到可运营的论坛首页',
-        'home.hero.title' => '保住这套星云观感的同时，把真正能运营的帖子位也接进来。',
-        'home.hero.body' => '首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。',
-        'home.hero.tag_primary' => '首页运营卡',
-        'home.hero.tag_secondary' => '站内回复提醒',
+        'home.hero.eyebrow' => '纳达尔星项目 · 星云初始03 · 首页主视觉',
+        'home.hero.title' => '把社区首页收口成既能持续运营、又能稳定承接内容的主入口。',
+        'home.hero.body' => '首页不再只是顺序展示最新帖子，而是把主视觉位、焦点卡、推荐内容和社区信号整理进同一条浏览动线里：既保住星云初始03的轻玻璃气质，也让运营重点和真实讨论都能自然被看见。',
+        'home.hero.tag_primary' => '首页运营位',
+        'home.hero.tag_secondary' => '互动回流',
         'home.hero.use_custom_title' => '1',
         'home.hero.use_custom_body' => '1',
-        'home.focus_one.badge' => 'OPS SLOT',
-        'home.focus_one.title' => '焦点卡 1 待绑定',
-        'home.focus_one.body' => '后台可把重点帖子直接塞进这张中部卡位。',
-        'home.focus_one.tag' => '焦点卡 1',
-        'home.focus_two.badge' => 'OPS SLOT',
-        'home.focus_two.title' => '焦点卡 2 待绑定',
-        'home.focus_two.body' => '适合放活动帖、征集帖、版本说明帖。',
-        'home.focus_two.tag' => '焦点卡 2',
-        'home.focus_three.badge' => 'OPS SLOT',
-        'home.focus_three.title' => '焦点卡 3 待绑定',
-        'home.focus_three.body' => '维持视觉稳定，同时把中段内容改成可运营入口。',
-        'home.focus_three.tag' => '焦点卡 3',
+        'home.focus_one.badge' => 'FOCUS SLOT',
+        'home.focus_one.title' => '焦点内容位待接入',
+        'home.focus_one.body' => '适合承接本周重点内容、版本说明或需要持续曝光的主线帖子。',
+        'home.focus_one.tag' => '焦点位一',
+        'home.focus_two.badge' => 'FOCUS SLOT',
+        'home.focus_two.title' => '第二焦点位待接入',
+        'home.focus_two.body' => '适合放活动征集、作者招募或值得继续扩散的讨论入口。',
+        'home.focus_two.tag' => '焦点位二',
+        'home.focus_three.badge' => 'FOCUS SLOT',
+        'home.focus_three.title' => '第三焦点位待接入',
+        'home.focus_three.body' => '为首页中段保留一个更柔和的承接位，方便补齐节奏而不堆信息墙。',
+        'home.focus_three.tag' => '焦点位三',
     ];
 }
 

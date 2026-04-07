@@ -55,7 +55,7 @@ render_header('PulseNest · 登录', null, ['showSearch' => false, 'headerMode' 
     </section>
 
     <section class="glass auth-panel nebula-form-panel">
-      <div class="section-kicker">Sign In</div>
+      <div class="section-kicker">登录入口</div>
       <h2>登录你的 PulseNest 账号</h2>
       <p class="desc">支持邮箱或用户名登录。登录成功后会立即回到首页，并同步你在内容流、提醒中心与会员中心的身份状态。</p>
 

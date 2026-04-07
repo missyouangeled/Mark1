@@ -77,7 +77,7 @@ render_header('PulseNest · 注册', null, ['showSearch' => false, 'headerMode' 
     </section>
 
     <section class="glass auth-panel nebula-form-panel">
-      <div class="section-kicker">Create Account</div>
+      <div class="section-kicker">创建账号</div>
       <h2>创建你的 PulseNest 账号</h2>
       <p class="desc">注册成功后会自动建立 session 并跳回首页。顶部导航、首页主行动、提醒中心和会员中心会立刻切换到你的登录态。</p>
 

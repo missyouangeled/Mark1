@@ -102,17 +102,17 @@ render_header('PulseNest · 编辑帖子', $user, [
       </div>
 
       <aside class="glass side-card nebula-side-panel">
-        <div class="section-kicker">Editing Guide</div>
+        <div class="section-kicker">编辑提示</div>
         <div class="quick-links">
-          <div class="quick-link static-link">可以调整版块归属，但不会打断原有详情页链接。</div>
-          <div class="quick-link static-link">可替换原图，或勾选移除配图。</div>
-          <div class="quick-link static-link">删帖入口仍放在详情页，避免误触。</div>
+          <div class="quick-link static-link">可以调整版块归属，但不会打断原有详情页链接和已有承接入口。</div>
+          <div class="quick-link static-link">可替换原封面，或勾选移除配图；前台展示版本会一起刷新。</div>
+          <div class="quick-link static-link">删帖入口仍放在详情页，避免在编辑链路里误触重动作。</div>
         </div>
       </aside>
     </section>
 
     <section class="glass auth-panel standalone-panel nebula-compose-panel">
-      <div class="kicker">Edit Post</div>
+      <div class="kicker">维护内容</div>
       <h2>编辑当前帖子</h2>
       <p class="desc">继续沿用星云初始03的轻玻璃语言，把“可维护”补到内容生产链路里。</p>
 
@@ -138,15 +138,15 @@ render_header('PulseNest · 编辑帖子', $user, [
         </div>
         <?php if (!empty($post['image_path'])): ?>
           <div class="field">
-            <label>当前配图</label>
+            <label>当前封面</label>
             <div class="post-cover-wrap"><img class="post-cover-image" src="<?= e(image_variant_public_path($post['image_path'], 'detail')) ?>" alt="<?= e($post['title']) ?>" decoding="async" fetchpriority="low"></div>
             <label class="checkbox-inline"><input type="checkbox" name="remove_image" value="1"> <span>移除当前配图</span></label>
           </div>
         <?php endif; ?>
         <div class="field">
-          <label>替换帖子图片（可选）</label>
+          <label>替换帖子封面（可选）</label>
           <input class="input file-input" type="file" name="cover_image" accept="image/jpeg,image/png,image/gif,image/webp" />
-          <div class="field-tip">若上传新图，将覆盖旧图；也可只改文字不换图。</div>
+          <div class="field-tip">若上传新图，将覆盖旧图并同步刷新列表页 / 详情页版本；也可以只改文字不换图。</div>
         </div>
         <div class="compose-actions">
           <a class="pill-btn" href="/post.php?id=<?= (int) $postId ?>">返回帖子详情</a>

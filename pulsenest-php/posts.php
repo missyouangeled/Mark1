@@ -116,7 +116,7 @@ render_header('PulseNest · 帖子列表', $user, [
           <div class="filter-grid two-up">
             <div class="field grow-field">
               <label>搜索帖子</label>
-              <input class="input" name="q" value="<?= e($search) ?>" placeholder="搜标题或正文关键词" />
+              <input class="input" name="q" value="<?= e($search) ?>" placeholder="搜标题、正文或你记得的一句关键词" />
             </div>
             <div class="field grow-field">
               <label>分类</label>
@@ -147,7 +147,7 @@ render_header('PulseNest · 帖子列表', $user, [
               </select>
             </div>
             <div class="filter-actions">
-              <button class="pill-btn solid" type="submit">筛选 / 搜索</button>
+              <button class="pill-btn solid" type="submit">开始筛选</button>
               <a class="pill-btn" href="/posts.php">清空条件</a>
             </div>
           </div>
@@ -161,15 +161,15 @@ render_header('PulseNest · 帖子列表', $user, [
       </div>
 
       <aside class="glass side-card nebula-side-panel ops-side-panel">
-        <div class="section-kicker">Forum Map</div>
+        <div class="section-kicker">论坛地图</div>
         <div class="forum-pills">
           <?php foreach ($forum as $category): ?>
             <a class="forum-pill" href="/posts.php?category=<?= e($category['slug']) ?>"><?= e($category['name']) ?></a>
           <?php endforeach; ?>
         </div>
         <div class="feed-list dense-feed-list">
-          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">检索维度</div><div class="text">标题 / 正文全文关键词搜索已启用。</div></div></div>
-          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">浏览维度</div><div class="text">可先看分类，再落到具体版块。</div></div></div>
+          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">检索维度</div><div class="text">支持按标题、正文和记忆中的关键词继续往回找内容。</div></div></div>
+          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">浏览维度</div><div class="text">可以先看大类，再落到具体版块，不会一下掉进信息墙。</div></div></div>
           <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">最新帖子</div><div class="text"><?= e($latestPost['title'] ?? '还没有任何帖子，等第一篇把这里点亮。') ?></div></div></div>
         </div>
       </aside>
@@ -224,7 +224,7 @@ render_header('PulseNest · 帖子列表', $user, [
       <aside class="right-col-stack">
         <?php foreach ($forum as $category): ?>
           <section class="glass section-card surface-section">
-            <div class="section-kicker">Category</div>
+            <div class="section-kicker">分类导览</div>
             <div class="section-title small-section-title"><?= e($category['name']) ?></div>
             <div class="list-stack compact-link-stack">
               <?php foreach ($category['boards'] as $board): ?>

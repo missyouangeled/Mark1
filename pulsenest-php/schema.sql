@@ -212,24 +212,24 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO site_settings (setting_key, setting_value)
 VALUES
-  ('home.hero.eyebrow', '星云初始01 · 首页升级到可运营的论坛首页'),
-  ('home.hero.title', '保住这套星云观感的同时，把真正能运营的帖子位也接进来。'),
-  ('home.hero.body', '首页现在不只读最新帖子，而是优先吃后台运营位：支持帖子置顶、精华、推荐位排序，以及 Hero / 焦点卡绑定，既不破坏“星云初始01”的视觉锚点，也让首页有了明确运营抓手。'),
-  ('home.hero.tag_primary', '首页运营卡'),
-  ('home.hero.tag_secondary', '站内回复提醒'),
+  ('home.hero.eyebrow', '纳达尔星项目 · 星云初始03 · 首页主视觉'),
+  ('home.hero.title', '把社区首页收口成既能持续运营、又能稳定承接内容的主入口。'),
+  ('home.hero.body', '首页不再只是顺序展示最新帖子，而是把主视觉位、焦点卡、推荐内容和社区信号整理进同一条浏览动线里：既保住星云初始03的轻玻璃气质，也让运营重点和真实讨论都能自然被看见。'),
+  ('home.hero.tag_primary', '首页运营位'),
+  ('home.hero.tag_secondary', '互动回流'),
   ('home.hero.use_custom_title', '1'),
   ('home.hero.use_custom_body', '1'),
-  ('home.focus_one.badge', 'OPS SLOT'),
-  ('home.focus_one.title', '焦点卡 1 待绑定'),
-  ('home.focus_one.body', '后台可把重点帖子直接塞进这张中部卡位。'),
-  ('home.focus_one.tag', '焦点卡 1'),
-  ('home.focus_two.badge', 'OPS SLOT'),
-  ('home.focus_two.title', '焦点卡 2 待绑定'),
-  ('home.focus_two.body', '适合放活动帖、征集帖、版本说明帖。'),
-  ('home.focus_two.tag', '焦点卡 2'),
-  ('home.focus_three.badge', 'OPS SLOT'),
-  ('home.focus_three.title', '焦点卡 3 待绑定'),
-  ('home.focus_three.body', '维持视觉稳定，同时把中段内容改成可运营入口。'),
-  ('home.focus_three.tag', '焦点卡 3')
+  ('home.focus_one.badge', 'FOCUS SLOT'),
+  ('home.focus_one.title', '焦点内容位待接入'),
+  ('home.focus_one.body', '适合承接本周重点内容、版本说明或需要持续曝光的主线帖子。'),
+  ('home.focus_one.tag', '焦点位一'),
+  ('home.focus_two.badge', 'FOCUS SLOT'),
+  ('home.focus_two.title', '第二焦点位待接入'),
+  ('home.focus_two.body', '适合放活动征集、作者招募或值得继续扩散的讨论入口。'),
+  ('home.focus_two.tag', '焦点位二'),
+  ('home.focus_three.badge', 'FOCUS SLOT'),
+  ('home.focus_three.title', '第三焦点位待接入'),
+  ('home.focus_three.body', '为首页中段保留一个更柔和的承接位，方便补齐节奏而不堆信息墙。'),
+  ('home.focus_three.tag', '焦点位三')
 ON DUPLICATE KEY UPDATE
   setting_value = COALESCE(site_settings.setting_value, VALUES(setting_value));

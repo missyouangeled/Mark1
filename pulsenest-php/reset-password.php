@@ -42,26 +42,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record) {
 
 render_header('PulseNest · 重置密码', $user);
 ?>
-  <div class="shell page-shell narrow">
-    <section class="card auth-panel standalone-panel">
-      <div class="kicker">Set New Password</div>
+  <main class="shell auth-shell nebula-auth-shell auth-page-shell">
+    <section class="auth-ambient-panel">
+      <div class="auth-ambient-copy">
+        <div class="auth-badge">纳达尔星项目 · 星云初始03 · 密码更新</div>
+        <h1>把密码更新这一步，也收进同一套安静、清晰的入口体验里。</h1>
+        <p>链接有效时，你可以直接在这里完成密码更新；更新完成后，这条链接会立即失效，避免重复使用。</p>
+        <div class="auth-meta-strip">
+          <span>重置链接一次有效</span>
+          <span>更新后立即失效</span>
+          <span>完成后返回登录入口</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card auth-panel standalone-panel auth-form-panel">
+      <div class="kicker">更新密码</div>
       <h2>重置密码</h2>
-      <p class="desc">只要 token 有效，就可以在这里完成密码更新。更新后该 token 会被立即标记为已使用。</p>
+      <p class="desc">只要这条重置链接仍然有效，就可以在这里安全完成密码更新。</p>
 
       <?php if ($error): ?><div class="notice error"><?= e($error) ?></div><?php endif; ?>
       <?php if ($record): ?>
-        <div class="notice success">正在为邮箱 <?= e($record['email']) ?> 重置密码。</div>
+        <div class="notice success">正在为邮箱 <?= e($record['email']) ?> 更新密码。</div>
         <form class="form" method="post">
           <input type="hidden" name="token" value="<?= e($token) ?>" />
           <div class="grid-2">
             <div class="field"><label>新密码</label><input class="input" type="password" name="password" placeholder="输入新密码" /></div>
             <div class="field"><label>确认新密码</label><input class="input" type="password" name="confirm_password" placeholder="再次输入新密码" /></div>
           </div>
-          <button class="submit" type="submit">保存新密码</button>
+          <button class="submit" type="submit">完成密码更新</button>
         </form>
       <?php else: ?>
-        <div class="bottom-tip">先去 <a class="link" href="/forgot-password.php">忘记密码</a> 页面重新生成一个链接。</div>
+        <div class="bottom-tip">先去 <a class="link" href="/forgot-password.php">忘记密码</a> 页面重新生成一条新的重置链接。</div>
       <?php endif; ?>
     </section>
-  </div>
+  </main>
 <?php render_footer(); ?>

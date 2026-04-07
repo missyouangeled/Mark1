@@ -247,6 +247,8 @@ $postFeedback = $post ? post_feedback_summary($post) : null;
 $isAuthorViewing = $post && $user && (int) $user['id'] === (int) ($post['user_id'] ?? 0);
 $discussionGuide = null;
 $discussionAftercare = null;
+$authorBioLength = $post ? mb_strlen(trim((string) ($post['bio'] ?? ''))) : 0;
+$authorCardIsDense = $post && $authorBioLength >= 160 && (!empty($post['location']) || !empty($post['website_url']));
 if ($post) {
     if (!$user) {
         $discussionGuide = [
@@ -604,12 +606,12 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
             </div>
           </article>
 
-          <section class="glass panel-card surface-section">
-            <div class="section-kicker">Continue Reading</div>
+          <section class="glass panel-card surface-section continue-browse-section">
+            <div class="section-kicker">继续浏览</div>
             <div class="side-head"><h3>继续沿着这条内容线往下看</h3></div>
             <div class="nebula-section-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px;">
               <div class="glass panel-card inner-card">
-                <div class="section-kicker">Same Board</div>
+                <div class="section-kicker">同版块延伸</div>
                 <div class="small-section-title"><?= e($post['board_name'] ?? '当前版块') ?></div>
                 <div class="list-stack compact-link-stack">
                   <?php foreach ($relatedBoardPosts as $item): ?>
@@ -622,7 +624,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 </div>
               </div>
               <div class="glass panel-card inner-card">
-                <div class="section-kicker">More From Author</div>
+                <div class="section-kicker">作者更多内容</div>
                 <div class="small-section-title"><?= e($post['nickname']) ?> 的更多内容</div>
                 <div class="list-stack compact-link-stack">
                   <?php foreach ($relatedAuthorPosts as $item): ?>
@@ -638,7 +640,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
           </section>
 
           <section id="discussion" class="glass panel-card comment-panel surface-section">
-            <div class="section-kicker">Discussion</div>
+            <div class="section-kicker">评论与讨论</div>
             <div class="side-head"><h3>评论区与回复区</h3></div>
             <?php if ($discussionGuide): ?>
               <div class="discussion-guide-card">
@@ -658,17 +660,17 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 <input type="hidden" name="parent_id" value="0">
                 <div class="field">
                   <label>写下你的回复</label>
-                  <textarea class="textarea small-textarea" name="content" placeholder="聊聊你的看法、补充或反驳"></textarea>
+                  <textarea class="textarea small-textarea" name="content" placeholder="聊聊你的看法、补充、延伸或不同意见"></textarea>
                 </div>
                 <button class="submit" type="submit">发布评论</button>
               </form>
             <?php else: ?>
-              <div class="notice">登录后就能参与评论和回复。<a class="link" href="/login.php">去登录</a></div>
+              <div class="notice">登录后就能参与评论和回复，把阅读自然接到讨论里。<a class="link" href="/login.php">去登录</a></div>
             <?php endif; ?>
 
             <div class="comment-list">
               <?php if (!$commentTree): ?>
-                <div class="empty-inline nebula-empty">还没有人回复，来做第一个把讨论点亮的人。</div>
+                <div class="empty-inline nebula-empty">这里还很安静，你可以顺手留下第一条回复，把这篇内容真正接进讨论里。</div>
               <?php else: ?>
                 <?php foreach ($commentTree as $comment): ?>
                   <?php render_comment_item($comment, $user, $postId); ?>
@@ -695,9 +697,9 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
 
         <aside class="right-col-stack">
           <section class="glass section-card surface-section post-side-card">
-            <div class="section-kicker">Author Snapshot</div>
+            <div class="section-kicker">作者名片</div>
             <div class="side-head"><h3>作者名片</h3></div>
-            <div class="author-item detail-author-card">
+            <div class="author-item detail-author-card <?= $authorCardIsDense ? 'detail-author-card--dense' : '' ?>">
               <div class="author-row">
                 <div class="author-badge">🌌</div>
                 <div class="author-main">
@@ -706,18 +708,31 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
                 </div>
                 <div class="score">作者</div>
               </div>
-              <p><?= e($post['bio'] ?: '这个作者还没有写简介，但你已经可以继续查看他的公开内容。') ?></p>
-              <div class="chips" style="margin-top: 12px; gap: 6px;">
+              <div class="author-bio-block <?= $authorCardIsDense ? 'author-bio-block--dense' : '' ?>">
+                <p class="author-bio-copy <?= $authorCardIsDense ? 'author-bio-copy-dense' : '' ?>"><?= e($post['bio'] ?: '这个作者还没有补公开简介，但你已经可以继续查看他的主页、内容和互动轨迹。') ?></p>
+                <?php if ($authorCardIsDense): ?>
+                  <div class="author-bio-tail-note">简介较长，资料行已拆开承接；如果想看完整公开档案，继续进入作者主页会更舒服。</div>
+                <?php endif; ?>
+              </div>
+              <div class="chips author-meta-chips" style="margin-top: 12px; gap: 6px;">
                 <span class="chip"><?= (int) $post['like_count'] ?> 赞</span>
                 <span class="chip"><?= (int) $post['comment_count'] ?> 回复</span>
-                <?php if (!empty($post['location'])): ?><span class="chip"><?= e($post['location']) ?></span><?php endif; ?>
-                <?php if (!empty($post['website_url'])): ?><span class="chip"><?= e(profile_link_label($post['website_url'])) ?></span><?php endif; ?>
                 <?php if ($authorProfileSummary): ?><span class="chip">资料<?= e($authorProfileSummary['tone']) ?></span><?php endif; ?>
                 <span class="chip"><?= $authorAccountAgeDays <= 7 ? '新加入作者' : '稳定作者档案' ?></span>
                 <span class="chip"><?= e(human_time($post['created_at'])) ?></span>
               </div>
+              <?php if (!empty($post['location']) || !empty($post['website_url'])): ?>
+                <div class="detail-list author-detail-list">
+                  <?php if (!empty($post['location'])): ?>
+                    <div class="detail-row author-detail-row"><span>所在地</span><strong><?= e($post['location']) ?></strong></div>
+                  <?php endif; ?>
+                  <?php if (!empty($post['website_url'])): ?>
+                    <div class="detail-row author-detail-row"><span>作者链接</span><strong><a class="inline-link" href="<?= e($post['website_url']) ?>" target="_blank" rel="noopener noreferrer"><?= e(profile_link_label($post['website_url'])) ?></a></strong></div>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
               <?php if ($authorProfileSummary): ?>
-                <div class="author-presence-note">公开资料完成度 <?= (int) $authorProfileSummary['percent'] ?>% · <?= !empty($post['website_url']) ? '作者已挂出外部入口' : '当前未挂出外部入口' ?><?= !empty($post['location']) ? ' · 常驻 ' . e($post['location']) : '' ?></div>
+                <div class="author-presence-note">公开资料完成度 <?= (int) $authorProfileSummary['percent'] ?>% · <?= !empty($post['website_url']) ? '作者已挂出外部入口' : '当前未挂出外部入口' ?><?= !empty($post['location']) ? ' · 常驻城市信息已公开' : '' ?></div>
               <?php endif; ?>
               <?php if ($authorPresence): ?>
                 <div class="author-presence-note subtle-secondary-note">创作者状态：<?= e($authorPresence['label']) ?> · <?= e($authorPresence['meta']) ?></div>
@@ -729,7 +744,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
           </section>
 
           <section class="glass section-card surface-section post-side-card">
-            <div class="section-kicker">Quick Jump</div>
+            <div class="section-kicker">相关入口</div>
             <div class="side-head"><h3>相关入口</h3></div>
             <div class="quick-links compact-link-stack">
               <a class="quick-link" href="/posts.php?board=<?= e($post['board_slug']) ?>"><strong>同版块帖子</strong><span>继续浏览当前版块的相关讨论。</span></a>
@@ -738,7 +753,7 @@ function render_comment_item(array $comment, ?array $user, int $postId, bool $is
               <?php if (!empty($post['website_url'])): ?>
                 <a class="quick-link" href="<?= e($post['website_url']) ?>" target="_blank" rel="noopener noreferrer"><strong>作者外部链接</strong><span>继续访问 <?= e($post['nickname']) ?> 挂出的主页或作品入口。</span></a>
               <?php endif; ?>
-              <a class="quick-link" href="/notifications.php"><strong>我的提醒</strong><span>回到通知页处理互动消息。</span></a>
+              <a class="quick-link" href="/notifications.php"><strong>我的提醒</strong><span>回到提醒中心继续处理互动消息和后续回流。</span></a>
               <?php if (can_manage_post($user, $post)): ?>
                 <a class="quick-link" href="/edit-post.php?id=<?= (int) $post['id'] ?>"><strong>编辑当前帖子</strong><span>继续维护标题、正文与封面。</span></a>
               <?php endif; ?>
