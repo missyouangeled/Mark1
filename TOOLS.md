@@ -41,6 +41,13 @@ Things like:
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
 
+### Git / GitHub
+
+- This machine has a GitHub-specific SSH key at `~/.ssh/id_ed25519_github_openclaw`.
+- If plain `git push origin master` hits `Permission denied (publickey)`, use:
+  - `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_github_openclaw -o IdentitiesOnly=yes' git push origin master`
+- Cause: the default SSH identity selection may miss the GitHub key unless it is specified explicitly or wired through `~/.ssh/config`.
+
 ## Why Separate?
 
 Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.

@@ -6,3 +6,7 @@ skills/**/.git/
 skills/**/node_modules/
 skills/**/memory/
 skills/**/.DS_Store
+.clawhub/
+.run/
+skills/**/.clawhub/
+\[A-Za-z\]

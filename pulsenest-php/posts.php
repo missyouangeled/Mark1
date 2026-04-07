@@ -170,7 +170,7 @@ render_header('PulseNest · 帖子列表', $user, [
         <div class="feed-list dense-feed-list">
           <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">检索维度</div><div class="text">支持按标题、正文和记忆中的关键词继续往回找内容。</div></div></div>
           <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">浏览维度</div><div class="text">可以先看大类，再落到具体版块，不会一下掉进信息墙。</div></div></div>
-          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">最新帖子</div><div class="text"><?= e($latestPost['title'] ?? '还没有任何帖子，等第一篇把这里点亮。') ?></div></div></div>
+          <div class="feed-item"><div class="pulse-dot"></div><div><div class="time">最新帖子</div><div class="text"><?= e($latestPost['title'] ?? '当前还没有公开帖子，等内容逐步进来后，这里会开始滚动更新。') ?></div></div></div>
         </div>
       </aside>
     </section>

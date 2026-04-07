@@ -357,12 +357,12 @@ render_header('PulseNest', $user, [
                   <div class="author-badge">⏱️</div>
                   <div class="author-main">
                     <div class="author-name"><?= e($rangeMeta['label']) ?></div>
-                    <div class="meta"><?= !empty($timeRangeHotPosts[$rangeKey]) ? '按时间窗口统计的实时热度结果' : '这个时间段内还没有足够内容' ?></div>
+                    <div class="meta"><?= !empty($timeRangeHotPosts[$rangeKey]) ? '按时间窗口统计的实时热度结果' : '这个时间窗口里的公开互动还在慢慢形成' ?></div>
                   </div>
                 </div>
                 <div class="rank-list" style="margin-top:12px;">
                   <?php if (empty($timeRangeHotPosts[$rangeKey])): ?>
-                    <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无热帖</div><div class="meta">等这个时间窗里积累真实互动</div></div><div class="score">--</div></div></div>
+                    <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">这一档热度还在形成中</div><div class="meta">等这个时间窗口里的公开互动继续累起来</div></div><div class="score">--</div></div></div>
                   <?php else: ?>
                     <?php foreach ($timeRangeHotPosts[$rangeKey] as $index => $hotPost): ?>
                       <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/post.php?id=<?= (int) $hotPost['id'] ?>"><?= e($hotPost['title']) ?></a></div><div class="meta">@<?= e($hotPost['username']) ?> · <?= (int) $hotPost['like_count'] ?> 赞 · <?= (int) $hotPost['comment_count'] ?> 回复 · <?= (int) ($hotPost['view_count'] ?? 0) ?> 浏览</div></div><div class="score"><?= (int) ($hotPost['like_count'] * ranking_weight('like') + $hotPost['comment_count'] * ranking_weight('comment') + $hotPost['view_count'] * ranking_weight('view')) ?></div></div></div>
@@ -396,7 +396,7 @@ render_header('PulseNest', $user, [
               <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/posts.php?board=<?= e($board['slug']) ?>"><?= e($board['name']) ?></a></div><div class="meta"><?= e($board['category_name']) ?> · 近 7 天浏览 <?= (int) ($board['total_views'] ?? 0) ?></div></div><div class="score"><?= (int) ($board['post_count'] ?? 0) ?>帖</div></div></div>
             <?php endforeach; ?>
             <?php if (!$activeBoardsHome): ?>
-              <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃版块数据</div><div class="meta">等近 7 天发帖积累后自动出现</div></div><div class="score">--</div></div></div>
+              <div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">活跃版块还在形成中</div><div class="meta">等近 7 天公开内容继续累起来后会自然出现</div></div><div class="score">--</div></div></div>
             <?php endif; ?>
           </div>
         </section>
@@ -460,7 +460,7 @@ render_header('PulseNest', $user, [
           <div class="section-title">值得继续关注的创作者</div>
           <div class="author-list">
             <?php if (!$topAuthors): ?>
-              <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">等待首批创作者成型</div><div class="meta">等公开内容和互动再多一点，这里会自动切换成真实作者名单。</div></div><div class="score">预留中</div></div><p>当前还没有足够数据形成稳定的推荐作者视图，先保留这块位置，不让侧栏节奏塌掉。</p></div>
+              <div class="author-item"><div class="author-row"><div class="author-badge">✨</div><div class="author-main"><div class="author-name">推荐作者视图还在形成中</div><div class="meta">等公开内容和互动再多一点，这里会自然切换成真实作者名单。</div></div><div class="score">预留中</div></div><p>当前还没有足够数据支撑稳定的推荐作者视图，先把这个位置安静留住，不让侧栏节奏塌掉。</p></div>
             <?php else: ?>
               <?php foreach (array_slice($topAuthors, 0, 3) as $author): ?>
                 <div class="author-item">

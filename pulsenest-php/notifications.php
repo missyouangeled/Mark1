@@ -283,7 +283,7 @@ render_header('PulseNest · 我的提醒', $user, [
             </tr>
           <?php endforeach; ?>
           <?php if (!$typeRows): ?>
-            <tr><td colspan="4" class="muted">还没有任何提醒统计，等第一波互动来点亮这里。</td></tr>
+            <tr><td colspan="4" class="muted">当前还没有形成提醒分布，等后续互动逐步累起来，这里会自然出现结构。</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
@@ -295,7 +295,7 @@ render_header('PulseNest · 我的提醒', $user, [
     <div class="side-head admin-head-row"><h3>提醒列表</h3><span class="muted">评论审核通知会直接标出“已通过 / 已隐藏”，不再只给一个模糊的状态更新。</span></div>
     <div class="list-stack notification-stack curated-stack <?= $hasDenseNotificationFlow ? 'notification-stack--dense' : '' ?>">
       <?php if (!$notifications): ?>
-        <div class="empty-inline nebula-empty">当前这个视角下还没有提醒。可以换个筛选看看，或者先回内容流等下一次互动回来。</div>
+        <div class="empty-inline nebula-empty">当前这个视角下还没有提醒。可以换个筛选看看，或者先回内容流继续活动，等新的互动再回到这里。</div>
       <?php else: ?>
         <?php foreach ($notifications as $item): ?>
           <?php $moderationCopy = match ($item['type'] ?? '') {

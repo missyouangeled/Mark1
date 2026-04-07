@@ -1321,7 +1321,7 @@ render_header('PulseNest · 后台管理', $user, [
         <?php foreach ($activeBoards as $index => $row): ?>
           <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><?= e($row['category_name']) ?> / <?= e($row['board_name']) ?></div><div class="meta">近 7 天发帖活跃度</div></div><div class="score"><?= (int) $row['post_count'] ?>帖</div></div></div>
         <?php endforeach; ?>
-        <?php if (!$activeBoards): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃版块数据</div><div class="meta">等近 7 天帖子积累后自动出现</div></div><div class="score">--</div></div></div><?php endif; ?>
+        <?php if (!$activeBoards): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">活跃版块还在形成中</div><div class="meta">等近 7 天公开内容继续累起来后会自然出现</div></div><div class="score">--</div></div></div><?php endif; ?>
       </div>
     </section>
 
@@ -1332,7 +1332,7 @@ render_header('PulseNest · 后台管理', $user, [
         <?php foreach ($activeAuthors as $index => $row): ?>
           <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><a class="inline-link" href="/user.php?id=<?= (int) $row['id'] ?>"><?= e($row['nickname']) ?></a></div><div class="meta">@<?= e($row['username']) ?> · 近 7 天累计浏览 <?= (int) $row['total_views'] ?></div></div><div class="score"><?= (int) $row['post_count'] ?>帖</div></div></div>
         <?php endforeach; ?>
-        <?php if (!$activeAuthors): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无活跃作者数据</div><div class="meta">等近 7 天帖子积累后自动出现</div></div><div class="score">--</div></div></div><?php endif; ?>
+        <?php if (!$activeAuthors): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">活跃作者还在形成中</div><div class="meta">等近 7 天内容与浏览继续累起来后会自然出现</div></div><div class="score">--</div></div></div><?php endif; ?>
       </div>
     </section>
   </div>
@@ -1345,7 +1345,7 @@ render_header('PulseNest · 后台管理', $user, [
         <?php foreach ($reportReasonStats as $index => $row): ?>
           <div class="rank-item"><div class="rank-row"><div class="rank-index">#<?= $index + 1 ?></div><div class="rank-main"><div class="rank-name"><?= e(report_reason_label($row['reason'] ?? 'other')) ?></div><div class="meta">原始值：<?= e($row['reason'] ?? 'other') ?></div></div><div class="score"><?= (int) $row['total_count'] ?></div></div></div>
         <?php endforeach; ?>
-        <?php if (!$reportReasonStats): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">暂无举报理由数据</div><div class="meta">等举报发生后自动汇总</div></div><div class="score">--</div></div></div><?php endif; ?>
+        <?php if (!$reportReasonStats): ?><div class="rank-item"><div class="rank-row"><div class="rank-index">#0</div><div class="rank-main"><div class="rank-name">举报结构还没有形成</div><div class="meta">等后续举报进入队列后，这里会自动汇总出主要风险类型</div></div><div class="score">--</div></div></div><?php endif; ?>
       </div>
     </section>
 
