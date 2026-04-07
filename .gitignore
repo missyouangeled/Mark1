@@ -10,3 +10,6 @@ skills/**/.DS_Store
 .run/
 skills/**/.clawhub/
 \[A-Za-z\]
+skills/evolver-src/
+skills/self-improving-agent/
+skills/web-claude/
