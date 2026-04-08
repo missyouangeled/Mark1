@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/self-improvement-tool-errors",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw plugin that auto-captures high-confidence tool failures into .learnings/ERRORS.md and routes ambiguous tool signals into .learnings/INBOX.md.",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

@@ -125,7 +125,7 @@ cp -r hooks/openclaw ~/.openclaw/hooks/self-improvement
 openclaw hooks enable self-improvement
 ```
 
-The hook keeps `agent:bootstrap` and also listens to internal `message:preprocessed` + `message:sent` events. High-confidence signals are auto-routed into formal learning files; weaker signals go to `.learnings/INBOX.md`.
+The internal hook keeps `agent:bootstrap` and also listens to `message:preprocessed` + `message:sent`. A companion local plugin (`self-improvement-tool-errors`) handles raw tool failures through `after_tool_call`. High-confidence signals are auto-routed into formal learning files; weaker signals go to `.learnings/INBOX.md`.
 
 See `references/openclaw-integration.md` for complete details.
 

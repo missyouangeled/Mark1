@@ -138,7 +138,7 @@ The bundled OpenClaw hook keeps the original bootstrap reminder and adds conserv
 - high-confidence failure / error → `ERRORS.md`
 - weaker or ambiguous signal → `INBOX.md`
 
-This design is intentionally conservative. If you need raw tool-level error capture, add plugin hooks or keep manual logging in the loop.
+This design is intentionally conservative. Message-level capture stays in the internal hook; raw tool-level failure capture now belongs in the companion `self-improvement-tool-errors` plugin via `after_tool_call`, with manual logging still available for anything the runtime does not surface.
 
 ## Verification
 

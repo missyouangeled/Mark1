@@ -222,7 +222,7 @@ OpenClaw internal hooks expose a documented low-level event model that is enough
 | Explicit missing-capability request in `message:preprocessed` | Auto-log to `.learnings/FEATURE_REQUESTS.md` |
 | High-confidence failure signal in `message:preprocessed` or `message:sent` | Auto-log to `.learnings/ERRORS.md` |
 | Ambiguous / weak signal | Auto-log to `.learnings/INBOX.md` only |
-| Tool call error | Prefer plugin hooks or manual logging if you need raw tool-level context |
+| Tool call error | Prefer the companion `self-improvement-tool-errors` plugin via `after_tool_call`; fall back to manual logging when the runtime does not surface enough context |
 | Session handoff confusion | Log to AGENTS.md with delegation pattern |
 | Model behavior surprise | Log to SOUL.md with expected vs actual |
 | Skill issue | Log to .learnings/ or report upstream |

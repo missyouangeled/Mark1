@@ -31,6 +31,8 @@ for path in \
   "$WORKSPACE_DIR/.learnings" \
   "$WORKSPACE_DIR/.learnings/INBOX.md" \
   "$WORKSPACE_DIR/openclaw-env/skill-overlays/self-improving-agent/hooks/openclaw/handler.js" \
+  "$WORKSPACE_DIR/openclaw-env/plugins/self-improvement-tool-errors/openclaw.plugin.json" \
+  "$WORKSPACE_DIR/openclaw-env/plugins/self-improvement-tool-errors/index.js" \
   "$WORKSPACE_DIR/scripts/pulsenest-preview.sh" \
   "$WORKSPACE_DIR/scripts/openclaw-resume-watch.sh" \
   "$WORKSPACE_DIR/openclaw-env/openclaw.local.example.json" \
@@ -73,6 +75,12 @@ if [ -f "$HOME/.openclaw/hooks/self-improvement/handler.js" ]; then
   pass 'exists: ~/.openclaw/hooks/self-improvement/handler.js'
 else
   warn 'missing: ~/.openclaw/hooks/self-improvement/handler.js'
+fi
+
+if openclaw plugins inspect self-improvement-tool-errors --json >/tmp/self-improvement-tool-errors.inspect.json 2>/dev/null; then
+  pass 'visible: self-improvement-tool-errors'
+else
+  warn 'missing plugin: self-improvement-tool-errors'
 fi
 
 if [ -f "$HOME/.openclaw/skills/cli-anything/SKILL.md" ]; then

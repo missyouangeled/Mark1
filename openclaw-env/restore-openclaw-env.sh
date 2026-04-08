@@ -43,6 +43,12 @@ if [ -d "${SELF_IMPROVEMENT_HOOK_SRC}" ]; then
   cp -r "${SELF_IMPROVEMENT_HOOK_SRC}" "${HOOKS_DIR}/self-improvement"
 fi
 
+SELF_IMPROVEMENT_TOOL_PLUGIN_SRC="${WORKSPACE_DIR}/openclaw-env/plugins/self-improvement-tool-errors"
+if [ -f "${SELF_IMPROVEMENT_TOOL_PLUGIN_SRC}/openclaw.plugin.json" ]; then
+  openclaw plugins install --force "${SELF_IMPROVEMENT_TOOL_PLUGIN_SRC}" >/dev/null
+  openclaw plugins enable self-improvement-tool-errors >/dev/null || true
+fi
+
 [ -f "${WORKSPACE_DIR}/.learnings/LEARNINGS.md" ] || printf "# Learnings\n\nCorrections, insights, and knowledge gaps captured during development.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/LEARNINGS.md"
 [ -f "${WORKSPACE_DIR}/.learnings/ERRORS.md" ] || printf "# Errors Log\n\nCommand failures, exceptions, and unexpected behaviors.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/ERRORS.md"
 [ -f "${WORKSPACE_DIR}/.learnings/FEATURE_REQUESTS.md" ] || printf "# Feature Requests\n\nCapabilities requested by user that don't currently exist.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/FEATURE_REQUESTS.md"
@@ -56,6 +62,7 @@ echo "  systemctl --user daemon-reload"
 echo "  systemctl --user enable --now pulsenest-preview.service"
 echo "  systemctl --user enable --now openclaw-resume-watch.timer"
 echo "  openclaw hooks enable self-improvement"
+echo "  openclaw plugins enable self-improvement-tool-errors"
 echo
 echo "Before pushing or using providers, manually restore:"
 echo "  - ~/.ssh keys / GitHub auth"

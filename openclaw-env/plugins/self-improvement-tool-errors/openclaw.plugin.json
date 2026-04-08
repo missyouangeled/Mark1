@@ -1,0 +1,30 @@
+{
+  "id": "self-improvement-tool-errors",
+  "name": "Self-Improvement Tool Errors",
+  "description": "Capture high-confidence OpenClaw tool failures through plugin lifecycle hooks. Use to auto-log exec/tool errors, approval or policy blocks, timeouts, and connection failures into .learnings/ while routing weaker signals to INBOX.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
+      "skipSubagents": {
+        "type": "boolean"
+      },
+      "formalCooldownMinutes": {
+        "type": "number",
+        "minimum": 1
+      },
+      "inboxCooldownMinutes": {
+        "type": "number",
+        "minimum": 1
+      },
+      "maxExcerptChars": {
+        "type": "number",
+        "minimum": 80,
+        "maximum": 1200
+      }
+    }
+  }
+}

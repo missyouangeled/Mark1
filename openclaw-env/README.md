@@ -72,7 +72,7 @@ cd ~/.openclaw/workspace
 bash openclaw-env/restore-skills.sh
 ```
 
-### 3. 执行恢复脚本（会安装 self-improvement hook，并补齐 `.learnings/`）
+### 3. 执行恢复脚本（会安装 self-improvement hook、tool-error plugin，并补齐 `.learnings/`）
 
 ```bash
 bash openclaw-env/restore-openclaw-env.sh
