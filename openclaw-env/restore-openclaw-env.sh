@@ -33,10 +33,20 @@ render_template "${WORKSPACE_DIR}/openclaw-env/templates/openclaw-resume-watch.t
 chmod +x "${WORKSPACE_DIR}/scripts/pulsenest-preview.sh"
 chmod +x "${WORKSPACE_DIR}/scripts/openclaw-resume-watch.sh"
 
-if [ -d "${WORKSPACE_DIR}/skills/self-improving-agent/hooks/openclaw" ]; then
-  rm -rf "${HOOKS_DIR}/self-improvement"
-  cp -r "${WORKSPACE_DIR}/skills/self-improving-agent/hooks/openclaw" "${HOOKS_DIR}/self-improvement"
+SELF_IMPROVEMENT_HOOK_SRC="${WORKSPACE_DIR}/skills/self-improving-agent/hooks/openclaw"
+if [ ! -d "${SELF_IMPROVEMENT_HOOK_SRC}" ] && [ -d "${WORKSPACE_DIR}/openclaw-env/skill-overlays/self-improving-agent/hooks/openclaw" ]; then
+  SELF_IMPROVEMENT_HOOK_SRC="${WORKSPACE_DIR}/openclaw-env/skill-overlays/self-improving-agent/hooks/openclaw"
 fi
+
+if [ -d "${SELF_IMPROVEMENT_HOOK_SRC}" ]; then
+  rm -rf "${HOOKS_DIR}/self-improvement"
+  cp -r "${SELF_IMPROVEMENT_HOOK_SRC}" "${HOOKS_DIR}/self-improvement"
+fi
+
+[ -f "${WORKSPACE_DIR}/.learnings/LEARNINGS.md" ] || printf "# Learnings\n\nCorrections, insights, and knowledge gaps captured during development.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/LEARNINGS.md"
+[ -f "${WORKSPACE_DIR}/.learnings/ERRORS.md" ] || printf "# Errors Log\n\nCommand failures, exceptions, and unexpected behaviors.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/ERRORS.md"
+[ -f "${WORKSPACE_DIR}/.learnings/FEATURE_REQUESTS.md" ] || printf "# Feature Requests\n\nCapabilities requested by user that don't currently exist.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/FEATURE_REQUESTS.md"
+[ -f "${WORKSPACE_DIR}/.learnings/INBOX.md" ] || printf "# Learning Inbox\n\nLow-confidence or ambiguous signals captured automatically for later review.\n\n---\n" > "${WORKSPACE_DIR}/.learnings/INBOX.md"
 
 echo
 echo "Environment restore files installed."

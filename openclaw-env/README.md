@@ -23,6 +23,7 @@
    - user systemd 单元模板
    - OpenClaw 配置样板
    - Skills 恢复清单
+   - `self-improving-agent` 的本仓 overlay（避免只在本机热改后丢失）
    - CLI-Anything 本地仓库 + OpenClaw skill + helper 命令
 
 ## 当前恢复包包含什么
@@ -31,6 +32,7 @@
 - `scripts/openclaw-resume-watch.sh`
 - `openclaw-env/restore-openclaw-env.sh`
 - `openclaw-env/restore-skills.sh`
+- `openclaw-env/skill-overlays/self-improving-agent/`
 - `openclaw-env/restore-tooling.sh`
 - `openclaw-env/templates/*.service`
 - `openclaw-env/templates/*.timer`
@@ -64,16 +66,16 @@ git clone <你的仓库地址> ~/.openclaw/workspace
 cd ~/.openclaw/workspace
 ```
 
-### 2. 执行恢复脚本
-
-```bash
-bash openclaw-env/restore-openclaw-env.sh
-```
-
-### 3. 恢复 Skills
+### 2. 恢复 Skills（先把 workspace skill 本体和 overlay 补齐）
 
 ```bash
 bash openclaw-env/restore-skills.sh
+```
+
+### 3. 执行恢复脚本（会安装 self-improvement hook，并补齐 `.learnings/`）
+
+```bash
+bash openclaw-env/restore-openclaw-env.sh
 ```
 
 ### 4. 恢复补充工具层（含 CLI-Anything）
@@ -113,6 +115,7 @@ openclaw gateway status
 - `openclaw-env/NEW_MACHINE_BOOTSTRAP.md`
 - `openclaw-env/secrets-checklist.example.md`
 - `openclaw-env/skills-manifest.json`
+- `openclaw-env/skill-overlays/self-improving-agent/`
 - `openclaw-env/restore-skills.sh`
 - `openclaw-env/restore-tooling.sh`
 

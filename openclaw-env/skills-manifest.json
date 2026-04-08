@@ -19,7 +19,8 @@
       "name": "self-improving-agent",
       "type": "git",
       "repo": "https://github.com/peterskoett/self-improving-agent.git",
-      "branch": "master"
+      "branch": "master",
+      "notes": "After restore, apply openclaw-env/skill-overlays/self-improving-agent/ to keep the local proactive OpenClaw hook upgrade."
     },
     {
       "name": "evolver",

@@ -21,6 +21,7 @@
 - `.learnings/*.md`
 - OpenClaw 环境脚本与模板
 - Skills 恢复清单
+- `self-improving-agent` 的本仓 overlay + proactive self-improvement hook
 - CLI-Anything 本地仓库 / OpenClaw skill / helper 命令
 - 当前环境锚点信息（含默认模型参考：`github-copilot/gpt-5.4`）
 
@@ -46,6 +47,7 @@ command -v cli-anything
 - `~/.openclaw/workspace/HANDOFF.md`
 - `~/.openclaw/workspace/PROJECT_VERSIONS.md`
 - `~/.openclaw/skills/cli-anything/SKILL.md`
+- `~/.openclaw/hooks/self-improvement/handler.js`
 - `openclaw status --json` 里当前版本 / 当前模型 / gateway 状态
 
 ---

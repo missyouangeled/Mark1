@@ -42,7 +42,8 @@
    - `PROJECT_VERSIONS.md`
    - `HANDOFF.md`
    - 项目代码目录 `pulsenest-php/`
-4. 再应用 `openclaw-env/restore-skills.sh`，按清单恢复 Skills 本体，而不是依赖旧机器本地残留目录
+4. 先应用 `openclaw-env/restore-skills.sh`，按清单恢复 Skills 本体并自动套用本仓 overlay
+5. 再应用 `openclaw-env/restore-openclaw-env.sh`，安装 hooks / systemd 模板并补齐 `.learnings/`
 
 ### 这个“全量工作备份”当前不包含什么
 

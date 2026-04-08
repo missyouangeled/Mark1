@@ -49,7 +49,11 @@
           "enabled": true
         },
         "self-improvement": {
-          "enabled": true
+          "enabled": true,
+          "skipSubagents": true,
+          "formalCooldownMinutes": 720,
+          "inboxCooldownMinutes": 180,
+          "maxExcerptChars": 280
         }
       }
     }

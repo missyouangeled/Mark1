@@ -29,6 +29,8 @@ for path in \
   "$WORKSPACE_DIR/HANDOFF.md" \
   "$WORKSPACE_DIR/memory" \
   "$WORKSPACE_DIR/.learnings" \
+  "$WORKSPACE_DIR/.learnings/INBOX.md" \
+  "$WORKSPACE_DIR/openclaw-env/skill-overlays/self-improving-agent/hooks/openclaw/handler.js" \
   "$WORKSPACE_DIR/scripts/pulsenest-preview.sh" \
   "$WORKSPACE_DIR/scripts/openclaw-resume-watch.sh" \
   "$WORKSPACE_DIR/openclaw-env/openclaw.local.example.json" \
@@ -65,6 +67,12 @@ if [ -d "$HOME/.openclaw/hooks/self-improvement" ]; then
   pass 'exists: ~/.openclaw/hooks/self-improvement'
 else
   warn 'missing: ~/.openclaw/hooks/self-improvement'
+fi
+
+if [ -f "$HOME/.openclaw/hooks/self-improvement/handler.js" ]; then
+  pass 'exists: ~/.openclaw/hooks/self-improvement/handler.js'
+else
+  warn 'missing: ~/.openclaw/hooks/self-improvement/handler.js'
 fi
 
 if [ -f "$HOME/.openclaw/skills/cli-anything/SKILL.md" ]; then

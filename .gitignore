@@ -13,3 +13,4 @@ skills/**/.clawhub/
 skills/evolver-src/
 skills/self-improving-agent/
 skills/web-claude/
+.learnings/.hook-state.json

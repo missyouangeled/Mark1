@@ -4,12 +4,14 @@ set -euo pipefail
 WORKSPACE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS_DIR="${WORKSPACE_DIR}/skills"
 MANIFEST="${WORKSPACE_DIR}/openclaw-env/skills-manifest.json"
+OVERLAYS_DIR="${WORKSPACE_DIR}/openclaw-env/skill-overlays"
 
 mkdir -p "${SKILLS_DIR}"
 
 export WORKSPACE_DIR
 export SKILLS_DIR
 export MANIFEST
+export OVERLAYS_DIR
 
 python3 - <<'PY'
 import json, os, shutil, subprocess, tempfile, zipfile, pathlib, urllib.request
@@ -76,4 +78,32 @@ for skill in manifest.get('skills', []):
 
     else:
         raise RuntimeError(f'unknown skill type: {stype}')
+PY
+
+python3 - <<'PY'
+import os, pathlib, shutil
+
+skills_dir = pathlib.Path(os.environ.get('SKILLS_DIR', ''))
+overlays_dir = pathlib.Path(os.environ.get('OVERLAYS_DIR', ''))
+
+if not overlays_dir.exists():
+    raise SystemExit(0)
+
+for overlay in sorted(overlays_dir.iterdir()):
+    if not overlay.is_dir():
+        continue
+    dst = skills_dir / overlay.name
+    if not dst.exists():
+        print(f'== skip overlay {overlay.name}: skill missing ==')
+        continue
+    print(f'== applying overlay {overlay.name} ==')
+    for src in sorted(overlay.rglob('*')):
+        rel = src.relative_to(overlay)
+        target = dst / rel
+        if src.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, target)
+        print(f'  overlay -> {target}')
 PY
