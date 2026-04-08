@@ -45,16 +45,19 @@ bash openclaw-env/restore-openclaw-env.sh
 bash openclaw-env/restore-skills.sh
 ```
 
-### 4. 恢复补充工具层（含 CLI-Anything）
+### 4. 恢复补充工具层（含 CLI-Anything / QMD）
 
 ```bash
 bash openclaw-env/restore-tooling.sh
+systemctl --user daemon-reload
+systemctl --user restart openclaw-gateway.service
 ```
 
-### 5. 检查依赖与路径
+### 5. 检查依赖、路径、QMD 运行态
 
 ```bash
 bash openclaw-env/post-restore-check.sh
+bash openclaw-env/qmd-agent-status.sh main
 ```
 
 ### 6. 合并 OpenClaw 配置样板
@@ -105,7 +108,8 @@ openclaw gateway status
 - `pulsenest-preview.service` 已可启动
 - `openclaw-resume-watch.timer` 已可启动
 - `restore-skills.sh` 可以按清单恢复 Skills
-- `restore-tooling.sh` 可以恢复 CLI-Anything 本地仓库、OpenClaw skill 和 `cli-anything` helper 命令
+- `restore-tooling.sh` 可以恢复 CLI-Anything 本地仓库、OpenClaw skill、`cli-anything` helper 命令，以及 gateway 的 QMD CPU-only / hf-mirror drop-in
+- `qmd-agent-status.sh` 可以看到 agent-scoped QMD 索引和 gateway QMD env 是否真正生效
 
 ## 仍然需要手动处理的内容
 
@@ -121,3 +125,9 @@ openclaw gateway status
 这套 SOP 的目标是：
 
 **把“项目 + 工作记忆 + 可跟仓库走的环境结构”一口气接回来。**
+
+补充说明：QMD 默认仍应保持 search-only 稳态；如果以后要恢复 embedding / rerank，先运行：
+
+```bash
+bash openclaw-env/qmd-prefetch-models-via-mirror.sh check all
+```

@@ -26,6 +26,52 @@
       }
     }
   },
+  "memory": {
+    "backend": "qmd",
+    "citations": "auto",
+    "qmd": {
+      "command": "/home/REPLACE_ME/.npm-global/bin/qmd",
+      "includeDefaultMemory": false,
+      "paths": [
+        {
+          "name": "memory-root",
+          "path": ".",
+          "pattern": "MEMORY.md"
+        },
+        {
+          "name": "memory-dir",
+          "path": "memory",
+          "pattern": "**/*.md"
+        }
+      ],
+      "searchMode": "search",
+      "update": {
+        "interval": "5m",
+        "debounceMs": 15000,
+        "onBoot": true,
+        "waitForBootSync": false,
+        "embedInterval": "0",
+        "commandTimeoutMs": 30000,
+        "updateTimeoutMs": 120000,
+        "embedTimeoutMs": 15000
+      },
+      "limits": {
+        "maxResults": 6,
+        "timeoutMs": 120000
+      },
+      "scope": {
+        "default": "deny",
+        "rules": [
+          {
+            "action": "allow",
+            "match": {
+              "chatType": "direct"
+            }
+          }
+        ]
+      }
+    }
+  },
   "tools": {
     "profile": "coding"
   },
@@ -87,6 +133,8 @@
   },
   "notes": {
     "currentDefaultModel": "github-copilot/gpt-5.4",
-    "upgradeRestoreHint": "Restore or relogin the provider for the default model after upgrade; do not copy private tokens from another machine blindly."
+    "upgradeRestoreHint": "Restore or relogin the provider for the default model after upgrade; do not copy private tokens from another machine blindly.",
+    "qmdStableMode": "Keep QMD in search-only mode by default (searchMode=search, embedInterval=0).",
+    "qmdMirrorCaveat": "Gateway can carry HF_ENDPOINT=https://hf-mirror.com, but QMD 2.1.0 still hardcodes parts of the huggingface.co download path. Prepare advanced models with the mirror-prefetch script before re-enabling embedding or rerank."
   }
 }

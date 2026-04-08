@@ -25,6 +25,9 @@
    - Skills 恢复清单
    - `self-improving-agent` 的本仓 overlay（避免只在本机热改后丢失）
    - CLI-Anything 本地仓库 + OpenClaw skill + helper 命令
+   - QMD 安装与 OpenClaw QMD memory backend 配置
+   - gateway 的 QMD CPU-only / hf-mirror service drop-in
+   - QMD 运行态检查脚本与镜像预热脚本
 
 ## 当前恢复包包含什么
 
@@ -34,6 +37,12 @@
 - `openclaw-env/restore-skills.sh`
 - `openclaw-env/skill-overlays/self-improving-agent/`
 - `openclaw-env/restore-tooling.sh`
+- QMD（`@tobilu/qmd`）全局安装与 OpenClaw memory backend 样板配置
+- gateway QMD service drop-in：
+  - `openclaw-env/templates/openclaw-gateway.qmd-cpu.conf`
+  - `openclaw-env/templates/openclaw-gateway.qmd-hf-mirror.conf`
+- `openclaw-env/qmd-agent-status.sh`
+- `openclaw-env/qmd-prefetch-models-via-mirror.sh`
 - `openclaw-env/templates/*.service`
 - `openclaw-env/templates/*.timer`
 - `openclaw-env/templates/cli-anything-helper.sh`
@@ -78,19 +87,32 @@ bash openclaw-env/restore-skills.sh
 bash openclaw-env/restore-openclaw-env.sh
 ```
 
-### 4. 恢复补充工具层（含 CLI-Anything）
+### 4. 恢复补充工具层（含 CLI-Anything 与 QMD）
 
 ```bash
 bash openclaw-env/restore-tooling.sh
 ```
 
-### 5. 执行恢复检查
+说明：当前恢复样板会优先把 QMD 配成**本地稳定模式**——`searchMode=search`、`embedInterval=0`，并同步写入 gateway 的两个 service drop-in：
+
+- `QMD_LLAMA_GPU=false`（固定 CPU-only）
+- `HF_ENDPOINT=https://hf-mirror.com`
+
+### 5. 让 gateway 重新吃到新环境
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart openclaw-gateway.service
+```
+
+### 6. 执行恢复检查
 
 ```bash
 bash openclaw-env/post-restore-check.sh
+bash openclaw-env/qmd-agent-status.sh main
 ```
 
-### 6. 手动补私密项
+### 7. 手动补私密项
 
 至少检查并补这些：
 
@@ -99,7 +121,7 @@ bash openclaw-env/post-restore-check.sh
 - `~/.openclaw/openclaw.json` 里的私密字段
 - 如需继续使用当前默认模型 / 认证路径：恢复或重新登录当前 provider（这台机器当前默认模型锚点为 `github-copilot/gpt-5.4`）
 
-### 7. 启动 / 验证
+### 8. 启动 / 验证
 
 ```bash
 systemctl --user daemon-reload
@@ -118,6 +140,8 @@ openclaw gateway status
 - `openclaw-env/skill-overlays/self-improving-agent/`
 - `openclaw-env/restore-skills.sh`
 - `openclaw-env/restore-tooling.sh`
+- `openclaw-env/qmd-agent-status.sh`
+- `openclaw-env/qmd-prefetch-models-via-mirror.sh`
 
 ## openclaw.local.example.json 的用途
 
@@ -126,11 +150,64 @@ openclaw gateway status
 - 默认模型
 - workspace 路径
 - hooks/internal 开启项
+- memory / QMD 后端样板配置（默认按本地稳定模式：search-only + no scheduled embed）
 - browser 配置
 - gateway 非敏感偏好
 - browser 插件启用状态
 
 不要直接覆盖真实 `~/.openclaw/openclaw.json`，应该人工比对后合并。
+
+## 当前 QMD 收口结论（2026-04-08）
+
+### 1) 稳定默认
+
+当前默认建议继续保持：
+
+- `memory.backend = qmd`
+- `memory.qmd.searchMode = search`
+- `memory.qmd.update.embedInterval = 0`
+- gateway service env：
+  - `QMD_LLAMA_GPU=false`
+  - `HF_ENDPOINT=https://hf-mirror.com`
+
+这套组合的目标不是追求向量能力，而是先把 **本地 BM25 / 关键词检索稳定跑通**。
+
+### 2) 现在已经验证到哪一步
+
+已经验证：
+
+- OpenClaw 配置层已切到 `backend=qmd`
+- gateway 运行态确实带上了 `QMD_LLAMA_GPU=false` 与 `HF_ENDPOINT=https://hf-mirror.com`
+- agent-scoped QMD 索引已经存在，并能直接用 `qmd search` 命中工作区里的记忆 / 说明文档
+- 由于 QMD scope 配置只允许 `chatType=direct`，**主会话直聊**应该使用 QMD；而 **subagent / 非 direct 场景** 看到 `qmd search denied by scope` 属于设计内行为，不算故障
+
+### 3) 为什么暂时不恢复 embedding / rerank
+
+当前不建议直接恢复 embedding / rerank，原因不是 CPU-only 本身，而是：
+
+- QMD 2.1.0 的部分下载路径仍写死 `https://huggingface.co/...`
+- 也就是说，哪怕 gateway service 已经带上 `HF_ENDPOINT=https://hf-mirror.com`，**这也不足以保证 QMD 默认模型下载自动改走镜像**
+- 实测 `hf-mirror.com` 本身可达，默认三类模型 URL 也可直取，但 QMD 默认下载逻辑并未完全跟随这个变量
+- 因此，当前最稳的策略仍是：**search-only 默认不动；高级模型单独预热；确认缓存就位后再谨慎开启**
+
+### 4) 如果以后想谨慎恢复高级能力
+
+先做这条路线，而不是直接改默认模式：
+
+```bash
+bash openclaw-env/qmd-prefetch-models-via-mirror.sh check all
+bash openclaw-env/qmd-prefetch-models-via-mirror.sh download embed
+# 如需更进一步，再考虑 rerank / expand
+bash openclaw-env/qmd-agent-status.sh main
+```
+
+等 `~/.cache/qmd/models/` 里对应 GGUF 文件齐了，再评估是否临时恢复：
+
+- `vsearch`（先只测 embedding）
+- `query --no-rerank`（再测扩展链路）
+- 完整 rerank（最后再开）
+
+不要把高级模式直接设成默认启动项。
 
 ## 目标
 

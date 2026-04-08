@@ -31,6 +31,7 @@
 
 ```bash
 bash openclaw-env/post-restore-check.sh
+bash openclaw-env/qmd-agent-status.sh main
 openclaw status --json
 systemctl --user status openclaw-gateway.service --no-pager
 command -v cli-anything
@@ -49,6 +50,7 @@ command -v cli-anything
 - `~/.openclaw/skills/cli-anything/SKILL.md`
 - `~/.openclaw/hooks/self-improvement/handler.js`
 - `openclaw status --json` 里当前版本 / 当前模型 / gateway 状态
+- `bash openclaw-env/qmd-agent-status.sh main` 能看到 agent-scoped QMD 索引与 gateway QMD env
 
 ---
 
@@ -63,3 +65,9 @@ command -v cli-anything
 - 本机安装的软件本体
 
 如果默认模型需要继续沿用，恢复后记得重新确认对应 provider 是否仍已登录。
+
+QMD 高级能力默认仍建议保持关闭；如要准备 embedding / rerank，先用：
+
+```bash
+bash openclaw-env/qmd-prefetch-models-via-mirror.sh check all
+```
