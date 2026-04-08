@@ -118,6 +118,19 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
 
+## Background Subagents
+
+- If a background subagent has finished its task and has no more work, close it instead of leaving it hanging.
+- If a task is likely to take a while or risks making the main session feel stuck, prefer spawning a background subagent proactively and let the main session stay responsive.
+- Use the main session for short interactive work; use background subagents for long-running implementation, research, or multi-step refactors.
+
+## Thinking Level Rules
+
+- Default to normal/default (or low when explicitly available) for short answers, simple explanations, routine commands, straightforward file edits, and tasks whose path is already clear.
+- Raise thinking for complex debugging, architecture/design tradeoffs, large refactors, multi-file reasoning, recovery-path planning, security-sensitive analysis, or anything where a shallow answer is likely to be wrong.
+- If a task is both long-running and cognitively heavy, prefer a background subagent and use the higher thinking level there rather than making the main interactive session feel stuck.
+- Do not raise thinking just because a task is long; raise it when the task is genuinely uncertain, high-risk, or reasoning-heavy.
+
 **🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
 
 **📝 Platform Formatting:**

@@ -178,3 +178,243 @@ Repair the package-manager install so bundled runtime dependencies are fully pre
 - **Notes**: This was a transient mid-upgrade state while npm was still materializing the new dependency tree. After installation finished, OpenClaw 2026.4.5, doctor/fix, gateway restart, and post-restore checks all passed.
 
 ---
+
+## [ERR-20260408-001] tool-explicit-error
+
+**Logged**: 2026-04-08T03:14:39.501Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll faint-crustacean 10000 [redacted] [redacted]|[redacted]+I0xPdDzFuIt+[redacted]/KbnOgc+uFncRf9RRoFz/[redacted]/aLv3+8bM/7oM9ztf1+CgkyTzVk/[redacted]+sYuvDLsaCm5Aq9C1/8s23+rnLA6K7Qb+[redacted]/[redacted]+[redacted]== failed 0 451
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-002] tool-timeout
+
+**Logged**: 2026-04-08T03:19:07.741Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn timed out.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn 继续处理当前工作区中 QMD 接入 OpenClaw 的卡点，把它尽量推进到真正稳定可用状态。已知现状：1) `@tobilu/qmd` 已全局安装，`qmd --version` 为 2.1.0；2) `~/.openclaw/openclaw.json` 已配置 `memory.backend = "qmd"` 且 gateway 已重启；3) OpenClaw 日志里出现过 `qmd memory startup initialization armed for agent "main"`，说明已接入；4) 但 boot 阶段 `qmd embed` 在 120000ms 超时；5) `qmd status` 显示 node-llama-c…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-003] tool-timeout
+
+**Logged**: 2026-04-08T04:09:45.089Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool memory_search timed out.
+
+### Error
+```text
+[memory_search] memory_search QMD 接入 OpenClaw 根因 Hugging Face unreachable embed timeout BM25 可用 5 [redacted] [redacted]|m+OTEQgvlOFEb+[redacted]/WUtJlGWk9/omuzL7pO1yucI1v9n0WX/KxsZcfHYPXniFlSPj+MkXJ4o/vqVsXVBthbop0/wsB948zSK5AjRYvsRt9P/[redacted]+DQ/[redacted]/[redacted]+[redacted]/TqMD0xjSJ4GuDWfRpaRCEK+[redacted]== 4067
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: memory_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-004] tool-approval-blocked
+
+**Logged**: 2026-04-08T04:12:53.753Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by an approval gate.
+
+### Error
+```text
+[write] write # 2026-04-08 - 将当前工作区里的 `self-improving-agent` 从“只在 `agent:bootstrap` 提醒”升级成更主动但保守的版本： - 保留原有 bootstrap reminder。 - 新增 OpenClaw internal hook 自动分流： - 用户明确纠正 → `.learnings/LEARNINGS.md` - 明显缺失能力诉求 → `.learnings/FEATURE_REQUESTS.md` - 高置信失败 / 报错 → `.learnings/ERRORS.md` - 低置信信号 → `.learnings/INBOX.md` - 新增去重状态文件设计：运行时写 `.learnings/.hook-state.js…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-005] tool-timeout
+
+**Logged**: 2026-04-08T04:32:33.368Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.request for url in [ '[url] '[url] '[url] ]: try: req=urllib.request.Request(url, method='HEAD') with urllib.request.urlopen(req, timeout=20) as r: print(url, r.status, r.getheader('content-length'), r.getheader('content-type')) except Exception as e: print(url, 'ERROR', e) PY /home/missyouangeled/.openclaw/workspa…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-006] tool-explicit-error
+
+**Logged**: 2026-04-08T04:33:27.561Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user daemon-reload && systemctl --user restart openclaw-gateway.service && systemctl --user cat openclaw-gateway.service | sed -n '1,240p' /home/missyouangeled/.openclaw/workspace 1000 120 [redacted] [redacted]|[redacted]/6UmHuosmycrZ9dQgNvoH/z/bDuLb5kHR2XG+[redacted]+[redacted]+[redacted]/[redacted]+[redacted]+tmyAjhYBP8C18yQdci+[re…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-006] tool-timeout
+
+**Logged**: 2026-04-08T04:33:27.600Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec HF_ENDPOINT=[url] QMD_LLAMA_GPU=false python3 - <<'PY' import urllib.request urls=[ '[url] '[url] ] for url in urls: try: req=urllib.request.Request(url, method='HEAD') with urllib.request.urlopen(req, timeout=20) as r: print(url, r.status, r.getheader('content-length')) except Exception as e: print(url, 'ERROR', e) PY /home/missyouangeled/.open…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260408-007] tool-explicit-error
+
+**Logged**: 2026-04-08T04:34:29.143Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user daemon-reload && systemctl --user restart openclaw-gateway.service && sleep 2 && systemctl --user cat openclaw-gateway.service | sed -n '1,260p' && printf '\n---\n' && systemctl --user status openclaw-gateway.service --no-pager | sed -n '1,80p' /home/missyouangeled/.openclaw/workspace 1000 120 [redacted] [redacted]|DU9fWAm8Y57tk…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
