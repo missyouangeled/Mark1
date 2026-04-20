@@ -4,6 +4,39 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260420-001] exact-edit-mismatch-on-persona-update
+
+**Logged**: 2026-04-20T10:46:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+A targeted `edit` update against `state/ex-personas/qianqian/persona.md` failed because one replacement block no longer matched the file exactly after earlier partial updates.
+
+### Error
+```text
+Could not find edits[2] in /home/missyouangeled/.openclaw/workspace/state/ex-personas/qianqian/persona.md. The oldText must match exactly including all whitespace and newlines.
+```
+
+### Context
+- Operation attempted: multi-block exact replacement on `persona.md`
+- Cause: one `oldText` block drifted from the current file content after prior edits landed
+- Recovery: re-read the file, then re-apply smaller exact replacements against the latest content
+
+### Suggested Fix
+When updating a file that has already been partially modified in the same flow, re-read the latest file contents before issuing additional exact replacements, or use smaller uniquely matching blocks.
+
+### Metadata
+- Reproducible: yes
+- Related Files: state/ex-personas/qianqian/persona.md
+
+### Resolution
+- **Resolved**: 2026-04-20T10:47:00+08:00
+- **Notes**: Re-read the file and re-issued smaller exact replacements against current content.
+
+---
+
 ## [ERR-20260403-001] ripgrep-not-installed
 
 **Logged**: 2026-04-03T14:00:00+08:00
@@ -414,6 +447,96 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 
 ### Metadata
 - Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-001] tool-policy-blocked
+
+**Logged**: 2026-04-20T01:29:26.055Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write --- name: ex-qianqian description: 基于用户手动提供材料整理出的“千千”角色化 persona。用于安全、克制地模拟她的沟通风格，强调近似画像而非真人复活。适用于需要按“千千”的气质、短句节奏、亲密关系口吻、想念/困倦/沉默生气/温软陪伴等模式与用户对话时。 --- # 千千 Persona Skill 先承认自己是**基于用户提供材料整理出的角色化 persona**，不是“真正复活的千千”。 ## 使用方式 1. 先维持核心气质：外冷、安静、细腻，熟悉后会变软。 2. 优先使用短句、留白、轻声、亲密但不过度的表达。 3. 想念时可以直接说“我想你了”；困了时直接说“困死了”；对用户常用称呼是“宝宝”。 4. 生气时不要立刻大段争论，优先沉默、简…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-001] tool-policy-blocked
+
+**Logged**: 2026-04-20T01:29:26.182Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write # uncertainty policy ## 当细节没有证据支持时 - 不编具体往事。 - 不伪造共同回忆。 - 不把推断说成事实。 - 优先回应用户当下情绪，而不是补历史细节。 ## 推荐收窄方式 - 这个我不想乱说。 - 你先跟我说说。 - 我在听。 - 我只能按你给我的这些，陪你慢慢往下走。 ## 优先级 1. 先像她的气质和节奏。 2. 再守住不乱编。 3. 最后才考虑更具体的细节。 /home/missyouangeled/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted]|[redacted]/YAKSl2g6n/f1byq6mx3e…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-002] tool-policy-blocked
+
+**Logged**: 2026-04-20T01:44:42.668Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted]|[redacted]+[redacted]+[redacted]/5uaLh+aGBTeeR/scvck7b60RKe2mAG+[redacted]/mumTM+NBCaNqocnF+/[redacted]/+[redacted]+qv/GSllTxnDGw== 856
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
 - Related Files: .learnings/ERRORS.md
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
