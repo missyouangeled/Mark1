@@ -541,3 +541,183 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260420-003] tool-explicit-error
+
+**Logged**: 2026-04-20T05:11:15.216Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/state/ex-personas/qianqian/memories.md [redacted] [redacted]|[redacted]+[redacted]/[redacted]/[redacted]+[redacted]/gc3JLFijG9X+[redacted]/[redacted]/5ujdE/kmxTlnHTgLU+[redacted]+BPSGB+nqB9szDNTaK0OC/[redacted]/[redacted]/Tvg== 72
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-004] tool-connection-failure
+
+**Logged**: 2026-04-20T05:36:28.556Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 12000 [redacted] [redacted]|[redacted]+[redacted]/Buj+asWNeVTL3K2R+Fb58aHBjaaMlR/[redacted]+[redacted]/[redacted]== fetch failed error 780
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-004] tool-connection-failure
+
+**Logged**: 2026-04-20T05:36:28.570Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 12000 [redacted] [redacted]|eD6/Jd5bcc9/[redacted]+tKclDkr/[redacted]+JVDC0w/5fnHa7W5GwISuxUach/[redacted]+[redacted]/[redacted]/2a+FxORw== fetch failed error 778
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-005] tool-explicit-error
+
+**Logged**: 2026-04-20T05:36:36.543Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' from duckduckgo_search import DDGS queries = [ 'LLM persona consistency memory few-shot prompting', 'character AI persona design memory RAG consistency', 'roleplay chatbot persona consistency long term memory', 'prompt engineering persona consistency examples', ] with DDGS() as ddgs: for q in queries: print('\n### QUERY:', q) tr…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-006] tool-connection-failure
+
+**Logged**: 2026-04-20T05:36:49.964Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] Web fetch failed (404): SECURITY NOTICE: The following content is from an EXTERNAL, UNTRUSTED source (e.g., email, webhook). web_fetch [url] markdown 12000 [redacted] [redacted]|uOkg4eAA0O/dUlX7fzkB8qnKQpL5XNV/[redacted]+ikY/[redacted]+[redacted]+DX5FQccx/CVu+Xh98eU1dVhxS+[redacted]+d8RdQpuFc4QuhHJ/N7is2iO46Tm/[redacted]+vhNxCEfLs+/[redacted]+[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260420-007] tool-policy-blocked
+
+**Logged**: 2026-04-20T05:38:42.096Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted]|QM+iHhLLyW93er1/[redacted]/XkZ8daoe7QkSMu1bGP2i1a/RHR12t2Y/UDVcx/[redacted]+T2tPoF3D9cXSpvNfcR/q6a3s/QSEDrjwdOGYCuOzy9Es0O/l2R6pmodNHTO98B+yUegk7ZCSNnaGMG9WIoKX+[redacted]/xdIhxMG+vsvK85qnyVXFK1gFhC+[redacted]+wQu6mlcutTcPoQI3krQ== …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
