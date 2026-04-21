@@ -64,16 +64,14 @@ Things like:
 
 ### Voice replies / TTS
 
-- Local voice-reply helper lives in: `tools/voice-reply/`
-- Current implementation uses `msedge-tts` in user space (no root required)
-- Default Chinese voice in helper: `zh-CN-XiaoxiaoNeural`
-- Test command:
-  - `node tools/voice-reply/tts.mjs --text '你好，我是贾维斯。' --out /tmp/jarvis-voice.webm`
-- Output format is `webm/opus`, suitable for OpenClaw audio attachment replies
-- If the helper is used manually, send with:
-  - `[[audio_as_voice]]`
-  - `MEDIA:/path/to/file.webm`
-- Added Noiz-based reply helper for better timbre continuity:
+- Local voice-reply helpers live in: `tools/voice-reply/`
+- **Simple local fallback** uses `msedge-tts` in user space (no root required)
+  - Script: `tools/voice-reply/tts.mjs`
+  - Default Chinese voice: `zh-CN-XiaoxiaoNeural`
+  - Prefer mp3 for current OpenClaw / Control UI usage
+  - Example:
+    - `node tools/voice-reply/tts.mjs --text '你好，我是贾维斯。' --out /tmp/jarvis-voice.mp3`
+- **Noiz-based helper** for stronger timbre continuity:
   - Script: `tools/voice-reply/noiz-reply.sh`
   - Private default reference clip path: `~/.local/share/openclaw-voice-reply/default-ref.mp3`
   - Presets: `natural`, `gentle`, `bright`, `late-night`
@@ -82,6 +80,16 @@ Things like:
     - implemented with ffmpeg `rubberband` filter and `formant=preserved`
   - Example:
     - `bash tools/voice-reply/noiz-reply.sh --style natural --pitch-semitones -1.5 --text '你好，我在。' --out /tmp/noiz-reply.mp3`
+- **Local free XTTS helper** for on-device voice cloning:
+  - Script: `tools/voice-reply/local-xtts-reply.sh`
+  - Uses local env: `~/.local/share/openclaw-voice-venv311`
+  - Default private reference clip path: `~/.local/share/openclaw-voice-reply/default-ref.mp3`
+  - Default output path: `tmp/voice-replies/local-xtts-YYYYmmdd-HHMMSS.mp3`
+  - Example:
+    - `bash tools/voice-reply/local-xtts-reply.sh --text '你好，我在。' --out /tmp/local-xtts.mp3`
+- If a helper is used manually, send with:
+  - `[[audio_as_voice]]`
+  - `MEDIA:/path/to/file.mp3`
 
 ### Local audio trimming / reference-voice prep
 
