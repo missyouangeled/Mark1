@@ -98,11 +98,27 @@ Things like:
 - Reason: system Python lacks `pip` / `ensurepip`, so normal `venv` bootstrap is broken on this machine.
 - Working local Coqui/XTTS environment path:
   - `~/.local/share/openclaw-voice-venv311`
-- Important compatibility note:
+  - actual storage is moved to the second disk and symlinked at:
+    - `/mnt/data/openclaw/openclaw-voice-venv311`
+- XTTS model cache path:
+  - `~/.local/share/tts`
+  - actual storage is moved to the second disk and symlinked at:
+    - `/mnt/data/openclaw/tts`
+- uv cache path:
+  - `~/.cache/uv`
+  - actual storage is moved to the second disk and symlinked at:
+    - `/mnt/data/openclaw/uv-cache`
+- Important compatibility notes:
   - Coqui TTS `0.22.0` does **not** support Python 3.12 on this machine; use Python 3.11 via `uv`.
+  - XTTS with current PyTorch/TTS stack needed local compatibility fixes on this machine:
+    - pin `transformers==4.41.2` (newer 5.x / late 4.x removed `BeamSearchScorer` expected by XTTS)
+    - patch `TTS/utils/io.py` to default `torch.load(..., weights_only=False)` for trusted XTTS checkpoints under PyTorch >=2.6
+    - patch `TTS/tts/models/xtts.py` `load_audio()` to use `librosa.load()` instead of `torchaudio.load()` to avoid missing system FFmpeg shared-library issues
 - First XTTS model download requires explicit Coqui CPML confirmation:
   - tool recognizes `COQUI_TOS_AGREED=1`
   - do **not** set it unless the user has explicitly agreed to the non-commercial CPML / relevant license terms.
+- Current local XTTS smoke test output path:
+  - `/home/missyouangeled/.openclaw/workspace/tmp/voice-replies/local-xtts-test.mp3`
 
 ## Why Separate?
 
