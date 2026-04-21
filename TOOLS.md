@@ -77,8 +77,11 @@ Things like:
   - Script: `tools/voice-reply/noiz-reply.sh`
   - Private default reference clip path: `~/.local/share/openclaw-voice-reply/default-ref.mp3`
   - Presets: `natural`, `gentle`, `bright`, `late-night`
+  - Supports pitch correction after synthesis with formant preservation:
+    - `--pitch-semitones -1.5` → lower register slightly while keeping the speaking feel mostly intact
+    - implemented with ffmpeg `rubberband` filter and `formant=preserved`
   - Example:
-    - `bash tools/voice-reply/noiz-reply.sh --style natural --text '你好，我在。' --out /tmp/noiz-reply.mp3`
+    - `bash tools/voice-reply/noiz-reply.sh --style natural --pitch-semitones -1.5 --text '你好，我在。' --out /tmp/noiz-reply.mp3`
 
 ### Local audio trimming / reference-voice prep
 

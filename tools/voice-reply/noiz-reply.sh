@@ -3,7 +3,9 @@ set -euo pipefail
 
 BASE_DIR="/home/missyouangeled/.openclaw/workspace"
 REF_AUDIO_DEFAULT="$HOME/.local/share/openclaw-voice-reply/default-ref.mp3"
+FFMPEG_BIN="$HOME/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg"
 STYLE="${VOICE_STYLE:-natural}"
+PITCH_SEMITONES="${VOICE_PITCH_SEMITONES:-0}"
 OUT=""
 TEXT=""
 REF_AUDIO="$REF_AUDIO_DEFAULT"
@@ -12,11 +14,12 @@ LANG="zh"
 usage() {
   cat <<'EOF'
 Usage:
-  bash tools/voice-reply/noiz-reply.sh --text "你好" [--style natural|gentle|bright|late-night] [--out /path/out.mp3] [--ref-audio /path/ref.mp3]
+  bash tools/voice-reply/noiz-reply.sh --text "你好" [--style natural|gentle|bright|late-night] [--pitch-semitones -1.5] [--out /path/out.mp3] [--ref-audio /path/ref.mp3]
 
 Notes:
   - Uses Noiz with a fixed short reference clip to keep the timbre close to the chosen sample.
   - Prosody is shaped mainly by style preset + punctuation in the input text.
+  - Pitch is adjusted post-synthesis with ffmpeg rubberband using formant preservation.
   - Current default ref audio path: ~/.local/share/openclaw-voice-reply/default-ref.mp3
 EOF
 }
@@ -33,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --out|-o)
       OUT="$2"
+      shift 2
+      ;;
+    --pitch-semitones)
+      PITCH_SEMITONES="$2"
       shift 2
       ;;
     --ref-audio)
@@ -102,5 +109,21 @@ python3 "$BASE_DIR/skills/noizai-tts/scripts/tts.py" \
   --speed "$SPEED" \
   --emo "$EMO" \
   --output "$OUT"
+
+if [[ "$PITCH_SEMITONES" != "0" && "$PITCH_SEMITONES" != "0.0" ]]; then
+  if [[ ! -x "$FFMPEG_BIN" ]]; then
+    echo "Error: ffmpeg helper not found: $FFMPEG_BIN" >&2
+    exit 1
+  fi
+  PITCH_FACTOR="$(python3 - "$PITCH_SEMITONES" <<'PY'
+import math, sys
+semi=float(sys.argv[1])
+print(f"{2 ** (semi / 12.0):.6f}")
+PY
+)"
+  TMP_OUT="${OUT%.mp3}.pitchtmp.mp3"
+  "$FFMPEG_BIN" -y -i "$OUT" -af "rubberband=pitch=${PITCH_FACTOR}:formant=preserved:pitchq=quality:transients=smooth" "$TMP_OUT" >/dev/null 2>&1
+  mv -f "$TMP_OUT" "$OUT"
+fi
 
 printf '%s\n' "$OUT"
