@@ -73,6 +73,12 @@ Things like:
 - If the helper is used manually, send with:
   - `[[audio_as_voice]]`
   - `MEDIA:/path/to/file.webm`
+- Added Noiz-based reply helper for better timbre continuity:
+  - Script: `tools/voice-reply/noiz-reply.sh`
+  - Private default reference clip path: `~/.local/share/openclaw-voice-reply/default-ref.mp3`
+  - Presets: `natural`, `gentle`, `bright`, `late-night`
+  - Example:
+    - `bash tools/voice-reply/noiz-reply.sh --style natural --text '你好，我在。' --out /tmp/noiz-reply.mp3`
 
 ### Local audio trimming / reference-voice prep
 
