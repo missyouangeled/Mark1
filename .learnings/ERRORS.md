@@ -4,6 +4,36 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260421-003] noiz-custom-voice-credit-limit
+
+**Logged**: 2026-04-21T13:50:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+The correct Noiz flow for extracting only timbre is to create a custom voice via `POST /v1/voices` and then synthesize with `voice_id`, but the current Noiz account cannot create the custom voice because the API returned `credit limit exceeded`.
+
+### Error
+```text
+{"code":400,"message":"credit limit exceeded"}
+```
+
+### Context
+- User clarified they want only the timbre from the authorized audio, not the song's prosody/intonation
+- Investigation of `https://noiz.ai/openapi.json` showed that `POST /v1/voices` is the proper endpoint for creating a reusable custom voice clone
+- Attempting to create the voice from the prepared 10s reference clip failed due account credit limits
+
+### Suggested Fix
+When Noiz zero-shot cloning from `ref-audio` leaks singing prosody, switch to the custom-voice flow (`/v1/voices`). If that fails with credit limits, surface the billing/credit issue clearly and ask the user to top up or use another provider/local model.
+
+### Metadata
+- Reproducible: yes
+- Related Files: skills/noizai-tts/scripts/tts.py
+- Tags: noiz, custom-voice, billing, tts
+
+---
+
 ## [ERR-20260421-002] noiz-reference-audio-too-long-and-no-local-trimmer
 
 **Logged**: 2026-04-21T13:36:00+08:00
@@ -1646,6 +1676,36 @@ Tool exec returned an explicit error state.
 ### Context
 - Hook source: plugin:after_tool_call
 - Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-030] tool-connection-failure
+
+**Logged**: 2026-04-21T05:46:47.415Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] Web fetch failed (404): SECURITY NOTICE: The following content is from an EXTERNAL, UNTRUSTED source (e.g., email, webhook). web_fetch [url] markdown 6000 [redacted] [redacted]|qxQ+[redacted]/[redacted]+YWweQ5ycc/[redacted]+g26hxLlK+1SrkJLn/[redacted]+[redacted]/ZKDNfblJCFD+[redacted]+6zJEeL/c8OIWi9+piITOwKhwccC1yDJR20gO/on22UosxCF+uGxO+EzoLBzDg…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
 - Session Key: agent:main:main
 
 ### Suggested Fix
