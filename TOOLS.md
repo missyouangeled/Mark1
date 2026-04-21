@@ -62,6 +62,26 @@ Things like:
   - `PYTHONPATH=/home/missyouangeled/Desktop/CLI-Anything/gimp/agent-harness python3 -m cli_anything.gimp.gimp_cli project profiles`
 - Note: the sample GIMP harness README still references an older module path (`python3 -m cli.gimp_cli`), but the runnable module on this machine is `python3 -m cli_anything.gimp.gimp_cli`.
 
+### Voice replies / TTS
+
+- Local voice-reply helper lives in: `tools/voice-reply/`
+- Current implementation uses `msedge-tts` in user space (no root required)
+- Default Chinese voice in helper: `zh-CN-XiaoxiaoNeural`
+- Test command:
+  - `node tools/voice-reply/tts.mjs --text '你好，我是贾维斯。' --out /tmp/jarvis-voice.webm`
+- Output format is `webm/opus`, suitable for OpenClaw audio attachment replies
+- If the helper is used manually, send with:
+  - `[[audio_as_voice]]`
+  - `MEDIA:/path/to/file.webm`
+
+### Local audio trimming / reference-voice prep
+
+- User-space ffmpeg helper installed at:
+  - `~/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg`
+- Reason: this machine has no system `ffmpeg` / `ffprobe`, but Noiz voice cloning rejects reference audio longer than 30s, so local trimming may be needed before upload.
+- Example trim command:
+  - `~/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg -y -ss 40 -t 10 -i '/path/input.mp3' -vn -acodec libmp3lame -b:a 96k '/path/output.mp3'`
+
 ## Why Separate?
 
 Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
