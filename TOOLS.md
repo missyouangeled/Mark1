@@ -91,6 +91,19 @@ Things like:
 - Example trim command:
   - `~/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg -y -ss 40 -t 10 -i '/path/input.mp3' -vn -acodec libmp3lame -b:a 96k '/path/output.mp3'`
 
+### Local free voice-cloning stack
+
+- `uv` installed in user space at:
+  - `~/.local/bin/uv`
+- Reason: system Python lacks `pip` / `ensurepip`, so normal `venv` bootstrap is broken on this machine.
+- Working local Coqui/XTTS environment path:
+  - `~/.local/share/openclaw-voice-venv311`
+- Important compatibility note:
+  - Coqui TTS `0.22.0` does **not** support Python 3.12 on this machine; use Python 3.11 via `uv`.
+- First XTTS model download requires explicit Coqui CPML confirmation:
+  - tool recognizes `COQUI_TOS_AGREED=1`
+  - do **not** set it unless the user has explicitly agreed to the non-commercial CPML / relevant license terms.
+
 ## Why Separate?
 
 Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
