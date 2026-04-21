@@ -4,6 +4,42 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260421-002] noiz-reference-audio-too-long-and-no-local-trimmer
+
+**Logged**: 2026-04-21T13:36:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Attempting to clone a voice from a user-provided song vocal file failed because Noiz rejects reference audio longer than 30 seconds, and this machine currently lacks local audio trimming tools (`ffmpeg` / `ffprobe` / `sox`).
+
+### Error
+```text
+{"code":400,"message":"audio duration exceeds limit (max 30 seconds)"}
+/bin/bash: line 1: ffprobe: command not found
+```
+
+### Context
+- Operation attempted: use `skills/noizai-tts/scripts/tts.py` with a local MP3 reference track for Noiz voice cloning
+- User-provided path initially included an extra space before the filename; actual file was found by searching `/home/missyouangeled/Music`
+- The located file existed, but sending the full track to Noiz failed because reference audio must be 30 seconds or shorter
+- Local recovery was blocked because standard audio trimming tools are not installed in this runtime
+
+### Suggested Fix
+When users provide full songs or long vocal tracks for Noiz cloning, either ask for a 10–30 second dry vocal clip up front or install local audio tooling before attempting trimming.
+
+### Metadata
+- Reproducible: yes
+- Related Files: skills/noizai-tts/scripts/tts.py
+- Tags: noiz, tts, voice-cloning, audio-prep
+
+### Resolution
+- **Resolved**: 2026-04-21T13:44:00+08:00
+- **Notes**: Installed a user-space ffmpeg helper at `~/.local/share/openclaw-audio-tools/.../ffmpeg`, trimmed the reference track locally to a short MP3 clip, and Noiz cloning succeeded with the shorter sample.
+
+---
+
 ## [ERR-20260420-001] exact-edit-mismatch-on-persona-update
 
 **Logged**: 2026-04-20T10:46:00+08:00
@@ -717,6 +753,906 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 
 ### Metadata
 - Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-001] tool-policy-blocked
+
+**Logged**: 2026-04-21T01:58:34.938Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec set -e rg -n "audio_as_voice|MEDIA:" /home/missyouangeled/.npm-global/lib/node_modules/openclaw /home/missyouangeled/.openclaw 2>/dev/null | head -n 100 printf '\n== apt candidates ==\n' apt-cache policy espeak-ng ffmpeg | sed -n '1,120p' /home/missyouangeled/.openclaw/workspace 2000 30 [redacted] [redacted]|rygcx+S/[redacted]/blr6QxyVBKoQ03mPx+…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-002] tool-explicit-error
+
+**Logged**: 2026-04-21T02:02:58.419Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll gentle-harbor 5000 [redacted] [redacted]|[redacted]+[redacted]+[redacted]/[redacted]+7yZMACukNFntxh+mZdW6D646+[redacted]/fOB7OSOIT+/8h+TLhVF8QpPbJ4fr8UclqA3C/2NoniZJ9HknmvCU/[redacted]+P/T+[redacted]== failed 0 799
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-003] tool-explicit-error
+
+**Logged**: 2026-04-21T02:21:02.513Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill nova-ember [redacted] [redacted]|[redacted]/vJ+MdISpEFUuPmHi+5L3EAUUbWD9QEkFPo7+n1P+bNKnB3wLX4uRPD3dr+0ir26x6pyzZ5EVY/[redacted]+/[redacted]+jZDlqPmkjlJV//[redacted]+voAu7XLj9PvK/[redacted]/cQeOPuHSvc+PMup3/upp2x4d21mA+sE9bGTh/[redacted]/256dsc++DfQb/Yex8I9g== failed 60
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-004] tool-explicit-error
+
+**Logged**: 2026-04-21T02:24:38.127Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll nimble-kelp 12000 [redacted] [redacted]|80pAGra9cLdryqO+4RUOus0I+sJ0g9Vv3QMHSnUavn+SMrah/lnUMsCmOzPRlI10GZ5sL8g/2jGX0HbiPL5N/DKKdOGszq/npckf09to6vAAHjtYwgg1X9+QRUHz5hFLPxsKgbwRLapbxO+[redacted]+/[redacted]/2UC30ABT/pHUpeKPZgPw7NA+SxgTR1yQ6eAk4OlwKQgF/[redacted]/YZcP+sWMd5/6/[redacted]+xbZqfYquiDw== failed 13
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-005] tool-timeout
+
+**Logged**: 2026-04-21T02:27:00.826Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] req=urllib.request.Request(f'[url] headers={'Authorization': f'Bearer {token}'}) with urllib.request.urlopen(req, timeout=10) as r: data=json.load(r) print(json.dumps({…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-006] tool-timeout
+
+**Logged**: 2026-04-21T02:27:24.723Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request, urllib.parse, pathlib cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] tmp=pathlib.Path('/home/missyouangeled/.openclaw/workspace/tmp') files=sorted(tmp.glob('*.webm')) print('FILES=', [str(p) for p in files[:10]]) i…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-007] tool-timeout
+
+**Logged**: 2026-04-21T02:39:00.464Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec set -e cd /home/missyouangeled/.openclaw/workspace out=tmp/[redacted].mp3 node tools/voice-reply/tts.mjs --text '你好，这是 mp3 语音链路测试。' --out "$out" python3 - <<'PY' import json, urllib.request, urllib.parse cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] source='/…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-008] tool-explicit-error
+
+**Logged**: 2026-04-21T02:49:14.532Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e agent-browser --session voice-debug eval ' (() => { const audios = Array.from(document.querySelectorAll("audio")); return audios.map((a, i) => ({ index: i, src: a.getAttribute("src"), currentSrc: a.currentSrc, readyState: a.readyState, networkState: a.networkState, paused: a.paused, duration: a.duration, error: a.error ? { code: a.error.c…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-009] tool-timeout
+
+**Logged**: 2026-04-21T02:49:33.651Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request, urllib.parse cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] source='/home/missyouangeled/.openclaw/workspace/tmp/[redacted].mp3' base=f'[url] source, 'token': token}) for label, headers in [ ('HEAD', {'method':'HEA…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-010] tool-timeout
+
+**Logged**: 2026-04-21T02:50:28.702Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec set -e openclaw gateway restart python3 - <<'PY' import json, urllib.request, urllib.parse, time cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] source='/home/missyouangeled/.openclaw/workspace/tmp/[redacted].mp3' base=f'[url] source, 'token': token}) for _ in …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-011] tool-timeout
+
+**Logged**: 2026-04-21T02:53:08.603Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec set -e openclaw gateway status || true python3 - <<'PY' import json, urllib.request, urllib.parse cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] source='/home/missyouangeled/.openclaw/workspace/tmp/[redacted].mp3' base=f'[url] source, 'token': token}) # HEAD t…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-012] tool-timeout
+
+**Logged**: 2026-04-21T02:55:59.841Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request, urllib.parse cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) port=cfg['gateway']['port'] token=cfg['gateway']['auth']['token'] for source in [ '/home/missyouangeled/.openclaw/workspace/tmp/[redacted].mp3', '/home/missyouangeled/.openclaw/workspace/tmp/[redacted].mp3' ]: q=urllib.p…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-013] tool-explicit-error
+
+**Logged**: 2026-04-21T02:56:03.623Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) URL="[url] agent-browser --session voice-debug open "$URL" >/dev/null 2>&1 || true agent-browser --session voice-debug wait --load networkidle >/dev/null 2>&1 || true agent-browser --session …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-014] tool-explicit-error
+
+**Logged**: 2026-04-21T02:59:38.655Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e agent-browser --session voice-debug close || true TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) URL="[url] agent-browser --session voice-debug --args "--no-sandbox" open "$URL" >/dev/null agent-browser --session voice-debug wait --load n…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-015] tool-explicit-error
+
+**Logged**: 2026-04-21T03:04:19.183Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) URL="[url] agent-browser --session voice-debug close >/dev/null 2>&1 || true agent-browser --session voice-debug --args "--no-sandbox" open "$URL" >/dev/null agent-browser --session voice-deb…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-016] tool-timeout
+
+**Logged**: 2026-04-21T03:26:03.212Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|elLKZObC5rLXg7c/[redacted]+fTFXqz8P1ff6WYpMlI3+zz+[redacted]/GApoR9Bdc7ru02CXZ/[redacted]/[redacted]/[redacted]+[redacted]/pmZ/1BIn/xHwn1theC5C1utCflXac2eq/[redacted]== timeout 21058
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-017] tool-timeout
+
+**Logged**: 2026-04-21T03:28:32.707Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|MkF5C5OLF7jiibm3m/[redacted]+ljfIbZnHwW6gu0/cZK7VO+qp+[redacted]/[redacted]/yN+HuQatBMdxxrXbSm2fbMZiU/x1V6TArj8eIxknB8pl5s0u/E4n6RF1J1+[redacted]+[redacted]/+[redacted]+a7LlRRdI+Bnbag== timeout 20916
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-018] tool-timeout
+
+**Logged**: 2026-04-21T03:36:17.310Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|[redacted]+[redacted]/g//[redacted]/[redacted]+[redacted]+[redacted]/[redacted]/0L24n2gTZbQuTb2hK/[redacted]== timeout 20800
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-019] tool-timeout
+
+**Logged**: 2026-04-21T04:04:24.175Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|[redacted]+[redacted]+KFkZHZroylS+[redacted]+[redacted]/Vc27R0aF/[redacted]+CDOGd61mRg0wSURC5Rh+D8Pxaz+[redacted]+HWid633LLgg3Q+9aIEcLZ3yAiw== timeout 20559
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-020] tool-timeout
+
+**Logged**: 2026-04-21T04:07:25.148Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|[redacted]/2RzvUjTBbxg0HZi0V/[redacted]+HE5g+[redacted]//K5+B43H75oI1gxLK/[redacted]/[redacted]+QnXHm/g+[redacted]/7ztm1HbPBiifw== timeout 20581
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-021] tool-explicit-error
+
+**Logged**: 2026-04-21T04:08:56.315Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) agent-browser --session voice-root-check close >/dev/null 2>&1 || true agent-browser --session voice-root-check --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-root…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-021] tool-explicit-error
+
+**Logged**: 2026-04-21T04:08:56.441Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) agent-browser --session voice-chat-check close >/dev/null 2>&1 || true agent-browser --session voice-chat-check --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-chat…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-022] tool-explicit-error
+
+**Logged**: 2026-04-21T04:09:26.967Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) agent-browser --session voice-click-check close >/dev/null 2>&1 || true agent-browser --session voice-click-check --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-cl…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-023] tool-explicit-error
+
+**Logged**: 2026-04-21T04:10:50.145Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e TOKEN=$(python3 - <<'PY' import json cfg=json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) print(cfg['gateway']['auth']['token']) PY ) agent-browser --session voice-overlay-check close >/dev/null 2>&1 || true agent-browser --session voice-overlay-check --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voic…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-024] tool-explicit-error
+
+**Logged**: 2026-04-21T04:16:23.551Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e agent-browser --session voice-device-only close >/dev/null 2>&1 || true agent-browser --session voice-device-only --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-device-only wait --load networkidle >/dev/null || true agent-browser --session voice-device-only eval ' (() => { localStorage.clear(); localStorage.set…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-025] tool-explicit-error
+
+**Logged**: 2026-04-21T04:18:26.761Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e agent-browser --session voice-device-only-v2 close >/dev/null 2>&1 || true agent-browser --session voice-device-only-v2 --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-device-only-v2 wait --load networkidle >/dev/null || true agent-browser --session voice-device-only-v2 eval ' (() => { localStorage.clear(); loca…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-026] tool-timeout
+
+**Logged**: 2026-04-21T04:24:44.810Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main 20 [redacted] [redacted]|[redacted]/[redacted]+LHT01a2FMF74MhNr/[redacted]+u6hsm9YAEVa+[redacted]/[redacted]+jlvcLG+[redacted]/ehNRy4+AaHLLZZMlipjRH42/Kuei/fqNVaeJXROvdcB21pHv4/[redacted]+[redacted]== timeout 21495
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-027] tool-explicit-error
+
+**Logged**: 2026-04-21T04:25:24.396Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec set -e agent-browser --session voice-device-only-v3 close >/dev/null 2>&1 || true agent-browser --session voice-device-only-v3 --args "--no-sandbox" open "[url] >/dev/null agent-browser --session voice-device-only-v3 wait --load networkidle >/dev/null || true agent-browser --session voice-device-only-v3 eval ' (() => { localStorage.clear(); loca…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-028] tool-explicit-error
+
+**Logged**: 2026-04-21T05:34:16.517Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec ffprobe -v error -show_entries format=filename,duration,bit_rate:stream=codec_name,codec_type,sample_rate,channels -of json '/home/missyouangeled/Music/ 2053_raw(1).mp3' /home/missyouangeled/.openclaw/workspace 10000 120 [redacted] [redacted]|VcwQDA2l9R06Pt6UE/[redacted]+9MC3X/[redacted]/[redacted]+[redacted]++[redacted]/[redacted]/[redacted]== …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-029] tool-explicit-error
+
+**Logged**: 2026-04-21T05:36:30.354Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' mods=['mutagen','pydub','audioread','soundfile','librosa','requests'] for m in mods: try: __import__(m) print(m+':yes') except Exception as e: print(m+':no') PY /home/missyouangeled/.openclaw/workspace 10000 120 [redacted] [redacted]|yp+cDVbayiJXeUcNOV0R0/[redacted]/[redacted]/yvf5jG/C7S6Mo2LyPdG2J+SaQZev4Mgup0o58XQp+[redacted]+…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
 - Related Files: .learnings/ERRORS.md
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
