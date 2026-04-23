@@ -14,10 +14,11 @@
 默认按下面顺序恢复上下文：
 
 1. 读 `PROJECT_VERSIONS.md`
-2. 读 `memory/YYYY-MM-DD.md`（今天 + 昨天）
-3. 如果在主会话里，再读 `MEMORY.md`
-4. 查看当前 Git 分支与最近提交
-5. 再开始动代码
+2. 读 `PROJECT_INDEX.md`
+3. 读 `memory/YYYY-MM-DD.md`（今天 + 昨天）
+4. 如果在主会话里，再读 `MEMORY.md`
+5. 查看当前 Git 分支与最近提交
+6. 再开始动代码
 
 ## 当前主项目
 

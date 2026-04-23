@@ -118,6 +118,13 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
 
+## Project Index
+
+- `PROJECT_INDEX.md` is the long-term directory of user projects in this workspace.
+- When a new real project is created or identified, record at least: project name, main directory, brief description, and URL/start method if available.
+- When the user later asks about "that project", check `PROJECT_INDEX.md` first before searching blindly.
+- If a project is renamed, moved, or gains a common alias, update `PROJECT_INDEX.md` so future sessions do not forget it exists.
+
 ## Background Subagents
 
 - If a background subagent has finished its task and has no more work, close it instead of leaving it hanging.

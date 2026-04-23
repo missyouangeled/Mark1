@@ -43,6 +43,28 @@ Docker build fails on Apple Silicon due to platform mismatch
 
 ---
 
+## [LRN-20260423-001] best_practice
+
+**Logged**: 2026-04-23T00:45:00Z
+**Priority**: high
+**Status**: promoted
+**Area**: docs
+
+### Summary
+在温暖、陪伴式的日常聊天里，不要习惯性用列表和一堆选择来收尾。
+
+### Details
+用户明确反馈：我的回答已经减少了很多“AI感”，但最后仍常常切成列表，给出很多选项。这会把本来已经自然的聊天重新拉回功能化、工具化的语气。更好的做法是在这类对话里自然收束，让一句话像人聊天那样落地，而不是条件反射式列点。
+
+### Suggested Action
+将这条规则固化到 SOUL.md，并在后续陪伴式聊天中优先使用自然段收尾，只有在用户明确需要比较、选择或结构化信息时再使用列表。
+
+### Metadata
+- Source: user_feedback
+- Related Files: SOUL.md, MEMORY.md, memory/2026-04-23.md
+- Tags: conversation-style, ai-feel, companionship, list-making
+
+---
 
 ## [LRN-20260417-001] correction
 
