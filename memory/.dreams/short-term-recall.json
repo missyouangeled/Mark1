@@ -1,0 +1,460 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-08T04:15:49.548Z",
+  "entries": {
+    "memory:memory/2026-04-03.md:26:28": {
+      "key": "memory:memory/2026-04-03.md:26:28",
+      "path": "memory/2026-04-03.md",
+      "startLine": 26,
+      "endLine": 28,
+      "source": "memory",
+      "snippet": "- 今天安装并启用了本地技能：`skills/self-improving-agent`（含 `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md`、`.learnings/FEATURE_REQUESTS.md` 初始化与 hook 接入）、`skills/skill-vetter`；另外按用户明确要求也安装了 `skills/evolver`，并以保守模式启动（不接 Hub、不当 worker、不走 bridge 自动执行、memory 隔离在它自己的目录里）。 - 用户在实际预览中反馈：首页滚动“非常卡”；已开始把性能优先级提到更高，先后压低/移除会伤滚动的样式因素，包括首页 `background-attachment: fixed`、大面积重玻璃模糊、过重阴影和部分高成本 hover/动态，方向改为“假玻璃 + 轻阴影”，优先保证首页上下滑动流畅。 - 用户特别点名登录/注册页“文字感觉没有排版”；随后已把 `login.php`、`register.php`、`forgot-password.php` 纳入同一套 auth 入口视觉体系，统一左右结构、标题层级、说明文案、表单节奏与星云初始03口径，让这组三页更像完整产品入口而不是零散表单。",
+      "recallCount": 3,
+      "dailyCount": 0,
+      "totalScore": 2.295668474169744,
+      "maxScore": 0.7905047448768576,
+      "firstRecalledAt": "2026-04-08T01:31:16.964Z",
+      "lastRecalledAt": "2026-04-08T04:15:49.548Z",
+      "queryHashes": [
+        "473f0c802131",
+        "b4459cbe944c",
+        "86449ab8c1ad"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "skills/self-improving-agent",
+        "learnings/learnings.md",
+        "learnings/errors.md",
+        "learnings/feature-requests.md",
+        "skills/skill-vetter",
+        "skills/evolver",
+        "先后压低/移除会伤滚动的样式因素",
+        "background-attachment"
+      ]
+    },
+    "memory:memory/2026-04-07.md:72:82": {
+      "key": "memory:memory/2026-04-07.md:72:82",
+      "path": "memory/2026-04-07.md",
+      "startLine": 72,
+      "endLine": 82,
+      "source": "memory",
+      "snippet": "- 已把明显的本地杂物移入回收站：`.clawhub/`、`.run/`、`[A-Za-z]`、`skills/creaa-ai/.clawhub/`，并把这些模式补进工作区 `.gitignore`。 - 用户提到刚刚在命令行里装了 CLI-Anything，已排查并确认： - 系统 PATH 中没有官方全局 `cli-anything` 可执行文件。 - 实际存在的是本地仓库：`/home/missyouangeled/Desktop/CLI-Anything`。 - 该仓库本质上是一个多平台集成仓库，里面同时提供 OpenClaw skill、Claude Code plugin、OpenCode commands、Codex skill，以及各软件生成好的 `agent-harness/`，而不是单一的 npm 全局 CLI 包。 - 已按它 README 中的 OpenClaw 用法，把 `openclaw-skill/SKILL.md` 安装到：`~/.openclaw/skills/cli-anything/SKILL.md`。 - 另外补了一个本地 helper 命令：`~/.local/bin/cli-anything`，用于快速打印 repo / skill 路径和 OpenClaw 用法提示，但它不是上游官方 CLI 本体。 - 为了避免只停留在“文件在不在”，还做了最小可运行验证： - 直接以内置 GIMP harness 进行模块级试跑，以下命令已成功执行： - `PYTHONPATH=/home/missyouan",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7898876522783692,
+      "maxScore": 0.7898876522783692,
+      "firstRecalledAt": "2026-04-08T01:31:16.964Z",
+      "lastRecalledAt": "2026-04-08T01:31:16.964Z",
+      "queryHashes": [
+        "473f0c802131"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "a-za-z",
+        "skills/creaa-ai",
+        "cli-anything",
+        "agent-harness",
+        "openclaw-skill/skill.md",
+        "local/bin/cli-anything",
+        "home/missyouan",
+        "明显"
+      ]
+    },
+    "memory:memory/2026-04-07.md:33:44": {
+      "key": "memory:memory/2026-04-07.md:33:44",
+      "path": "memory/2026-04-07.md",
+      "startLine": 33,
+      "endLine": 44,
+      "source": "memory",
+      "snippet": "- 实际存在的是本地仓库：`/home/missyouangeled/Desktop/CLI-Anything`。 - 该仓库本质上是一个多平台集成仓库，里面同时提供 OpenClaw skill、Claude Code plugin、OpenCode commands、Codex skill，以及各软件生成好的 `agent-harness/`，而不是单一的 npm 全局 CLI 包。 - 已按它 README 中的 OpenClaw 用法，把 `openclaw-skill/SKILL.md` 安装到：`~/.openclaw/skills/cli-anything/SKILL.md`。 - 另外补了一个本地 helper 命令：`~/.local/bin/cli-anything`，用于快速打印 repo / skill 路径和 OpenClaw 用法提示，但它不是上游官方 CLI 本体。 - 为了避免只停留在“文件在不在”，还做了最小可运行验证： - 直接以内置 GIMP harness 进行模块级试跑，以下命令已成功执行： - `PYTHONPATH=/home/missyouangeled/Desktop/CLI-Anything/gimp/agent-harness python3 -m cli_anything.gimp.gimp_cli --help` - `PYTHONPATH=/home/missyouangeled/Desktop/CLI-Anything/gimp/agent-harness python3 -m c",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7876011095619235,
+      "maxScore": 0.7876011095619235,
+      "firstRecalledAt": "2026-04-08T01:31:16.964Z",
+      "lastRecalledAt": "2026-04-08T01:31:16.964Z",
+      "queryHashes": [
+        "473f0c802131"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "agent-harness",
+        "openclaw-skill/skill.md",
+        "local/bin/cli-anything",
+        "cli-anything.gimp.gimp-cli",
+        "实际",
+        "存在",
+        "的是",
+        "本地"
+      ]
+    },
+    "memory:memory/2026-04-03.md:22:26": {
+      "key": "memory:memory/2026-04-03.md:22:26",
+      "path": "memory/2026-04-03.md",
+      "startLine": 22,
+      "endLine": 26,
+      "source": "memory",
+      "snippet": "- 本轮延续并保留已有通知闭环增强：举报处理通知已支持带 note，前台提醒页会显示“处理结果”而不是复用审核文案。 - 已执行一轮全量 PHP 语法检查：`pulsenest-php/*.php` 全部 `php -l` 通过，无语法错误。 - 当前判断：星云初始03 已非常接近可视为“100% 完工”的收口状态；若还要继续，只建议做极少量最终人工预览级微调（例如个别旧 Hero 文案默认值、create/edit post 页 brand chip 仍停留在星云初始01 口径、少数页面的局部 spacing 观察值）。 - 用户明确要求：后续像星云初始03这种连续推进的工作，不用每一步停下来征求同意；可以直接开后台分身持续推进，并且每到关键节点都要留记录到 memory / HANDOFF / PROJECT_VERSIONS 等对应文件。 - 今天安装并启用了本地技能：`skills/self-improving-agent`（含 `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md`、`.learnings/FEATURE_REQUESTS.md` 初始化与 hook 接入）、`skills/skill-vetter`；另外按用户明确要求也安装了 `skills/evolver`，并以保守模式启动（不接 Hub、不当 worker、不走 bridge 自动执行、memory 隔离在它自己的目录里）。",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "totalScore": 1.5235166417297594,
+      "maxScore": 0.7859377523369292,
+      "firstRecalledAt": "2026-04-08T01:31:16.964Z",
+      "lastRecalledAt": "2026-04-08T04:09:45.050Z",
+      "queryHashes": [
+        "473f0c802131",
+        "b4459cbe944c"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "pulsenest-php",
+        "create/edit",
+        "project-versions",
+        "skills/self-improving-agent",
+        "learnings/learnings.md",
+        "learnings/errors.md",
+        "learnings/feature-requests.md",
+        "skills/skill-vetter"
+      ]
+    },
+    "memory:memory/2026-04-08.md:1:18": {
+      "key": "memory:memory/2026-04-08.md:1:18",
+      "path": "memory/2026-04-08.md",
+      "startLine": 1,
+      "endLine": 18,
+      "source": "memory",
+      "snippet": "# 2026-04-08 - 将当前工作区里的 `self-improving-agent` 从“只在 `agent:bootstrap` 提醒”升级成更主动但保守的版本： - 保留原有 bootstrap reminder。 - 新增 OpenClaw internal hook 自动分流： - 用户明确纠正 → `.learnings/LEARNINGS.md` - 明显缺失能力诉求 → `.learnings/FEATURE_REQUESTS.md` - 高置信失败 / 报错 → `.learnings/ERRORS.md` - 低置信信号 → `.learnings/INBOX.md` - 新增去重状态文件设计：运行时写 `.learnings/.hook-state.json`，并已加入 `.gitignore`。 - 为了避免 `skills/self-improving-agent/` 因主仓 `.gitignore` 而只停留在本机热改，已新增主仓可追踪覆盖层：`openclaw-env/skill-overlays/self-improving-agent/`。 - 已同步更新恢复链路： - `openclaw-env/restore-skills.sh` 会在恢复 skill 后自动应用 overlay。 - `openclaw-env/restore-openclaw-env.sh` 会优先从 workspace skill 安装 hook，不存在时回退到 overlay，并补齐 `.learnings",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7571540153799062,
+      "maxScore": 0.7571540153799062,
+      "firstRecalledAt": "2026-04-08T03:04:33.625Z",
+      "lastRecalledAt": "2026-04-08T03:04:33.625Z",
+      "queryHashes": [
+        "e7e8d54623f8"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "self-improving-agent",
+        "learnings/learnings.md",
+        "learnings/feature-requests.md",
+        "learnings/errors.md",
+        "learnings/inbox.md",
+        "hook-state.json",
+        "skills/self-improving-agent",
+        "openclaw-env/restore-skills.sh"
+      ]
+    },
+    "memory:memory/2026-04-07.md:63:75": {
+      "key": "memory:memory/2026-04-07.md:63:75",
+      "path": "memory/2026-04-07.md",
+      "startLine": 63,
+      "endLine": 75,
+      "source": "memory",
+      "snippet": "- 这一轮完成后再次执行 `php -l pulsenest-php/*.php`，全量通过，无语法错误。 - 之后已按用户偏好完成提交并推送备份： - 本地提交：`2c7face` · `backup(xingyun03): tighten final review surfaces` - 首次直接 `git push origin master` 因 GitHub SSH 身份未命中而失败，报错 `Permission denied (publickey)`。 - 排查后确认本机可用 GitHub key 为 `~/.ssh/id_ed25519_github_openclaw`，并已用： - `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_github_openclaw -o IdentitiesOnly=yes' git push origin master` - 当前这轮系统性修改已成功推送到 GitHub 远端 `origin/master`。 - 随后又继续做了一轮环境侧收口： - 已把 GitHub SSH 默认配置写入 `~/.ssh/config`，之后这台机器可直接对 `github.com` 命中 `id_ed25519_github_openclaw`，不用每次手写 `GIT_SSH_COMMAND`。 - 已把明显的本地杂物移入回收站：`.clawhub/`、`.run/`、`[A-Za-z]`、`skills/creaa-ai/.clawhub/`，并把这些模式补进工作区 `.g",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7289789737292812,
+      "maxScore": 0.7289789737292812,
+      "firstRecalledAt": "2026-04-08T03:04:33.625Z",
+      "lastRecalledAt": "2026-04-08T03:04:33.625Z",
+      "queryHashes": [
+        "e7e8d54623f8"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "backup",
+        "备份",
+        "pulsenest-php",
+        "ssh/id-ed25519-github-openclaw",
+        "git-ssh-command",
+        "origin/master",
+        "ssh/config",
+        "github.com"
+      ]
+    },
+    "memory:memory/2026-04-07.md:24:34": {
+      "key": "memory:memory/2026-04-07.md:24:34",
+      "path": "memory/2026-04-07.md",
+      "startLine": 24,
+      "endLine": 34,
+      "source": "memory",
+      "snippet": "- 首次直接 `git push origin master` 因 GitHub SSH 身份未命中而失败，报错 `Permission denied (publickey)`。 - 排查后确认本机可用 GitHub key 为 `~/.ssh/id_ed25519_github_openclaw`，并已用： - `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_github_openclaw -o IdentitiesOnly=yes' git push origin master` - 当前这轮系统性修改已成功推送到 GitHub 远端 `origin/master`。 - 随后又继续做了一轮环境侧收口： - 已把 GitHub SSH 默认配置写入 `~/.ssh/config`，之后这台机器可直接对 `github.com` 命中 `id_ed25519_github_openclaw`，不用每次手写 `GIT_SSH_COMMAND`。 - 已把明显的本地杂物移入回收站：`.clawhub/`、`.run/`、`[A-Za-z]`、`skills/creaa-ai/.clawhub/`，并把这些模式补进工作区 `.gitignore`。 - 用户提到刚刚在命令行里装了 CLI-Anything，已排查并确认： - 系统 PATH 中没有官方全局 `cli-anything` 可执行文件。 - 实际存在的是本地仓库：`/home/missyouangeled/Desktop/CLI-Anything",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.727203141115964,
+      "maxScore": 0.727203141115964,
+      "firstRecalledAt": "2026-04-08T03:04:33.625Z",
+      "lastRecalledAt": "2026-04-08T03:04:33.625Z",
+      "queryHashes": [
+        "e7e8d54623f8"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "ssh/id-ed25519-github-openclaw",
+        "git-ssh-command",
+        "origin/master",
+        "ssh/config",
+        "github.com",
+        "id-ed25519-github-openclaw",
+        "a-za-z",
+        "skills/creaa-ai"
+      ]
+    },
+    "memory:memory/2026-04-07.md:57:66": {
+      "key": "memory:memory/2026-04-07.md:57:66",
+      "path": "memory/2026-04-07.md",
+      "startLine": 57,
+      "endLine": 66,
+      "source": "memory",
+      "snippet": "- 当前判断：这轮继续把星云初始03往“去原型味、统一语气、可验收成品”方向收了一点，属于低风险收口，不是结构性改造。 - 随后又按“2 → 3”继续推进了一轮偏验收级的 CSS 密度细磨，重点压了会员中心 / 帖子详情 / 后台三块高密度区域的视觉节奏： - `style.css` 继续下调 section kicker 的字号与字距，减少标签喊话感。 - 会员中心的 route mini card、资料进度卡、状态卡、详情行、右侧快捷入口卡整体再轻一点，信息堆叠感比前一版更弱。 - 帖子详情页的 detail card、评论卡、discussion guide / aftercare 卡片继续收紧，阅读区更稳，不再显得一层套一层过厚。 - 后台的 filter row、bulk bar、table cell、表头字距、权限卡与小输入框整体再压一轮，视觉上更像长期运营中的紧凑控制台，而不是偏松散的展示页。 - 这一轮完成后再次执行 `php -l pulsenest-php/*.php`，全量通过，无语法错误。 - 之后已按用户偏好完成提交并推送备份： - 本地提交：`2c7face` · `backup(xingyun03): tighten final review surfaces` - 首次直接 `git push origin master` 因 GitHub SSH 身份未命中而失败，报错 `Permission denied (publickey)`。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7375788893928303,
+      "maxScore": 0.7375788893928303,
+      "firstRecalledAt": "2026-04-08T04:09:45.050Z",
+      "lastRecalledAt": "2026-04-08T04:09:45.050Z",
+      "queryHashes": [
+        "b4459cbe944c"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "backup",
+        "备份",
+        "style.css",
+        "pulsenest-php",
+        "当前",
+        "判断",
+        "继续",
+        "星云"
+      ]
+    },
+    "memory:memory/2026-04-08.md:15:24": {
+      "key": "memory:memory/2026-04-08.md:15:24",
+      "path": "memory/2026-04-08.md",
+      "startLine": 15,
+      "endLine": 24,
+      "source": "memory",
+      "snippet": "- `openclaw-env/post-restore-check.sh` 已新增 self-improvement overlay / hook / INBOX 检查项。 - 本地已做的验证： - `handler.js` 用 Node 模拟跑通 bootstrap + correction + feature request + error + inbox 分流。 - `bash -n` 校验 `restore-openclaw-env.sh` / `restore-skills.sh` / `post-restore-check.sh` 语法通过。 - 用临时 `HOME` 实跑 `restore-openclaw-env.sh`，确认会安装 `~/.openclaw/hooks/self-improvement/handler.js`。 - 用临时 `HOME` 跑 `post-restore-check.sh`，新增检查项通过；未恢复 provider / cli-anything skill 的警告符合预期。 - 又继续补上第二阶段的 tool 级失败自动沉淀： - 研究 OpenClaw 文档后确认：要抓 raw tool 失败，最合适的不是继续堆 internal hook，而是用 native plugin 的 `after_tool_call`；`tool_result_persist` 更偏同步转写结果，不适合做磁盘侧学习落盘。 - 已新增本地可恢复 plugin：`openclaw-env/plugins/self-impr",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7328094859572252,
+      "maxScore": 0.7328094859572252,
+      "firstRecalledAt": "2026-04-08T04:09:45.050Z",
+      "lastRecalledAt": "2026-04-08T04:09:45.050Z",
+      "queryHashes": [
+        "b4459cbe944c"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "self-improvement",
+        "handler.js",
+        "restore-openclaw-env.sh",
+        "restore-skills.sh",
+        "post-restore-check.sh",
+        "cli-anything",
+        "after-tool-call",
+        "tool-result-persist"
+      ]
+    },
+    "memory:memory/2026-04-08.md:23:31": {
+      "key": "memory:memory/2026-04-08.md:23:31",
+      "path": "memory/2026-04-08.md",
+      "startLine": 23,
+      "endLine": 31,
+      "source": "memory",
+      "snippet": "- 已新增本地可恢复 plugin：`openclaw-env/plugins/self-improvement-tool-errors/`，通过 `after_tool_call` 自动捕获高置信 tool 失败并写入 `.learnings/ERRORS.md`，模糊信号进 `.learnings/INBOX.md`。 - 当前覆盖的高置信场景：`exec` 非零退出、tool 显式 error、approval block、policy / host deny、timeout、fetch / connection fail。 - 明确仍不直接自动落盘的场景：`Command still running` / 需要后续 `process` 的状态，只进 `INBOX.md`；如果 OpenClaw 某次运行根本没把失败暴露到 `after_tool_call`，这个插件也抓不到。 - 已把恢复链路接上：`restore-openclaw-env.sh` 会安装并启用 `self-improvement-tool-errors`，`post-restore-check.sh` 会检查 plugin 源和安装可见性。 - 本地验证： - 用 Node mock 事件跑通 `exec` 非零退出 / `fetch failed` / approval blocked / still-running 分流。 - 实跑 `bash openclaw-env/restore-openclaw-env.sh` + `bash openclaw-env/",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7304298475268899,
+      "maxScore": 0.7304298475268899,
+      "firstRecalledAt": "2026-04-08T04:09:45.050Z",
+      "lastRecalledAt": "2026-04-08T04:09:45.050Z",
+      "queryHashes": [
+        "b4459cbe944c"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "after-tool-call",
+        "learnings/errors.md",
+        "learnings/inbox.md",
+        "inbox.md",
+        "restore-openclaw-env.sh",
+        "self-improvement-tool-errors",
+        "post-restore-check.sh",
+        "still-running"
+      ]
+    },
+    "memory:memory/2026-04-03.md:56:63": {
+      "key": "memory:memory/2026-04-03.md:56:63",
+      "path": "memory/2026-04-03.md",
+      "startLine": 56,
+      "endLine": 63,
+      "source": "memory",
+      "snippet": "- 本轮再次执行 `php -l pulsenest-php/*.php`，全部通过，无语法错误。 - 本轮后的预期收益： - 首页首开：会比上一轮更少重复配置查询、少一部分首页聚合查询、少拉大图，体感上应继续缩短首开等待和首屏资源压力。 - 首页滚动：首屏以下模块更晚绘制，列表/卡片图更轻，滚到中后段时的掉帧感预计会继续下降，尤其是图片较多或机器偏弱时更明显。 - 仍然残留的主要瓶颈： - 首页 `topAuthors` / `topPostsByViews` / `time hotlist` 仍然依赖实时聚合 likes/comments，数据量上来后还会继续吃 SQL；若要再降，下一轮应考虑做更明确的首页查询拆分、缓存或冗余统计字段。 - 旧图不会自动回填生成衍生图；新上传图已经走轻量链路，但历史大图若很多，局部页面仍可能吃到原图负担。 - 今天继续扩充了 Skills 恢复体系：新增 `openclaw-find-skills`、`proactive-agent-lite`、`openclaw-agent-browser`、`liang-tavily-search`，并把它们写入 `openclaw-env/skills-manifest.json`，纳入“星云初始03全量工作备份 / 环境全量恢复包”的可恢复范围。",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "totalScore": 1.5548193682710445,
+      "maxScore": 0.7912383509031038,
+      "firstRecalledAt": "2026-04-08T04:13:16.054Z",
+      "lastRecalledAt": "2026-04-08T04:15:49.548Z",
+      "queryHashes": [
+        "283e32b7c71b",
+        "86449ab8c1ad"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "备份",
+        "pulsenest-php",
+        "列表/卡片图更轻",
+        "likes/comments",
+        "openclaw-find-skills",
+        "proactive-agent-lite",
+        "openclaw-agent-browser",
+        "liang-tavily-search"
+      ]
+    },
+    "memory:memory/2026-04-03.md:63:67": {
+      "key": "memory:memory/2026-04-03.md:63:67",
+      "path": "memory/2026-04-03.md",
+      "startLine": 63,
+      "endLine": 67,
+      "source": "memory",
+      "snippet": "- 今天继续扩充了 Skills 恢复体系：新增 `openclaw-find-skills`、`proactive-agent-lite`、`openclaw-agent-browser`、`liang-tavily-search`，并把它们写入 `openclaw-env/skills-manifest.json`，纳入“星云初始03全量工作备份 / 环境全量恢复包”的可恢复范围。 - 其中 Tavily skill 已在本机调通，但真实 `TAVILY_API_KEY` 不进入 Git；恢复时应通过目标机本地配置或环境变量补齐。 - 用户要求“更新 星云初始03全量工作备份与环境全量恢复包，并推送”；执行时需要一并纳入当前性能优化后的 `pulsenest-php/` 代码、今天日志与 `.learnings/ERRORS.md` 的更新，以及新增 Skills 的恢复清单。 - 今天继续在 `pulsenest-php/` 做一轮“资料体系补强 + 可运营完善”的轻量补丁，重点不是新业务，而是把用户身份层做得更像正式社区产品： - `config.php` 自动补齐 `pulsenest_users.location` / `website_url` 字段，并把登录态 / 刷新用户态统一扩展到这两项；同时新增轻量 URL 规范化与外链标签辅助函数，允许用户填 `example.com` 这类输入并自动规范成 `https://`。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7757747017067361,
+      "maxScore": 0.7757747017067361,
+      "firstRecalledAt": "2026-04-08T04:13:16.054Z",
+      "lastRecalledAt": "2026-04-08T04:13:16.054Z",
+      "queryHashes": [
+        "283e32b7c71b"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "备份",
+        "openclaw-find-skills",
+        "proactive-agent-lite",
+        "openclaw-agent-browser",
+        "liang-tavily-search",
+        "tavily-api-key",
+        "pulsenest-php",
+        "learnings/errors.md"
+      ]
+    },
+    "memory:memory/2026-04-08.md:71:78": {
+      "key": "memory:memory/2026-04-08.md:71:78",
+      "path": "memory/2026-04-08.md",
+      "startLine": 71,
+      "endLine": 78,
+      "source": "memory",
+      "snippet": "- `~/.openclaw/openclaw.json` 已切到 `memory.backend = \"qmd\"`，gateway 也已重启并能看到 QMD memory 启动日志。 - 目前已确认的真实状态不是“没装上”，而是“已装上并接入，但首轮 embedding / 向量链路未稳定”。 - 当前 QMD 卡点已定位： - 不是单纯 CPU 慢，而是本机当前对 Hugging Face 直连失败（出现 `Network is unreachable`），导致 QMD 首轮模型下载 / embed 走不通。 - 即使如此，QMD 的纯关键词 / BM25 搜索已验证能工作；也就是说当前更准确的状态是“基础本地搜索可用，向量 / rerank 受网络条件影响未跑通”。 - 已决定后续把 QMD 目标从“先追求完整向量能力”收窄为“先在本地稳定用起来”： - 研究 OpenClaw 的 QMD manager 后确认：当 `searchMode = \"search\"` 时本就不该主动跑 embed；而 embed 定时器可通过把 `memory.qmd.update.embedInterval` 压到 `0` / 不启用来停掉。 - 后续稳定化方向已明确为：固定 CPU-only 思路、优先保住 BM25 / search-only 路线、尽量避免 boot 阶段反复卡 embed，再考虑更高阶向量能力。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.858943997127015,
+      "maxScore": 0.858943997127015,
+      "firstRecalledAt": "2026-04-08T04:15:49.548Z",
+      "lastRecalledAt": "2026-04-08T04:15:49.548Z",
+      "queryHashes": [
+        "86449ab8c1ad"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "embedding",
+        "gateway",
+        "network",
+        "qmd",
+        "网络",
+        "openclaw/openclaw.json",
+        "memory.backend",
+        "memory.qmd.update.embedinterval"
+      ]
+    },
+    "memory:memory/2026-04-08.md:64:73": {
+      "key": "memory:memory/2026-04-08.md:64:73",
+      "path": "memory/2026-04-08.md",
+      "startLine": 64,
+      "endLine": 73,
+      "source": "memory",
+      "snippet": "- 额外注意：OpenClaw 会提示 `plugins.allow` 为空时非 bundled plugin 可能被自动发现；当前 restore 通过 `plugins enable` 可正常启用，但如果以后要更严一点，可以再把这个 plugin id 加进显式 allowlist。 - 用户新增长期要求： - 以后后台分身如果没有任务就关闭，不要挂着。 - 以后如果判断任务会耗时较长，应优先自动开后台分身执行，避免主会话显得卡住。 - 以后默认按一套实用的 thinking 规则执行：普通问答 / 简单解释 / 路径明确的小改动保持默认或低；复杂排错 / 架构取舍 / 大改前规划 / 多上下文综合判断 / 高风险恢复与安全一致性问题开高；又长又复杂的任务优先放到后台分身并在分身上使用更高推理。 - 已开始接入 QMD 作为 OpenClaw 的 memory backend： - 本机已安装 `@tobilu/qmd`，命令可用版本为 `qmd 2.1.0`。 - `~/.openclaw/openclaw.json` 已切到 `memory.backend = \"qmd\"`，gateway 也已重启并能看到 QMD memory 启动日志。 - 目前已确认的真实状态不是“没装上”，而是“已装上并接入，但首轮 embedding / 向量链路未稳定”。 - 当前 QMD 卡点已定位：",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.8560061910637026,
+      "maxScore": 0.8560061910637026,
+      "firstRecalledAt": "2026-04-08T04:15:49.548Z",
+      "lastRecalledAt": "2026-04-08T04:15:49.548Z",
+      "queryHashes": [
+        "86449ab8c1ad"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "embedding",
+        "gateway",
+        "qmd",
+        "plugins.allow",
+        "tobilu/qmd",
+        "2.1.0",
+        "openclaw/openclaw.json",
+        "memory.backend"
+      ]
+    },
+    "memory:memory/2026-04-08.md:77:80": {
+      "key": "memory:memory/2026-04-08.md:77:80",
+      "path": "memory/2026-04-08.md",
+      "startLine": 77,
+      "endLine": 80,
+      "source": "memory",
+      "snippet": "- 研究 OpenClaw 的 QMD manager 后确认：当 `searchMode = \"search\"` 时本就不该主动跑 embed；而 embed 定时器可通过把 `memory.qmd.update.embedInterval` 压到 `0` / 不启用来停掉。 - 后续稳定化方向已明确为：固定 CPU-only 思路、优先保住 BM25 / search-only 路线、尽量避免 boot 阶段反复卡 embed，再考虑更高阶向量能力。 - QMD 这一轮排查里，有两个后台分身都已按用户偏好在结束后关闭；其中第二个稳定化分身没有带回新的有效修复，只确认了应继续围绕“本地先稳定用起来”这个更窄目标收口。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.849541015386774,
+      "maxScore": 0.849541015386774,
+      "firstRecalledAt": "2026-04-08T04:15:49.548Z",
+      "lastRecalledAt": "2026-04-08T04:15:49.548Z",
+      "queryHashes": [
+        "86449ab8c1ad"
+      ],
+      "recallDays": [
+        "2026-04-08"
+      ],
+      "conceptTags": [
+        "qmd",
+        "memory.qmd.update.embedinterval",
+        "cpu-only",
+        "search-only",
+        "研究",
+        "openclaw",
+        "manager",
+        "确认"
+      ]
+    }
+  }
+}

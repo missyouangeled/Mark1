@@ -1717,3 +1717,933 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260421-031] tool-explicit-error
+
+**Logged**: 2026-04-21T06:02:00.844Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env bash set -euo pipefail BASE_DIR="/home/missyouangeled/.openclaw/workspace" REF_AUDIO_DEFAULT="$HOME/.local/share/openclaw-voice-reply/default-ref.mp3" STYLE="${VOICE_STYLE:-natural}" OUT="" TEXT="" REF_AUDIO="$REF_AUDIO_DEFAULT" LANG="zh" usage() { cat <<'EOF' Usage: bash tools/voice-reply/noiz-reply.sh --text "你好" [--style natu…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-032] tool-explicit-error
+
+**Logged**: 2026-04-21T06:44:18.909Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll calm-orbit 60000 [redacted] [redacted]|[redacted]+RhVYuHmU/+[redacted]/[redacted]/[redacted]+[redacted]+625VjoZB+EfBR0samjpRbswMtcf2f+GUyGKWPLK1t7RA+[redacted]+IYKsP+EFyPloFgiDcNqmMX+eSA== failed 1 13092
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-033] tool-explicit-error
+
+**Logged**: 2026-04-21T06:56:16.259Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll glow-haven 60000 [redacted] [redacted]|/mf8KXxFaGd0PCI4Iaw+[redacted]+S7ssCmUbzqvJcjgaCBTV/[redacted]/G/P/[redacted]/8b006aZ2lrttHCgALnrI+8TR4LmVuM0atH0u0zBN+y7efPeRKM8OGm//[redacted]/VGWpQm5V4FDdMYt/h50pp+[redacted]/egCkh2syibXvRfKE8C7RE5x+[redacted]+WBnC3DJBAKKzA== failed 1 20920
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-034] tool-explicit-error
+
+**Logged**: 2026-04-21T07:01:05.540Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll plaid-cedar 60000 [redacted] [redacted]|j5CWRRODhjaMDuFjyDE9/[redacted]+[redacted]/[redacted]+lf1toFpOpxebYhFeERldkUr/[redacted]+F1U17j5GLROZAAiZrW/[redacted]+cpxxQCAjR3lZXHkpv+vsqHQ4DNwV9VYiSb28+[redacted]== failed 1 6127
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-035] tool-explicit-error
+
+**Logged**: 2026-04-21T07:09:18.647Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll vivid-orbit 60000 [redacted] [redacted]|Q/[redacted]/[redacted]/mBMgyA4XT+[redacted]/[redacted]/[redacted]+[redacted]== failed 1 17668
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-036] tool-explicit-error
+
+**Logged**: 2026-04-21T07:17:52.437Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll gentle-shore 60000 [redacted] [redacted]|[redacted]/[redacted]/[redacted]/[redacted]+3qwy+[redacted]+oh55/vlJaCbS6qHlmgw== failed 1 23158
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-037] tool-explicit-error
+
+**Logged**: 2026-04-21T07:18:27.943Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll clear-crest 30000 [redacted] [redacted]|m3hydCqAg40WM3u+[redacted]+SIU0R+[redacted]/yOWpMkU3UKg+[redacted]+[redacted]+qy+23dK2mE0F6sYbQtm0+[redacted]/z3zqTyXbz99Af05ZVBMz0ch/[redacted]/[redacted]/25BRzSPuCt52cyG/[redacted]== failed 28 4585
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-038] tool-explicit-error
+
+**Logged**: 2026-04-21T08:35:18.872Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll nova-atlas 1000 [redacted] [redacted]|bWD5aM+QIzaP8dNm1G6/[redacted]+i4v/[redacted]/R57+[redacted]+QmsDEqRWi0/pa8MC/[redacted]/9rcsl4/m3lYgqj8cYZ3G+[redacted]+[redacted]+k8lSPyO/[redacted]/[redacted]+S87LyoA== failed 145
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-039] tool-explicit-error
+
+**Logged**: 2026-04-21T08:56:25.561Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll swift-mist 10000 [redacted] [redacted]|LDWJ22YlGP96nHokIn+[redacted]/uqmbfkE3F2pvo1Qg3L/X/jUQUuOK4FaOP0nG/DD/[redacted]+[redacted]/EO6+[redacted]+CRN4OXgMxnb9XkJ5gBpFV6b+[redacted]+[redacted]/EzS3dxIuLMx1Bw0N3c6pZf+7LvMWl4gaplNjmWyUystjQ== failed 1 6623
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-040] tool-explicit-error
+
+**Logged**: 2026-04-21T09:12:14.200Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env bash set -euo pipefail BASE_DIR="/home/missyouangeled/.openclaw/workspace" VENV_DIR="$HOME/.local/share/openclaw-voice-venv311" PYTHON_BIN="$VENV_DIR/bin/python" REF_AUDIO_DEFAULT="$HOME/.local/share/openclaw-voice-reply/default-ref.mp3" FFMPEG_BIN="$HOME/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260421-041] tool-policy-blocked
+
+**Logged**: 2026-04-21T09:50:16.008Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read ~/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted]|[redacted]/QNxbR2tu/[redacted]+[redacted]/yxvg3K2QC9mGOr28Li3O1+[redacted]+/pTkB+L5jJaQ8ypa/[redacted]+O6a9dq8lS0/RMWfjSYFSqOjgNmVi+4vARZJmWR2i4+NfYWiBOrew== 428
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-001] tool-explicit-error
+
+**Logged**: 2026-04-22T01:55:19.037Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, glob, subprocess apps=[] seen=set() for path in glob.glob('/usr/share/applications/*.desktop') + glob.glob('/var/lib/snapd/desktop/applications/*.desktop'): name=None; execv=None try: with open(path,'r',encoding='utf-8',errors='ignore') as f: for line in f: if line.startswith('Name=') and name is None: name=line.strip…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-002] tool-connection-failure
+
+**Logged**: 2026-04-22T06:36:00.480Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|dL1x/HKjsi+GO7ms5bCBOUc+Gh+[redacted]/f5X0q++[redacted]+[redacted]+[redacted]+2p2SYhGNKZD+O6mowzjmi7wXz0HWs/[redacted]/21/p00dhDTrl/[redacted]== fetch failed error 808
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-002] tool-connection-failure
+
+**Logged**: 2026-04-22T06:36:00.510Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|XC3+A7c9ND5VJo7kdUVWmp/MlLy6+1zviq+6o+oDU7V1+T5QZcI1xxxa+[redacted]+8PxliuK+xw54NhQbCTHWTf/[redacted]/Ag0iPfKYEn142Qzy5S+SrYBBhOiIrNHCUQ/HRzJdzMnp/z2P1w== fetch failed error 817
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-003] tool-timeout
+
+**Logged**: 2026-04-22T06:36:09.782Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.parse, urllib.request, re queries=['Happy Horse 1.0 open source','"Happy Horse 1.0"','Happy Horse 1.0 model'] for q in queries: url='[url] print('\n### QUERY:', q) try: txt=urllib.request.urlopen(url, timeout=20).read().decode('utf-8','ignore') for m in re.finditer(r'nofollow" class="result__a" href="(.*?)">(.*?)</…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-004] tool-timeout
+
+**Logged**: 2026-04-22T06:37:12.500Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.request, urllib.parse, re urls=[ ('GitHub repo search','[url] Horse 1.0"')), ('GitHub repo search 2','[url] Horse model')), ('HuggingFace search','[url] Horse')), ] for label,url in urls: print('\n###',label) try: data=urllib.request.urlopen(url, timeout=20).read().decode('utf-8','ignore') print(data[:4000]) except…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-005] tool-connection-failure
+
+**Logged**: 2026-04-22T09:09:23.134Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|AGIAcF7umpZf9SWGLzl+aKmlalmRWknI16tv8Z+[redacted]/[redacted]+wGFxXGgRxlSFRKShHlF3+PJYXrA1Rb1sXT2mLO2nT7Bk/Oxwr872Q+EkoWzPTCFWbkpGV2hY+HSSgKrKE01YCR2iR8bK//IaAmGDXEyGxM/[redacted]+[redacted]/2jcY089uFpYcMvOyshhQCwJ+[redacted]/[redacted]== fetch failed error 720
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-005] tool-connection-failure
+
+**Logged**: 2026-04-22T09:09:23.167Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|[redacted]+[redacted]+3tNPlft/[redacted]+[redacted]+[redacted]+uIn6osIXehD7T/[redacted]/[redacted]+agiLm/[redacted]+dI9zwByUVI9rtQZlx+GcRktlPS2hpx2Br+9aqyNTGjKVHThFzA== fetch failed error 722
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-005] tool-connection-failure
+
+**Logged**: 2026-04-22T09:09:23.202Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|[redacted]+[redacted]/[redacted]/alXPX9yUE+xAaavsTlVm1P5ia41U+RBklYEwDdjeSi/TIkshHsMd6DFmtbugmjTZH/[redacted]+W9l9O/3GADBL0U5dP+[redacted]== fetch failed error 724
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-006] tool-explicit-error
+
+**Logged**: 2026-04-22T09:24:57.481Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll clear-coral 30000 [redacted] [redacted]|[redacted]+l7p5FLc+05kcFtp0PEpXhyR/[redacted]+[redacted]/v5EaSMu0zAwx8fCc+[redacted]/[redacted]== failed 1 311
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260422-007] tool-policy-blocked
+
+**Logged**: 2026-04-22T09:33:42.653Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted]|q5ohOZTt+[redacted]/fCXC+ydKg8hrYi3Ra4U7vOs+/9L+[redacted]+[redacted]+dRESR/UqVn+MtYzLGwd4Rug+k4Mnsua5I+[redacted]+T/[redacted]+BeBTBSXkApK/jyRE+1DGyXUnokzXpv/[redacted]/[redacted]+iBsc1QA6BzAZ2Pqkg== 291
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:openclaw-weixin:direct:o9cq808hd5pqqwldk7kazvo-cpco@im.wechat
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-001] tool-explicit-error
+
+**Logged**: 2026-04-24T05:51:26.793Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll briny-valley [redacted] [redacted] failed 30
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-002] tool-explicit-error
+
+**Logged**: 2026-04-24T05:51:29.417Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process log briny-valley [redacted] [redacted] failed 27
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-003] tool-explicit-error
+
+**Logged**: 2026-04-24T05:51:46.577Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace/proto-tide && npm run dev & sleep 15 && curl -s [url] | grep -q "PulseNest" && echo "SUCCESS" || echo "FAILED" [redacted] [redacted] running 10042
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-004] tool-timeout
+
+**Logged**: 2026-04-24T07:27:33.796Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 31011
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-005] tool-explicit-error
+
+**Logged**: 2026-04-24T07:30:40.791Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll lucky-breeze [redacted] [redacted] failed 37
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-006] tool-explicit-error
+
+**Logged**: 2026-04-24T07:33:49.556Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll tender-willow [redacted] [redacted] failed 24
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260424-007] tool-explicit-error
+
+**Logged**: 2026-04-24T08:30:22.207Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn returned an explicit error state.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn frontend-skill-search subagent Search for and recommend a top-tier 'Frontend Architecture' or 'Professional Web Design' skill from the OpenClaw ecosystem (using find-skills or clawhub). The goal is to find a skill that goes beyond simple UI tweaks and offers professional design systems, architecture patterns, and high-end vis…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-001] tool-policy-blocked
+
+**Logged**: 2026-04-27T01:28:15.614Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/skills/ex-qianqian/references/uncertainty-policy.md [redacted] [redacted] 249
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:openclaw-weixin:direct:o9cq808hd5pqqwldk7kazvo-cpco@im.wechat
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-002] tool-timeout
+
+**Logged**: 2026-04-27T04:50:01.222Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30453
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-003] tool-timeout
+
+**Logged**: 2026-04-27T04:54:01.593Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30843
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

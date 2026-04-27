@@ -17,9 +17,9 @@ const hotThreads = [
 ];
 
 const liveCards = [
-  { title: '夜航派对', text: '限时讨论活动 · 参与话题可点亮夜光徽章', badge: 'NOW' },
-  { title: '编辑推荐墙', text: '6 位编辑轮流上墙，展示“今晚真想玩”的理由', badge: 'HOT' },
-  { title: '开黑招募', text: '自动聚合同类型玩家偏好，像论坛招募贴一样直给', badge: 'NEW' }
+  { title: '夜航派对', text: '限时讨论活动 · 参与话题可点亮夜光徽章', badge: 'NOW', icon: '🌌' },
+  { title: '编辑推荐墙', text: '6 位编辑轮流上墙，展示“今晚真想玩”的理由', badge: 'HOT', icon: '🧠' },
+  { title: '开黑招募', text: '自动聚合同类型玩家偏好，像论坛招募贴一样直给', badge: 'NEW', icon: '🎮' }
 ];
 
 const authors = [
@@ -38,228 +38,211 @@ const pulseFeed = [
 
 export default function HomePage() {
   return (
-    <div className="pb-28 pt-10 md:pb-36 md:pt-14">
+    <div className="pb-28 pt-10 md:pb-48 md:pt-20">
       <section className="page-shell">
-        <div className="items-stretch grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="glass hero-panel flex h-full overflow-hidden rounded-[36px] border border-white/10">
-            <div className="grid gap-8 p-6 md:grid-cols-[1.15fr_0.85fr] md:p-8 lg:p-10">
-              <div className="flex flex-col justify-between gap-8">
-                <div className="space-y-5">
-                  <div className="brand-chip inline-flex rounded-full px-4 py-2 text-sm font-medium text-emerald-100">
-                    本周焦点 · {featured.tag} · 热榜第一候选
-                  </div>
-                  <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-white md:text-6xl">
-                    像逛热门论坛首页一样，先被氛围钩住，再被热度和观点留下来。
-                  </h1>
-                  <p className="max-w-2xl text-base leading-8 text-white/70 md:text-lg">
-                    这轮增强把 PulseNest 从“漂亮原型”往“更像真实热门社区站”推进：加入热榜、活动卡、标签云、作者推荐、实时动态、悬浮操作和更明显的论坛感信息编排。
-                  </p>
-                </div>
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <Link href={`/game/${featured.slug}`} className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#23d3a2,#6df0cf)] px-6 py-3 text-sm font-semibold text-slate-950">
-                    进入主推详情
-                  </Link>
-                  <Link href="/discover" className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white/88">
-                    去看发现页专题
-                  </Link>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  {heroStats.map(([label, num, note]) => (
-                    <div key={label} className="rounded-3xl border border-white/8 bg-white/4 p-4">
-                      <div className="text-xs uppercase tracking-[0.28em] text-white/42">{label}</div>
-                      <div className="mt-2 text-2xl font-semibold text-white">{num}</div>
-                      <div className="mt-1 text-sm text-soft">{note}</div>
-                    </div>
-                  ))}
-                </div>
+        {/* Main Hero Bento Grid */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:grid-rows-2">
+          
+          {/* Feature Hero - Large Spanning Block */}
+          <div className="glass hero-panel relative overflow-hidden rounded-[40px] border border-white/10 col-span-1 lg:col-span-8 lg:row-span-2 p-8 md:p-12 flex flex-col justify-between">
+            <div className="relative z-10 space-y-8">
+              <div className="brand-chip inline-flex rounded-full px-4 py-1.5 text-xs font-bold tracking-wider text-emerald-100 uppercase">
+                Featured this week · {featured.tag}
               </div>
+              <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tighter text-white md:text-7xl lg:text-8xl">
+                先被氛围钩住，<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-sky-400">再被热度留下来。</span>
+              </h1>
+              <p className="max-w-xl text-lg leading-relaxed text-white/60 md:text-xl">
+                像逛热门论坛首页一样，在PulseNest体验真正的社区感。加入热榜、活动卡、实时动态，让游戏探索不再孤单。
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <Link href={`/game/${featured.slug}`} className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-8 py-4 text-sm font-bold text-slate-950 transition-transform hover:scale-105 active:scale-95">
+                  进入主推详情
+                </Link>
+                <Link href="/discover" className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-8 py-4 text-sm font-medium text-white transition-hover hover:bg-white/10">
+                  探索发现页
+                </Link>
+              </div>
+            </div>
 
-              <div className="space-y-4">
-                <div className={`${featured.accentClass} relative h-[320px] overflow-hidden rounded-[30px] border border-white/10 md:h-full`}>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 top-0 flex items-center justify-between p-5 md:p-6">
-                    <span className="rounded-full border border-white/14 bg-black/18 px-3 py-1 text-xs text-white/86">Forum Pick</span>
-                    <span className="rounded-full bg-rose-400/18 px-3 py-1 text-xs text-rose-100">热帖角标</span>
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-                    <div className="text-xs uppercase tracking-[0.35em] text-emerald-200/80">Hero Pick</div>
-                    <div className="mt-3 text-3xl font-semibold">{featured.title}</div>
-                    <div className="mt-2 text-white/72">{featured.hero}</div>
-                    <div className="mt-6 flex flex-wrap gap-2">
-                      {featured.platforms.map((platform) => (
-                        <span key={platform} className="rounded-full border border-white/14 bg-black/18 px-3 py-1 text-xs text-white/84">
-                          {platform}
-                        </span>
-                      ))}
-                    </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 mt-16 relative z-10">
+              {heroStats.map(([label, num, note]) => (
+                <div key={label} className="rounded-2xl border border-white/5 bg-white/5 p-8 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+                  <div className="mt-2 text-3xl font-bold text-white">{num}</div>
+                  <div className="mt-1 text-xs text-soft">{note}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Hero Visual - Floating Element */}
+            <div className="absolute -right-20 -bottom-20 w-2/3 h-2/3 bg-gradient-to-br from-emerald-500/20 to-sky-500/20 rounded-full blur-[120px] pointer-events-none" />
+          </div>
+
+          {/* Hot Board - Medium Block */}
+          <div className="glass bento-item rounded-[40px] p-8 col-span-1 lg:col-span-4 lg:row-span-1 flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div className="text-sm font-bold uppercase tracking-widest text-emerald-300">Hot Board</div>
+              <span className="text-[10px] px-2 py-1 rounded-full bg-rose-500/20 text-rose-200 border border-rose-500/30">LIVE</span>
+            </div>
+            <div className="flex-1 space-y-3 overflow-hidden">
+              {hotThreads.map(([rank, title, heat]) => (
+                <div key={title} className="group flex items-center gap-4 p-3 rounded-2xl transition-colors hover:bg-white/5">
+                  <div className="text-lg font-black text-white/20 group-hover:text-emerald-400 transition-colors">{rank}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-white/90 truncate group-hover:text-white">{title}</div>
+                    <div className="text-[10px] text-soft">{heat}</div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <aside className="grid h-full gap-6 xl:auto-rows-fr">
-            <div className="glass h-full rounded-[32px] p-6 md:p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Hot Board</div>
-                  <div className="mt-2 text-2xl font-semibold">右侧热榜</div>
+          {/* Pulse Feed - Medium Block */}
+          <div className="glass bento-item rounded-[40px] p-8 col-span-1 lg:col-span-4 lg:row-span-1 flex flex-col">
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-6">Pulse Feed</div>
+            <div className="flex-1 space-y-4">
+              {pulseFeed.map(([time, text]) => (
+                <div key={text} className="flex gap-3 items-start">
+                  <div className="mt-1.5 h-2 w-2 rounded-full bg-emerald-400 pulse-dot" />
+                  <div>
+                    <div className="text-[10px] text-white/40 font-medium">{time}</div>
+                    <div className="text-xs leading-relaxed text-white/80">{text}</div>
+                  </div>
                 </div>
-                <span className="rounded-full border border-rose-300/18 bg-rose-300/10 px-3 py-1 text-xs text-rose-100">论坛感增强</span>
-              </div>
-              <div className="mt-6 space-y-3">
-                {hotThreads.map(([rank, title, heat]) => (
-                  <div key={title} className="rounded-3xl border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/14 hover:bg-white/[0.05]">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/6 text-sm font-semibold text-white/90">{rank}</div>
-                      <div className="min-w-0 flex-1">
-                        <div className="line-clamp-2 text-sm font-medium leading-6 text-white/90">{title}</div>
-                        <div className="mt-1 text-xs text-soft">{heat}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-
-            <div className="glass h-full rounded-[32px] p-6 md:p-7">
-              <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Pulse Feed</div>
-              <div className="mt-4 space-y-3">
-                {pulseFeed.map(([time, text]) => (
-                  <div key={text} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                    <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300 pulse-dot" />
-                    <div>
-                      <div className="text-xs text-white/42">{time}</div>
-                      <div className="mt-1 text-sm leading-6 text-white/84">{text}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="page-shell mt-32 items-stretch grid gap-6 md:mt-36 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="glass h-full rounded-[32px] p-7 md:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Focus Slots</div>
-              <div className="mt-2 text-2xl font-semibold">焦点位 / 活动卡 / 论坛运营位</div>
-            </div>
-            <span className="text-sm text-soft">全用渐变、SVG/emoji、抽象块面表达，无侵权素材</span>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {liveCards.map((item, index) => (
-              <div key={item.title} className={`focus-card focus-${index + 1} relative overflow-hidden rounded-[28px] border border-white/10 p-5`}>
-                <div className="absolute right-4 top-4 rounded-full bg-black/18 px-3 py-1 text-xs text-white/86">{item.badge}</div>
-                <div className="text-3xl">{index === 0 ? '🌌' : index === 1 ? '🧠' : '🎮'}</div>
-                <div className="mt-8 text-xl font-semibold text-white">{item.title}</div>
-                <div className="mt-3 text-sm leading-7 text-white/78">{item.text}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="glass h-full rounded-[32px] p-7 md:p-8">
-          <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Tag Cloud</div>
-          <div className="mt-3 text-2xl font-semibold">标签云 / 轻入口导航</div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            {tagCloud.map((tag, index) => (
-              <button
-                key={tag}
-                className={`tag-cloud-item rounded-full border px-4 py-2 text-sm transition hover:-translate-y-0.5 ${index % 3 === 0 ? 'border-emerald-300/22 bg-emerald-300/10 text-emerald-100' : index % 3 === 1 ? 'border-sky-300/18 bg-sky-300/10 text-sky-100' : 'border-fuchsia-300/18 bg-fuchsia-300/10 text-fuchsia-100'}`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-          <div className="mt-8 rounded-[26px] border border-white/8 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/46">今日社区情绪</div>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="h-3 flex-1 overflow-hidden rounded-full bg-white/8">
-                <div className="h-full w-[74%] rounded-full bg-[linear-gradient(90deg,#23d3a2,#77e7ff,#b06df0)]" />
-              </div>
-              <div className="text-sm font-semibold text-white">74%</div>
-            </div>
-            <p className="mt-3 text-sm leading-7 text-soft">本日更偏向“高颜值 + 轻沉浸 + 适合分享观点”的内容，说明社区不只是找游戏，也在找表达欲。</p>
           </div>
         </div>
       </section>
 
-      <section className="page-shell mt-32 space-y-16 md:mt-40 md:space-y-20">
-        <SectionTitle
-          kicker="Trending Now"
-          title="最近讨论度最高的 3 款候选"
-          description="继续保留原本稳定的卡片浏览逻辑，同时给卡片所在区域加入更像热门站首页的“正在热聊”语境。"
-        />
-        <div className="ticker-strip rounded-full border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
-          🔥 热议中：剧情浓度 / 四人开黑 / 年度美术 / 夜游氛围 / 独立黑马 / 机甲拼装 / 轻竞速叙事
+      {/* Middle Section: Focus Slots & Tag Cloud */}
+      <section className="page-shell mt-32 grid grid-cols-1 gap-8 lg:grid-cols-12">
+        
+        {/* Focus Slots - Bento style */}
+        <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-8">
+          {liveCards.map((item, index) => (
+            <div key={item.title} className={`focus-card bento-item relative overflow-hidden rounded-[32px] p-8 text-white flex flex-col justify-between min-h-[240px] ${index === 0 ? 'focus-1' : index === 1 ? 'focus-2' : 'focus-3'}`}>
+              <div className="absolute right-6 top-6 rounded-full bg-black/30 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-white border border-white/10">
+                {item.badge}
+              </div>
+              <div className="text-5xl mb-6">{item.icon}</div>
+              <div>
+                <div className="text-2xl font-bold mb-2">{item.title}</div>
+                <div className="text-sm text-white/80 leading-relaxed">{item.text}</div>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="grid gap-14 md:gap-16 lg:grid-cols-3 lg:gap-24 xl:gap-28 2xl:gap-32">
+
+        {/* Tag Cloud - Right Panel */}
+        <div className="glass bento-item rounded-[32px] p-8 lg:col-span-4 flex flex-col justify-between">
+          <div>
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-6">Tag Cloud</div>
+            <div className="flex flex-wrap gap-2">
+              {tagCloud.map((tag) => (
+                <button key={tag} className="tag-cloud-item px-4 py-2 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-white hover:border-emerald-400/50 transition-colors">
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-8 p-5 rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-sm">
+            <div className="text-xs font-bold text-white/40 uppercase tracking-tighter mb-3">Community Mood</div>
+            <div className="flex items-center gap-4">
+              <div className="h-1.5 flex-1 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full w-[74%] bg-gradient-to-r from-emerald-400 to-sky-400" />
+              </div>
+              <span className="text-sm font-bold text-white">74%</span>
+            </div>
+            <p className="mt-3 text-xs text-soft leading-relaxed">
+              本日更偏向“高颜值 + 轻沉浸 + 轻分享”的内容情绪。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Trending Section: Asymmetrical Grid */}
+      <section className="page-shell mt-32">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="max-w-2xl">
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-2">Trending Now</div>
+            <h2 className="text-4xl font-bold tracking-tighter text-white md:text-5xl">最近讨论度最高的候选</h2>
+          </div>
+          <div className="ticker-strip rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs text-white/60 font-medium">
+            🔥 热议中：剧情浓度 / 四人开黑 / 年度美术 / 夜游氛围 / 独立黑马 / 机甲拼装
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
           {trending.map((game) => (
             <GameCard key={game.slug} game={game} />
           ))}
         </div>
       </section>
 
-      <section className="page-shell mt-28 items-stretch grid gap-12 md:mt-32 lg:grid-cols-[1.2fr_0.8fr] lg:gap-14">
-        <div className="glass h-full rounded-[34px] p-8 md:p-10">
-          <SectionTitle
-            kicker="Editors' Notes"
-            title="为什么这种内容结构更像真实会停留的社区站"
-            description="热门论坛/社区不是只靠大图，而是把‘值得点开’‘正在发生’‘我还能去哪’同时摆在首页，让人自然停留。"
-          />
-          <div className="mt-16 grid gap-6 md:mt-20 md:grid-cols-3 md:gap-7">
-            {[
-              ['强视觉焦点位', 'Hero、活动卡、热帖角标形成“第一眼就有内容密度”的效果。'],
-              ['右侧高频信息', '热榜、动态、标签云、推荐作者都是论坛首页常见留人装置。'],
-              ['轻互动暗示', '悬浮 dock、状态按钮、动态脉冲、hover 微动效，能让页面更像活着的社区。']
-            ].map(([title, text]) => (
-              <div key={title} className="rounded-3xl border border-white/8 bg-white/[0.03] p-6">
-                <div className="text-lg font-semibold">{title}</div>
-                <p className="mt-3 text-sm leading-7 text-soft">{text}</p>
-              </div>
-            ))}
+      {/* Bottom Section: Authors & High Rated */}
+      <section className="page-shell mt-32 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        
+        {/* Editors' Notes - Large block */}
+        <div className="glass bento-item rounded-[40px] p-10 lg:col-span-7 flex flex-col justify-between">
+          <div>
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-4">Editors' Notes</div>
+            <h3 className="text-3xl font-bold text-white mb-6 tracking-tight">为什么这种内容结构更像真实会停留的社区站</h3>
+            <p className="text-lg text-white/60 leading-relaxed mb-12 max-w-2xl">
+              热门论坛/社区不是只靠大图，而是把‘值得点开’‘正在发生’‘我还能去哪’同时摆在首页，让人自然停留。
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              {[
+                ['强视觉焦点位', 'Hero、活动卡、热帖角标形成“第一眼就有内容密度”'],
+                ['右侧高频信息', '热榜、动态、标签云、推荐作者都是留人装置'],
+                ['轻互动暗示', '悬浮 dock、状态按钮、动态脉冲、hover 微动效']
+              ].map(([title, text]) => (
+                <div key={title} className="p-8 rounded-2xl border border-white/5 bg-white/[0.03] text-center">
+                  <div className="text-base font-bold text-white mb-2">{title}</div>
+                  <div className="text-xs text-soft leading-relaxed">{text}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid h-full gap-6 auto-rows-fr">
-          <div className="glass h-full rounded-[32px] p-7 md:p-9">
-            <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Recommended Authors</div>
-            <div className="mt-3 text-2xl font-semibold">推荐作者 / 勋章感名片</div>
-            <div className="mt-6 space-y-4">
+        {/* Authors & Rankings - Right Column Bento */}
+        <div className="lg:col-span-5 grid grid-cols-1 gap-8">
+          
+          {/* Recommended Authors */}
+          <div className="glass bento-item rounded-[32px] p-8 flex flex-col">
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-6">Recommended Authors</div>
+            <div className="space-y-4">
               {authors.map((author) => (
-                <div key={author.name} className="rounded-[26px] border border-white/8 bg-white/[0.03] p-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 ${author.glow}`}>🏅</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-white">
-                        <span className="font-semibold">{author.name}</span>
-                        <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[11px] text-amber-100">认证作者</span>
-                      </div>
-                      <div className="mt-1 text-sm text-soft">{author.tag}</div>
+                <div key={author.name} className="group flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-white/[0.03] transition-colors hover:bg-white/10">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 ${author.glow} text-xl`}>🏅</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white truncate">{author.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/30">认证</span>
                     </div>
-                    <div className="text-sm font-semibold text-emerald-300">{author.score}</div>
+                    <div className="text-xs text-soft truncate">{author.tag}</div>
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-white/72">{author.note}</p>
+                  <div className="text-sm font-bold text-emerald-400">{author.score}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="glass h-full rounded-[32px] p-7 md:p-9">
-            <div className="text-sm font-medium uppercase tracking-[0.32em] text-emerald-300/88">Top Rated</div>
-            <div className="mt-4 text-2xl font-semibold">高分速览</div>
-            <div className="mt-8 space-y-4 md:space-y-5">
+          {/* Top Rated Speed-view */}
+          <div className="glass bento-item rounded-[32px] p-8 flex flex-col">
+            <div className="text-sm font-bold uppercase tracking-widest text-emerald-300 mb-6">Top Rated</div>
+            <div className="space-y-3">
               {ranked.slice(0, 4).map((game, index) => (
-                <Link key={game.slug} href={`/game/${game.slug}`} className="flex items-center gap-5 rounded-3xl border border-white/8 bg-white/[0.03] px-5 py-5 transition hover:bg-white/[0.05] md:px-6 md:py-6">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/6 text-lg font-semibold text-white/80">#{index + 1}</div>
+                <Link key={game.slug} href={`/game/${game.slug}`} className="group flex items-center gap-4 p-3 rounded-2xl border border-white/5 bg-white/[0.03] transition-all hover:bg-white/10 hover:pl-6">
+                  <div className="text-lg font-black text-white/20 group-hover:text-emerald-400 transition-colors">#{index + 1}</div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-white">{game.title}</div>
-                    <div className="truncate text-sm text-soft">{game.subtitle}</div>
+                    <div className="text-sm font-bold text-white truncate group-hover:text-emerald-100 transition-colors">{game.title}</div>
+                    <div className="text-sm text-soft truncate">{game.subtitle}</div>
                   </div>
-                  <div className="text-sm font-semibold text-emerald-300">{game.rating.toFixed(1)}</div>
+                  <div className="text-sm font-bold text-emerald-400">{game.rating.toFixed(1)}</div>
                 </Link>
               ))}
             </div>

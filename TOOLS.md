@@ -68,6 +68,15 @@ Things like:
 - **Simple local fallback** uses `msedge-tts` in user space (no root required)
   - Script: `tools/voice-reply/tts.mjs`
   - Default Chinese voice: `zh-CN-XiaoxiaoNeural`
+  - **Current default voice-reply version**: `基础聊天女声版本`
+    - definition: local `msedge-tts` using `zh-CN-XiaoxiaoNeural`, optimized by using more conversational text rather than imitation/cloning
+    - user-selected reference sample: `tmp/voice-replies/basic-female-confession-chatty-20260422-165649.mp3`
+    - usage rule: for future normal voice replies, default to this version first
+  - Named fallback preset: **基础女声版本**
+    - definition: local `msedge-tts` baseline using `zh-CN-XiaoxiaoNeural`
+    - purpose: safety fallback when later experiments sound worse, stiffer, or less natural
+    - restore rule: if the user says “恢复到基础女声版本”, revert to this preset directly
+    - reference sample chosen by user: `tmp/voice-replies/natural-baseline-xiaoxiao-20260422-164306.mp3`
   - Prefer mp3 for current OpenClaw / Control UI usage
   - Example:
     - `node tools/voice-reply/tts.mjs --text '你好，我是贾维斯。' --out /tmp/jarvis-voice.mp3`

@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0f1115;
-  --panel: rgba(24, 29, 38, 0.88);
+  --bg: #0a0c10;
+  --panel: rgba(18, 22, 30, 0.7);
   --panel-strong: #151922;
-  --soft: #9aa4b2;
-  --line: rgba(255, 255, 255, 0.08);
+  --soft: #8a93a0;
+  --line: rgba(255, 255, 255, 0.06);
   --brand: #23d3a2;
   --brand-2: #6df0cf;
-  --text: #f4f7fb;
+  --text: #fdfdfe;
+  --accent-glow: rgba(35, 211, 162, 0.15);
 }
 
 * {
@@ -22,12 +23,18 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(35, 211, 162, 0.18), transparent 28%),
-    radial-gradient(circle at 90% 12%, rgba(124, 92, 255, 0.16), transparent 22%),
-    linear-gradient(180deg, #101319 0%, #090b10 100%);
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(35, 211, 162, 0.08), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(124, 92, 255, 0.08), transparent 30%),
+    radial-gradient(circle at 50% 90%, rgba(176, 109, 240, 0.05), transparent 40%),
+    #0a0c10;
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+section {
+  margin-bottom: 160px;
 }
 
 a {
@@ -40,15 +47,15 @@ a {
 }
 
 .page-shell {
-  width: min(1240px, calc(100% - 32px));
+  width: min(1320px, calc(100% - 48px));
   margin: 0 auto;
 }
 
 .glass {
   background: var(--panel);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(24px);
   border: 1px solid var(--line);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
 }
 
 .text-soft {
@@ -56,27 +63,26 @@ a {
 }
 
 .brand-chip {
-  background: linear-gradient(135deg, rgba(35, 211, 162, 0.18), rgba(109, 240, 207, 0.1));
-  border: 1px solid rgba(109, 240, 207, 0.26);
+  background: linear-gradient(135deg, rgba(35, 211, 162, 0.2), rgba(109, 240, 207, 0.1));
+  border: 1px solid rgba(109, 240, 207, 0.3);
+  box-shadow: 0 0 20px rgba(35, 211, 162, 0.1);
 }
 
 .hero-panel {
   position: relative;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(35, 211, 162, 0.12), transparent 22%),
-    radial-gradient(circle at 100% 0%, rgba(110, 98, 255, 0.14), transparent 24%),
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)),
+  background: 
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
     var(--panel);
 }
 
 .header-glow {
-  background: linear-gradient(90deg, rgba(35,211,162,0.08), rgba(119,231,255,0.04), rgba(176,109,240,0.08));
+  background: linear-gradient(90deg, rgba(35,211,162,0.1), rgba(119,231,255,0.05), rgba(176,109,240,0.1));
 }
 
 .floating-dock {
   border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(12, 14, 19, 0.72);
-  backdrop-filter: blur(18px);
+  background: rgba(10, 12, 16, 0.8);
+  backdrop-filter: blur(20px);
 }
 
 .ticker-strip {
@@ -89,83 +95,66 @@ a {
   animation: pulseGlow 2s infinite;
 }
 
+/* Modern Interaction States */
 .tag-cloud-item,
 .focus-card,
 .glass,
 .floating-dock a,
-.floating-dock button {
-  transition: transform 240ms ease, border-color 240ms ease, background-color 240ms ease, box-shadow 240ms ease;
+.floating-dock button,
+.bento-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .focus-card:hover,
-.tag-cloud-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+.tag-cloud-item:hover,
+.bento-item:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Bento Grid Specifics */
+.bento-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.bento-gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(255,255,255,0.05) 0%, transparent 60%);
 }
 
 .focus-1 {
-  background:
-    radial-gradient(circle at 20% 18%, rgba(255,255,255,0.26), transparent 16%),
-    linear-gradient(135deg, #2e3192 0%, #1bffff 100%);
+  background: linear-gradient(135deg, #1e2a78 0%, #0a4a78 100%);
 }
-
 .focus-2 {
-  background:
-    radial-gradient(circle at 84% 18%, rgba(255,255,255,0.18), transparent 16%),
-    linear-gradient(135deg, #7928ca 0%, #ff0080 100%);
+  background: linear-gradient(135deg, #5a1a78 0%, #7a1a5a 100%);
 }
-
 .focus-3 {
-  background:
-    radial-gradient(circle at 16% 22%, rgba(255,255,255,0.22), transparent 16%),
-    linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  background: linear-gradient(135deg, #1a785a 0%, #1a7878 100%);
 }
 
 .cover-art {
-  background:
-    radial-gradient(circle at 24% 18%, rgba(255,255,255,0.38), transparent 16%),
-    radial-gradient(circle at 78% 12%, rgba(109, 240, 207, 0.34), transparent 20%),
-    linear-gradient(135deg, #283e8e 0%, #7a4ff3 42%, #11d19f 100%);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  position: relative;
 }
-
-.cover-art.alt-1 {
-  background:
-    radial-gradient(circle at 20% 18%, rgba(255,255,255,0.3), transparent 14%),
-    radial-gradient(circle at 80% 10%, rgba(255,201,99,0.3), transparent 22%),
-    linear-gradient(135deg, #ee6f57 0%, #6f42c1 50%, #2ceaa3 100%);
-}
-
-.cover-art.alt-2 {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.24), transparent 12%),
-    radial-gradient(circle at 72% 18%, rgba(86,190,255,0.28), transparent 20%),
-    linear-gradient(135deg, #0c6ff9 0%, #0fc9c3 56%, #09203f 100%);
-}
-
-.cover-art.alt-3 {
-  background:
-    radial-gradient(circle at 28% 14%, rgba(255,255,255,0.3), transparent 12%),
-    radial-gradient(circle at 78% 24%, rgba(255,132,182,0.32), transparent 18%),
-    linear-gradient(135deg, #f97316 0%, #e11d48 44%, #1f2937 100%);
+.cover-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
 }
 
 @keyframes pulseGlow {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(109, 240, 207, 0.45);
-  }
-  70% {
-    transform: scale(1.08);
-    box-shadow: 0 0 0 10px rgba(109, 240, 207, 0);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(109, 240, 207, 0);
-  }
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(109, 240, 207, 0.4); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(109, 240, 207, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(109, 240, 207, 0); }
 }
 
 @media (max-width: 768px) {
   .page-shell {
-    width: min(100%, calc(100% - 20px));
+    width: calc(100% - 24px);
   }
 }

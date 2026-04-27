@@ -43,3 +43,63 @@ Low-confidence or ambiguous signals captured automatically for later review.
 - Suggested Action: Review manually before promoting to a formal learning file.
 
 ---
+
+## 2026-04-21T05:13:04.192Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 13:13 GMT+8] 能不能安装一个 Noiz AI Skill
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---
+
+## 2026-04-21T05:55:08.832Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 13:55 GMT+8] 能不能帮我看看有没有类似的Skill 可以调整音色，音调的，然后不花钱的。
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---
+
+## 2026-04-21T06:06:38.328Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 14:06 GMT+8] 语气。和说话的感觉挺好，现在把声音的音调调整一下，因为给你的原版声音文件是一首歌曲，音调肯定会高一些，能不能与其他真人声音对比一下，然后把音调调整下来，但是音色要保持不变。
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---
+
+## 2026-04-21T06:14:56.478Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 14:14 GMT+8] 中降更好，但是能不能调整一下 更趋近于真人说话的感觉，现在还是有点别扭。不太像真人。
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---
+
+## 2026-04-21T08:40:03.467Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 16:40 GMT+8] 等一下，系统提示空间不够，我加了一块硬盘，刚才也都配置完了，这个模型下载会不会空间不够，如果不够能不能用另一块硬盘。
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---
+
+## 2026-04-21T09:58:48.351Z · low-confidence-user-signal
+
+- Source: message:preprocessed
+- Session Key: agent:main:main
+- Summary: User message may contain a correction, feature gap, or failure signal but was not strong enough for formal logging.
+- Signal: [Tue 2026-04-21 17:58 GMT+8] 额 切换到千千的时候 能不能不说 像先去找身边能联系的人，或者直接打当地的紧急求助电话 这类的话。
+- Suggested Action: Review manually before promoting to a formal learning file.
+
+---

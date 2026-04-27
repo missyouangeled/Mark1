@@ -1,0 +1,73 @@
+/* 
+  Nebula Project (proto-tide) Design Tokens
+  Established by Senior Frontend Architect
+*/
+
+:root {
+  /* --- Color Palette --- */
+  /* Base & Surface */
+  --color-bg: #0a0c10;
+  --color-surface-base: rgba(18, 22, 30, 0.7);
+  --color-surface-strong: #151922;
+  --color-surface-subtle: rgba(255, 255, 255, 0.03);
+  --color-surface-hover: rgba(255, 255, 255, 0.08);
+  
+  /* Brand & Accents */
+  --color-brand: #23d3a2;
+  --color-brand-light: #6df0cf;
+  --color-brand-glow: rgba(35, 211, 162, 0.15);
+  --color-accent-primary: #23d3a2;
+  --color-accent-secondary: #77e7ff;
+  --color-accent-tertiary: #b06d90;
+  
+  /* Text & Contrast */
+  --color-text-main: #fdfdfe;
+  --color-text-muted: #8a93a0;
+  --color-text-dim: rgba(255, 255, 255, 0.4);
+  
+  /* Borders & Dividers */
+  --color-border-default: rgba(255, 255, 255, 0.06);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
+  --color-border-brand: rgba(109, 240, 207, 0.3);
+
+  /* --- Spacing System (4px base) --- */
+  --space-xs: 0.25rem;   /* 4px */
+  --space-sm: 0.5rem;    /* 8px */
+  --space-md: 1rem;      /* 16px */
+  --space-lg: 1.5rem;    /* 24px */
+  --space-xl: 2rem;      /* 32px */
+  --space-2xl: 3rem;     /* 48px */
+  --space-3xl: 4rem;     /* 64px */
+  --space-4xl: 6rem;     /* 96px */
+  --space-5xl: 8rem;     /* 128px */
+  --space-6xl: 10rem;    /* 160px */
+
+  /* --- Radius System --- */
+  --radius-sm: 0.5rem;    /* 8px */
+  --radius-md: 0.75rem;   /* 12px */
+  --radius-lg: 1rem;      /* 16px */
+  --radius-xl: 1.5rem;    /* 24px */
+  --radius-2xl: 2rem;     /* 32px */
+  --radius-3xl: 2.5rem;   /* 40px */
+  --radius-full: 9999px;
+
+  /* --- Typography --- */
+  --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+  --text-7xl: 4.5rem;
+  --text-8xl: 5rem;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+}
