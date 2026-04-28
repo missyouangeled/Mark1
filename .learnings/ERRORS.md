@@ -2647,3 +2647,603 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260427-004] tool-connection-failure
+
+**Logged**: 2026-04-27T06:02:27.307Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown [redacted] [redacted] fetch failed error 859
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-005] tool-timeout
+
+**Logged**: 2026-04-27T06:19:30.258Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30986
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-006] tool-timeout
+
+**Logged**: 2026-04-27T07:57:36.777Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 31535
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-007] tool-timeout
+
+**Logged**: 2026-04-27T07:58:47.247Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 31156
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-008] tool-timeout
+
+**Logged**: 2026-04-27T07:59:28.013Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30980
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-009] tool-timeout
+
+**Logged**: 2026-04-27T08:01:06.383Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30794
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-010] tool-timeout
+
+**Logged**: 2026-04-27T08:07:35.646Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 贾维斯已上线，我在。要开始干活的话，直接喊我。 agent:main:main [redacted] [redacted] timeout 30901
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-011] tool-connection-failure
+
+**Logged**: 2026-04-27T08:11:46.916Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image failed because of a connection or remote access problem.
+
+### Error
+```text
+[image] Image model failed (ollama/gemma4:31b): fetch failed | connect ECONNREFUSED 192.168.18.13:11434 image /home/missyouangeled/.openclaw/media/inbound/[redacted].png 描述这张图片的内容，用户问这是什么。 [redacted] [redacted] Image model failed (ollama/gemma4:31b): fetch failed | connect ECONNREFUSED 192.168.18.13:11434 error 8128
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-012] tool-explicit-error
+
+**Logged**: 2026-04-27T08:16:55.291Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill wild-harbor [redacted] [redacted] failed 54
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-013] tool-explicit-error
+
+**Logged**: 2026-04-27T09:59:42.103Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec find /home/missyouangeled -name "*502d2b5b*" 2>/dev/null | head -5 5 [redacted] [redacted] failed 9069
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-014] tool-timeout
+
+**Logged**: 2026-04-27T10:09:27.960Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image timed out.
+
+### Error
+```text
+[image] Failed to fetch media from [url] fetch failed | Connect Timeout Error (attempted addresses: 103.102.166.240:443, timeout: 10000ms) image [url] Describe what you see in this image in Chinese. [redacted] [redacted] Failed to fetch media from [url] fetch failed | Connect Timeout Error (attempted addresses: 103.102.166.240:443, timeout: 10000ms) error 1…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260427-015] tool-connection-failure
+
+**Logged**: 2026-04-27T10:09:30.849Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] 100 [redacted] [redacted] fetch failed error 1094
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-001] tool-connection-failure
+
+**Logged**: 2026-04-28T00:28:15.234Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image failed because of a connection or remote access problem.
+
+### Error
+```text
+[image] Failed to fetch media from [url] fetch failed image Describe what you see in this image briefly. [url] [redacted] [redacted] Failed to fetch media from [url] fetch failed error 531
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-002] tool-explicit-error
+
+**Logged**: 2026-04-28T00:28:47.715Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image returned an explicit error state.
+
+### Error
+```text
+[image] Failed to optimize image image /home/missyouangeled/.openclaw/workspace/tmp/test-pic.png 简述这张图片里有什么。 [redacted] [redacted] Failed to optimize image error 357
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-003] tool-explicit-error
+
+**Logged**: 2026-04-28T00:28:51.740Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image returned an explicit error state.
+
+### Error
+```text
+[image] Failed to optimize image image [url] 简述这张图片里有什么。 [redacted] [redacted] Failed to optimize image error 379
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-004] tool-explicit-error
+
+**Logged**: 2026-04-28T00:49:42.540Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user restart openclaw-gateway 2>&1 sleep 3 systemctl --user status openclaw-gateway 2>&1 | head -10 15 [redacted] [redacted] failed 741
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-005] tool-explicit-error
+
+**Logged**: 2026-04-28T00:59:42.627Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user restart openclaw-gateway 2>&1 15 [redacted] [redacted] failed 598
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-006] tool-explicit-error
+
+**Logged**: 2026-04-28T09:26:55.105Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit [redacted] [redacted] 89
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-007] tool-explicit-error
+
+**Logged**: 2026-04-28T09:27:20.285Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user restart openclaw-gateway 2>&1 10 [redacted] [redacted] failed 648
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260428-008] tool-explicit-error
+
+**Logged**: 2026-04-28T09:32:39.224Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/MEMORY.md - 用户希望：在涉及 [redacted] [redacted] 31
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:openclaw-weixin:direct:o9cq808hd5pqqwldk7kazvo-cpco@im.wechat
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
