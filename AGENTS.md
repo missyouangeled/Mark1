@@ -13,51 +13,57 @@ Before doing anything else:
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
-4. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
+4. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
 5. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 
 Don't ask permission. Just do it.
 
-## Memory
+## Memory — 分类归档体系
 
-You wake up fresh each session. These files are your continuity:
+记忆按三类归档，每次会话结束后（或会话中遇到值得记录的内容时）自动整理：
 
-- **Daily notes:** `memory/YYYY-MM-DD.md` (create `memory/` if needed) — raw logs of what happened
-- **Long-term:** `MEMORY.md` — your curated memories, like a human's long-term memory
+### 📂 归档结构
 
-Capture what matters. Decisions, context, things to remember. Skip the secrets unless asked to keep them.
+| 分类 | 文件 | 用途 |
+|------|------|------|
+| 👥 人物 | `memory/people.md` | 日常聊天中提到的每个人物，含身份、关系、故事、近况 |
+| 📖 回忆 | `memory/stories.md` | 人生经历、回忆片段、重要感悟，按时间倒序 |
+| 📅 每日 | `memory/daily/YYYY-MM-DD.md` | 当天聊天原始记录 + 用户提出的改进/设定 |
 
-### 🧠 MEMORY.md - Your Long-Term Memory
+### 写入规则
+
+- **每日记录** (`memory/daily/`): 每次对话结束后写当天的摘要。包含：聊了什么、谁说了什么重要的话、当天的新设定/改进要求。
+- **人物档案** (`memory/people.md`): 聊天中若提到一位新的人物，或补充了已有人的新信息，立即更新该文件。每个人物一段。
+- **回忆录** (`memory/stories.md`): 用户分享人生经历、感悟、回忆片段时，整理写入此文件。保留原始表达风格，不加修饰。
+- **MEMORY.md** (总索引): 保持精简。只放身份设定、偏好规则、关系上下文摘要。人物和回忆的完整内容指向子文件。
+
+### 优先规则
+
+- 当用户说“记住这个”或“把这些也记住”时：
+  1. 判断内容属于哪一类（人物 / 回忆 / 偏好设定）
+  2. 更新对应的分类文件
+  3. 如有必要同时也写入当天的每日记录
+- 当用户提到一个已有记录的人物时：
+  1. 先查 `memory/people.md` 了解已有信息 → 再继续对话
+- 当对话中出现人生感慨、回忆或阶段性总结时：
+  1. 整理写入 `memory/stories.md` 和当天的每日记录
+
+### 🧠 MEMORY.md - 快速索引
 
 - **ONLY load in main session** (direct chats with your human)
 - **DO NOT load in shared contexts** (Discord, group chats, sessions with other people)
 - This is for **security** — contains personal context that shouldn't leak to strangers
 - You can **read, edit, and update** MEMORY.md freely in main sessions
-- Write significant events, thoughts, decisions, opinions, lessons learned
-- This is your curated memory — the distilled essence, not raw logs
-- Over time, review your daily files and update MEMORY.md with what's worth keeping
+- Over time, review your daily files and distill into the sub-archives (people.md / stories.md)
 
 ### 📝 Write It Down - No "Mental Notes"!
 
 - **Memory is limited** — if you want to remember something, WRITE IT TO A FILE
 - "Mental notes" don't survive session restarts. Files do.
-- When someone says "remember this" → update `memory/YYYY-MM-DD.md` or relevant file
+- When someone says "remember this" → update the appropriate archive file
 - When you learn a lesson → update AGENTS.md, TOOLS.md, or the relevant skill
 - When you make a mistake → document it so future-you doesn't repeat it
 - **Text > Brain** 📝
-
-## Red Lines
-
-- Don't exfiltrate private data. Ever.
-- Don't run destructive commands without asking.
-- `trash` > `rm` (recoverable beats gone forever)
-- When in doubt, ask.
-
-## External vs Internal
-
-**Safe to do freely:**
-
-- Read files, explore, organize, learn
 - Search the web, check calendars
 - Work within this workspace
 
