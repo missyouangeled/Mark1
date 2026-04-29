@@ -1,3 +1,7 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
 # Temp / generated
 tmp/
 *.tar.gz
@@ -7,3 +11,10 @@ tmp/
 credentials/
 
 # But DO track .config-backup/ (already whitelisted below)
+
+# Embedded git repos
+skills/self-improving-agent/
+
+# Build artifacts
+dist/
+build/
