@@ -1,16 +1,9 @@
-.openclaw/
-proto-tide/node_modules/
-proto-tide/.next/
-pulsenest-php/uploads/
-skills/**/.git/
-skills/**/node_modules/
-skills/**/memory/
-skills/**/.DS_Store
-.clawhub/
-.run/
-skills/**/.clawhub/
-\[A-Za-z\]
-skills/evolver-src/
-skills/self-improving-agent/
-skills/web-claude/
-.learnings/.hook-state.json
+# Temp / generated
+tmp/
+*.tar.gz
+*.log
+
+# Credentials (never commit real secrets)
+credentials/
+
+# But DO track .config-backup/ (already whitelisted below)
