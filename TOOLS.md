@@ -35,14 +35,21 @@ Things like:
 
 ### OpenClaw automation
 
+- 适用机器：通用（其中带“掌机”字样的条目仅适用于掌机（Windows））
+- 系统 / OS：通用 / Windows / Linux（按各条目说明执行）
+
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
 - Windows 更新脚本（掌机）：
+  - 适用机器：掌机（Windows）
+  - 系统 / OS：Windows
   - `scripts/update-openclaw.ps1`
   - `scripts/update-openclaw.cmd`
   - 用途：执行 `git pull --ff-only`，若仓库有新提交则自动 `openclaw gateway restart`
   - 掌机建议直接运行：`.\scripts\update-openclaw.cmd`
 - Windows gateway 保活（掌机）：
+  - 适用机器：掌机（Windows）
+  - 系统 / OS：Windows
   - watchdog 脚本：`scripts/openclaw-gateway-watchdog.ps1`
   - 安装脚本：`scripts/install-openclaw-gateway-watchdog.ps1`
   - 卸载脚本：`scripts/uninstall-openclaw-gateway-watchdog.ps1`
@@ -56,13 +63,19 @@ Things like:
   - 停机规则：当需要手动关闭掌机上的 OpenClaw 时，先禁用 `OpenClaw Gateway Watchdog` 与 `OpenClaw Gateway`，再停止当前 gateway 实例，避免稍后又被自动拉起
   - 日志位置：`%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 - Windows SSD 优化（掌机）：
+  - 适用机器：掌机（Windows）
+  - 系统 / OS：Windows
   - 脚本：`scripts/optimize-ssd-trim-zhangji-windows.ps1`
   - cmd 包装器：`scripts/optimize-ssd-trim-zhangji-windows.cmd`
   - 作用：对掌机这台 Windows 机器的 SSD 卷执行 `Analyze + ReTrim`
   - 注意：需要“以管理员身份运行”
 - User systemd units:
+  - 适用机器：公司（Linux）/ 其他 Linux 机器
+  - 系统 / OS：Linux
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
+
+- 详细维护说明：`docs/掌机-Windows-OpenClaw-维护说明.md`
 
 ### Git / GitHub
 

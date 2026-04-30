@@ -1,5 +1,10 @@
-# Install OpenClaw Gateway Watchdog scheduled task (Windows / PowerShell)
-# Usage:
+# 适用机器：掌机（Windows）
+# 系统 / OS：Windows
+# 用途：为掌机上的 OpenClaw gateway 安装 watchdog 计划任务
+# 行为：
+#   1. 登录时自动检查一次
+#   2. 之后每隔固定分钟数重复巡检
+# 用法：
 #   .\scripts\install-openclaw-gateway-watchdog.ps1
 
 [CmdletBinding()]

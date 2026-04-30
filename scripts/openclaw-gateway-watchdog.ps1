@@ -1,7 +1,12 @@
-# OpenClaw Gateway watchdog (Windows / PowerShell)
-# Usage:
-#   .\scripts\openclaw-gateway-watchdog.ps1           # check only
-#   .\scripts\openclaw-gateway-watchdog.ps1 -AutoFix  # check and repair
+# 适用机器：掌机（Windows）
+# 系统 / OS：Windows
+# 用途：巡检并自愈掌机上的 OpenClaw gateway
+# 行为：
+#   1. 检查本地 `http://127.0.0.1:18789/` 是否可用
+#   2. 若不可用，则补充执行 `openclaw gateway restart`
+# 用法：
+#   .\scripts\openclaw-gateway-watchdog.ps1           # 仅检查
+#   .\scripts\openclaw-gateway-watchdog.ps1 -AutoFix  # 检查并自动修复
 
 [CmdletBinding()]
 param(

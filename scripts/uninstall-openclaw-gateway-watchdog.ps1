@@ -1,5 +1,7 @@
-# Uninstall OpenClaw Gateway Watchdog scheduled task (Windows / PowerShell)
-# Usage:
+# 适用机器：掌机（Windows）
+# 系统 / OS：Windows
+# 用途：卸载掌机上的 OpenClaw Gateway Watchdog 计划任务
+# 用法：
 #   .\scripts\uninstall-openclaw-gateway-watchdog.ps1
 
 [CmdletBinding()]
