@@ -75,7 +75,9 @@ Things like:
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
 
+- 读取 / 更新总规则：`docs/多机器-读取与更新规则.md`
 - 详细维护说明：`docs/掌机-Windows-OpenClaw-维护说明.md`
+- 详细维护说明：`docs/公司-Linux-OpenClaw-维护说明.md`
 
 ### Git / GitHub
 

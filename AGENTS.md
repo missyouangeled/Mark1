@@ -136,6 +136,8 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - For a provisional new-machine entry, generate: a short human-readable `设备名`, a conservative `环境标签` (use `未归类` when unsure), the current `系统/OS` label, and the identifiers used for matching.
 - Any system-related note, fix doc, runbook, script note, or GitHub-backed documentation that is specific to one machine/environment must clearly label its scope in the document itself, including at minimum: `设备名/环境标签` and `系统/OS`.
 - Preferred wording style for such docs: `适用机器：掌机（Windows）` / `适用机器：公司（Linux）`; if truly cross-machine, mark it explicitly as `适用机器：通用`.
+- For machine-specific system work, after identifying the current host, read docs in this order: `HOST_CONTEXT.md` → `docs/多机器-读取与更新规则.md` → the maintenance doc matching the current machine tag/OS (for example `docs/公司-Linux-OpenClaw-维护说明.md` or `docs/掌机-Windows-OpenClaw-维护说明.md`) → only then the matching scripts/config files.
+- When current host is `公司（Linux）`, prefer Linux-marked docs/scripts and do not apply `掌机（Windows）` steps directly; when current host is `掌机（Windows）`, prefer Windows-marked docs/scripts and do not apply Linux-specific steps directly.
 - Never overwrite a user-confirmed device name, environment tag, or OS label automatically.
 - If the user later provides a better name or location, update the existing entry instead of creating duplicates.
 - After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
