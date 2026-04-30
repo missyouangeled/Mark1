@@ -50,6 +50,11 @@ Things like:
   - 计划任务名：`OpenClaw Gateway Watchdog`
   - 作用：登录时检查一次，并且每 3 分钟巡检一次；若本地 `http://127.0.0.1:18789/` 不通，则自动执行 `openclaw gateway restart`
   - 日志位置：`%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
+- Windows SSD 优化（掌机）：
+  - 脚本：`scripts/optimize-ssd-trim-zhangji-windows.ps1`
+  - cmd 包装器：`scripts/optimize-ssd-trim-zhangji-windows.cmd`
+  - 作用：对掌机这台 Windows 机器的 SSD 卷执行 `Analyze + ReTrim`
+  - 注意：需要“以管理员身份运行”
 - User systemd units:
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
