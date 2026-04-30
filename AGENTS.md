@@ -131,6 +131,8 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - Prefer stable identifiers in this order: runtime `host` metadata → OS hostname/computer name → explicit local IP fallback.
 - When a host matches, quietly apply that host's rules as part of normal behavior.
 - If nothing matches, do **not** guess a location.
+- After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
+- Treat `git pull` + `openclaw gateway restart` as one update workflow when the local workspace has changed.
 
 ## Project Index
 
