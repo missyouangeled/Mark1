@@ -27,7 +27,16 @@
 
 - 登录时自动检查 gateway
 - 每 3 分钟巡检一次
-- 如果本地 `http://127.0.0.1:18789/` 不通，则自动执行 `openclaw gateway restart`
+- 如果本地 `http://127.0.0.1:18789/` 不通，则优先执行 `openclaw gateway restart`
+- 如果发现原生 `OpenClaw Gateway` 计划任务带有“仅交流电供电时启动 / 切到电池就停止”的限制，watchdog 会继续直接调用 `C:\Users\GOG\.openclaw\gateway.cmd` 兜底拉起网关，避免掌机在电池模式下失联
+
+当前已确认现象：
+
+- 这台掌机上的原生 `OpenClaw Gateway` 计划任务 XML 当前带有：
+  - `<DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>`
+  - `<StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>`
+- 这会导致“只在接通电源时自动启动 / 保持运行”的错误行为
+- 由于当前会话没有可用提权能力，暂未直接改写该原生任务；已通过 watchdog 与手动启动脚本加入 direct-wrapper fallback 规避此问题
 
 日志位置：
 

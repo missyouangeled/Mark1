@@ -22,6 +22,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
 $logDir = Join-Path $env:LOCALAPPDATA 'OpenClaw\watchdog'
 $logFile = Join-Path $logDir 'gateway-watchdog.log'
+$gatewayWrapper = Join-Path (Join-Path $env:USERPROFILE '.openclaw') 'gateway.cmd'
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
@@ -104,6 +105,45 @@ function Test-GatewayHealthy {
     }
 }
 
+function Get-GatewayTaskBatteryPolicy {
+    param([string]$TaskName = 'OpenClaw Gateway')
+
+    try {
+        [xml]$xml = schtasks /Query /TN $TaskName /XML 2>$null
+        $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+        $ns.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
+
+        $disallow = $xml.SelectSingleNode('//t:DisallowStartIfOnBatteries', $ns)
+        $stop = $xml.SelectSingleNode('//t:StopIfGoingOnBatteries', $ns)
+
+        return [pscustomobject]@{
+            Found                       = $true
+            DisallowStartIfOnBatteries  = $disallow -and $disallow.InnerText -eq 'true'
+            StopIfGoingOnBatteries      = $stop -and $stop.InnerText -eq 'true'
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Found                       = $false
+            DisallowStartIfOnBatteries  = $false
+            StopIfGoingOnBatteries      = $false
+        }
+    }
+}
+
+function Start-GatewayDirectly {
+    param(
+        [string]$WrapperPath,
+        [string]$WorkingDirectory
+    )
+
+    if (-not (Test-Path $WrapperPath)) {
+        throw "Gateway wrapper not found: $WrapperPath"
+    }
+
+    Start-Process -FilePath $WrapperPath -WorkingDirectory $WorkingDirectory -WindowStyle Hidden | Out-Null
+}
+
 $openclawCmd = Resolve-OpenClawCommand
 Write-Log "Checking OpenClaw gateway (port=$Port, autoFix=$AutoFix)"
 
@@ -138,9 +178,37 @@ if ($recheck.Healthy) {
     exit 0
 }
 
-Write-Log "Gateway still unhealthy after restart: $($recheck.Detail)" 'ERROR'
+Write-Log "Gateway still unhealthy after restart: $($recheck.Detail)" 'WARN'
 if ($recheck.Raw) {
-    Write-Log ("Post-restart diagnostics: " + ($recheck.Raw -replace "`r?`n", ' | ')) 'ERROR'
+    Write-Log ("Post-restart diagnostics: " + ($recheck.Raw -replace "`r?`n", ' | ')) 'WARN'
+}
+
+$taskPolicy = Get-GatewayTaskBatteryPolicy
+if ($taskPolicy.Found -and ($taskPolicy.DisallowStartIfOnBatteries -or $taskPolicy.StopIfGoingOnBatteries)) {
+    Write-Log 'Detected battery-restricted OpenClaw Gateway scheduled task; trying direct wrapper start as fallback' 'WARN'
+}
+else {
+    Write-Log 'Trying direct gateway wrapper start as fallback' 'WARN'
+}
+
+try {
+    Start-GatewayDirectly -WrapperPath $gatewayWrapper -WorkingDirectory $repoRoot
+}
+catch {
+    Write-Log "Direct wrapper start failed: $($_.Exception.Message)" 'ERROR'
+    exit 2
+}
+
+Start-Sleep -Seconds 6
+$directRecheck = Test-GatewayHealthy -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds
+if ($directRecheck.Healthy) {
+    Write-Log "Gateway recovered after direct wrapper start: $($directRecheck.Detail)"
+    exit 0
+}
+
+Write-Log "Gateway still unhealthy after direct wrapper start: $($directRecheck.Detail)" 'ERROR'
+if ($directRecheck.Raw) {
+    Write-Log ("Direct-start diagnostics: " + ($directRecheck.Raw -replace "`r?`n", ' | ')) 'ERROR'
 }
 
 exit 2
