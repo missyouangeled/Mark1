@@ -12,7 +12,7 @@ Before doing anything else:
 
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
-3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback
+3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
 4. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
 5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
@@ -132,7 +132,10 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - Host/location tags are for self-awareness only: they help the agent know **which machine it is currently on**, not split the workspace into different rulebooks.
 - Unless the user explicitly says otherwise, the same repo-backed rules must apply across all devices after they sync the latest workspace.
 - Do **not** vary persona, permissions, safety posture, model defaults, memory policy, or workflow rules solely because the host/location tag is different.
-- If nothing matches, do **not** guess a location.
+- If nothing matches, do **not** guess a location; register the device as a provisional new machine instead.
+- For a provisional new-machine entry, generate: a short human-readable `设备名`, a conservative `环境标签` (use `未归类` when unsure), and the identifiers used for matching.
+- Never overwrite a user-confirmed device name or environment tag automatically.
+- If the user later provides a better name or location, update the existing entry instead of creating duplicates.
 - After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
 - Treat `git pull` + `openclaw gateway restart` as one update workflow when the local workspace has changed.
 
@@ -152,6 +155,15 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
   2. run `git pull --ff-only`
   3. if the repo changed — or if the user explicitly wants the latest rules applied now — run `openclaw gateway restart`
 - After restart, continue work under the freshly synced shared rules without making the user repeat the intent.
+
+## New Machine Auto-Registration
+
+- When a restored workspace starts on an unknown device, treat the first successful host check as a machine-registration event.
+- If the current host does not match any entry in `HOST_CONTEXT.md`, append a provisional entry immediately instead of leaving it implicit.
+- Generate `设备名` from the strongest user-facing cue available: user-provided name first, then obvious hardware/model/role, and raw hostname only as a last fallback.
+- Generate `环境标签` conservatively: use labels like `公司`, `家里`, or `掌机` only when the evidence is strong; otherwise use `未归类`.
+- Record every identifier used for recognition so later sessions can match the same device reliably.
+- Once the user gives a better name or confirms the environment, rewrite that entry in place.
 
 ## Background Subagents
 
