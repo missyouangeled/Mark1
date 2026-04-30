@@ -133,8 +133,10 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - Unless the user explicitly says otherwise, the same repo-backed rules must apply across all devices after they sync the latest workspace.
 - Do **not** vary persona, permissions, safety posture, model defaults, memory policy, or workflow rules solely because the host/location tag is different.
 - If nothing matches, do **not** guess a location; register the device as a provisional new machine instead.
-- For a provisional new-machine entry, generate: a short human-readable `设备名`, a conservative `环境标签` (use `未归类` when unsure), and the identifiers used for matching.
-- Never overwrite a user-confirmed device name or environment tag automatically.
+- For a provisional new-machine entry, generate: a short human-readable `设备名`, a conservative `环境标签` (use `未归类` when unsure), the current `系统/OS` label, and the identifiers used for matching.
+- Any system-related note, fix doc, runbook, script note, or GitHub-backed documentation that is specific to one machine/environment must clearly label its scope in the document itself, including at minimum: `设备名/环境标签` and `系统/OS`.
+- Preferred wording style for such docs: `适用机器：掌机（Windows）` / `适用机器：公司（Linux）`; if truly cross-machine, mark it explicitly as `适用机器：通用`.
+- Never overwrite a user-confirmed device name, environment tag, or OS label automatically.
 - If the user later provides a better name or location, update the existing entry instead of creating duplicates.
 - After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
 - Treat `git pull` + `openclaw gateway restart` as one update workflow when the local workspace has changed.
