@@ -27,6 +27,7 @@
 - 用户特别强调：不能只是建了 PROJECT_INDEX.md 却以后忘掉它；"项目先查 PROJECT_INDEX.md" 应作为长期工作规则。
 - 用户希望：建立一个“机器 → 地点/环境”概念；当前这台 Linux 主机 `missyouangeled-VMware-Virtual-Platform`（兜底 IP `192.168.233.130`）应视为“公司”，ROG 掌机 `TABLET-EH5U3C01` 应视为“掌机”。这类标识只用于让 OpenClaw 知道自己当前在哪台机器上，不用于拆分规则集；各设备同步同一仓库后，应共享同一套规则。
 - 用户希望：以后设备从 GitHub 拉取 workspace 更新后，把 `openclaw gateway restart` 作为默认更新流程的一部分。
+- 用户确认：以后像“同步这台机器”“更新这台机器”“拉一下最新规则”这类自然语言，应默认理解为：在当前机器的 workspace 仓库执行 `git pull --ff-only`，必要时再执行 `openclaw gateway restart`，以应用同一套共享规则。
 
 ## 记忆归档索引
 

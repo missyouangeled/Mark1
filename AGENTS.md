@@ -142,6 +142,16 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - When the user later asks about "that project", check `PROJECT_INDEX.md` first before searching blindly.
 - If a project is renamed, moved, or gains a common alias, update `PROJECT_INDEX.md` so future sessions do not forget it exists.
 
+## Workspace Sync Workflow
+
+- Natural-language trigger: when the user says phrases like `同步这台机器`, `更新这台机器`, `拉一下最新规则`, or other clearly equivalent wording, interpret it as **sync the current machine's workspace repo to the latest shared rules**.
+- Host/location tags only answer **which machine is current**; they do not change the rule set. The repo-backed rules stay shared across devices.
+- Default sync flow on the current machine:
+  1. go to the current workspace repo
+  2. run `git pull --ff-only`
+  3. if the repo changed — or if the user explicitly wants the latest rules applied now — run `openclaw gateway restart`
+- After restart, continue work under the freshly synced shared rules without making the user repeat the intent.
+
 ## Background Subagents
 
 - If a background subagent has finished its task and has no more work, close it instead of leaving it hanging.
