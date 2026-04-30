@@ -143,6 +143,14 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
 - Treat `git pull` + `openclaw gateway restart` as one update workflow when the local workspace has changed.
 
+## Plans vs System Work vs Daily Work
+
+- `PLANS.md` is **only** for plans, research conclusions, architecture options, and technical decisions.
+- Machine-specific system configuration, maintenance notes, scripts, repairs, and runbooks must go to the matching docs/scripts instead of `PLANS.md`.
+- Daily execution traces, today's user requests, and conversational summaries belong in `memory/daily/YYYY-MM-DD.md`.
+- These three categories must stay separate in GitHub: **plans** (`PLANS.md`) vs **system/config/maintenance** (`docs/`, `TOOLS.md`, `HOST_CONTEXT.md`, script headers) vs **daily work logs** (`memory/daily/`). Do not mix them or use one as a substitute for another.
+- Read `docs/方案与系统工作隔离规则.md` when you need the explicit routing rule.
+
 ## Project Index
 
 - `PROJECT_INDEX.md` is the long-term directory of user projects in this workspace.
