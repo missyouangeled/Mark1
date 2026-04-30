@@ -17,6 +17,8 @@
 - `scripts/openclaw-gateway-watchdog.ps1`
 - `scripts/install-openclaw-gateway-watchdog.ps1`
 - `scripts/uninstall-openclaw-gateway-watchdog.ps1`
+- `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.ps1`
+- `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.cmd`
 
 相关计划任务：
 
@@ -37,6 +39,10 @@
   - `<StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>`
 - 这会导致“只在接通电源时自动启动 / 保持运行”的错误行为
 - 由于当前会话没有可用提权能力，暂未直接改写该原生任务；已通过 watchdog 与手动启动脚本加入 direct-wrapper fallback 规避此问题
+- 如需把底层原生任务也修正为电池安全，可执行：
+  - `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.ps1`
+  - 或 `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.cmd`
+  - 某些系统环境下需要“以管理员身份运行”
 
 日志位置：
 
