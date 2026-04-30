@@ -12,9 +12,10 @@ Before doing anything else:
 
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
-3. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
-4. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
-5. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback
+4. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
+5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
+6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 
 Don't ask permission. Just do it.
 
@@ -123,6 +124,13 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 ## Tools
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
+
+## Host / Location Context
+
+- Use `HOST_CONTEXT.md` for machine-specific identity such as "公司", "家里", or device roles.
+- Prefer stable identifiers in this order: runtime `host` metadata → OS hostname/computer name → explicit local IP fallback.
+- When a host matches, quietly apply that host's rules as part of normal behavior.
+- If nothing matches, do **not** guess a location.
 
 ## Project Index
 
