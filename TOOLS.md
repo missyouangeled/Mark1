@@ -46,9 +46,13 @@ Things like:
   - watchdog 脚本：`scripts/openclaw-gateway-watchdog.ps1`
   - 安装脚本：`scripts/install-openclaw-gateway-watchdog.ps1`
   - 卸载脚本：`scripts/uninstall-openclaw-gateway-watchdog.ps1`
-  - cmd 包装器：`scripts/install-openclaw-gateway-watchdog.cmd` / `scripts/uninstall-openclaw-gateway-watchdog.cmd`
-  - 计划任务名：`OpenClaw Gateway Watchdog`
+  - 停机脚本：`scripts/stop-openclaw-gateway-zhangji-windows.ps1`
+  - 恢复脚本：`scripts/start-openclaw-gateway-zhangji-windows.ps1`
+  - cmd 包装器：`scripts/install-openclaw-gateway-watchdog.cmd` / `scripts/uninstall-openclaw-gateway-watchdog.cmd` / `scripts/stop-openclaw-gateway-zhangji-windows.cmd` / `scripts/start-openclaw-gateway-zhangji-windows.cmd`
+  - 桌面快捷入口：`关闭 OpenClaw（掌机）.cmd` / `启动 OpenClaw（掌机）.cmd`
+  - 计划任务名：`OpenClaw Gateway Watchdog` / `OpenClaw Gateway`
   - 作用：登录时检查一次，并且每 3 分钟巡检一次；若本地 `http://127.0.0.1:18789/` 不通，则自动执行 `openclaw gateway restart`
+  - 停机规则：当需要手动关闭掌机上的 OpenClaw 时，先禁用 `OpenClaw Gateway Watchdog` 与 `OpenClaw Gateway`，再停止当前 gateway 实例，避免稍后又被自动拉起
   - 日志位置：`%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 - Windows SSD 优化（掌机）：
   - 脚本：`scripts/optimize-ssd-trim-zhangji-windows.ps1`
