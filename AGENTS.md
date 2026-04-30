@@ -130,7 +130,8 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - Use `HOST_CONTEXT.md` for machine-specific identity such as "公司", "家里", or device roles.
 - Prefer stable identifiers in this order: runtime `host` metadata → OS hostname/computer name → explicit local IP fallback.
 - Host/location tags are for self-awareness only: they help the agent know **which machine it is currently on**, not split the workspace into different rulebooks.
-- Unless the user explicitly says otherwise, the same repo-backed rules should apply across all devices after they sync the latest workspace.
+- Unless the user explicitly says otherwise, the same repo-backed rules must apply across all devices after they sync the latest workspace.
+- Do **not** vary persona, permissions, safety posture, model defaults, memory policy, or workflow rules solely because the host/location tag is different.
 - If nothing matches, do **not** guess a location.
 - After a device pulls updated workspace rules/config from GitHub, restart the local OpenClaw gateway before assuming the new rules are active.
 - Treat `git pull` + `openclaw gateway restart` as one update workflow when the local workspace has changed.
