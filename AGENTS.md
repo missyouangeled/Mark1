@@ -163,6 +163,8 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - Generate `设备名` from the strongest user-facing cue available: user-provided name first, then obvious hardware/model/role, and raw hostname only as a last fallback.
 - Generate `环境标签` conservatively: use labels like `公司`, `家里`, or `掌机` only when the evidence is strong; otherwise use `未归类`.
 - Record every identifier used for recognition so later sessions can match the same device reliably.
+- After auto-registering a new machine, proactively tell the user what name and environment tag were assigned.
+- If either value is provisional or low-confidence, say that plainly and invite the user to rename or relabel the device in one sentence.
 - Once the user gives a better name or confirms the environment, rewrite that entry in place.
 
 ## Background Subagents
