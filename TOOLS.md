@@ -37,6 +37,11 @@ Things like:
 
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
+- Windows 更新脚本（掌机）：
+  - `scripts/update-openclaw.ps1`
+  - `scripts/update-openclaw.cmd`
+  - 用途：执行 `git pull --ff-only`，若仓库有新提交则自动 `openclaw gateway restart`
+  - 掌机建议直接运行：`.\scripts\update-openclaw.cmd`
 - User systemd units:
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
