@@ -4,6 +4,7 @@ node_modules/
 
 # Temp / generated
 tmp/
+.openclaw/
 *.tar.gz
 *.log
 

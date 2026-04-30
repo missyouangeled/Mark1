@@ -42,6 +42,14 @@ Things like:
   - `scripts/update-openclaw.cmd`
   - 用途：执行 `git pull --ff-only`，若仓库有新提交则自动 `openclaw gateway restart`
   - 掌机建议直接运行：`.\scripts\update-openclaw.cmd`
+- Windows gateway 保活（掌机）：
+  - watchdog 脚本：`scripts/openclaw-gateway-watchdog.ps1`
+  - 安装脚本：`scripts/install-openclaw-gateway-watchdog.ps1`
+  - 卸载脚本：`scripts/uninstall-openclaw-gateway-watchdog.ps1`
+  - cmd 包装器：`scripts/install-openclaw-gateway-watchdog.cmd` / `scripts/uninstall-openclaw-gateway-watchdog.cmd`
+  - 计划任务名：`OpenClaw Gateway Watchdog`
+  - 作用：登录时检查一次，并且每 3 分钟巡检一次；若本地 `http://127.0.0.1:18789/` 不通，则自动执行 `openclaw gateway restart`
+  - 日志位置：`%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 - User systemd units:
   - `~/.config/systemd/user/openclaw-resume-watch.service`
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
