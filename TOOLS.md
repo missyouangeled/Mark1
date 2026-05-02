@@ -83,10 +83,20 @@ Things like:
 
 ### Git / GitHub
 
-- This machine has a GitHub-specific SSH key at `~/.ssh/id_ed25519_github_openclaw`.
-- If plain `git push origin master` hits `Permission denied (publickey)`, use:
-  - `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_github_openclaw -o IdentitiesOnly=yes' git push origin master`
-- Cause: the default SSH identity selection may miss the GitHub key unless it is specified explicitly or wired through `~/.ssh/config`.
+- 适用机器：通用（其中带“掌机”字样的条目仅适用于掌机（Windows））
+- 系统 / OS：通用 / Windows（按各条目说明执行）
+
+- 公司 / Linux 机器：
+  - This machine has a GitHub-specific SSH key at `~/.ssh/id_ed25519_github_openclaw`.
+  - If plain `git push origin master` hits `Permission denied (publickey)`, use:
+    - `GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519_github_openclaw -o IdentitiesOnly=yes' git push origin master`
+  - Cause: the default SSH identity selection may miss the GitHub key unless it is specified explicitly or wired through `~/.ssh/config`.
+
+- 掌机（Windows）：
+  - Current SSH key path: `~/.ssh/id_ed25519_rog_ally`
+  - `~/.ssh/config` now routes `github.com` through `ssh.github.com:443`
+  - Reason: this machine can authenticate to GitHub over SSH, but direct port 22 to `github.com` may abort; port 443 to `ssh.github.com` works reliably here
+  - Expected result after this change: plain `git push origin master` should work without extra per-command overrides
 
 ### CLI-Anything
 
