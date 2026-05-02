@@ -13,8 +13,12 @@ param(
     [switch]$AutoFix,
     [switch]$Quiet,
     [int]$Port = 18789,
-    [int]$TimeoutSeconds = 5
+    [int]$TimeoutSeconds = 8
 )
+
+$restartGraceSeconds = 20
+$directStartGraceSeconds = 25
+$startingGraceSeconds = 20
 
 $ErrorActionPreference = 'Stop'
 
@@ -87,22 +91,62 @@ function Test-GatewayHealthy {
     $uri = "http://127.0.0.1:$GatewayPort/"
     if (Test-GatewayHttp -Uri $uri -TimeoutSec $TimeoutSec) {
         return [pscustomobject]@{
-            Healthy = $true
-            Method  = 'http'
-            Detail  = "HTTP probe ok: $uri"
-            Raw     = $null
+            Healthy      = $true
+            Transitional = $false
+            Method       = 'http'
+            Detail       = "HTTP probe ok: $uri"
+            Raw          = $null
         }
     }
 
     $statusText = Get-GatewayStatusText -CommandPath $CommandPath
-    $looksHealthy = $statusText -match 'Connectivity probe:\s+ok' -or $statusText -match 'Runtime:\s+running'
+    $looksHealthy = $statusText -match 'Connectivity probe:\s+ok' -or $statusText -match 'gateway status reports healthy'
+    $looksStarting =
+        $statusText -match 'Runtime:\s+running' -or
+        $statusText -match 'Warm-up:' -or
+        $statusText -match 'Verified gateway listener detected on port' -or
+        $statusText -match 'Port\s+' + [regex]::Escape([string]$GatewayPort) + '\s+is already in use' -or
+        $statusText -match 'Gateway already running locally'
 
     return [pscustomobject]@{
-        Healthy = $looksHealthy
-        Method  = 'status'
-        Detail  = if ($looksHealthy) { 'gateway status reports healthy' } else { 'HTTP probe failed and gateway status did not report healthy state' }
-        Raw     = $statusText
+        Healthy      = $looksHealthy
+        Transitional = (-not $looksHealthy) -and $looksStarting
+        Method       = 'status'
+        Detail       = if ($looksHealthy) {
+            'gateway status reports healthy'
+        }
+        elseif ($looksStarting) {
+            'gateway process/listener exists but is still starting or temporarily overloaded'
+        }
+        else {
+            'HTTP probe failed and gateway status did not report healthy state'
+        }
+        Raw          = $statusText
     }
+}
+
+function Wait-GatewayRecovery {
+    param(
+        [string]$CommandPath,
+        [int]$GatewayPort,
+        [int]$TimeoutSec,
+        [int]$MaxWaitSeconds,
+        [string]$Reason
+    )
+
+    $deadline = (Get-Date).AddSeconds($MaxWaitSeconds)
+    do {
+        Start-Sleep -Seconds 5
+        $check = Test-GatewayHealthy -CommandPath $CommandPath -GatewayPort $GatewayPort -TimeoutSec $TimeoutSec
+        if ($check.Healthy) {
+            return $check
+        }
+        if ($check.Transitional) {
+            Write-Log "${Reason}: gateway still looks transitional, keep waiting" 'WARN'
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    return Test-GatewayHealthy -CommandPath $CommandPath -GatewayPort $GatewayPort -TimeoutSec $TimeoutSec
 }
 
 function Get-GatewayTaskBatteryPolicy {
@@ -162,6 +206,15 @@ if (-not $AutoFix) {
     exit 1
 }
 
+if ($check.Transitional) {
+    Write-Log "Gateway looks busy rather than dead; waiting ${startingGraceSeconds}s before trying restart" 'WARN'
+    $warmupCheck = Wait-GatewayRecovery -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds -MaxWaitSeconds $startingGraceSeconds -Reason 'Warm-up grace'
+    if ($warmupCheck.Healthy) {
+        Write-Log "Gateway recovered during warm-up grace: $($warmupCheck.Detail)"
+        exit 0
+    }
+}
+
 Write-Log 'Running openclaw gateway restart' 'WARN'
 Push-Location $repoRoot
 try {
@@ -171,8 +224,7 @@ finally {
     Pop-Location
 }
 
-Start-Sleep -Seconds 5
-$recheck = Test-GatewayHealthy -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds
+$recheck = Wait-GatewayRecovery -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds -MaxWaitSeconds $restartGraceSeconds -Reason 'Post-restart grace'
 if ($recheck.Healthy) {
     Write-Log "Gateway recovered after restart: $($recheck.Detail)"
     exit 0
@@ -199,8 +251,7 @@ catch {
     exit 2
 }
 
-Start-Sleep -Seconds 6
-$directRecheck = Test-GatewayHealthy -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds
+$directRecheck = Wait-GatewayRecovery -CommandPath $openclawCmd -GatewayPort $Port -TimeoutSec $TimeoutSeconds -MaxWaitSeconds $directStartGraceSeconds -Reason 'Direct-start grace'
 if ($directRecheck.Healthy) {
     Write-Log "Gateway recovered after direct wrapper start: $($directRecheck.Detail)"
     exit 0
