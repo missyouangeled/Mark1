@@ -52,7 +52,20 @@ $xml.Save($tempXml)
 
 try {
     Write-Step 'Re-registering scheduled task with battery-safe settings'
-    schtasks /Create /TN $taskName /XML $tempXml /F | Out-Null
+    $createOutput = schtasks /Create /TN $taskName /XML $tempXml /F 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw ($createOutput.Trim())
+    }
+}
+catch {
+    $message = ($_ | Out-String).Trim()
+    Write-Host ''
+    Write-Host 'OpenClaw Gateway battery policy repair did not complete.' -ForegroundColor Red
+    if ($message) {
+        Write-Host "  - Details: $message" -ForegroundColor Red
+    }
+    Write-Host '  - Tip: on this Windows handheld, please retry this script in an elevated PowerShell window.' -ForegroundColor Yellow
+    exit 2
 }
 finally {
     Remove-Item $tempXml -ErrorAction SilentlyContinue
@@ -66,7 +79,15 @@ $verifyNs.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/ta
 $disallow = $verifyXml.SelectSingleNode('//t:DisallowStartIfOnBatteries', $verifyNs)
 $stop = $verifyXml.SelectSingleNode('//t:StopIfGoingOnBatteries', $verifyNs)
 
+if ($disallow.InnerText -ne 'false' -or $stop.InnerText -ne 'false') {
+    Write-Host ''
+    Write-Host 'OpenClaw Gateway battery policy verification failed.' -ForegroundColor Red
+    Write-Host "  - DisallowStartIfOnBatteries = $($disallow.InnerText)" -ForegroundColor Red
+    Write-Host "  - StopIfGoingOnBatteries = $($stop.InnerText)" -ForegroundColor Red
+    exit 3
+}
+
 Write-Host ''
-Write-Host 'OpenClaw Gateway battery policy has been repaired for 掌机（Windows）.' -ForegroundColor Green
+Write-Host 'OpenClaw Gateway battery policy has been repaired for this Windows handheld.' -ForegroundColor Green
 Write-Host "  - DisallowStartIfOnBatteries = $($disallow.InnerText)"
 Write-Host "  - StopIfGoingOnBatteries = $($stop.InnerText)"
