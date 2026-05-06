@@ -48,6 +48,33 @@
 
 - `%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 
+### 1.5 启动稳定性（GitHub Copilot discovery）
+
+已确认过一类会让掌机上的 gateway 看起来“端口已经监听，但 health / restart 长时间超时”的启动问题。
+
+现象：
+
+- `openclaw gateway restart` 可能长时间卡住，最后报 health check 超时
+- 本地 `127.0.0.1:18789` 偶尔能通，但 control UI / probe 不稳定
+- 日志里会看到 gateway 已经 `starting HTTP server...`，但 sidecars / readiness 卡很久
+
+本次在掌机上采用的缓解方式：
+
+- 配置文件：`C:\Users\GOG\.openclaw\openclaw.json`
+- 已设置：`plugins.entries.github-copilot.config.discovery.enabled = false`
+
+作用：
+
+- 禁用 **GitHub Copilot 启动期 model discovery**
+- 避免 gateway 每次启动都因为 Copilot token / discovery 路径把 sidecars 卡住
+- 保留 `github-copilot` 插件本身启用，不影响后续按需使用
+
+补充说明：
+
+- 本次变更前已在同目录生成备份：`C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1505`
+- 当前验证结果：修改后 `openclaw gateway restart` 已可正常完成，`openclaw gateway status --deep` probe 恢复为 `ok`
+- 若未来确认 GitHub Copilot 启动期 discovery 已不再导致卡顿，可再评估是否恢复为默认行为
+
 ### 2. 一键关闭 / 恢复入口
 
 相关脚本：
