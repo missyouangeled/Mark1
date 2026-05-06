@@ -48,6 +48,14 @@
 
 - `%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 
+当前调试状态（2026-05-06）：
+
+- 用户已明确要求：为避免 watchdog 持续自动重启掩盖根因，先把 `OpenClaw Gateway Watchdog` 从掌机上彻底移除
+- 当前已执行：`scripts/uninstall-openclaw-gateway-watchdog.ps1`
+- 当前结果：计划任务 `OpenClaw Gateway Watchdog` 已卸载，不再继续对 gateway 做自动健康检查与自动重启
+- 这意味着后续需要人工观察并手动拉起 gateway，但也能更干净地暴露“微信消息进入后回复链路把 gateway 拖挂”的根本问题
+- 若后续确有需要恢复兜底保活，可重新执行：`scripts/install-openclaw-gateway-watchdog.ps1`
+
 ### 1.5 启动稳定性（GitHub Copilot / 默认模型链路）
 
 已确认掌机上存在一类会让 gateway“能启动但不稳定”、并进一步把微信插件也拖着一起掉线的启动问题。
