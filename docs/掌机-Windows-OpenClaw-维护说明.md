@@ -48,32 +48,51 @@
 
 - `%LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log`
 
-### 1.5 启动稳定性（GitHub Copilot discovery）
+### 1.5 启动稳定性（GitHub Copilot / 默认模型链路）
 
-已确认过一类会让掌机上的 gateway 看起来“端口已经监听，但 health / restart 长时间超时”的启动问题。
+已确认掌机上存在一类会让 gateway“能启动但不稳定”、并进一步把微信插件也拖着一起掉线的启动问题。
 
-现象：
+典型现象：
 
-- `openclaw gateway restart` 可能长时间卡住，最后报 health check 超时
-- 本地 `127.0.0.1:18789` 偶尔能通，但 control UI / probe 不稳定
-- 日志里会看到 gateway 已经 `starting HTTP server...`，但 sidecars / readiness 卡很久
+- `openclaw gateway restart` 可能长时间卡住，最后报 health check / probe timeout
+- watchdog 分钟巡检会误判 gateway 不健康，然后反复自动重启
+- Control UI 会出现 websocket 握手超时或反复重连
+- 日志里可见：
+  - `startup model warmup timed out after 5000ms`
+  - `models.list` 偶发耗时非常长（现场见过约 68s / 74s）
+  - `liveness warning` 中出现很高的 event loop delay / utilization
 
-本次在掌机上采用的缓解方式：
+根因收敛：
+
+- 仅关闭 `github-copilot` 的启动期 discovery 还不够
+- 当默认模型仍指向 `github-copilot/gpt-5.4`，且该模型仍保留在 `agents.defaults.models` 里时，启动 warmup / 模型列表链路仍可能把 event loop 卡住
+- 一旦卡到 watchdog 的分钟健康检查窗口，watchdog 就会把 gateway 当成“坏了”，于是继续自动重启；微信插件本身虽然能起来，但会被这些重启一起打断
+
+本机当前采用的稳定化设置：
 
 - 配置文件：`C:\Users\GOG\.openclaw\openclaw.json`
-- 已设置：`plugins.entries.github-copilot.config.discovery.enabled = false`
+- 已设置：
+  - `plugins.entries.github-copilot.config.discovery.enabled = false`
+  - `plugins.entries.github-copilot.enabled = false`
+  - `agents.defaults.model.primary = deepseek/deepseek-chat`
+  - 从 `agents.defaults.models` 中移除 `github-copilot/gpt-5.4`
 
 作用：
 
-- 禁用 **GitHub Copilot 启动期 model discovery**
-- 避免 gateway 每次启动都因为 Copilot token / discovery 路径把 sidecars 卡住
-- 保留 `github-copilot` 插件本身启用，不影响后续按需使用
+- 禁用 **GitHub Copilot 启动期 discovery**
+- 同时把默认运行链路从 Copilot 切回 DeepSeek，避免启动 warmup / models.list 再次走到 Copilot 那条慢路径
+- 保留 `openclaw-weixin` 正常启用，优先保证掌机上的 OpenClaw 与微信插件稳定在线
 
 补充说明：
 
-- 本次变更前已在同目录生成备份：`C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1505`
-- 当前验证结果：修改后 `openclaw gateway restart` 已可正常完成，`openclaw gateway status --deep` probe 恢复为 `ok`
-- 若未来确认 GitHub Copilot 启动期 discovery 已不再导致卡顿，可再评估是否恢复为默认行为
+- 首次缓解前备份：`C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1505`
+- 稳定化调整前备份：`C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1526-stability`
+- 当前验证结果：
+  - `openclaw gateway restart` 可完成
+  - 本地 HTTP 探测返回 `200`
+  - watchdog 在后续分钟巡检中恢复为 `Gateway healthy: HTTP probe ok`
+  - 微信插件日志可见 `weixin monitor started`
+- 若未来需要重新启用 GitHub Copilot，建议逐项回退并重新观察 watchdog / models.list / warmup，而不要一次性全部恢复
 
 ### 2. 一键关闭 / 恢复入口
 
