@@ -4,6 +4,73 @@
 
 ## 当前默认接手方式
 
+## 当前临时高优先级接手任务（掌机 OpenClaw / 微信回复链路）
+
+- 任务目标：让 `掌机（Windows）` 上的 OpenClaw 达到“稳定可用 + 微信插件能稳定回复”，而不只是“能启动”。
+- 当前机器：`TABLET-EH5U3CO1` / `掌机（Windows）`
+- 远程接管方式：公司 Linux 机通过 SSH 连接 `GOG@100.122.111.6`（密钥：`~/.ssh/id_ed25519_openclaw_handheld`）
+
+### 截至 2026-05-06 晚上的当前结论
+
+1. **启动主故障已部分收敛**
+   - 原先最明显的启动卡死与 `github-copilot` 默认模型链路有关。
+   - 已在掌机配置 `C:\Users\GOG\.openclaw\openclaw.json` 中改为：
+     - `agents.defaults.model.primary = deepseek/deepseek-chat`
+     - 移除默认模型里的 `github-copilot/gpt-5.4`
+     - `plugins.entries.github-copilot.enabled = false`
+     - `plugins.entries.github-copilot.config.discovery.enabled = false`
+   - 对应备份：
+     - `C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1505`
+     - `C:\Users\GOG\.openclaw\openclaw.json.bak-20260506-1526-stability`
+
+2. **微信插件“收消息”是通的，但“回复执行”会把 gateway 拖挂**
+   - 日志已确认微信消息能进入 gateway：有 `inbound message` / `bodyLen=2 hasMedia=false`
+   - 紧接着出现 `acpx staging bundled runtime deps`
+   - 随后出现 `eventLoopUtilization=1`、`active=1 queued=1`
+   - 然后 gateway 卡死，之前会被 watchdog 误判重启
+   - 结论：当前主问题不是微信收不到，而是**收到微信后，agent / ACPX / 回复执行链路会把 gateway 卡住**
+
+3. **watchdog 已按用户要求彻底移除**
+   - 用户明确要求：先删掉 watchdog，避免它继续掩盖根因
+   - 已执行：`scripts/uninstall-openclaw-gateway-watchdog.ps1`
+   - 当前 `OpenClaw Gateway Watchdog` 计划任务已不存在
+   - 相关记录已写入 `docs/掌机-Windows-OpenClaw-维护说明.md`
+
+4. **当前现场状态并不稳定，且到傍晚又回到了启动失败态**
+   - 17:05 之后的日志可见：
+     - `loading configuration…`
+     - `resolving authentication…`
+     - `starting...`
+   - 17:24 曾出现：`Gateway restart timed out after 180s waiting for health checks.`
+   - 截至本次收口前，`openclaw gateway status --deep` 仍可能返回：
+     - `Connectivity probe: failed`
+     - `connect ECONNREFUSED 127.0.0.1:18789`
+   - 这说明：**去掉 watchdog 后，gateway 本体仍存在独立的启动/运行异常，不是只有微信回复这一层**
+
+### 下一步最该做的事
+
+按优先级继续：
+
+1. **先把“当前为什么连 gateway 都起不来”重新钉死**
+   - 重点看 17:05 之后这一段日志到底停在什么阶段
+   - 不要再让旧结论（下午一度能起来）覆盖晚上的新现场
+
+2. **把“收到微信后触发 ACPX / 回复链路卡死”的问题继续往下切**
+   - 重点看：session 元数据已写入，但真正 session 文件/agent run 是否在落盘前就阻塞
+   - 重点源码：`selection-ABXC-aG3.js`、ACPX runtime 相关 dist 文件、bundled runtime staging 相关文件
+
+3. **优先尝试低风险修法**
+   - 配置级绕过 > 小补丁 > 大改
+   - 优先考虑：把 ACPX/runtime 的初始化从“首条微信消息触发”改成“启动前预热/预展开”，避免把回复主链路卡死
+
+### 相关文档 / 提交
+
+- 维护说明：`docs/掌机-Windows-OpenClaw-维护说明.md`
+- 相关提交：
+  - `979a206` `docs: 记录掌机 GitHub Copilot discovery 启动修复`
+  - `9342661` `docs: 更新掌机稳定配置与微信链路说明`
+  - `2c020b2` `docs: 记录掌机 watchdog 卸载状态`
+
 当用户说：
 - 继续做
 - 继续开发
