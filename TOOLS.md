@@ -80,6 +80,24 @@ Things like:
 - 读取 / 更新总规则：`docs/多机器-读取与更新规则.md`
 - 详细维护说明：`docs/掌机-Windows-OpenClaw-维护说明.md`
 - 详细维护说明：`docs/公司-Linux-OpenClaw-维护说明.md`
+- Control UI 品牌补丁（当前已用于把左上角 OpenClaw 品牌改成贾维斯风格）：
+  - 适用机器：公司（Linux）（脚本本身可复用，但当前部署记录在公司 Linux 机）
+  - 系统 / OS：Linux
+  - 配置文件：`config/control-ui-branding.json`
+  - 应用脚本：`scripts/apply-openclaw-control-ui-branding.py`
+  - 作用：重复应用 Control UI 左上角品牌名、Logo、浏览器标题、favicon / apple-touch-icon / manifest 名称覆盖，避免 OpenClaw 升级后手工逐个改静态文件
+  - 默认品牌图来源：`avatars/jarvis-neon-20260507.png`
+  - 用法：`python3 scripts/apply-openclaw-control-ui-branding.py`
+- 临时文件下载分享（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）
+  - 系统 / OS：Linux
+  - 用途：当需要把当前机器上的文件交给宿主机浏览器或其他同网段设备下载时，优先在目标文件所在目录起临时 HTTP 服务，然后直接把完整 URL 发给用户
+  - 推荐命令：`python3 -m http.server 8765 --bind 0.0.0.0`
+  - 推荐做法：在包含目标文件的目录执行；随后把 `http://当前机器IP:8765/文件名` 发给用户
+  - 当前公司 Linux 机器兜底 IP：`192.168.233.130`
+  - 例如：`http://192.168.233.130:8765/rustdesk-1.4.6-x86_64.exe`
+  - 使用场景：用户说“给我一个地址，我去宿主机浏览器里下”或明确表示附件 / 本地路径不好用时
+  - 收尾：文件下载完成后，可结束对应的临时 `python3 -m http.server` 进程，避免长期暴露目录
 
 ### Git / GitHub
 

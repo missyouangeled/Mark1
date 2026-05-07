@@ -1,0 +1,20 @@
+{
+  "scope": {
+    "machine": "公司（Linux）",
+    "os": "Linux"
+  },
+  "branding": {
+    "brandTitle": "贾维斯",
+    "brandEyebrow": "CONTROL",
+    "windowTitle": "贾维斯 Control",
+    "manifestName": "贾维斯 Control",
+    "manifestShortName": "贾维斯",
+    "notificationTitle": "贾维斯"
+  },
+  "assets": {
+    "logoSource": "avatars/jarvis-neon-20260507.png",
+    "runtimeLogoFile": "jarvis-brand.png",
+    "favicon32File": "favicon-32.png",
+    "appleTouchIconFile": "apple-touch-icon.png"
+  }
+}

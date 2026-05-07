@@ -86,6 +86,43 @@
 
 - 在 Linux 用户态下调度 resume-watch 逻辑
 
+### 3. Control UI 品牌覆盖（贾维斯）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-07
+- 维护来源：用户希望把 Control UI 左上角默认的 OpenClaw / 小龙虾品牌，逐步替换成更贴近“贾维斯”的品牌呈现，并要求采用“可重复应用”的方案，避免 OpenClaw 升级后又回到默认样式。
+
+相关文件：
+
+- 配置：`config/control-ui-branding.json`
+- 应用脚本：`scripts/apply-openclaw-control-ui-branding.py`
+- 当前默认品牌图：`avatars/jarvis-neon-20260507.png`
+
+用途：
+
+- 重复应用 Control UI 左上角品牌名与 logo 覆盖
+- 同步覆盖浏览器标题、favicon / apple-touch-icon、manifest 名称与默认通知标题
+- 尽量避免每次升级后再手工去改 `dist/control-ui/` 里的静态产物
+
+当前默认配置：
+
+- 左上角品牌名：`贾维斯`
+- 小标题：`CONTROL`
+- 浏览器标题：`贾维斯 Control`
+
+应用方式：
+
+```bash
+python3 scripts/apply-openclaw-control-ui-branding.py
+```
+
+说明：
+
+- 该脚本会把配置中的品牌图复制到本机 OpenClaw 安装目录下的 `dist/control-ui/`，并注入一个额外的 `jarvis-branding-override.js` 覆盖脚本。
+- 如果以后用户想把左上角名称改成 `J.A.R.V.I.S.`、改别的图、或继续往电影风格靠，只需要改 `config/control-ui-branding.json` 再重跑脚本。
+- 这是“可重复应用补丁”，不是官方配置项；OpenClaw 升级后如静态资源被覆盖，重新跑一次脚本即可恢复。
+
 ## 标注规则
 
 今后凡是会同步到 GitHub、且内容属于 **公司（Linux）** 专用的系统说明、脚本说明、修复记录，都必须在正文显式写出：
