@@ -126,6 +126,12 @@ def write_override_script(
             ["OpenClaw", brand_title],
         ],
         "attributeNames": ["title", "aria-label", "placeholder", "alt"],
+        "targetedTextSelectors": [
+            [".dashboard-header__breadcrumb-link", brand_title],
+            [".login-gate__title", brand_title],
+            [".sidebar-brand__title", brand_title],
+            [".sidebar-brand__eyebrow", brand_eyebrow],
+        ],
         "skipClosestSelectors": [
             "pre",
             "code",
@@ -213,6 +219,12 @@ def write_override_script(
     }}
   }}
 
+  function applyTargetedTextOverrides() {{
+    for (const [selector, value] of BRAND.targetedTextSelectors) {{
+      document.querySelectorAll(selector).forEach((node) => setText(node, value));
+    }}
+  }}
+
   function applyBranding(root) {{
     try {{
       if (document.title !== BRAND.windowTitle) document.title = BRAND.windowTitle;
@@ -230,8 +242,7 @@ def write_override_script(
       setAttr(logo, 'src', BRAND.logoHref);
       setAttr(logo, 'alt', BRAND.logoAlt);
 
-      setText(document.querySelector('.sidebar-brand__title'), BRAND.brandTitle);
-      setText(document.querySelector('.sidebar-brand__eyebrow'), BRAND.brandEyebrow);
+      applyTargetedTextOverrides();
       replaceVisibleText(root);
     }} catch (err) {{
       console.warn('[jarvis-branding] apply failed:', err);
