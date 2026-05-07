@@ -85,9 +85,11 @@ Things like:
   - 系统 / OS：Linux
   - 配置文件：`config/control-ui-branding.json`
   - 应用脚本：`scripts/apply-openclaw-control-ui-branding.py`
-  - 作用：重复应用 Control UI 左上角品牌名、Logo、浏览器标题、favicon / apple-touch-icon / manifest 名称覆盖，避免 OpenClaw 升级后手工逐个改静态文件
+  - systemd 自动重应用：`~/.config/systemd/user/openclaw-gateway.service.d/branding.conf`
+  - 作用：重复应用 Control UI 左上角品牌名、Logo、浏览器标题、favicon / apple-touch-icon / manifest 名称覆盖，并额外把页面里可见的 `OpenClaw` 文案尽量替换成“贾维斯”，避免 OpenClaw 升级后手工逐个改静态文件
   - 默认品牌图来源：`avatars/jarvis-neon-20260507.png`
-  - 用法：`python3 scripts/apply-openclaw-control-ui-branding.py`
+  - 自动生效规则：公司 Linux 机上每次 `openclaw-gateway.service` 启动前，都会先自动执行一次品牌补丁脚本；因此以后只要 OpenClaw 升级后重启 gateway，就会自动重新覆盖
+  - 手工用法：`python3 scripts/apply-openclaw-control-ui-branding.py`
 - 临时文件下载分享（公司 / Linux 机器）：
   - 适用机器：公司（Linux）
   - 系统 / OS：Linux

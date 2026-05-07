@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # 适用机器：通用（当前已在公司（Linux）验证）
 # 系统 / OS：Linux / macOS / Windows（取决于本机 OpenClaw 安装位置）
-# 用途：为本机 OpenClaw Control UI 重复应用品牌补丁，覆盖左上角品牌名、图标、浏览器标题与 PWA 清单。
+# 用途：为本机 OpenClaw Control UI 重复应用品牌补丁，覆盖左上角品牌名、图标、浏览器标题、PWA 清单，以及页面中可见的 OpenClaw 品牌字样。
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ SCRIPT_NAME = "jarvis-branding-override.js"
 def die(message: str) -> "NoReturn":
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(1)
+
 
 
 def read_json(path: Path) -> dict:
@@ -101,7 +102,17 @@ def inject_head_block(html: str, version: str) -> str:
 
 
 
-def write_override_script(path: Path, *, brand_title: str, brand_eyebrow: str, window_title: str, logo_file: str, favicon_file: str, apple_touch_file: str, version: str) -> None:
+def write_override_script(
+    path: Path,
+    *,
+    brand_title: str,
+    brand_eyebrow: str,
+    window_title: str,
+    logo_file: str,
+    favicon_file: str,
+    apple_touch_file: str,
+    version: str,
+) -> None:
     payload = {
         "brandTitle": brand_title,
         "brandEyebrow": brand_eyebrow,
@@ -110,6 +121,25 @@ def write_override_script(path: Path, *, brand_title: str, brand_eyebrow: str, w
         "faviconHref": f"./{favicon_file}?v={version}",
         "appleTouchHref": f"./{apple_touch_file}?v={version}",
         "logoAlt": brand_title,
+        "visibleTextReplacements": [
+            ["OpenClaw Control", window_title],
+            ["OpenClaw", brand_title],
+        ],
+        "attributeNames": ["title", "aria-label", "placeholder", "alt"],
+        "skipClosestSelectors": [
+            "pre",
+            "code",
+            "textarea",
+            "input",
+            ".message",
+            ".message-list",
+            ".message-bubble",
+            ".chat-thread",
+            ".tool-output",
+            ".tool-call",
+            ".tool-result",
+            ".cm-editor",
+        ],
     }
     script = f"""(() => {{
   const BRAND = {json.dumps(payload, ensure_ascii=False, indent=2)};
@@ -122,7 +152,68 @@ def write_override_script(path: Path, *, brand_title: str, brand_eyebrow: str, w
     if (node && value && node.textContent !== value) node.textContent = value;
   }}
 
-  function applyBranding() {{
+  function replaceLiterals(value) {{
+    if (typeof value !== 'string' || !value) return value;
+    let next = value;
+    for (const [from, to] of BRAND.visibleTextReplacements) {{
+      if (from && typeof to === 'string' && next.includes(from)) {{
+        next = next.split(from).join(to);
+      }}
+    }}
+    return next;
+  }}
+
+  function shouldSkipElement(element) {{
+    if (!element || typeof element.closest !== 'function') return false;
+    return BRAND.skipClosestSelectors.some((selector) => {{
+      try {{
+        return Boolean(element.closest(selector));
+      }} catch {{
+        return false;
+      }}
+    }});
+  }}
+
+  function patchAttribute(element, name) {{
+    if (!element || shouldSkipElement(element)) return;
+    const current = element.getAttribute(name);
+    if (!current) return;
+    const next = replaceLiterals(current);
+    if (next !== current) setAttr(element, name, next);
+  }}
+
+  function patchTextNode(node) {{
+    if (!node || typeof node.nodeValue !== 'string') return;
+    const parent = node.parentElement;
+    if (!parent || shouldSkipElement(parent)) return;
+    if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 'CODE', 'PRE'].includes(parent.tagName)) return;
+    const current = node.nodeValue;
+    const next = replaceLiterals(current);
+    if (next !== current) node.nodeValue = next;
+  }}
+
+  function replaceVisibleText(root) {{
+    const base = root && root.nodeType ? root : (document.body || document.documentElement);
+    if (!base) return;
+
+    if (base.nodeType === Node.ELEMENT_NODE) {{
+      BRAND.attributeNames.forEach((attr) => patchAttribute(base, attr));
+    }}
+
+    const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
+    let textNode;
+    while ((textNode = walker.nextNode())) {{
+      patchTextNode(textNode);
+    }}
+
+    if (typeof base.querySelectorAll === 'function') {{
+      base.querySelectorAll('*').forEach((element) => {{
+        BRAND.attributeNames.forEach((attr) => patchAttribute(element, attr));
+      }});
+    }}
+  }}
+
+  function applyBranding(root) {{
     try {{
       if (document.title !== BRAND.windowTitle) document.title = BRAND.windowTitle;
 
@@ -141,27 +232,36 @@ def write_override_script(path: Path, *, brand_title: str, brand_eyebrow: str, w
 
       setText(document.querySelector('.sidebar-brand__title'), BRAND.brandTitle);
       setText(document.querySelector('.sidebar-brand__eyebrow'), BRAND.brandEyebrow);
+      replaceVisibleText(root);
     }} catch (err) {{
       console.warn('[jarvis-branding] apply failed:', err);
     }}
   }}
 
   let scheduled = false;
-  function scheduleApply() {{
+  function scheduleApply(root) {{
     if (scheduled) return;
     scheduled = true;
     requestAnimationFrame(() => {{
       scheduled = false;
-      applyBranding();
+      applyBranding(root);
     }});
   }}
 
   function boot() {{
-    applyBranding();
-    const observer = new MutationObserver(scheduleApply);
-    observer.observe(document.documentElement, {{ childList: true, subtree: true }});
-    window.addEventListener('pageshow', applyBranding);
-    document.addEventListener('visibilitychange', applyBranding);
+    applyBranding(document.body || document.documentElement);
+    const observer = new MutationObserver((mutations) => {{
+      for (const mutation of mutations) {{
+        if (mutation.type === 'childList') {{
+          mutation.addedNodes.forEach((node) => scheduleApply(node));
+        }} else if (mutation.type === 'characterData') {{
+          scheduleApply(mutation.target?.parentElement || document.body || document.documentElement);
+        }}
+      }}
+    }});
+    observer.observe(document.documentElement, {{ childList: true, subtree: true, characterData: true }});
+    window.addEventListener('pageshow', () => applyBranding(document.body || document.documentElement));
+    document.addEventListener('visibilitychange', () => applyBranding(document.body || document.documentElement));
   }}
 
   if (document.readyState === 'loading') {{
@@ -248,7 +348,7 @@ def main() -> int:
     sw = sw.replace('const title = data.title || "OpenClaw";', f'const title = data.title || {json.dumps(notification_title, ensure_ascii=False)};')
     sw_path.write_text(sw, encoding="utf-8")
 
-    print(f"Applied Control UI branding patch.")
+    print("Applied Control UI branding patch.")
     print(f"- packageRoot: {package_root}")
     print(f"- logoSource: {logo_source}")
     print(f"- runtimeLogo: {runtime_logo_path}")
