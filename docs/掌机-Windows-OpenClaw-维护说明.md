@@ -3,7 +3,7 @@
 - 适用机器：掌机（Windows）
 - 系统 / OS：Windows
 - 文档类型：本机专用说明
-- 当前维护对象：ROG 掌机 / `TABLET-EH5U3CO1`
+- 当前维护对象：ROG 掌机 / `TABLET-EH5U3C01`（系统里也可能显示为 `TABLET-EH5U3CO1`）
 - 最近维护日期：2026-05-07
 - 最近维护时间：2026-05-07 14:23 CST (+0800)
 - 最近维护来源：公司（Linux）机器通过 SSH 远程维护掌机（Windows）
@@ -274,7 +274,50 @@
 - 默认保持 DeepSeek 当主模型
 - Copilot 保持启用但暂不切默认
 
-### 2. 如果后续再出问题，优先判断顺序
+### 2. 掌机（Windows）下载更新后的默认处理方式
+
+当这台掌机从 GitHub 拉到最新 workspace，或用户明确说：
+
+- `同步这台机器`
+- `更新这台机器`
+- `拉一下最新规则`
+
+在 **掌机（Windows）** 上，默认应按 Windows 方式理解，而不是照 Linux 的命令路径生搬硬套。
+
+#### 推荐更新入口
+
+优先直接运行：
+
+- `scripts/update-openclaw.cmd`
+
+或在 PowerShell 中运行：
+
+- `powershell -ExecutionPolicy Bypass -File .\scripts\update-openclaw.ps1`
+
+#### 这两个脚本的默认行为
+
+1. 进入当前 workspace 仓库
+2. 执行 `git pull --ff-only`
+3. 若检测到新提交，则自动执行 `openclaw gateway restart`
+4. 若用户明确要求“即使没更新也立刻应用一次”，则可用 PowerShell 版本加 `-AlwaysRestart`
+
+#### 掌机上更新后的默认阅读顺序
+
+如果这台掌机刚拉完更新，OpenClaw 应优先按这个顺序理解规则：
+
+1. `HOST_CONTEXT.md`
+2. `docs/多机器-读取与更新规则.md`
+3. 本文档 `docs/掌机-Windows-OpenClaw-维护说明.md`
+4. `TOOLS.md` 里所有标注为 `掌机（Windows）` 的条目
+5. 再看对应的 `.ps1` / `.cmd` 脚本
+
+#### 掌机上默认不要误用的更新方式
+
+- 不要把公司（Linux）的 `systemd` / shell 更新方式直接搬到掌机执行
+- 不要优先按 Linux 路径去找 `~/.config/systemd/user/*`
+- 不要把“gateway 重启”理解成 Linux service 操作；在掌机上应按 Windows 下的 `openclaw gateway restart` 或既有 `.cmd/.ps1` 包装器处理
+
+### 3. 如果后续再出问题，优先判断顺序
 
 优先按这个顺序判断：
 

@@ -1,4 +1,6 @@
-# OpenClaw 更新脚本（Windows / PowerShell）
+# 适用机器：掌机（Windows）
+# 系统 / OS：Windows
+# 用途：在 Windows 环境下拉取 workspace 最新规则，并在需要时重启 OpenClaw gateway。
 # 用法：
 #   .\scripts\update-openclaw.ps1
 #   或通过 .cmd 包装器：.\scripts\update-openclaw.cmd
