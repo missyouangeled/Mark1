@@ -19,3 +19,14 @@ skills/self-improving-agent/
 # Build artifacts
 dist/
 build/
+.next/
+**/.next/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+
+# ClawHub / hook runtime state
+.clawhub/
+**/.clawhub/
+.learnings/.hook-state.json

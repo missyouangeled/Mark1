@@ -90,16 +90,31 @@ Things like:
   - 默认品牌图来源：`avatars/jarvis-neon-20260507.png`
   - 自动生效规则：公司 Linux 机上每次 `openclaw-gateway.service` 启动前，都会先自动执行一次品牌补丁脚本；因此以后只要 OpenClaw 升级后重启 gateway，就会自动重新覆盖
   - 手工用法：`python3 scripts/apply-openclaw-control-ui-branding.py`
+- NVIDIA 语音桥（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）
+  - 系统 / OS：Linux
+  - bridge 服务代码：`tools/nvidia-audio-bridge/bridge.py`
+  - bridge README：`tools/nvidia-audio-bridge/README.md`
+  - 依赖清单：`tools/nvidia-audio-bridge/requirements.txt`
+  - systemd 模板：`tools/nvidia-audio-bridge/openclaw-nvidia-audio-bridge.service`
+  - gateway 补丁脚本：`scripts/apply-openclaw-nvidia-audio-gateway-patch.py`
+  - 当前 bridge venv：`~/.local/share/openclaw-nvidia-audio-bridge-venv`
+  - 当前用户态 service：`~/.config/systemd/user/openclaw-nvidia-audio-bridge.service`
+  - 用途：让本机 OpenClaw gateway 通过本地 bridge 暴露 NVIDIA 免费 TTS / ASR 路径
+  - 快速定位规则：新机器若要复用这一套，先看 README，再按公司 Linux 维护说明执行
 - 临时文件下载分享（公司 / Linux 机器）：
   - 适用机器：公司（Linux）
   - 系统 / OS：Linux
   - 用途：当需要把当前机器上的文件交给宿主机浏览器或其他同网段设备下载时，优先在目标文件所在目录起临时 HTTP 服务，然后直接把完整 URL 发给用户
-  - 推荐命令：`python3 -m http.server 8765 --bind 0.0.0.0`
+  - 默认推荐命令：`python3 -m http.server 8765 --bind 0.0.0.0`
   - 推荐做法：在包含目标文件的目录执行；随后把 `http://当前机器IP:8765/文件名` 发给用户
   - 当前公司 Linux 机器兜底 IP：`192.168.233.130`
   - 例如：`http://192.168.233.130:8765/rustdesk-1.4.6-x86_64.exe`
   - 使用场景：用户说“给我一个地址，我去宿主机浏览器里下”或明确表示附件 / 本地路径不好用时
-  - 收尾：文件下载完成后，可结束对应的临时 `python3 -m http.server` 进程，避免长期暴露目录
+  - **注意**：对 `mp3` / `mp4` / `pdf` 等浏览器可能直接内联打开的文件，如果用户明确想要“直接下载”而不是在线播放/预览，**不要只给 `python -m http.server` 的裸地址**；应优先提供带 `Content-Disposition: attachment` 的临时下载服务地址
+  - 这次已验证的坑：浏览器访问普通 `http.server` 的 `mp3` 链接时，可能直接播放而不自动下载
+  - 处理方式：为目标文件单独起一个带 `attachment` 响应头的临时 HTTP 服务，再把那个地址发给用户
+  - 收尾：文件下载完成后，可结束对应的临时 HTTP 服务进程，避免长期暴露目录
 
 ### Git / GitHub
 
@@ -138,10 +153,11 @@ Things like:
 - **Simple local fallback** uses `msedge-tts` in user space (no root required)
   - Script: `tools/voice-reply/tts.mjs`
   - Default Chinese voice: `zh-CN-XiaoxiaoNeural`
-  - **Current default voice-reply version**: `基础聊天女声版本`
-    - definition: local `msedge-tts` using `zh-CN-XiaoxiaoNeural`, optimized by using more conversational text rather than imitation/cloning
-    - user-selected reference sample: `tmp/voice-replies/basic-female-confession-chatty-20260422-165649.mp3`
-    - usage rule: for future normal voice replies, default to this version first
+  - **Current default voice-reply version**: `中文混合模板版本`
+    - definition: 以更自然的中文音色为底，再吸收用户最终确认的更真实语气与语速；当前采用的成品模板为“第一条合体版提速 20%”
+    - user-selected reference sample: `tmp/voice-replies/zh-hybrid-default-template.mp3`
+    - usage rule: for future normal Chinese voice replies, default to this version first
+    - target feel: “第一条的声音 + 第二条的语气和语速”，最终确认版为 `zh-hybrid-noiz-natural-plus20-20260508-1225.mp3`
   - Named fallback preset: **基础女声版本**
     - definition: local `msedge-tts` baseline using `zh-CN-XiaoxiaoNeural`
     - purpose: safety fallback when later experiments sound worse, stiffer, or less natural
@@ -154,6 +170,10 @@ Things like:
   - Script: `tools/voice-reply/noiz-reply.sh`
   - Private default reference clip path: `~/.local/share/openclaw-voice-reply/default-ref.mp3`
   - Presets: `natural`, `gentle`, `bright`, `late-night`
+  - Current preferred Chinese template chain:
+    - timbre-direction sample: `tmp/voice-replies/zh-msedge-closer-to-nvidia-20260508-1222.mp3`
+    - user-final chosen template result: `tmp/voice-replies/zh-hybrid-noiz-natural-plus20-20260508-1225.mp3`
+    - stable alias for future reuse: `tmp/voice-replies/zh-hybrid-default-template.mp3`
   - Supports pitch correction after synthesis with formant preservation:
     - `--pitch-semitones -1.5` → lower register slightly while keeping the speaking feel mostly intact
     - implemented with ffmpeg `rubberband` filter and `formant=preserved`

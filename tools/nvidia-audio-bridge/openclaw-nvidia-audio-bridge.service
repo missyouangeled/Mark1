@@ -1,0 +1,19 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：为当前机器上的 OpenClaw 提供本地 NVIDIA 音频 bridge 的用户态 systemd 模板。
+[Unit]
+Description=OpenClaw NVIDIA Audio Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openclaw/workspace/tools/nvidia-audio-bridge
+ExecStart=%h/.local/share/openclaw-nvidia-audio-bridge-venv/bin/python %h/.openclaw/workspace/tools/nvidia-audio-bridge/bridge.py
+Restart=always
+RestartSec=3
+Environment=OPENCLAW_NVIDIA_AUDIO_BRIDGE_HOST=127.0.0.1
+Environment=OPENCLAW_NVIDIA_AUDIO_BRIDGE_PORT=18890
+
+[Install]
+WantedBy=default.target

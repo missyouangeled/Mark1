@@ -127,6 +127,88 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 - 如果以后用户想把左上角名称改成 `J.A.R.V.I.S.`、改别的图、或继续往电影风格靠，只需要改 `config/control-ui-branding.json` 再重跑脚本。
 - 这是“可重复应用补丁”，不是官方配置项；如果以后 OpenClaw 前端结构变化很大，补丁脚本可能需要跟着调整，但总体维护点已经集中到这几个文件里，不需要再手工逐个改 dist 文件。
 
+### 4. NVIDIA 免费语音模型桥接（公司 Linux）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-08
+- 用途：让当前这台公司 Linux 机上的 OpenClaw gateway 通过本地 bridge 使用 NVIDIA 免费语音模型（TTS / ASR），并保持主 gateway 继续稳定运行。
+
+当前方案：
+
+- OpenClaw gateway 继续监听：`127.0.0.1:18789`
+- 本地 NVIDIA 音频 bridge 监听：`127.0.0.1:18890`
+- gateway 新增代理路径：
+  - `/v1/audio/speech`
+  - `/v1/audio/transcriptions`
+- bridge 内部通过 `nvidia-riva-client` 走 `grpc.nvcf.nvidia.com:443` + `function-id` 调用 NVIDIA 公共免费语音函数，而不是直接依赖 `integrate.api.nvidia.com/v1/audio/...`
+
+相关文件：
+
+- bridge 服务代码：`tools/nvidia-audio-bridge/bridge.py`
+- bridge README：`tools/nvidia-audio-bridge/README.md`
+- 依赖清单：`tools/nvidia-audio-bridge/requirements.txt`
+- repo 内 service 模板：`tools/nvidia-audio-bridge/openclaw-nvidia-audio-bridge.service`
+- gateway 补丁脚本：`scripts/apply-openclaw-nvidia-audio-gateway-patch.py`
+- bridge 用户态 systemd：`~/.config/systemd/user/openclaw-nvidia-audio-bridge.service`
+- OpenClaw 配置：`~/.openclaw/openclaw.json`
+- OpenClaw 安装产物（被补丁修改）：`~/.npm-global/lib/node_modules/openclaw/dist/server.impl-*.js`
+- 新增代理模块：`~/.npm-global/lib/node_modules/openclaw/dist/openai-audio-http-nvidia-bridge.js`
+
+当前关键配置：
+
+- `~/.openclaw/openclaw.json` 已增加：
+
+```json
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+说明：
+
+- 这是为了让 OpenClaw 内部 `openAiCompatEnabled` 变为启用状态，从而让新增的音频 HTTP 路由真正生效。
+- 这个改动仍然保持 gateway 为 `loopback` 绑定，不会把本机接口直接暴露到外网。
+
+当前已验证结果：
+
+- 通过 gateway 调用 TTS：`200 OK`，可返回 `audio/mpeg`
+- 通过 gateway 调用 ASR：`200 OK`
+- 使用 gateway 先生成 TTS，再把生成的 MP3 回送 ASR，已得到正确转写：`Hello from nvidia gateway bridge test.`
+
+新机器最小落地步骤：
+
+1. 先读 `tools/nvidia-audio-bridge/README.md`，确认用途、依赖和验证命令。
+2. 确认 `~/.openclaw/openclaw.json` 里已有可用的 `models.providers.nvidia.apiKey`。
+3. 准备 bridge 运行环境（当前公司 Linux 机使用 `~/.local/share/openclaw-nvidia-audio-bridge-venv`）。
+4. 复制 repo 内模板 `tools/nvidia-audio-bridge/openclaw-nvidia-audio-bridge.service` 到 `~/.config/systemd/user/`，执行 `systemctl --user daemon-reload && systemctl --user enable --now openclaw-nvidia-audio-bridge.service`。
+5. 执行 `python3 scripts/apply-openclaw-nvidia-audio-gateway-patch.py` 给 OpenClaw 打补丁，再重启 bridge 与 gateway。
+6. 用 README 里的 `/health`、TTS、ASR 验证命令做最小回归。
+
+systemd 维护命令：
+
+```bash
+systemctl --user status openclaw-nvidia-audio-bridge.service
+systemctl --user restart openclaw-nvidia-audio-bridge.service
+journalctl --user -u openclaw-nvidia-audio-bridge.service -n 100 --no-pager
+```
+
+注意：
+
+- 该方案是本机补丁，不是 OpenClaw 官方现成配置项；未来 OpenClaw 升级后，如果 `dist/server.impl-*.js` 文件名或结构变化，需要重新执行或调整补丁脚本。
+- 如果 gateway 重启后音频接口重新变成 `404` 或 `502`，优先检查两点：
+  1. `openclaw-nvidia-audio-bridge.service` 是否仍在运行；
+  2. OpenClaw 升级后补丁是否被覆盖。
+- 不要把 NVIDIA API key 硬编码进脚本；bridge 会从 `~/.openclaw/openclaw.json` 中读取现有 `providers.nvidia.apiKey`。
+
 ## 标注规则
 
 今后凡是会同步到 GitHub、且内容属于 **公司（Linux）** 专用的系统说明、脚本说明、修复记录，都必须在正文显式写出：
