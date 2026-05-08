@@ -115,6 +115,17 @@ Things like:
   - 这次已验证的坑：浏览器访问普通 `http.server` 的 `mp3` 链接时，可能直接播放而不自动下载
   - 处理方式：为目标文件单独起一个带 `attachment` 响应头的临时 HTTP 服务，再把那个地址发给用户
   - 收尾：文件下载完成后，可结束对应的临时 HTTP 服务进程，避免长期暴露目录
+- 浏览器上传到当前机器（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）（脚本本身可复用）
+  - 系统 / OS：Linux
+  - 用途：当用户需要把宿主机浏览器里的本地文件直接拷到当前机器时，优先起一个一次性临时上传页，让用户在浏览器里直接选文件上传
+  - 固定脚本：`scripts/openclaw-upload-drop-server.py`
+  - 推荐起法：`python3 scripts/openclaw-upload-drop-server.py tmp/upload-drop/inbox <token> 8771`
+  - 推荐地址格式：`http://当前机器IP:8771/<token>`
+  - 适用场景：用户说“我把文件拷给你”“我从宿主机传给你”“浏览器给你上传文件”这类需求
+  - 当前验证通过的典型文件：`voices-v1.0.bin`、`kokoro-v1.0.int8.onnx`
+  - 默认规则：以后当用户需要把文件从宿主机/浏览器拷到这台机器时，优先直接用这种临时上传页，而不是先折腾聊天附件、下载地址反向中转或别的更绕的方法
+  - 安全做法：使用随机 token 路径、单独 inbox 目录；文件收完后及时关闭上传服务，避免长期暴露
 
 ### Git / GitHub
 
@@ -156,7 +167,7 @@ Things like:
   - **Current default voice-reply version**: `中文混合模板版本`
     - definition: 以更自然的中文音色为底，再吸收用户最终确认的更真实语气与语速；当前采用的成品模板为“第一条合体版提速 20%”
     - user-selected reference sample: `tmp/voice-replies/zh-hybrid-default-template.mp3`
-    - usage rule: for future normal Chinese voice replies, default to this version first
+    - usage rule: for future Chinese voice replies, use this as the default template across voice-reply surfaces unless the user explicitly asks for another voice/template
     - target feel: “第一条的声音 + 第二条的语气和语速”，最终确认版为 `zh-hybrid-noiz-natural-plus20-20260508-1225.mp3`
   - Named fallback preset: **基础女声版本**
     - definition: local `msedge-tts` baseline using `zh-CN-XiaoxiaoNeural`
