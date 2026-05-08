@@ -16,22 +16,34 @@
 
 ---
 
-## 最短操作版（以后在掌机上优先看这段）
+## 最短理解版（主流程）
 
-如果你只想知道这台 **掌机（Windows）** 现在该怎么更新、怎么验证，先看这 5 步：
+如果你只想知道这台 **掌机（Windows）** 在拉完 GitHub 更新后默认应该怎么继续，先记这 5 步：
 
-1. 在掌机上运行：`scripts/update-openclaw.cmd`
-2. 它会自动执行：`git pull --ff-only`
-3. 若拉到新提交，它会自动执行：`openclaw gateway restart`
-4. 脚本结尾会直接显示一段“更新结果摘要”与一次 `gateway status` 快查
-5. 更新后优先检查：
-   - 脚本输出里的 `gateway status` 快查结果
+1. 掌机上的 OpenClaw 在本机完成 `git pull --ff-only` 并重启 gateway
+2. 重启后，它先识别自己是 **掌机（Windows）**
+3. 然后按顺序读取：
+   - `HOST_CONTEXT.md`
+   - `docs/多机器-读取与更新规则.md`
+   - `docs/掌机-Windows-OpenClaw-维护说明.md`
+   - `TOOLS.md` 里标注为 `掌机（Windows）` 的条目
+   - 相关 `.ps1` / `.cmd` 脚本说明
+4. 接着它应根据这些说明，**自主完成当前机器需要的下载 / 安装 / 修复 / 验证**
+5. 完成后再检查：
+   - `openclaw gateway status`
    - 本地 Control UI：`http://127.0.0.1:18789/`
-6. 若是微信链路相关问题，再继续读本文后面的“优先判断顺序”与“关键修复记录”
+   - 若涉及微信，再继续看本文后面的“优先判断顺序”与“关键修复记录”
 
 一句话记忆：
 
-> 这台掌机是 **Windows**，更新优先走 `.cmd / .ps1`，不要套 Linux 的 `systemd` 那套。
+> 这台掌机是 **Windows**；主流程是“拉更新 / 重启后由本机 OpenClaw 自己读文档并继续自更新”，`.cmd / .ps1` 只是手动兜底入口，不是主路线。
+
+### 手动兜底入口（只有在需要人工强制触发时才用）
+
+如果确实需要人在掌机上手动触发一次同步，可以再用：
+
+- `scripts/update-openclaw.cmd`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\update-openclaw.ps1`
 
 ---
 

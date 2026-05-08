@@ -166,6 +166,9 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
   1. go to the current workspace repo
   2. run `git pull --ff-only`
   3. if the repo changed — or if the user explicitly wants the latest rules applied now — run `openclaw gateway restart`
+- After restart, the primary intent is **machine-local self-update**, not making the user manually re-read docs or click through every step.
+- Post-sync default behavior: the local OpenClaw on that machine should immediately identify current host → re-read `HOST_CONTEXT.md` → `docs/多机器-读取与更新规则.md` → the matching machine maintenance doc → relevant scripts / `TOOLS.md` entries, then proactively reconcile local machine state under the new rules.
+- When current host is `掌机（Windows）`, default post-sync behavior is: read the Windows-marked docs first, then autonomously perform the local downloads / installs / repairs / verification those docs imply, as long as the actions are local, reversible, and within the task scope. `.cmd` / `.ps1` wrappers are manual fallback entry points, not the main mental model.
 - After restart, continue work under the freshly synced shared rules without making the user repeat the intent.
 
 ## New Machine Auto-Registration
