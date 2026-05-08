@@ -43,6 +43,29 @@ Docker build fails on Apple Silicon due to platform mismatch
 
 ---
 
+## [LRN-20260508-001] best_practice
+
+**Logged**: 2026-05-08T12:49:00+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: docs
+
+### Summary
+OpenClaw 会话清理应采用分层流程：先保留当前会话树与主会话，再删索引和主会话文件，最后清残留与旧备份。
+
+### Details
+这次实际清理验证了一个更稳的默认方案：不直接大范围硬删，而是先识别保留集（当前正在使用的会话树 + 主会话），优先处理明显陈旧的 dashboard、旧直聊、已结束/失败/超时或僵尸 running 的 subagent；先移除 `sessions.json` 中的索引并处理对应主 `jsonl`，再继续清 `trajectory`、`checkpoint`、`bak`、`reset`、`.deleted` 等残留，最后才决定是否删除更老的备份目录。这样既能把列表和磁盘一起清干净，又不容易误伤当前正在使用的窗口。
+
+### Suggested Action
+把这条流程固化到 `AGENTS.md` 与 `MEMORY.md`，以后用户提到“清会话”时默认按这套执行；日常清理保持保守，不碰当前活跃会话核心文件，除非用户明确要求更激进的瘦身。
+
+### Metadata
+- Source: user_feedback
+- Related Files: AGENTS.md, MEMORY.md, memory/daily/2026-05-08.md
+- Tags: sessions, cleanup, workflow, openclaw
+
+---
+
 ## [LRN-20260423-001] best_practice
 
 **Logged**: 2026-04-23T00:45:00Z

@@ -185,6 +185,18 @@ Skills provide your tools. When you need one, check its `SKILL.md`. Keep local n
 - If a task is likely to take a while or risks making the main session feel stuck, prefer spawning a background subagent proactively and let the main session stay responsive.
 - Use the main session for short interactive work; use background subagents for long-running implementation, research, or multi-step refactors.
 
+## Completion Cleanup
+
+- Treat cleanup as a default end-of-task step, not an optional afterthought.
+- After finishing a task or reaching a clean stopping point, proactively close background subagents that no longer have work.
+- Cancel or reconcile obviously stale background tasks so they do not pile up or block later `openclaw gateway restart` runs.
+- Periodically prune clearly stale synthetic sessions with the configured session-maintenance policy / `openclaw sessions cleanup`, while preserving the active main session and durable user-facing conversation sessions.
+- Unless the user explicitly asks to keep extra sessions or tasks around for inspection, prefer leaving the workspace in a clean, low-noise state after work is done.
+- 当用户说“清会话”“再清一下会话”或明确表达同类意思时,默认使用分层会话清理流程,不要临时拍脑袋删。
+- 默认保留集: 当前正在使用的会话树(当前会话及其父 dashboard / 关联链) + 主会话; 只有在用户明确要求更激进时才扩大清理范围。
+- 默认清理顺序: 先核对 `sessions.json` 与保留集 → 清掉明显陈旧的 dashboard / 旧直聊 / 已结束、失败、超时或僵尸 running 的 subagent 的索引与主 `jsonl` → 再清理非保留会话的 `trajectory` / `checkpoint` / `bak` / `reset` / `.deleted` 残留 → 最后再视情况删旧备份目录。
+- 常规清理时,不要碰当前活跃会话自己的核心文件; 除非用户明确要求做更激进的瘦身。
+
 ## Thinking Level Rules
 
 - Default to normal/default (or low when explicitly available) for short answers, simple explanations, routine commands, straightforward file edits, and tasks whose path is already clear.
