@@ -23,10 +23,11 @@
 1. 在掌机上运行：`scripts/update-openclaw.cmd`
 2. 它会自动执行：`git pull --ff-only`
 3. 若拉到新提交，它会自动执行：`openclaw gateway restart`
-4. 更新后优先检查：
-   - `openclaw gateway status`
+4. 脚本结尾会直接显示一段“更新结果摘要”与一次 `gateway status` 快查
+5. 更新后优先检查：
+   - 脚本输出里的 `gateway status` 快查结果
    - 本地 Control UI：`http://127.0.0.1:18789/`
-5. 若是微信链路相关问题，再继续读本文后面的“优先判断顺序”与“关键修复记录”
+6. 若是微信链路相关问题，再继续读本文后面的“优先判断顺序”与“关键修复记录”
 
 一句话记忆：
 
