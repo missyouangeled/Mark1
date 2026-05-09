@@ -33,6 +33,7 @@ OUT=""
 PRESET=""
 FORMAT="auto"
 TEMPO=""
+MAX_NEW_TOKEN=""
 COLD_MODE=false
 LIST_PRESETS=false
 STOP_DAEMON=false
@@ -45,13 +46,14 @@ while [[ $# -gt 0 ]]; do
     --preset|--voice) PRESET="$2"; shift 2 ;;
     --format) FORMAT="$2"; shift 2 ;;
     --tempo) TEMPO="$2"; shift 2 ;;
+    --max-new-token) MAX_NEW_TOKEN="$2"; shift 2 ;;
     --cold) COLD_MODE=true; shift ;;
     --list-presets) LIST_PRESETS=true; shift ;;
     --stop) STOP_DAEMON=true; shift ;;
     --status) STATUS_ONLY=true; shift ;;
     --help|-h)
       echo "Usage: $0 [--text TEXT] [--out PATH] [--preset NAME] [--format wav|mp3]"
-      echo "       $0 [--tempo N] [--cold|--list-presets|--stop|--status]"
+      echo "       $0 [--tempo N] [--max-new-token N] [--cold|--list-presets|--stop|--status]"
       exit 0
       ;;
     *)
@@ -105,6 +107,7 @@ if $COLD_MODE; then
   [[ -n "$PRESET" ]] && args+=("--preset" "$PRESET")
   args+=("--format" "$FORMAT")
   [[ -n "$TEMPO" ]] && args+=("--tempo" "$TEMPO")
+  [[ -n "$MAX_NEW_TOKEN" ]] && args+=("--max-new-token" "$MAX_NEW_TOKEN")
   exec "$VENV_PYTHON" "$SCRIPT" "${args[@]}"
 fi
 
@@ -127,7 +130,7 @@ fi
 # Build JSON payload via Python tempfile (no shell escaping issues)
 PAYLOAD_FILE=$(mktemp /tmp/chattts-payload-json.XXXXXX)
 CHATTTS_TEXT="$TEXT" CHATTTS_OUT="$OUT" CHATTTS_FORMAT="$FORMAT" \
-  CHATTTS_PRESET="${PRESET:-}" CHATTTS_TEMPO="${TEMPO:-}" CHATTTS_PAYLOAD_FILE="$PAYLOAD_FILE" \
+  CHATTTS_PRESET="${PRESET:-}" CHATTTS_TEMPO="${TEMPO:-}" CHATTTS_MAX_NEW_TOKEN="${MAX_NEW_TOKEN:-}" CHATTTS_PAYLOAD_FILE="$PAYLOAD_FILE" \
   "$VENV_PYTHON" -c "
 import json, os
 payload = {
@@ -141,6 +144,9 @@ if p:
     payload['preset'] = p
 if t:
     payload['tempo'] = float(t)
+m = os.environ.get('CHATTTS_MAX_NEW_TOKEN', '')
+if m:
+    payload['max_new_token'] = int(m)
 with open(os.environ['CHATTTS_PAYLOAD_FILE'], 'w') as f:
     f.write(json.dumps(payload, ensure_ascii=False))
 "

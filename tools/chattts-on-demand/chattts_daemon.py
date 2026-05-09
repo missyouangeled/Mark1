@@ -57,7 +57,7 @@ chat = None          # ChatTTS instance
 device = None        # torch device
 config = None        # preset config
 last_request_time = 0.0
-current_preset_name = "default"
+current_preset_name = None
 current_spk_emb = None
 
 # ── Logging ──────────────────────────────────────────────────────────────
@@ -206,8 +206,8 @@ def synthesize(text: str, out_path: str, preset: str = "default",
 
     last_request_time = time.time()
 
-    # Update speaker embedding if preset changed
-    if preset != current_preset_name:
+    # Update speaker embedding if preset changed, or if this is the first request
+    if preset != current_preset_name or current_spk_emb is None:
         current_preset_name = preset
         current_spk_emb = resolve_spk_emb(preset)
         if current_spk_emb:

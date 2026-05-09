@@ -7,8 +7,8 @@
 #
 # Usage:
 #   bash tools/voice-reply/voice-reply.sh "回复文本内容"
-#   bash tools/voice-reply/voice-reply.sh "文本" default
 #   bash tools/voice-reply/voice-reply.sh "文本" preset-1
+#   OPENCLAW_VOICE_REPLY_PRESET=preset-2 bash tools/voice-reply/voice-reply.sh "文本"
 #
 # Returns:
 #   Path to generated audio file, or empty string on failure.
@@ -23,7 +23,7 @@ WRAPPER="$BASE_DIR/tools/voice-reply/chattts_voice_reply.py"
 VENV_PYTHON="$HOME/.local/share/openclaw-voice-venv311/bin/python3"
 
 TEXT="${1:-}"
-PRESET="${2:-default}"
+PRESET="${2:-${OPENCLAW_VOICE_REPLY_PRESET:-default}}"
 
 if [[ -z "$TEXT" ]]; then
   echo "" >&2

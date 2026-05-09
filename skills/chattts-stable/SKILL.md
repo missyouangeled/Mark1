@@ -42,7 +42,8 @@ tools/voice-reply/chattts-stable.sh --preset preset-1 --text '测试一下' --ou
 ## Rules
 
 - Prefer this skill when the user explicitly wants **ChatTTS stable** rather than Noiz / Kokoro / other TTS paths.
-- Treat `default` as the current mainline voice. It uses the model-default speaker on top of the fixed hybrid asset chain.
+- Treat `default` as the current mainline voice. It is the fixed `seed_1910` speaker embedding confirmed on 2026-05-09 and stored under `assets/presets/default-main-20260509.spk.txt`.
+- Treat `model-default` as the old drifting baseline kept only for manual comparison/debugging, not as the normal main-session voice.
 - Treat `preset-1` / `preset-2` / `preset-3` as saved `spk_emb` presets stored under `assets/presets/`.
 - Default tempo is already set to `1.15`, because that is the currently accepted baseline. Override with `--tempo` only when the user asks.
 - Keep the asset chain fixed unless the task is explicitly about rebuilding ChatTTS assets.

@@ -11,7 +11,7 @@ Architecture:
 Usage (from shell or agent tool call):
   python3 tools/voice-reply/chattts_voice_reply.py \
     --text "回复内容" \
-    [--preset default|preset-1|preset-2|preset-3] \
+    [--preset <presets.json 中的任意 preset 名>] \
     [--max-chars 60]
 
 Integration contract:
@@ -40,8 +40,11 @@ WORKSPACE = Path.home() / ".openclaw" / "workspace"
 ON_DEMAND_SH = WORKSPACE / "tools" / "chattts-on-demand" / "chattts-on-demand.sh"
 CLEANUP_SH = WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"
 DEFAULT_OUT_DIR = WORKSPACE / "tmp" / "voice-replies"
-MAX_TTS_CHARS = 60  # Longer text = slower CPU TTS; cap to keep latency acceptable
-TTS_TIMEOUT_SECONDS = 120
+DEFAULT_PRESET = os.environ.get("OPENCLAW_VOICE_REPLY_PRESET", "default")
+DEFAULT_TEMPO = float(os.environ.get("OPENCLAW_VOICE_REPLY_TEMPO", "1.32"))
+MAX_TTS_CHARS = 120  # 用户已确认更看重说完整，其次才是速度
+DEFAULT_MAX_NEW_TOKEN = int(os.environ.get("OPENCLAW_VOICE_REPLY_MAX_NEW_TOKEN", "768"))
+TTS_TIMEOUT_SECONDS = 180
 
 
 def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
@@ -105,7 +108,9 @@ def prune_expired_audio() -> None:
 
 def synthesize(
     text: str,
-    preset: str = "default",
+    preset: str = DEFAULT_PRESET,
+    tempo: float = DEFAULT_TEMPO,
+    max_new_token: int = DEFAULT_MAX_NEW_TOKEN,
     out_path: str | None = None,
     max_chars: int = MAX_TTS_CHARS,
 ) -> str | None:
@@ -146,7 +151,7 @@ def synthesize(
 
     try:
         result = subprocess.run(
-            [on_demand, "--text", clean, "--out", out_path, "--preset", preset],
+            [on_demand, "--text", clean, "--out", out_path, "--preset", preset, "--tempo", str(tempo), "--max-new-token", str(max_new_token)],
             capture_output=True,
             text=True,
             timeout=TTS_TIMEOUT_SECONDS,
@@ -165,10 +170,13 @@ def main() -> None:
         description="ChatTTS voice reply wrapper for main-session integration",
     )
     ap.add_argument("--text", required=True, help="Reply text to synthesize")
-    ap.add_argument("--preset", default="default",
-                    choices=["default", "preset-1", "preset-2", "preset-3"],
-                    help="Voice preset (default: default)")
+    ap.add_argument("--preset", default=DEFAULT_PRESET,
+                    help=f"Voice preset name from presets.json (default: {DEFAULT_PRESET})")
     ap.add_argument("--out", default="", help="Output path (auto-generated if omitted)")
+    ap.add_argument("--tempo", type=float, default=DEFAULT_TEMPO,
+                    help=f"Tempo multiplier (default: {DEFAULT_TEMPO})")
+    ap.add_argument("--max-new-token", type=int, default=DEFAULT_MAX_NEW_TOKEN,
+                    help=f"Max audio token budget (default: {DEFAULT_MAX_NEW_TOKEN})")
     ap.add_argument("--max-chars", type=int, default=MAX_TTS_CHARS,
                     help=f"Max chars for TTS (default: {MAX_TTS_CHARS})")
     args = ap.parse_args()
@@ -176,6 +184,8 @@ def main() -> None:
     out_path = synthesize(
         text=args.text,
         preset=args.preset,
+        tempo=args.tempo,
+        max_new_token=args.max_new_token,
         out_path=args.out or None,
         max_chars=args.max_chars,
     )

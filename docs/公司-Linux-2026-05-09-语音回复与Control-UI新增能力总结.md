@@ -78,7 +78,9 @@
 
 - 当前已确认的 ChatTTS stable 主入口
 - 固定 hybrid 资产链
-- 支持 default / preset-1 / preset-2 / preset-3
+- 当前 `default` 已改为固定 `seed_1910` 女声主线
+- `model-default` 仅保留作对照，不再作为主会话默认声线
+- 支持 `default` / `model-default` / `preset-1` / `preset-2` / `preset-3` / `first-female`
 
 #### 2) on-demand 语音 daemon 路径
 
@@ -150,6 +152,20 @@
 - 能旁路验证就不碰主链路
 - 不为了速度明显牺牲当前已认可的声音质感
 
+### 1.5 当前默认声线与情绪边界
+
+截至 2026-05-09 下午，主会话默认女声已经收口为：
+
+- `seed_1910_restored_emb.pt` → `default-main-20260509.spk.txt`
+- `default` preset = 当前主会话固定女声
+- `model-default` = 旧漂移基线，仅保留作人工对照
+
+用户当前确认的情绪边界：
+
+- 可以有自然、轻微的开心/笑意
+- 不要默认走夸张的“大笑版”
+- 主会话默认仍以自然聊天口吻为主
+
 ### 2. 为什么不用默认开机常驻 2GB daemon
 
 当前机器资源结论是：
@@ -169,6 +185,15 @@
 - 冷启动仍比热启动慢
 - 更深的自动化集成还可以继续收口
 - 但不再把它当一次性实验原型反复推倒
+
+### 4. 今天下午补修的关键 bug
+
+已定位并修复一个直接影响主会话默认女声的 bug：
+
+- 问题：on-demand daemon 冷启动后第一次收到 `default` 请求时，没有真正加载 `default` 对应的 `spk_emb`
+- 结果：第一次默认请求会错误掉回 `model-default`，导致用户仍听到男声/漂移声
+- 修复：`tools/chattts-on-demand/chattts_daemon.py` 改为在首次请求或 preset 变化时都强制重新解析并加载 `spk_emb`
+- 验收：修复后重启旧 daemon 并重跑默认音频，用户已现场确认“这个对”
 
 ---
 
