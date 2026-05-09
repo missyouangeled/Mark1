@@ -48,6 +48,45 @@ tools/voice-reply/chattts-stable.sh --preset preset-1 --text '测试一下' --ou
 - Keep the asset chain fixed unless the task is explicitly about rebuilding ChatTTS assets.
 - If the user asks for more voices later, add new preset files plus `assets/presets.json`; do not replace the current approved presets casually.
 
+## On-demand daemon (alternative startup)
+
+An on-demand daemon is available at `tools/chattts-on-demand/` that keeps the model warm between calls and auto-exits after 5 minutes of idle. Use for multiple sequential TTS requests without the ~12s cold-start overhead each time.
+
+```bash
+# First call (cold start, ~12s)
+bash tools/chattts-on-demand/chattts-on-demand.sh --text '你好' --out /tmp/out.wav
+
+# Subsequent calls (hot, ~4-10s depending on text length)
+bash tools/chattts-on-demand/chattts-on-demand.sh --text '第二次' --out /tmp/out2.wav
+```
+
+### Features (verified stable 2026-05-09)
+
+| Feature | Status |
+|---------|--------|
+| Idle auto-exit after 300s | ✅ Verfied — clean exit, no zombie processes |
+| Cold restart after idle exit | ✅ Verified — auto-starts on next request |
+| Stale socket recovery | ✅ Verified — detects dead daemon, cleans artifacts, restarts |
+| Multiple cold/hot cycles | ✅ Verified — no zombie accumulation |
+| Preset switching while hot | ✅ Verified — 4 presets tested, spk_emb switching works |
+| Crash recovery (`--cold` fallback) | ✅ Verified — works independently of daemon state |
+| Concurrent request queuing | ✅ Verified — serial processing, 3 rapid requests queued |
+
+### Improved stale-socket handling (2026-05-09)
+
+The `chattts-daemon.sh request` handler now includes a stale socket detection step:
+before connecting to the daemon socket, it performs a quick TCP-style probe
+(connect with 5s timeout). If the socket is stale (e.g., daemon crashed and
+left the socket file behind), it:
+1. Removes the stale socket + lock files
+2. Calls `$0 start` to spawn a fresh daemon
+3. Retries the request
+
+This eliminates the edge case where a `kill -9` on the daemon left the socket
+file intact but the process dead, causing subsequent requests to silently fail.
+
+See `tools/chattts-on-demand/README.md` for details, architecture, and risks. The daemon is separate from OpenClaw and does not affect gateway stability.
+
 ## Important files
 
 - Main entry: `skills/chattts-stable/scripts/chattts_stable.py`

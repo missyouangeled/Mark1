@@ -27,7 +27,7 @@ DEFAULT_TTS_SAMPLE_RATE = 22050
 DEFAULT_ASR_SAMPLE_RATE = 16000
 DEFAULT_TTS_MODEL = 'nvidia/magpie-tts-multilingual'
 DEFAULT_ASR_MODEL = 'nvidia/parakeet-1_1b-rnnt-multilingual-asr'
-DEFAULT_ASR_MODEL_ZH = 'nvidia/canary-1b-asr'  # Chinese ASR: only canary-1b works on NVCF bridge
+DEFAULT_ASR_MODEL_ZH = 'nvidia/whisper-large-v3'  # Chinese ASR: whisper-large-v3 is most accurate for short Chinese phrases
 DEFAULT_VOICE = 'aria'
 DEFAULT_VOICE_ZH = 'aria'  # Chinese defaults also use Aria voice
 FALLBACK_FFMPEG = Path.home() / '.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg'
@@ -213,7 +213,10 @@ def convert_any_audio_to_wav_bytes(source_bytes: bytes, suffix: str = '.bin') ->
         out = Path(tmpdir) / 'normalized.wav'
         src.write_bytes(source_bytes)
         subprocess.run([
-            ffmpeg, '-y', '-i', str(src), '-ac', '1', '-ar', str(DEFAULT_ASR_SAMPLE_RATE), '-f', 'wav', str(out)
+            ffmpeg, '-y', '-i', str(src),
+            '-ac', '1',
+            '-ar', str(DEFAULT_ASR_SAMPLE_RATE),
+            '-f', 'wav', str(out),
         ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         wav_bytes = out.read_bytes()
         with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:

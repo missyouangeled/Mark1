@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenClaw Voice Chat MVP</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c0f14;
+      --panel: #141923;
+      --soft: #1c2431;
+      --text: #e8edf5;
+      --muted: #9bacbf;
+      --accent: #7bdcff;
+      --accent-2: #8b9dff;
+      --danger: #ff7b8f;
+      --ok: #75e0a7;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, rgba(123,220,255,0.12), transparent 30%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      width: min(920px, calc(100vw - 24px));
+      margin: 24px auto 48px;
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 24px; }
+    h2 { font-size: 16px; margin-bottom: 12px; }
+    .sub { color: var(--muted); margin-top: 8px; line-height: 1.6; }
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 160px;
+      flex: 1;
+    }
+    select, input, textarea, button {
+      font: inherit;
+    }
+    select, input, textarea {
+      width: 100%;
+      background: var(--soft);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      color: #08111b;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      font-weight: 700;
+    }
+    button.secondary {
+      color: var(--text);
+      background: var(--soft);
+      border: 1px solid var(--border);
+      font-weight: 600;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .status {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(123,220,255,0.08);
+      color: var(--text);
+      border: 1px solid rgba(123,220,255,0.18);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .status.ok {
+      background: rgba(117,224,167,0.08);
+      border-color: rgba(117,224,167,0.25);
+    }
+    .status.err {
+      background: rgba(255,123,143,0.08);
+      border-color: rgba(255,123,143,0.25);
+    }
+    .turns {
+      display: grid;
+      gap: 12px;
+    }
+    .turn {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .bubble {
+      background: var(--soft);
+      border-radius: 12px;
+      padding: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    audio { width: 100%; }
+    .latency {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card">
+      <h1>语音对话 MVP</h1>
+      <p class="sub">现在这版是半双工：你说一句，我转文字、发给 OpenClaw、再用 ChatTTS stable 回一句。目标是先把整条链路稳定接起来。</p>
+    </section>
+
+    <section class="card">
+      <h2>状态</h2>
+      <div id="status" class="status">正在检查服务状态…</div>
+    </section>
+
+    <section class="card">
+      <h2>语音回复设置</h2>
+      <div class="grid-2">
+        <label>
+          说话音色
+          <select id="preset"></select>
+        </label>
+        <label>
+          语速
+          <input id="tempo" type="number" step="0.01" min="0.5" max="2.0" value="1.15" />
+        </label>
+      </div>
+      <div class="grid-2" style="margin-top:12px;">
+        <label>
+          ASR 识别模型
+          <select id="asrModel">
+            <option value="nvidia/whisper-large-v3">Whisper Large v3（推荐）</option>
+            <option value="nvidia/canary-1b-asr">Canary 1B</option>
+            <option value="nvidia/parakeet-ctc-0_6b-zh-cn">Parakeet CTC 0.6B 中文</option>
+          </select>
+        </label>
+        <label>
+          ASR 语言
+          <select id="asrLanguage">
+            <option value="zh-CN">中文（普通话）</option>
+            <option value="en-US">英语</option>
+            <option value="mixed">混用/自动</option>
+          </select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button id="recordBtn">开始录音</button>
+        <button id="stopBtn" class="secondary" disabled>停止并发送</button>
+        <button id="resetSessionBtn" class="secondary">重建 voice session</button>
+      </div>
+      <p class="sub" style="margin-top:10px;">默认会走独立 voice session，不刷当前文字主会话。等这条稳定了，再接实时打断和更低延迟。</p>
+    </section>
+
+    <section class="card">
+      <h2>文本直测</h2>
+      <label>
+        不走麦克风，直接发一句话
+        <textarea id="textInput" placeholder="比如：今天有点累，跟我说句话。"></textarea>
+      </label>
+      <div class="row" style="margin-top:12px;">
+        <button id="sendTextBtn" class="secondary">发送文本测试</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>对话记录</h2>
+      <div id="turns" class="turns"></div>
+    </section>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const presetEl = document.getElementById('preset');
+    const tempoEl = document.getElementById('tempo');
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const resetSessionBtn = document.getElementById('resetSessionBtn');
+    const sendTextBtn = document.getElementById('sendTextBtn');
+    const textInput = document.getElementById('textInput');
+    const turnsEl = document.getElementById('turns');
+
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let chunks = [];
+
+    function setStatus(text, kind = '') {
+      statusEl.textContent = text;
+      statusEl.className = `status ${kind}`.trim();
+    }
+
+    function selectedSettings() {
+      return {
+        preset: presetEl.value || 'default',
+        tempo: tempoEl.value || '1.15',
+      };
+    }
+
+    function addTurn(result) {
+      const wrap = document.createElement('div');
+      wrap.className = 'turn';
+      const latency = result.latencyMs || {};
+      const transcript = result.transcript || '（空）';
+      const reply = result.replyText || '（空）';
+      const chips = Object.entries(latency).map(([k, v]) => `<span class="chip">${k}: ${v} ms</span>`).join('');
+      wrap.innerHTML = `
+        <div class="meta">${new Date().toLocaleString()} · ${result.mode || 'turn'}</div>
+        <div class="bubble"><strong>你说：</strong>\n${escapeHtml(transcript)}</div>
+        <div class="bubble"><strong>贾维斯：</strong>\n${escapeHtml(reply)}</div>
+        <div class="latency">${chips}</div>
+        ${result.audioUrl ? `<audio controls autoplay src="${result.audioUrl}"></audio>` : ''}
+      `;
+      turnsEl.prepend(wrap);
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    }
+
+    async function loadHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        const presets = data.presets || [];
+        presetEl.innerHTML = '';
+        presets.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.name;
+          opt.textContent = item.default ? `${item.name} · ${item.label}（默认）` : `${item.name} · ${item.label}`;
+          presetEl.appendChild(opt);
+        });
+        presetEl.value = data.defaultPreset || 'default';
+        tempoEl.value = data.defaultTempo || 1.15;
+        const bridgeOk = !!(data.bridge && data.bridge.ok);
+        const session = data.session ? `${data.session.label || 'voice session'}\n${data.session.sessionId || ''}` : '尚未创建';
+        const lines = [
+          `Voice Chat 服务：正常`,
+          `NVIDIA bridge：${bridgeOk ? '已联通' : '未联通'}`,
+          `voice session：${session}`,
+          `当前输出缓存：${data.outputCount || 0} 个音频文件`,
+        ];
+        if (!bridgeOk && data.bridge) {
+          lines.push(`bridge 详情：${JSON.stringify(data.bridge)}`);
+        }
+        setStatus(lines.join('\n'), bridgeOk ? 'ok' : 'err');
+      } catch (err) {
+        setStatus(`状态检查失败：${err}`, 'err');
+      }
+    }
+
+    async function sendAudio(blob, filename = 'voice.webm') {
+      const { preset, tempo } = selectedSettings();
+      const form = new FormData();
+      form.append('file', blob, filename);
+      form.append('preset', preset);
+      form.append('tempo', tempo);
+      form.append('language', document.getElementById('asrLanguage').value || 'zh-CN');
+      form.append('model', document.getElementById('asrModel').value || 'nvidia/whisper-large-v3');
+      setStatus('正在识别语音、请求回复、合成语音……这一步会比纯聊天慢一点。');
+      const res = await fetch('/api/turn', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.detail || JSON.stringify(data));
+      }
+      addTurn(data);
+      setStatus('本轮完成。可以继续说下一句。', 'ok');
+    }
+
+    async function sendText() {
+      const text = textInput.value.trim();
+      if (!text) {
+        setStatus('先输入一点文本。', 'err');
+        return;
+      }
+      const { preset, tempo } = selectedSettings();
+      const form = new FormData();
+      form.append('text', text);
+      form.append('preset', preset);
+      form.append('tempo', tempo);
+      setStatus('正在走文本直测……');
+      const res = await fetch('/api/text-turn', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.detail || JSON.stringify(data));
+      }
+      addTurn(data);
+      setStatus('文本直测完成。', 'ok');
+    }
+
+    async function startRecording() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus('当前浏览器不支持麦克风录音。', 'err');
+        return;
+      }
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 48000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      const preferred = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ];
+      const mimeType = preferred.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+      mediaRecorder = mimeType ? new MediaRecorder(mediaStream, { mimeType }) : new MediaRecorder(mediaStream);
+      chunks = [];
+      mediaRecorder.ondataavailable = evt => {
+        if (evt.data && evt.data.size > 0) chunks.push(evt.data);
+      };
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const ext = blob.type.includes('ogg') ? 'ogg' : 'webm';
+        try {
+          await sendAudio(blob, `voice.${ext}`);
+        } catch (err) {
+          setStatus(`发送失败：${err}`, 'err');
+        } finally {
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+          }
+          mediaStream = null;
+          mediaRecorder = null;
+          recordBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      };
+      mediaRecorder.start();
+      recordBtn.disabled = true;
+      stopBtn.disabled = false;
+      setStatus('正在录音……说完后点“停止并发送”。');
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        setStatus('录音已停止，正在上传……');
+      }
+    }
+
+    recordBtn.addEventListener('click', async () => {
+      try {
+        await startRecording();
+      } catch (err) {
+        setStatus(`无法开始录音：${err}`, 'err');
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    });
+
+    stopBtn.addEventListener('click', stopRecording);
+
+    sendTextBtn.addEventListener('click', async () => {
+      try {
+        await sendText();
+      } catch (err) {
+        setStatus(`文本测试失败：${err}`, 'err');
+      }
+    });
+
+    resetSessionBtn.addEventListener('click', async () => {
+      try {
+        setStatus('正在重建 voice session……');
+        const res = await fetch('/api/session/reset', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+        await loadHealth();
+      } catch (err) {
+        setStatus(`重建 session 失败：${err}`, 'err');
+      }
+    });
+
+    loadHealth();
+  </script>
+</body>
+</html>

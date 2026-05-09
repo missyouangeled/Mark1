@@ -4,6 +4,105 @@
 
 ## 当前默认接手方式
 
+## 当前临时高优先级接手任务（ChatTTS encoder 补全 / 中文语音链路）
+
+- 任务目标：确认当前公司 Linux 机上的 ChatTTS 是否能从“decoder-only 候选方案”补成“带 encoder 的更完整方案”，从而恢复参考音频编码 / 更完整的 zero-shot 能力。
+- 当前机器：`missyouangeled-VMware-Virtual-Platform` / `公司（Linux）`
+- 截至 2026-05-08 17:14 的收口判断：**18:00 前完成“补全 + 验证”概率偏低，已先做续做记录，明天继续更稳。**
+
+### 当前已确认结论
+
+1. **当前 hybrid 方案已经能出中文，且听感通过**
+   - 复现脚本：`tmp/voice-replies/chattts-run-hybrid.py`
+   - 样本产物：`tmp/voice-replies/chattts-hybrid-infer.wav`
+   - 用户试听反馈：`效果相当真实。可以。`
+   - 但目前仍未切成默认中文语音回复链路，只保留为“已验证可用的候选方案”。
+
+2. **当前本地 `DVAE_full.pt` 实际并不 full，本质上仍是缺失编码侧的混合方案**
+   - 已直接检查 `tmp/voice-replies/chattts-hybrid/asset/DVAE_full.pt`
+   - 结果：`encoder.* = 0`、`downsample_conv.* = 0`、`preprocessor_mel.* = 0`；同时存在少量 `vq_layer.*`，但这仍不足以跑完整编码链
+   - 因此当前能说话主要是因为走了 decoder 路径，不是完整 encoder→decoder / sample-audio 链路。
+
+3. **“能不能补全”取决于是否拿到版本匹配的完整官方资产**
+   - 外部公开线索显示 `2Noise/ChatTTS` 资产列表里存在 `DVAE.safetensors`、`Decoder.safetensors`，并且有 `add DVAE with encoder` 相关提交痕迹。
+   - 因此：理论上**有机会补全**；但前提是拿到**与当前运行时/配置匹配**的完整 DVAE 权重。
+   - 不能靠补脚本“造出” encoder；如果拿不到对版资产，只能继续维持当前 decoder-only 路线。
+   - **新增现实约束（2026-05-08 晚）**：当前机器 shell 直连 GitHub 会报 `Connection reset by peer`，直连 Hugging Face 会报 `Network is unreachable`；所以后续不要默认指望本机直接在线拉模型，优先考虑“宿主机浏览器下载 → 临时上传页传入当前机器”这条已验证工作流。
+   - **最新进展（2026-05-08 17:57）**：用户已通过临时上传页把 `DVAE.safetensors` 与 `Decoder.safetensors` 传入当前机器，存放于 `tmp/upload-drop/chattts-20260508/`。已本地验货确认：
+     - `DVAE.safetensors`：`encoder.* = 113`、`decoder.* = 113`、`downsample_conv.* = 4`、`preprocessor_mel.* = 2`、`vq_layer.* = 8`
+     - `Decoder.safetensors`：仍是 decoder-only
+     - 这说明：**我们已经拿到一份真正带编码侧权重的官方 DVAE 候选资产**，明天不需要再花时间找文件，直接进入“兼容加载测试 → sample_audio/zero-shot 验证”阶段。
+   - **续做结果（2026-05-09 07:53）**：方案 A 已在当前公司 Linux 机完成第一轮功能性验证：
+     - 已把官方 `DVAE.safetensors` 转成新的 `tmp/voice-replies/chattts-full-attempt/asset/DVAE_full.pt`
+     - 其中 24 个 `decoder_block.*.weight` 键已按当前运行时需要，改名为 `decoder_block.*.gamma`；改名后本地 `DVAE` 模型 `load_state_dict(..., strict=False)` 的结果为 `missing=0 / unexpected=0`
+     - 由于文件内容被重写，本地脚本里需要绕过 ChatTTS 的 asset sha 校验；这属于“本地兼容加载补丁”，不是原始官方哈希通过
+     - 当前已新增复现脚本：`tmp/voice-replies/chattts-run-plan-a.py`
+     - 随后又把流程进一步收成了两段正式入口：
+       - 资产准备：`tmp/voice-replies/chattts-prepare-plan-a-assets.py`
+       - 运行时兼容补丁：`tmp/voice-replies/chattts_plan_a_compat.py`
+       - 说明文档：`tmp/voice-replies/README-chattts-plan-a.md`
+     - 此外，`Decoder.safetensors` 也已被验证只存在同类 `weight -> gamma` 命名差异；修正后可直接转成当前运行时可加载的 `Decoder.pt`，所以当前 `tmp/voice-replies/chattts-plan-a-runtime/` 已经可以使用“官方 DVAE + 官方 Decoder（经键名修正转换）+ 现有 GPT/Embed/Vocos/tokenizer 资产”的更干净组合，不再依赖 hybrid 目录里的旧 `Decoder.pt`
+     - 已成功验证三段链路：
+       1. 普通 TTS：`tmp/voice-replies/chattts-plan-a-normal.wav`
+       2. `sample_audio_speaker()` 编码：已成功产出 `spk_smp`（长度 `720`）
+       3. zero-shot 路径：已成功产出 `tmp/voice-replies/chattts-plan-a-zero-shot.wav`
+     - 中途唯一新增兼容坑是：`soundfile` 读出的参考音频默认是 `float64`，传给 `sample_audio_speaker()` 会在 torchaudio mel 变换处报 `double != float`；转成 `np.float32` 后已恢复正常
+     - 当前结论：**方案 A 已经不只是“理论可行”，而是“在本机 CPU 上能完成完整的 sample-audio / zero-shot 功能链验证”**
+     - 仍保留的 caveat：加载 GPT 时仍会看到一组旧有 `UNEXPECTED/MISSING` 提示（`embed_tokens.weight` 等），但后续源码核对后可更准确地理解为：当前 ChatTTS 本来就是把 `emb_code.* / emb_text.weight / head_code.* / head_text.*` 这些键放在单独的 `Embed.safetensors` 里，而 `GPT.from_pretrained()` 内部又是先用 Hugging Face `LlamaModel.from_pretrained(gpt_folder)` 只加载基础主干；因此日志里的 `UNEXPECTED` 与 `embed_tokens.weight MISSING` 更像这套“主干 GPT + 独立 Embed 头”拆分资产的加载提示，而不是这轮方案A特有的失败信号。结合当前普通 TTS 与 zero-shot 产物都已成功落地，可暂视为已知噪声，而非本轮 encoder 补全的主阻塞
+     - 另一个新确认点：`tmp/voice-replies/chattts-run-plan-a.py` 现在已经能直接读取外部 `mp3` 参考音频并自动重采样到 `24k`，`sample_audio_speaker()` 可成功产出 `spk_smp`；但若 `txt_smp` 不是该参考音频的**精确转写**，当前实测 zero-shot 可能会在起步阶段直接报 `unexpected end at index [0]` / `StopIteration`
+     - 这个缺口随后已经被真正补上：2026-05-09 08:08 左右，我联网搜索后锁定了 `AISHELL-3 Baseline Samples`（`https://sos1sos2sixteen.github.io/aishell3/`）这组公开中文样本。该页面直接给出样本音频与对应中文文本，OpenSLR `SLR93` 页面同时确认了 `Apache License 2.0`
+     - 我已从网页源码中提取并下载三条公开样本到本地：
+       - `tmp/voice-replies/public-ref-samples/aishell3/raw1.wav` → `在教学楼内释放大量烟雾`
+       - `tmp/voice-replies/public-ref-samples/aishell3/raw2.wav` → `不过英特尔之后不会继续接受如此大的损失`
+       - `tmp/voice-replies/public-ref-samples/aishell3/raw3.wav` → `替我播放相思风雨中`
+       - 转写汇总：`tmp/voice-replies/public-ref-samples/aishell3/TRANSCRIPTS.md`
+     - 随后已直接用 `raw3.wav + 替我播放相思风雨中` 成功跑通真实外部参考 zero-shot，产物：`tmp/voice-replies/chattts-plan-a-aishell3-raw3-zero-shot.wav`
+     - 用户接着要求按“先做2，再做1”的顺序继续。我先额外搜索了更像真实聊天口吻的公开来源，并确认三类高价值候选：
+       1. `MagicHub / RAMC`：网页可直接拿到 conversational sample 音频，但网页正文未直接暴露对应文本
+       2. `Hugging Face` 对话切片（例如搜索结果能看到 `Izzyzlin/CFSDD` 这类口语化文本）：文本风格非常自然，但当前机器 shell 直连 HF / datasets-server 仍然 `Network is unreachable`
+       3. `Chinese Dialogues / COERLL`：对话型且带转写，但实际资源落在 Google Drive，更适合后续通过宿主机浏览器挑取
+     - 然后我已补跑 AISHELL-3 另外两条公开样本：
+       - `raw1.wav + 在教学楼内释放大量烟雾` → `tmp/voice-replies/chattts-plan-a-aishell3-raw1-zero-shot.wav`
+       - `raw2.wav + 不过英特尔之后不会继续接受如此大的损失` → `tmp/voice-replies/chattts-plan-a-aishell3-raw2-zero-shot.wav`
+     - 到此，AISHELL-3 当前已下载的三条公开样本 `raw1/raw2/raw3` 都完成了一轮真实外部参考 zero-shot 验证
+     - 因此当前结论可以进一步升级为：**方案A 已经能稳定用“互联网上找到的公开中文参考样本 + 精确转写”完成多条真实外部参考 zero-shot 验证**
+
+### 为什么今天 18:00 前不建议硬冲
+
+- 剩余工作不只是下载一个文件，而是：
+  1. 找到真正带 encoder 的官方资产
+  2. 验证其内部键是否完整
+  3. 与当前 v0.2.x 运行时做兼容测试
+  4. 再验证普通 TTS / 参考音频编码 / zero-shot 路径
+- 这一步存在网络、版本匹配、依赖兼容三层不确定性；为了避免 18:00 前仓促得出假结论，先收口记录更稳。
+
+### 明天继续时的最短路径
+
+> 详细方案、外部核实结果、实施顺序与风险边界，见 `PLANS.md` 新增章节：`2026-05-08：ChatTTS encoder 补全与 zero-shot 恢复方案`
+> 其中已补充一节：`VMware 虚拟机使用宿主 GPU 的核实结论`
+
+- **关于 VMware GPU 的最新拍板**：
+  - 当前这台 VM 本地实测只看到 `VMware SVGA II Adapter [15ad:0405]`，驱动是 `vmwgfx`，`nvidia-smi` 不存在；因此**当前这台 VMware 客体不能视为已经具备可用的宿主 GPU 计算能力**。
+  - 公开资料核实后，结论应区分：
+    - `VMware Workstation/Fusion`：通常只有 3D 图形加速，不等于 guest 获得真实 CUDA 计算卡
+    - `vSphere/ESXi`：可以通过 `VMDirectPath I/O` 或 `NVIDIA vGPU` 让 VM 使用 GPU，适用于 AI / ML 负载，但这是另一层基础设施方案
+  - 所以：**不要把“当前 VMware VM 启 GPU”当成明天 ChatTTS 的主线前提**；主线仍是 encoder 补全与 zero-shot 验证。GPU 化如果要做，单独立项更稳。
+
+1. 优先获取官方完整 `DVAE.safetensors` 或真正带 encoder 的 `DVAE_full.pt`
+2. 先不跑大推理，先只检查权重键是否包含：
+   - `encoder.*`
+   - `vq.*`
+   - `downsample_conv.*`
+   - `preprocessor_mel.*`
+3. 若键完整，再接到当前 `ChatTTS v0.2.x` 运行时做最小加载测试
+4. 若加载通过，再测：
+   - 文转语音
+   - 参考音频编码
+   - 是否恢复更完整的 zero-shot 音色能力
+5. 若任一步失败，则明确收口为：
+   - 当前这台机器上 **ChatTTS 维持 decoder-only 候选方案**
+   - 默认中文语音回复链路继续保持现有方案，不擅自切换
+
 ## 当前临时高优先级接手任务（掌机 OpenClaw / 微信回复链路）
 
 - 任务目标：让 `掌机（Windows）` 上的 OpenClaw 达到“稳定可用 + 微信插件能稳定回复”，而不只是“能启动”。

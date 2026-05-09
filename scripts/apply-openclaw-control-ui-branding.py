@@ -149,6 +149,7 @@ def write_override_script(
     }
     script = f"""(() => {{
   const BRAND = {json.dumps(payload, ensure_ascii=False, indent=2)};
+  const TOOL_NOISE_STYLE_ID = 'jarvis-tool-noise-filter';
 
   function setAttr(node, name, value) {{
     if (node && node.getAttribute(name) !== value) node.setAttribute(name, value);
@@ -225,6 +226,48 @@ def write_override_script(
     }}
   }}
 
+  function ensureToolNoiseStyle() {{
+    if (document.getElementById(TOOL_NOISE_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = TOOL_NOISE_STYLE_ID;
+    style.textContent = `
+      .chat-tools-inline,
+      .chat-tool-msg-collapse,
+      .chat-bubble--tool-shell,
+      .chat-group.tool,
+      .chat-group[data-jarvis-hidden-tool-group="true"] {{
+        display: none !important;
+      }}
+    `;
+    document.head.appendChild(style);
+  }}
+
+  function isVisible(node) {{
+    if (!(node instanceof Element)) return false;
+    const style = window.getComputedStyle(node);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  }}
+
+  function refreshHiddenToolGroups(root) {{
+    const candidateGroups = new Set();
+    if (root instanceof Element) {{
+      if (root.matches('.chat-group')) candidateGroups.add(root);
+      root.querySelectorAll('.chat-group').forEach((group) => candidateGroups.add(group));
+    }}
+    document.querySelectorAll('.chat-group').forEach((group) => candidateGroups.add(group));
+
+    for (const group of candidateGroups) {{
+      const bubbles = Array.from(group.querySelectorAll('.chat-bubble'));
+      const visibleNonToolBubble = bubbles.some((bubble) => !bubble.classList.contains('chat-bubble--tool-shell') && isVisible(bubble));
+      const visibleMedia = Array.from(group.querySelectorAll('.chat-assistant-attachments, .chat-message-image, .chat-assistant-attachment-card')).some(isVisible);
+      if (!visibleNonToolBubble && !visibleMedia) {{
+        group.setAttribute('data-jarvis-hidden-tool-group', 'true');
+      }} else {{
+        group.removeAttribute('data-jarvis-hidden-tool-group');
+      }}
+    }}
+  }}
+
   function applyBranding(root) {{
     try {{
       if (document.title !== BRAND.windowTitle) document.title = BRAND.windowTitle;
@@ -242,8 +285,10 @@ def write_override_script(
       setAttr(logo, 'src', BRAND.logoHref);
       setAttr(logo, 'alt', BRAND.logoAlt);
 
+      ensureToolNoiseStyle();
       applyTargetedTextOverrides();
       replaceVisibleText(root);
+      refreshHiddenToolGroups(root instanceof Element ? root : document.body || document.documentElement);
     }} catch (err) {{
       console.warn('[jarvis-branding] apply failed:', err);
     }}

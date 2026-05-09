@@ -357,7 +357,7 @@ def main() -> None:
     ap.add_argument("--temperature", type=float, default=0.3)
     ap.add_argument("--top-p", type=float, default=0.7)
     ap.add_argument("--top-k", type=int, default=20)
-    ap.add_argument("--max-new-token", type=int, default=1024)
+    ap.add_argument("--max-new-token", type=int, default=384)
     args = ap.parse_args()
 
     if args.list_presets:
