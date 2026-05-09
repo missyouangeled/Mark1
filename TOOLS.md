@@ -209,6 +209,68 @@ Things like:
 - Example trim command:
   - `~/.local/share/openclaw-audio-tools/node_modules/@ffmpeg-installer/linux-x64/ffmpeg -y -ss 40 -t 10 -i '/path/input.mp3' -vn -acodec libmp3lame -b:a 96k '/path/output.mp3'`
 
+### Kokoro TTS 离线中文语音（2026-05-08 已验证通过）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 模型文件位置：`tmp/kokoro-offline/`
+  - `kokoro-v1.0.int8.onnx`（92MB，官方 int8 量化）
+  - `voices-v1.0.bin`（28MB，54 个声音全部含中文）
+- Python 运行环境：`/tmp/kokoro-test-venv`（Python 3.11，已安装 `kokoro-onnx`, `misaki`, `scipy`, `soundfile`）
+- **完全离线**，无网络依赖、无播放设备依赖（纯推理→wav）
+- 可用中文声音：`zf_xiaobei` `zf_xiaoni` `zf_xiaoxiao` `zf_xiaoyi`（女声）、`zm_yunjian` `zm_yunxi` `zm_yunxia` `zm_yunyang`（男声）
+- 用法（直接 Python）：
+  ```python
+  from kokoro_onnx import Kokoro
+  kokoro = Kokoro(
+      model_path='tmp/kokoro-offline/kokoro-v1.0.int8.onnx',
+      voices_path='tmp/kokoro-offline/voices-v1.0.bin'
+  )
+  audio, sr = kokoro.create('你好', voice='zf_xiaoxiao', speed=1.0, lang='cmn')
+  ```
+- 包装脚本：`tools/kokoro-tts/kokoro-tts.sh`
+  - `bash tools/kokoro-tts/kokoro-tts.sh --text '你好' --voice zf_xiaoxiao --out /tmp/out.mp3`
+- 试听样本：`tmp/voice-replies/kokoro-zh-official-int8-demo.mp3`
+- **默认使用路由**：由主会话决定是否替换当前 Noiz/Edge TTS 管线
+
+### ChatTTS hybrid 中文语音（2026-05-09 起已有正式 stable 入口）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 当前定位：**用户已明确认可这条 ChatTTS hybrid stable 主线，可作为正式的 ChatTTS 本地入口使用；`Noiz` 继续保留为保底版本。**
+- 运行环境：`~/.local/share/openclaw-voice-venv311/bin/python3`
+- 正式入口（Skill 脚本）：`skills/chattts-stable/scripts/chattts_stable.py`
+- 本地便捷包装器：`tools/voice-reply/chattts-stable.sh`
+- preset 配置：`skills/chattts-stable/assets/presets.json`
+- preset embedding 文件：`skills/chattts-stable/assets/presets/*.spk.txt`
+- 当前默认规则：
+  - `default` = 当前主线默认音色（model-default）
+  - `preset-1` / `preset-2` / `preset-3` = 已保存的可切换候选音色
+  - **默认语速 / 节奏**：`tempo=1.15`（因为这版是用户确认通过的基线）
+- 推荐运行方式：
+  - `python3 skills/chattts-stable/scripts/chattts_stable.py --list-presets`
+  - `python3 skills/chattts-stable/scripts/chattts_stable.py --preset default --text '你好，我在。' --out tmp/voice-replies/chattts-stable-default.mp3`
+  - `bash tools/voice-reply/chattts-stable.sh --preset preset-2 --text '我给你换一条音色。' --out tmp/voice-replies/chattts-stable-preset2.mp3`
+- 历史原型脚本（保留作研发记录，不再作为正式入口）：
+  - `tmp/voice-replies/chattts-run-hybrid.py`
+  - `tmp/voice-replies/chattts-run-hybrid-stable.py`
+  - `tmp/voice-replies/chattts-hybrid-sample-speakers.py`
+- hybrid 资产目录：`tmp/voice-replies/chattts-hybrid/asset/`
+  - `DVAE_full.pt` / `Vocos.pt` / `Decoder.pt`：来自 `chattts-v011/`
+  - `Embed.safetensors` + tokenizer：来自 v3 资产
+  - GPT：由 v011 `GPT.pt` 转成 HuggingFace `config.json + model.safetensors`
+- 当前关键补丁点（已内置在正式入口里）：
+  - 绕过官方 sha256 校验（自组装资产不会匹配原始哈希）
+  - `DVAE/DVAEDecoder load_state_dict(..., strict=False)`，容忍缺失 encoder 键
+  - tokenizer 从已失效的 `encode_plus()` 改走 `__call__()`，兼容当前 transformers
+- 已知限制：
+  - **无 encoder**：只能稳定走 decoder 推理路径，不适合参考音频克隆
+  - **纯 CPU**：短句可用，但不适合追求实时流式
+  - **版本脆弱**：对依赖版本和素材结构敏感，后续升级时要防回归
+- 判断规则：
+  - 若用户明确要走 `ChatTTS stable` / 本地 ChatTTS / preset 音色切换，优先使用这条正式入口
+  - 若要“任意参考音频克隆”或更强 timbre continuity，仍优先评估 `Noiz` / 其他方案，不要误把当前 stable 路线当成通用克隆器
+
 ### Local free voice-cloning stack
 
 - `uv` installed in user space at:
