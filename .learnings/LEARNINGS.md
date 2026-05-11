@@ -743,3 +743,24 @@ Review the correction and update the working understanding or prompt guidance if
 - Tags: workflow, video-download, douyin, fallback, blocking, search
 
 ---
+
+## [LRN-20260511-003] correction
+
+**Logged**: 2026-05-11T12:13:00+08:00
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+在“整理上午工作 + 选择性 git 提交/推送”这类连续工具链里，仍可能让前台短时间无感；必须先给一句可见进度，再继续跑后续命令。
+
+### Details
+用户再次直接反馈“又没反馈了。监工呢？”。说明即使前面已经把“前台保持可见、后台再插播”的规则写进 AGENTS.md，实际执行“检查状态 → 选文件暂存 → commit → push”这种连续操作时，前台仍然可能出现体感上的静默。问题不在于有没有做事，而在于关键长动作开始前没有先给一句明确的可见反馈。
+
+### Suggested Action
+以后凡是进入“整理/提交/推送/批量检查/长命令”链路时，先发一条短反馈，例如“我在整理提交范围，马上给你结果”或“我现在开始推送，推完立刻回你”；若中间步骤超过约 15-30 秒，再补一次进度。
+
+### Metadata
+- Source: user_feedback
+- Related Files: AGENTS.md, .learnings/LEARNINGS.md
+- Tags: feedback, responsiveness, git, workflow

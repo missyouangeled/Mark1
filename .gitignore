@@ -30,3 +30,14 @@ __pycache__/
 .clawhub/
 **/.clawhub/
 .learnings/.hook-state.json
+
+# Local-only research / installed tools / large assets
+memory/research/
+memory/????-??-??-????.md
+model.bin
+tools/Speech-AI-Forge/
+tools/audio-sep/
+skills/evolver-src/
+skills/evolver/memory/
+skills/ex-qianqian/memory/
+skills/web-claude/
