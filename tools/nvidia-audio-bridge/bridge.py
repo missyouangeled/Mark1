@@ -297,6 +297,7 @@ async def transcriptions(
             max_alternatives=1,
             audio_channel_count=1,
             enable_automatic_punctuation=True,
+            enable_word_time_offsets=True,
         )
         result = service.offline_recognize(raw_pcm, config)
     except Exception as exc:  # noqa: BLE001
@@ -321,23 +322,61 @@ async def transcriptions(
         else:
             raise HTTPException(status_code=502, detail=f'NVIDIA ASR 调用失败: {exc}') from exc
 
-    text = ' '.join(
-        alt.transcript.strip()
-        for item in result.results
-        for alt in item.alternatives
-        if alt.transcript.strip()
-    ).strip()
+    # Build full text from all segments
+    text_parts = []
+    for item in result.results:
+        for alt in item.alternatives:
+            t = alt.transcript.strip()
+            if t:
+                text_parts.append(t)
+    full_text = ' '.join(text_parts).strip()
+
+    # Extract word-level segments from Riva response
+    words = []
+    segment_offset = 0  # cumulative offset for each results item (milliseconds)
+    for item in result.results:
+        for alt in item.alternatives:
+            for w in alt.words:
+                start_ms = w.start_time / 10_000_000  # Riva time is in 100ns units → ms
+                end_ms = w.end_time / 10_000_000
+                words.append({
+                    'word': w.word.strip(),
+                    'start': round(start_ms / 1000, 3),  # seconds
+                    'end': round(end_ms / 1000, 3),      # seconds
+                    'confidence': round(w.confidence, 4) if w.confidence else None,
+                })
+
+    # Build text segments (one per alternative — usually one)
+    segments = []
+    for item in result.results:
+        for alt in item.alternatives:
+            t = alt.transcript.strip()
+            if not t:
+                continue
+            seg_words = [w for w in words if w['word'] and w['word'] in t or True]
+            # Find word bounds for this segment
+            seg_start = words[0]['start'] if words else None
+            seg_end = words[-1]['end'] if words else None
+            segments.append({
+                'start': seg_start,
+                'end': seg_end,
+                'text': t,
+                'confidence': round(alt.confidence, 4) if alt.confidence else None,
+            })
+
     fmt = (response_format or 'json').strip().lower()
     if fmt == 'text':
-        return PlainTextResponse(text)
+        return PlainTextResponse(full_text)
     if fmt == 'verbose_json':
         return JSONResponse({
-            'text': text,
+            'text': full_text,
             'model': resolved_model,
             'language': language,
             'sample_rate_hz': sample_rate,
+            'segments': segments,
+            'words': words,
         })
-    return JSONResponse({'text': text, 'model_used': resolved_model})
+    return JSONResponse({'text': full_text, 'model_used': resolved_model, 'segments': segments, 'words': words})
 
 
 if __name__ == '__main__':

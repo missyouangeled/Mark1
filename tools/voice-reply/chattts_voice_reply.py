@@ -42,9 +42,36 @@ CLEANUP_SH = WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"
 DEFAULT_OUT_DIR = WORKSPACE / "tmp" / "voice-replies"
 DEFAULT_PRESET = os.environ.get("OPENCLAW_VOICE_REPLY_PRESET", "default")
 DEFAULT_TEMPO = float(os.environ.get("OPENCLAW_VOICE_REPLY_TEMPO", "1.32"))
+GREETING_TEMPO_FACTOR = float(os.environ.get("OPENCLAW_VOICE_REPLY_GREETING_TEMPO_FACTOR", "0.85"))
 MAX_TTS_CHARS = 120  # 用户已确认更看重说完整，其次才是速度
 DEFAULT_MAX_NEW_TOKEN = int(os.environ.get("OPENCLAW_VOICE_REPLY_MAX_NEW_TOKEN", "768"))
 TTS_TIMEOUT_SECONDS = 180
+
+GREETING_OPENING_PREFIXES = (
+    "好呀",
+    "嗯，我在",
+    "我在呢",
+    "在呢",
+    "你好呀",
+    "嗨",
+    "嘿",
+    "早呀",
+    "早安",
+    "晚上好",
+    "午安",
+    "你来啦",
+)
+
+GREETING_OPENING_HINTS = (
+    "想聊点什么",
+    "想说点什么",
+    "随便说说",
+    "安静陪你",
+    "陪你一会儿",
+    "我听着",
+    "慢慢说",
+    "今天怎么样",
+)
 
 
 def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
@@ -106,6 +133,25 @@ def prune_expired_audio() -> None:
         pass
 
 
+def is_greeting_opening(text: str) -> bool:
+    """Heuristic: short greeting/opening turns should sound a bit slower and softer."""
+    normalized = re.sub(r"\s+", "", text)
+    if not normalized or len(normalized) > 80:
+        return False
+
+    starts_like_greeting = any(normalized.startswith(prefix) for prefix in GREETING_OPENING_PREFIXES)
+    has_opening_hint = any(hint in normalized for hint in GREETING_OPENING_HINTS)
+    question_count = normalized.count("？") + normalized.count("?")
+
+    return starts_like_greeting and (has_opening_hint or question_count >= 1)
+
+
+def choose_tempo(text: str, base_tempo: float) -> float:
+    if is_greeting_opening(text):
+        return round(base_tempo * GREETING_TEMPO_FACTOR, 4)
+    return base_tempo
+
+
 def synthesize(
     text: str,
     preset: str = DEFAULT_PRESET,
@@ -131,6 +177,7 @@ def synthesize(
     clean = clean_text_for_tts(text, max_chars=max_chars)
     if not clean:
         return None
+    effective_tempo = choose_tempo(clean, tempo)
 
     # 2. Opportunistic cleanup + determine output path
     prune_expired_audio()
@@ -151,7 +198,7 @@ def synthesize(
 
     try:
         result = subprocess.run(
-            [on_demand, "--text", clean, "--out", out_path, "--preset", preset, "--tempo", str(tempo), "--max-new-token", str(max_new_token)],
+            [on_demand, "--text", clean, "--out", out_path, "--preset", preset, "--tempo", str(effective_tempo), "--max-new-token", str(max_new_token)],
             capture_output=True,
             text=True,
             timeout=TTS_TIMEOUT_SECONDS,

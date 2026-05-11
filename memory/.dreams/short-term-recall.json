@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-27T05:58:36.329Z",
+  "updatedAt": "2026-05-08T09:06:43.977Z",
   "entries": {
     "memory:memory/2026-04-03.md:26:28": {
       "key": "memory:memory/2026-04-03.md:26:28",
@@ -500,6 +500,37 @@
         "voice",
         "路线",
         "概念"
+      ]
+    },
+    "memory:memory/daily/2026-05-08.md:21:24": {
+      "key": "memory:memory/daily/2026-05-08.md:21:24",
+      "path": "memory/daily/2026-05-08.md",
+      "startLine": 21,
+      "endLine": 24,
+      "source": "memory",
+      "snippet": "@@ -21,4 @@ (20 before, 0 after) - 随后已用用户手动上传的 `kokoro-v1.0.int8.onnx` 与 `voices-v1.0.bin` 真正跑通 Kokoro 中文离线样本; 但用户当场反馈差距很大, 几乎听不出来说的是中文。结论是: Kokoro 这条线目前属于“技术已跑通, 但中文体验不达标”, 暂不能作为上午那版完美语音的可替代方案。 - 继续深挖后, ChatTTS 在当前公司 Linux 机器上也被真正跑通: 通过“v0.1.1 权重 + v0.2.x 运行时 + 运行时补丁”的 hybrid 方案, 成功产出 `tmp/voice-replies/chattts-hybrid-infer.wav...",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.81,
+      "maxScore": 0.81,
+      "firstRecalledAt": "2026-05-08T09:06:43.977Z",
+      "lastRecalledAt": "2026-05-08T09:06:43.977Z",
+      "queryHashes": [
+        "574b7a7f7d49"
+      ],
+      "recallDays": [
+        "2026-05-08"
+      ],
+      "conceptTags": [
+        "kokoro-v1.0.int8.onnx",
+        "voices-v1.0.bin",
+        "v0.1.1",
+        "v0.2.x",
+        "21,4",
+        "随后",
+        "用户",
+        "kokoro"
       ]
     }
   }

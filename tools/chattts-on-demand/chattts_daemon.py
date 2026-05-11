@@ -69,6 +69,16 @@ logging.basicConfig(
 log = logging.getLogger("chattts-daemon")
 
 
+def recommend_max_new_token(text: str, explicit: int | None) -> int:
+    if explicit is not None:
+        return explicit
+    normalized = "".join(text.split())
+    units = max(1, len(normalized))
+    estimated = max(384, units * 12)
+    rounded = ((estimated + 127) // 128) * 128
+    return min(1024, rounded)
+
+
 # ── Patch ChatTTS runtime (same as chattts_stable.py) ──────────────────
 def patch_chattts_runtime() -> None:
     import torch
@@ -334,7 +344,11 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         temperature = float(request.get("temperature", 0.3))
         top_p = float(request.get("top_p", 0.7))
         top_k = int(request.get("top_k", 20))
-        max_new_token = int(request.get("max_new_token", 384))
+        raw_max_new_token = request.get("max_new_token")
+        max_new_token = recommend_max_new_token(
+            text,
+            int(raw_max_new_token) if raw_max_new_token is not None else None,
+        )
 
         if not text:
             response = {"ok": False, "error": "Missing 'text' field"}

@@ -126,6 +126,49 @@ Things like:
   - 当前验证通过的典型文件：`voices-v1.0.bin`、`kokoro-v1.0.int8.onnx`
   - 默认规则：以后当用户需要把文件从宿主机/浏览器拷到这台机器时，优先直接用这种临时上传页，而不是先折腾聊天附件、下载地址反向中转或别的更绕的方法
   - 安全做法：使用随机 token 路径、单独 inbox 目录；文件收完后及时关闭上传服务，避免长期暴露
+- 视频平台下载工作流（通用）：
+  - 适用机器：通用（浏览器参数按当前机器环境调整）
+  - 系统 / OS：通用
+  - 详细文档：`docs/通用-视频平台下载工作流.md`
+  - 最小脚本入口：`scripts/download-platform-video.py`
+  - 当前脚本能力：已支持“抖音公开视频页 URL → 提取真实 mp4 → 下载 → ffprobe 校验”；当已拿到多个候选视频页 URL 时，也支持把目标位作为变量选择；当输入作者主页 URL 时，会尝试提取候选列表，但若检测到主页作品流“服务异常”，会主动停止自动选取，避免误把热点/推荐视频当成作者作品；当输入是一段混合文本 / 搜索片段 / 分享文案时，也可自动提取其中的受支持 URL；`--list-only` 结果里会直接给出下一步下载命令，下载结果里也会附带可回放命令
+  - 目标位变量：`--pick first|last|random|index:N|video:<id>`
+  - 示例：`python3 scripts/download-platform-video.py 'https://www.douyin.com/video/7589959897509317938?source=Googlebot' --browser-args=--no-sandbox`
+  - 示例：`python3 scripts/download-platform-video.py --pick=index:2 'https://www.douyin.com/video/第1条?source=Googlebot' 'https://www.douyin.com/video/第2条?source=Googlebot' --browser-args=--no-sandbox`
+  - 示例：`python3 scripts/download-platform-video.py --pick=last '这里有两个候选 https://www.douyin.com/video/第1条?source=Googlebot 和 https://www.douyin.com/video/第2条?source=Googlebot' --browser-args=--no-sandbox`
+  - 示例：`python3 scripts/download-platform-video.py dummy --input-file ./candidates.txt --pick=index:1 --browser-args=--no-sandbox`
+  - 示例：`python3 scripts/download-platform-video.py --list-only --pick=last '这里有两个候选 https://www.douyin.com/video/第1条?source=Googlebot 和 https://www.douyin.com/video/第2条?source=Googlebot'`
+  - 示例：`python3 scripts/download-platform-video.py --list-only --pick=last --candidates-out tmp/video-downloads/candidates.txt '这里有两个候选 https://www.douyin.com/video/第1条?source=Googlebot 和 https://www.douyin.com/video/第2条?source=Googlebot'`
+  - 示例：`python3 scripts/download-platform-video.py --list-only --pick=last --candidates-out tmp/video-downloads/candidates.txt --report-out tmp/video-downloads/candidates.json '这里有两个候选 https://www.douyin.com/video/第1条?source=Googlebot 和 https://www.douyin.com/video/第2条?source=Googlebot'`
+  - 默认规则：以后当用户要求“去抖音/其他平台搜索并下载视频”时，优先先试站内直接路径；若被验证码、登录墙、作品流异常或前端懒加载拦住，立刻切到“外搜定位公开页面 → 拿作者主页 / 公开视频 → 提取真实媒体地址 → 下载并校验”的通用流程，不要原地卡死在站内搜索入口
+  - 抖音当前已验证可跑的关键点：
+    - 站内搜索可能直接落到验证码中间页
+    - 作者主页可打开，但作品流可能返回“服务异常，重新刷新拉取数据”且作品列表 API 响应体为空
+    - 可先从公开视频页反查作者主页，再从 `<video>.currentSrc` 直接拿到真实 mp4 地址
+    - 最小脚本已能直接处理公开视频页 URL，适合作为“最后一跳下载器”
+  - 当前公司 Linux 机 / VM 的浏览器注意事项：若 `agent-browser` 报 `No usable sandbox!`，需先 `agent-browser close --all`，再改用 `agent-browser --args "--no-sandbox" ...`
+  - 当前未补齐的缺口：
+    - 还没有稳定可复用的抖音登录态 / 账号态浏览器路径
+    - 还没有通过安全审查的通用验证码自动化方案
+    - `nodriver-kit` 公开来源与安装路径尚未确认，不要在来源不清时盲装
+    - 公开搜索引擎在当前链路里也不稳定：百度会进安全验证、搜狗会进反爬页、DuckDuckGo 不稳定、Bing 中文相关性偏弱，暂时不适合直接写死成脚本默认上游
+    - 当前脚本还不能直接完成“作者主页 / 关键词搜索 → 自动判断候选列表”整条链路，后续可继续补强
+- 双盘空间预检（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）
+  - 系统 / OS：Linux
+  - 背景：当前公司 Linux 机是“根盘 `/` + 数据盘 `/mnt/data`”双盘结构；以后遇到下载大文件、解压模型、批量生成素材、拉大仓库、落大缓存时，不要直接默认写根盘
+  - 固定规则：
+    - 先预估大小，再执行；默认按 **预计大小 × 2** 估算峰值占用
+    - 执行后根盘 `/` 剩余空间不要低于 **8G**，更稳妥是长期留 **10G+**
+    - 预计新增占用 **>= 1G** 时，默认优先写到 `/mnt/data/openclaw/download-staging/` 或其他 `/mnt/data/openclaw/...` 目录
+    - 只有小而短命的输出，才优先留在根盘/工作区
+    - 如果上层路径已被现有工具写死，优先采用“迁到 `/mnt/data` + 原路径放 symlink 回挂”方式，尽量不改主链路调用习惯
+  - 预检脚本：`scripts/storage-preflight.sh`
+    - 用法：`bash scripts/storage-preflight.sh 1.5G ChatTTS-assets`
+    - 用法：`bash scripts/storage-preflight.sh 800M 临时解压包`
+  - 当前已落地迁移：
+    - `~/.openclaw/workspace/tmp/voice-replies` → `/mnt/data/openclaw/workspace-tmp/voice-replies`
+    - `~/.cache/modelscope` → `/mnt/data/openclaw/modelscope-cache`
 
 ### Git / GitHub
 

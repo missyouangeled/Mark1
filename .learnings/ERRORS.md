@@ -3247,3 +3247,6783 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260429-001] user-reported-error
+
+**Logged**: 2026-04-29T09:59:46.326Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-04-29 17:59 GMT+8] 提示 permission denied (publickey)
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260430-001] user-reported-error
+
+**Logged**: 2026-04-29T23:43:17.395Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-04-30 07:43 GMT+8] 到了 要配置 Host github.com HostName github.com IdentityFile ~/.ssh/[redacted] IdentitiesOnly yes 这个的步骤。 但是 输入 Get-Content (Join-Path $env:USERPROFILE ".ssh\config") 还是报错
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260430-002] user-reported-error
+
+**Logged**: 2026-04-29T23:47:19.888Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-04-30 07:47 GMT+8] 额 配置好了以后 测试 还是提示 Permission denied (publickey)
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260430-003] user-reported-error
+
+**Logged**: 2026-04-30T00:08:30.087Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-04-30 08:08 GMT+8] such file or directorydebugl: Will attempt key: C:\\Users\\GOG\\.ssh\\id_ed25519_rog_aLly ED25519 SHA256:6sNZkd/NrYPOhBbLJyG6weM1QtNk+KQsXci0uR6Axve explicitdebugl: Will attempt key: C:\\Users\\GOG/.ssh/id_ed25519_rog_ally ED25519 SHA256:6sNZkd/NrYPO…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260430-004] tool-explicit-error
+
+**Logged**: 2026-04-30T00:41:31.870Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_search returned an explicit error state.
+
+### Error
+```text
+[web_search] web_search winget 0x80072eff InternetOpenUrl failed Git.Git install Windows 5 [redacted] [redacted]|098QN+BuYPZ9MX925CDTgf/Z/ab3h7sJpQF5dI9vNrqj+[redacted]/doLFu31CU6NEn35HlRT+[redacted]/NYaFM81Qu/[redacted]/KVYyDpumNGKbuQKIb+5ComgJzusPfr/a3rnKOLWkKdCK6MxaUFIS+gAbRN3GOErJJ4mdW/95tfTfqPP0XQ+E0lXT4cVJ+R3bqm0rlzz9MHaG+PruR1r5BD/s6ZMSBld/mE+fldXVQ+…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-005] tool-timeout
+
+**Logged**: 2026-04-30T01:35:26.996Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.request print(urllib.request.urlopen('[url] timeout=5).status) print(urllib.request.urlopen('[url] timeout=5).getheader('Content-Length')) PY 10000 [redacted] [redacted]|4c10N9WeUyA+JGupXw/xJgYWEd+[redacted]+[redacted]+2f2mHVfVXvwbdHF/[redacted]/nMB/AXOYRJ2IGPIOTWlqY/[redacted]+SmFdQonKMT+mQZJpRVWCqhbfR4ls/gKZnj2Jn…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-006] tool-explicit-error
+
+**Logged**: 2026-04-30T01:44:50.040Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill marine-ember [redacted] [redacted]|[redacted]/Jz2HfMlwfcPzXB2p24s8+[redacted]/zRKuIkLNeMgJsBSjpxAC/s4+ySVV+[redacted]/PmHVg/NgOlhoqInOLob9+QEgIWhAPDyHfJ+[redacted]+/ooWVOr+[redacted]+[redacted]/kak/T+M6bwZyibdnsAlLovgj/UgYALNc+[redacted]+Fp9eEsWlqme2yLY4RSQ== failed 51
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-007] tool-explicit-error
+
+**Logged**: 2026-04-30T01:59:00.466Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill gentle-crustacean [redacted] [redacted]|[redacted]/Gh+[redacted]+eTgSj+Sb/[redacted]+[redacted]+Ur07C/[redacted]+GN6DmGIzQo5/RSQhyMQM+gP+[redacted]+D/7w== failed 49
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-008] tool-explicit-error
+
+**Logged**: 2026-04-30T01:59:16.488Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' from pathlib import Path root=Path('/home/missyouangeled/.npm-global/lib/node_modules/openclaw') need=['Where will the Gateway run?','Existing config detected','OpenClaw configure'] for path in root.rglob('*'): if not path.is_file(): continue try: text=path.read_text(errors='ignore') except Exception: continue for s in need: if …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-009] tool-explicit-error
+
+**Logged**: 2026-04-30T01:59:22.072Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill warm-breeze [redacted] [redacted]|[redacted]+[redacted]/[redacted]/[redacted]/LoSG5+vzkcWgdLxZalcT5+[redacted]/[redacted]+[redacted]== failed 56
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-010] tool-policy-blocked
+
+**Logged**: 2026-04-30T02:25:37.072Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write @echo off setlocal set "SCRIPT_DIR=%~dp0" powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%update-openclaw.ps1" %* scripts/update-openclaw.cmd [redacted] [redacted]|yfro0z50D/[redacted]/wb4B+kaXm/[redacted]/E35AdEw76DAKvQbbZS+auouY/[redacted]+[redacted]/[redacted]/[redacted]+[redacted]== 47
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-011] tool-explicit-error
+
+**Logged**: 2026-04-30T03:12:43.983Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec git status --short && echo '---RG1---' && rg -n "HOST_CONTEXT|host context|公司|掌机|同步这台机器|git pull --ff-only|gateway restart|auto.*host|hostname|computer name" -S . /home/missyouangeled/.openclaw/workspace 10000 [redacted] [redacted]|LJc4HmQh87Baz54CD+ApvSx/[redacted]+[redacted]/[redacted]/I9Cc7QI262A91qvQKi+[redacted]/[redacted]+[redacted]/I8Y+[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-012] tool-connection-failure
+
+**Logged**: 2026-04-30T04:22:31.966Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec grep -RIn --exclude-dir=node_modules -E 'fetch failed|login-github-copilot|device code|GitHub Copilot login failed|TypeError: fetch failed' /home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs /home/missyouangeled/.npm-global/lib/node_modules/openclaw | head -n 80 /home/missyouangeled/.openclaw/workspace 10000 120 [redacted] [redacted…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-013] tool-policy-blocked
+
+**Logged**: 2026-04-30T04:42:44.357Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, os p=os.path.expanduser('~/.openclaw/openclaw.json') cfg=json.load(open(p)) print('plugins.allow =', cfg.get('plugins',{}).get('allow')) print('dmScope =', cfg.get('session',{}).get('dmScope')) print('sendPolicy =', cfg.get('session',{}).get('sendPolicy')) PY /home/missyouangeled/.openclaw/workspace 10000 120 [redac…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-014] tool-timeout
+
+**Logged**: 2026-04-30T04:56:52.013Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec openclaw models status --probe-provider deepseek --probe-timeout 15000 /home/missyouangeled/.openclaw/workspace 10000 120 [redacted] [redacted]|[redacted]++naQctK0rFQH81lvYSXXa+[redacted]+kKN3+[redacted]+vT72J2Wn37tK7n+cKzlCbPZy/[redacted]+[redacted]/[redacted]/+[redacted]== running 10078
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-015] tool-connection-failure
+
+**Logged**: 2026-04-30T05:40:16.141Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write failed because of a connection or remote access problem.
+
+### Error
+```text
+[write] write - 掌机切换测试后，用户确认：本地 OpenClaw 刚启动时会有一段明显等待/冷启动期，但熬过初始化后基本就能正常使用；当前主要体感问题是启动初期偏慢，而不是全程不可用。 - 掌机当前所连网络无法稳定访问 GitHub `443`（`curl` 访问 `github.com` / `api.github.com` 失败），导致 GitHub Copilot 设备登录流程报 `fetch failed`；因此掌机上 Copilot 暂时未配通，需换可访问 GitHub 的网络后再继续。 - 为避免掌机因 Copilot 不可用而卡死，已建议先把掌机默认聊天模型恢复为 `deepseek/deepseek-chat`；同时确认：`DeepSeek Chat` 不等同于 `DeepSe…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-016] tool-policy-blocked
+
+**Logged**: 2026-04-30T05:47:05.327Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec grep -RIn --exclude-dir=node_modules -E 'channel routing|route.*openclaw-weixin|allowFrom|pairing request|no pending.*pairing|wechat.*private chats only|DM policy|channelConfigs metadata' /home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs | head -n 200 /home/missyouangeled/.openclaw/workspace 10000 120 [redacted] [redacted]|[redacte…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260430-017] tool-explicit-error
+
+**Logged**: 2026-04-30T05:47:30.189Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, glob base=os.path.expanduser('~/.openclaw/credentials') print('# credentials matches') for p in sorted(glob.glob(os.path.join(base,'openclaw-weixin*'))): print(os.path.basename(p)) try: print(open(p,'r',encoding='utf-8',errors='ignore').read()[:1200]) except Exception as e: print('[read failed]', e) pass print('\n# st…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-001] tool-explicit-error
+
+**Logged**: 2026-05-06T00:16:32.712Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec openclaw gateway restart 2>&1 20 [redacted] [redacted] failed 3722
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-002] tool-explicit-error
+
+**Logged**: 2026-05-06T00:21:09.754Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll briny-mist 8000 [redacted] [redacted] failed 0 2547
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-003] tool-connection-failure
+
+**Logged**: 2026-05-06T00:31:17.094Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 12000 [redacted] [redacted]|yjF42Hpd44aStjPLMW+[redacted]/[redacted]+EILQi+DJANIKs+[redacted]+U8XqhUKtFN/[redacted]+[redacted]/Z/+[redacted]/[redacted]/[redacted]== fetch failed error 4202
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-004] tool-timeout
+
+**Logged**: 2026-05-06T00:31:43.945Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request for url in [ '[url] '[url] '[url] '[url] ]: print('\n===', url, '===') try: with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) if isinstance(data, list): for item in data[:30]: print(item.get('type'), item.get('name'), item.get('path')) else: for k in ['full_name','html_url','stargaz…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-005] tool-timeout
+
+**Logged**: 2026-05-06T00:31:44.361Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request paths = [ 'skills/evolver', 'skills/capability-evolver', 'openclaw/skills/evolver', 'openclaw/skills/capability-evolver', 'skills', ] base='[url] for p in paths: url=base+p print('\n===', p, '===') try: with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) if isinstance(data, list): for…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-006] tool-timeout
+
+**Logged**: 2026-05-06T00:31:51.907Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.parse, urllib.request q='export_history.js capability-evolver' url='[url] print(url) try: with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) for item in data.get('items',[])[:20]: print(item.get('repository',{}).get('full_name'), item.get('path'), item.get('html_url')) except Exception as e:…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-007] tool-timeout
+
+**Logged**: 2026-05-06T00:31:54.498Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.parse, urllib.request queries = [ 'capability-evolver in:name', 'autogame-17 capability-evolver', 'autogame-17 evolver', 'repo:EvoMap/evolver export_history.js', ] for q in queries: url='[url] print('\n===', q, '===') try: with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) for item in data.g…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-008] tool-explicit-error
+
+**Logged**: 2026-05-06T00:32:15.060Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace/skills/evolver-src && rg -n "readFileSync|readdirSync|glob|workspace|memory/|assets/|src/|package\.json|~/.evomap|node_id|home|ssh|aws|config" -S src scripts index.js 25 [redacted] [redacted]|[redacted]+877GQgDT+9MLNlbqKUBKHJD/Q/IeCqBqDiL6a/liI13a1sVFJ86ZYNGlRy+SwTRkHVaUQ0awbn5pmy7+gZyignKO74xdR/rjCI3V…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-008] tool-explicit-error
+
+**Logged**: 2026-05-06T00:32:15.072Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace/skills/evolver-src && rg -n "open\.feishu|feishu|lark|fetch\(|https?://|Bearer |Authorization|MEMORY\.md|USER\.md|SOUL\.md|IDENTITY\.md|\.env|openclaw/agents|sessions/|exec\(|eval\(|child_process|git reset --hard|npm install|publish|worker|A2A_NODE_SECRET|GITHUB_TOKEN|MEMORY_GRAPH_REMOTE" -S . 25 [reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-009] tool-policy-blocked
+
+**Logged**: 2026-05-06T00:32:57.726Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/skills/evolver-src/src/gep/policyCheck.js 1 260 [redacted] [redacted]|UdObn/9GQTW/[redacted]+[redacted]+rNrgCt+[redacted]/[redacted]/[redacted]/R/C2IRo9NjIs3KcouzFIZT+bKAot+[redacted]+l8CnBkmGdID7kFu3jvcH+6HaJrPg== 132
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-010] tool-timeout
+
+**Logged**: 2026-05-06T00:33:13.238Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request for url in [ '[url] '[url] '[url] ]: print('\n===', url, '===') with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) if isinstance(data, list): for item in data[:30]: print(item.get('type'), item.get('name'), item.get('path')) else: for k in ['full_name','html_url','stargazers_count','…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-011] tool-timeout
+
+**Logged**: 2026-05-06T00:46:15.327Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request url='[url] with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) print('tag=', data.get('tag_name')) for a in data.get('assets', []): print(a.get('name'), '::', a.get('browser_download_url')) PY 25 [redacted] [redacted]|[redacted]+LwD+[redacted]+[redacted]+[redacted]+j7Cw5tDkB4bB1IR+[re…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-012] tool-connection-failure
+
+**Logged**: 2026-05-06T00:47:17.959Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 20000 [redacted] [redacted]|Aev2ymuO+[redacted]/[redacted]+[redacted]/Sgg2u4uDh0Pkj8TIAjhb9+kokhl2p53ev7Vd6zV+[redacted]/[redacted]+paZQhPNcVs+[redacted]+[redacted]== fetch failed error 996
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-013] tool-timeout
+
+**Logged**: 2026-05-06T00:47:24.130Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.request for url in ['[url] print('\nURL', url) try: req=urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'}) with urllib.request.urlopen(req, timeout=20) as r: text=r.read(20000).decode('utf-8','ignore') print(text[:4000]) except Exception as e: print('ERR', e) PY 30 [redacted] [redacted]|Nq843qTDNYsgf…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-014] tool-timeout
+
+**Logged**: 2026-05-06T00:47:36.779Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import urllib.request urls=[ '[url] '[url] ] for u in urls: print('\n',u) try: req=urllib.request.Request(u, headers={'User-Agent':'Mozilla/5.0'}) with urllib.request.urlopen(req, timeout=20) as r: print('final=', r.geturl()) print('status=', getattr(r,'status',None)) print('type=', r.headers.get('content-type')) print('len=', r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-015] tool-policy-blocked
+
+**Logged**: 2026-05-06T00:47:59.897Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec bash -lc 'apt-cache policy rustdesk 2>/dev/null || true; apt-cache search ^rustdesk$ 2>/dev/null || true; flatpak --version 2>/dev/null || true; snap --version 2>/dev/null || true' 20 [redacted] [redacted]|DgD6oQov6DRxAg/[redacted]/S3SlkL4i0e//1/[redacted]/msAKQo1I/[redacted]/[redacted]/K7JoPhGw== completed 0 4578
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-016] tool-connection-failure
+
+**Logged**: 2026-05-06T00:48:09.393Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_search failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_search] fetch failed web_search RustDesk 1.4.6 x86_64.exe mirror direct download 10 [redacted] [redacted]|ymSWtU7Q4p143ePs+nx5FTqkmsSQouVVtBoF+[redacted]/UZnJLc/[redacted]/gsk0LfN+ANbEOuDYiv/y+[redacted]/[redacted]+[redacted]/[redacted]== fetch failed error 10756
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-017] tool-timeout
+
+**Logged**: 2026-05-06T00:48:38.166Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc ' set -e URL=[url] OUT=/tmp/rustdesk-test.exe rm -f "$OUT" (curl --http1.1 -L --retry 3 --retry-delay 2 --retry-all-errors --fail -o "$OUT" "$URL" && echo CURL_OK && ls -lh "$OUT") || true if [ ! -s "$OUT" ]; then rm -f "$OUT" (wget --tries=3 --timeout=30 -O "$OUT" "$URL" && echo WGET_OK && ls -lh "$OUT") || true fi ' 180 [redacted] [re…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-018] tool-timeout
+
+**Logged**: 2026-05-06T00:48:51.342Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc ' set -e OUT=/tmp/rustdesk-test.exe URL="[url] rm -f "$OUT" (wget --user-agent="Mozilla/5.0" --header="Accept: */*" --content-disposition --trust-server-names --max-redirect=20 --tries=2 --timeout=30 -O "$OUT" "$URL" && echo OK && ls -lh "$OUT") || true ' 120 [redacted] [redacted]|5c6eiq/[redacted]/Q0+[redacted]+AzSFhfETbGvai6QNIcwOgV/c…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-019] tool-timeout
+
+**Logged**: 2026-05-06T00:48:59.654Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc ' set -e OUT=/tmp/rustdesk-test.exe URL="[url] rm -f "$OUT" (wget --user-agent="Mozilla/5.0" --tries=2 --timeout=30 -O "$OUT" "$URL" && echo OK && ls -lh "$OUT") || true ' 120 [redacted] [redacted]|V9kueq+P+BeIQw2plURcrGroRIo/[redacted]/uZi/[redacted]/3fSDnrnjQTzR2+214PmOvva/CPFLH0s8+[redacted]+RJ2Q1e6n8+[redacted]+wDLO+[redacted]+[reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-020] tool-connection-failure
+
+**Logged**: 2026-05-06T00:51:48.358Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|9kX+R8256805mTai+UWe86Dt0qAqqvEoR/l2Kpuz3BemNNVrJK/[redacted]+[redacted]/CR3Fdw6cVzl/Y5TcWvbe+[redacted]+[redacted]/[redacted]/gOhaKeqfujYe2m+AuUKliUJVhRMu3DU+[redacted]+TvbeTpVOUDkhg== fetch failed error 1981
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-020] tool-timeout
+
+**Logged**: 2026-05-06T00:51:48.379Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import json, urllib.request url='[url] with urllib.request.urlopen(url, timeout=20) as r: data=json.load(r) for a in data.get('assets', []): if a.get('name') in ['rustdesk-1.4.6-x86_64.exe','rustdesk-1.4.6-x86_64.AppImage']: print('NAME', a['name']) for k,v in a.items(): if k in ['name','size','browser_download_url','content_typ…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-021] tool-explicit-error
+
+**Logged**: 2026-05-06T00:52:59.931Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill rapid-tidepool [redacted] [redacted]|eqm8lS8XuR/[redacted]/[redacted]/Tm84J47O+bjMBo7JZzzpoY+e2aeQYo/cPAFT8i+[redacted]/EzXD981NsCJ5zF0ZbBQgi+[redacted]+/[redacted]+eVMOcvw/KlLuVfCw8SDE/[redacted]/C6tCNiolD63I+3/OCQIJntrGjI4Iu2+Tsi+1SFwM/[redacted]== failed 47
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-022] tool-timeout
+
+**Logged**: 2026-05-06T00:53:06.185Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'timeout 5s $HOME/.local/opt/rustdesk/rustdesk-1.4.6-x86_64.AppImage --version >/tmp/rustdesk-version.txt 2>&1 || true; sed -n "1,40p" /tmp/rustdesk-version.txt' 15 [redacted] [redacted]|b9rA4xx2ZOz3WVoKdYGzdg+aPV9JRJn/6n/[redacted]/[redacted]/[redacted]+bHWe2pBV0oMmPP8ejt9+qe0KG4+ixUs7WChpBgPlMJ86+CByiTxGXVcDv+2Ny6/mm6LhnY9i+[redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-023] tool-policy-blocked
+
+**Logged**: 2026-05-06T04:16:06.714Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec bash -lc 'set -euo pipefail DIR="$HOME/Downloads/rustdesk" PUBKEY="ssh-ed25519 [redacted] [redacted]" mkdir -p "$DIR" cat > "$DIR/enable-openclaw-ssh.ps1" <<'"'"'EOF'"'"' #requires -version 5.1 [CmdletBinding()] param() $ErrorActionPreference = 'Stop' function Test-IsAdmin { $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent() $…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-024] tool-policy-blocked
+
+**Logged**: 2026-05-06T04:16:31.138Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' from pathlib import Path pubkey = 'ssh-ed25519 [redacted] [redacted]' dir = Path('/home/missyouangeled/Downloads/rustdesk') dir.mkdir(parents=True, exist_ok=True) ps1 = dir / 'enable-openclaw-ssh.ps1' cmd = dir / 'enable-openclaw-ssh.cmd' content = rf'''#requires -version 5.1 [CmdletBinding()] param() $ErrorActionPreference = 'S…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-025] tool-explicit-error
+
+**Logged**: 2026-05-06T04:16:42.796Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll kind-orbit 1000 [redacted] [redacted]|Bjhp8YkkUOhal7E/D7AkUu54Cn+[redacted]+[redacted]+9wDmf4rpdC/cEyVm3AoNu4hVvu//[redacted]+X1f6qa6eqNlM+[redacted]/[redacted]+tm97elssHpv3/[redacted]/[redacted]/f4451yFmrNrTdd+bWQ== failed 29
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-026] tool-timeout
+
+**Logged**: 2026-05-06T04:43:05.099Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'ssh -i ~/.ssh/[redacted] -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=5 GOG@192.168.18.42 "hostname && whoami"' 15 [redacted] [redacted]|G+q9KuRipanyIYUGp+Y/[redacted]+/[redacted]/9c5PTAJye/[redacted]+nSmLMZxeDAAKW4/[redacted]+G5pulYxYOsWD1/pa1smZJgaKgGAqXPt2a/zvuKbJNbvZksytlGxiyf/[redacted]/[redacted]+[redact…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-027] tool-explicit-error
+
+**Logged**: 2026-05-06T04:45:31.761Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll glow-sable 30000 [redacted] [redacted]|[redacted]+cRHbMSux3to5tJTtU/[redacted]+Gnbj+[redacted]+dy4SrA3zwBW+oFvR6az1bNZLSaAyW/[redacted]/L+[redacted]/fiV4FH4NnPpgAk8lcz+ZwoDQU5xJ7tLMAz2+[redacted]+42XDOLbC8+MIYN81Q== failed 100 8809
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-028] tool-connection-failure
+
+**Logged**: 2026-05-06T04:45:47.593Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] text 12000 [redacted] [redacted]|[redacted]+[redacted]/vK87DC86m/[redacted]/Q5H3Uzx+Roh0dZJojwOcPPOVNmDaK+[redacted]/5X1QyXMy7uiFJD/aCnD3+I7ty2F1aBjBSM7tB6Fm2xB/[redacted]/[redacted]/Vdat4gKf3877lxuhg== fetch failed error 2253
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-029] tool-explicit-error
+
+**Logged**: 2026-05-06T04:51:10.152Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill fast-nudibranch [redacted] [redacted]|[redacted]+o/gLNU0UTt/[redacted]/[redacted]+[redacted]/[redacted]/[redacted]/[redacted]+[redacted]== failed 57
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-030] tool-timeout
+
+**Logged**: 2026-05-06T04:51:44.531Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'tailscale up --qr --timeout=10s 2>&1 || true' 20 [redacted] [redacted]|[redacted]+[redacted]/kPPsHAriSe9K7LxtVWKN+Abt7hg6C/XkABDIF0Kf/[redacted]+M/GnFJOREGuUa9E+lXHMMuEO1bRn3irLJ+SLAuoYG/[redacted]+[redacted]+[redacted]/63WR8eNocdbhQQ== completed 0 576
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-031] tool-timeout
+
+**Logged**: 2026-05-06T04:52:12.217Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'sudo -n tailscale --socket /var/snap/tailscale/common/socket/tailscaled.sock set --operator=$USER && sudo -n tailscale --socket /var/snap/tailscale/common/socket/tailscaled.sock up --timeout=12s 2>&1 || true' 25 [redacted] [redacted]|yzbFFnlfZl1uB7bZz+[redacted]+[redacted]+k7qbCO+8V4Ho/[redacted]/[redacted]+[redacted]+[redacted]+[redac…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-032] tool-timeout
+
+**Logged**: 2026-05-06T04:52:20.444Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'sudo -n tailscale --socket /var/snap/tailscale/common/socket/tailscaled.sock set --operator=$USER; sudo -n tailscale --socket /var/snap/tailscale/common/socket/tailscaled.sock up --timeout=12s 2>&1 || true' 25 [redacted] [redacted]|8tBSl+[redacted]/[redacted]/4VHeBjcixPkoRJUVY/AmUWmu3l4Aw5AfASoClaq/[redacted]/[redacted]+577r/[redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-033] tool-timeout
+
+**Logged**: 2026-05-06T04:52:38.849Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'sudo -n tailscale set --operator=$USER; sudo -n tailscale up --timeout=12s 2>&1 || true' 25 [redacted] [redacted]|iWm8TWP1WL5RgKZ2Da/[redacted]/[redacted]/[redacted]+DPN6+Y37aG5aNbCHfWEs/[redacted]+3qZ5FZY6WlJwUsijb9Xak68+[redacted]/[redacted]== running 10036
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-034] tool-timeout
+
+**Logged**: 2026-05-06T05:02:25.084Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'ssh -i ~/.ssh/[redacted] -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "hostname && whoami && ver"' 20 [redacted] [redacted]|[redacted]/ZrTJjSy3WP2cX6VOGG9+[redacted]+[redacted]/s+[redacted]+[redacted]/adeD4Q9qxo99gDtB/[redacted]== completed 0 1736
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-035] tool-timeout
+
+**Logged**: 2026-05-06T05:02:49.784Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'ssh -i ~/.ssh/[redacted] -o BatchMode=yes GOG@100.122.111.6 "echo ==== WHERE OPENCLAW ==== & where openclaw & echo. & echo ==== OPENCLAW STATUS ==== & openclaw status & echo. & echo ==== GATEWAY STATUS ==== & openclaw gateway status & echo. & echo ==== LOCAL HTTP 18789 ==== & powershell -NoProfile -Command \"try { \\\$r = Invoke-WebReq…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-036] tool-timeout
+
+**Logged**: 2026-05-06T05:10:39.360Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' $p = Join-Path $env:LOCALAPPDATA 'Temp\openclaw\openclaw-2026-05-06.log' if (!(Test-Path $p)) { Write-Host 'NO_GATEWAY_LOG'; exit 0 } Select-String -Path $p -Pattern '12:08|12:09|12:10|event_loop_delay|fetch-timeout|models.list|webchat:connect|gateway:start|heartbeat' | Select-Object -Last 80 …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-037] tool-connection-failure
+
+**Logged**: 2026-05-06T05:13:21.438Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec bash -lc 'grep -Rin "LiteLLM pricing fetch failed\|pricing fetch failed\|models.list\|OPENCLAW_DEBUG_TIMING" /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist /home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs 2>/dev/null | head -120' 40 [redacted] [redacted]|ALyFNo4SaUI5whipV+d9F54R/ZS6+xMK3663WfD29nr2fh/[redacted]/[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-038] tool-timeout
+
+**Logged**: 2026-05-06T05:13:43.978Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc 'grep -RinE "FETCH_TIMEOUT_MS|pricing fetch failed|LITELLM|models.authStatus|pricing" /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/usage-format-ZhKID6__.js /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist | head -120' 40 [redacted] [redacted]|[redacted]+O6xrg5D2ZW+[redacted]+[redacted]+[redacted]+i+[red…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-039] tool-connection-failure
+
+**Logged**: 2026-05-06T05:18:33.444Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn failed because of a connection or remote access problem.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn(mode="session") requires thread=true so the subagent can stay bound to a channel thread. Retry with { mode: "session", thread: true } on a channel that supports threads, use mode="run" for one-shot work, or use sessions_send(sessionKey=...) to keep talking to a persistent session without thread binding. sessions_spawn 你是一个后台技…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-040] tool-connection-failure
+
+**Logged**: 2026-05-06T05:18:52.550Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn failed because of a connection or remote access problem.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn 你是一个后台技术分身，目标是：在 Windows 掌机 TABLET-EH5U3CO1 上，针对 OpenClaw '偶发掉线/假死' 做根因排查与修复方案设计，必须优先找根因，不接受仅靠 watchdog 在掉线后重启这种兜底方案作为最终答案。当前链路已打通：请从本机 Linux 通过 SSH 访问 GOG@100.122.111.6，私钥路径 ~/.ssh/[redacted]。已确认：1) gateway 当前运行正常，127.0.0.1:18789 可达；2) 2026-05-06 12:09 左右 watchdog 发现 unhealthy 后重启恢复；3) 日志显示 models.list 曾耗时约 98.7s，另有一次约 63.8s…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-041] tool-timeout
+
+**Logged**: 2026-05-06T06:39:08.901Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' try { $r = Invoke-WebRequest '[url] -UseBasicParsing -TimeoutSec 5 Write-Host ('HTTP_STATUS=' + $r.StatusCode) } catch { Write-Host ('HTTP_FAIL=' + $_.Exception.Message) } '''.strip() enc = base64.b64encode(ps.encode('utf-16le')).decode() cmd=['bash','-lc',f"ssh -i ~/.ssh/[redacted] -o BatchMo…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-042] tool-explicit-error
+
+**Logged**: 2026-05-06T06:42:02.502Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll quick-basil 120000 [redacted] [redacted]|qhyGEZ1buY/2y8ZOz50xmn3pzCDGH1V+[redacted]/[redacted]/8/T8rVm4hWyrIlPgCQS14gnOb+[redacted]/+TN9a7Sv8/LEBbPZOQBPd/[redacted]/WfWECYhJYDqcDPhOg== failed 45 18373
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-043] tool-timeout
+
+**Logged**: 2026-05-06T06:44:17.670Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' $cli = 'C:\Users\GOG\AppData\Roaming\npm\openclaw.cmd' cmd /c '"C:\Users\GOG\AppData\Roaming\npm\openclaw.cmd" gateway restart' Start-Sleep -Seconds 4 try { $r = Invoke-WebRequest '[url] -UseBasicParsing -TimeoutSec 8 Write-Host ('HTTP_STATUS=' + $r.StatusCode) } catch { Write-Host ('HTTP_FAIL…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-044] tool-explicit-error
+
+**Logged**: 2026-05-06T06:47:12.753Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll faint-glade 20000 [redacted] [redacted]|[redacted]/4E13rM8F/J2fTkGz8bDJhDR7eR4QpSKi+[redacted]+v0sRulZaa+[redacted]+/hVKasiZNvRgID+[redacted]/ZPz0WZfasub363db4HZvTY/[redacted]+[redacted]+[redacted]== failed 23
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-045] tool-timeout
+
+**Logged**: 2026-05-06T06:47:28.585Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' try { $r = Invoke-WebRequest '[url] -UseBasicParsing -TimeoutSec 8 Write-Host ('HTTP_STATUS=' + $r.StatusCode) } catch { Write-Host ('HTTP_FAIL=' + $_.Exception.Message) } '''.strip() enc = base64.b64encode(ps.encode('utf-16le')).decode() cmd=['bash','-lc',f"ssh -i ~/.ssh/[redacted] GOG@100.12…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-046] tool-explicit-error
+
+**Logged**: 2026-05-06T06:54:56.365Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' $p = Join-Path $env:LOCALAPPDATA 'Temp\openclaw\openclaw-2026-05-06.log' if (Test-Path $p) { Select-String -Path $p -Pattern 'Listening: 127.0.0.1:18789|gateway ready|Gateway ready|HTTP server|starting HTTP server|initial refresh failed|restart sentinel refresh failed|Connectivity probe: faile…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-047] tool-timeout
+
+**Logged**: 2026-05-06T06:55:24.926Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import base64, subprocess ps = r''' $cli = 'C:\Users\GOG\AppData\Roaming\npm\openclaw.cmd' & $cli gateway restart Start-Sleep -Seconds 10 try { $r = Invoke-WebRequest '[url] -UseBasicParsing -TimeoutSec 10 Write-Host ('HTTP_STATUS=' + $r.StatusCode) } catch { Write-Host ('HTTP_FAIL=' + $_.Exception.Message) } & $cli gateway stat…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-048] tool-timeout
+
+**Logged**: 2026-05-06T06:58:16.889Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn timed out.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn(mode="session") requires thread=true so the subagent can stay bound to a channel thread. Retry with { mode: "session", thread: true } on a channel that supports threads, use mode="run" for one-shot work, or use sessions_send(sessionKey=...) to keep talking to a persistent session without thread binding. sessions_spawn 继续分析 Wi…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-049] tool-timeout
+
+**Logged**: 2026-05-06T06:58:33.970Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn timed out.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn 继续分析 Windows 掌机 OpenClaw 卡死根因。已知：当前已修复缺失的全局安装（openclaw.cmd 恢复），gateway 可以启动并短暂可达，但很快 probe timeout。关键证据： 1) 14:56 重启后日志出现 `starting HTTP server...` -> `http server listening (3 plugins: acpx, memory-core, openclaw-weixin; 42.0s)` -> `gateway ready`。 2) 同时/随后 `gateway status` 显示 Runtime running, listener on 127.0.0.1:18789, 但 …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-050] tool-explicit-error
+
+**Logged**: 2026-05-06T07:01:35.252Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec bash -lc "grep -RInE '[redacted]|[redacted]|getHealthCache|initial refresh failed|refresh failed|event_loop_delay' /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/server.impl-C1dgKTkE.js /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/health-* /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/* 2>/de…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-051] tool-timeout
+
+**Logged**: 2026-05-06T07:03:39.870Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "grep -n '[redacted]' /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/models-config-IozNRzUu.js | sed -n '1,40p'" 120 /home/missyouangeled/.openclaw/workspace announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted]|zT/HfUdpgJlswzzRa1UZF+[redacted]+07XKAWYuzh4CUGqTJ9A+mGd7GjmqKTvohCf0ygwlX+[redacted]+[redacted]+7…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-052] tool-timeout
+
+**Logged**: 2026-05-06T07:04:23.684Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "grep -RInE 'discovery.*enabled|provider discovery|LIVE_GATEWAY_PROVIDERS|OPENCLAW_LIVE_GATEWAY|models\.providers|catalog timed out' /home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist 2>/dev/null | sed -n '1,220p'" 120 /home/missyouangeled/.openclaw/workspace a…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-053] tool-timeout
+
+**Logged**: 2026-05-06T07:11:53.203Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -Command \"if (Test-Path $env:USERPROFILE\\.openclaw\\models.json) { Get-Content -Raw $env:USERPROFILE\\.openclaw\\models.json } else { Write-Output NO_MODELS_JSON }\"'" 40 /home/missyouangeled/.openclaw/workspace announce:v1:agent:m…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-053] tool-timeout
+
+**Logged**: 2026-05-06T07:11:53.226Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -Command \"Get-Content -Raw $env:USERPROFILE\\.openclaw\\openclaw.json\"'" 40 /home/missyouangeled/.openclaw/workspace announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted]|[redacted]/[redacted]+[redacted]+dwp6/Sw2J9Ez4Om0…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-054] tool-timeout
+
+**Logged**: 2026-05-06T07:12:05.564Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'cmd /c type C:\\Users\\GOG\\.openclaw\\openclaw.json'" 40 /home/missyouangeled/.openclaw/workspace announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted]|/[redacted]/2oRO8jo73Bl/HLQH0kWc3bb60/[redacted]/[redacted]+[redacted]+[redacted]+fpVGrH/[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-055] tool-timeout
+
+**Logged**: 2026-05-06T07:12:18.391Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 \"powershell -NoProfile -Command \\\"$paths = @('C:\\\\Users\\\\GOG\\\\.openclaw\\\\auth-profiles.json','C:\\\\Users\\\\GOG\\\\.config\\\\openclaw\\\\auth-profiles.json'); foreach ($p in $paths) { if (Test-Path $p) { Write-Output ('FOUND=' + $p); $raw = Ge…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-056] tool-timeout
+
+**Logged**: 2026-05-06T07:12:44.732Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'cmd /c for /r C:\\Users\\GOG %f in (auth-profiles.json) do @echo FOUND=%f & @findstr /c:"github-copilot:github" "%f" >nul && @echo HAS_GH_COPILOT_PROFILE=1'" 60 /home/missyouangeled/.openclaw/workspace announce:v1:agent:main:subagent:[redacted]:[redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-057] tool-explicit-error
+
+**Logged**: 2026-05-06T07:13:02.546Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill tidy-summit announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted]|WM3X5iKrSpYVaU8UtLgzc+[redacted]/[redacted]/Vhg8c3sdLcYlSmD9Xc9vqFO+[redacted]+[redacted]+[redacted]/[redacted]+wb//P9Mwg/zVMD3j1IF/UL15f/2qI8PCmSYdrzc+[redacted]+EDE9S0jinZ2WQ== failed 25
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-058] tool-timeout
+
+**Logged**: 2026-05-06T07:14:01.599Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'cmd /c if exist C:\\Users\\GOG\\.openclaw\\credentials\\github-copilot.token.json (echo EXISTS & type C:\\Users\\GOG\\.openclaw\\credentials\\github-copilot.token.json) else echo NO_TOKEN_CACHE'" 40 /home/missyouangeled/.openclaw/workspace announce:v1:age…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-059] tool-timeout
+
+**Logged**: 2026-05-06T07:14:11.902Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -Command \"if (Test-Path ''C:\\Users\\GOG\\.openclaw\\credentials\\github-copilot.token.json'') { Get-Content -Raw ''C:\\Users\\GOG\\.openclaw\\credentials\\github-copilot.token.json'' } else { Write-Output ''NO_TOKEN_CACHE'' }\"'" 4…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-060] tool-timeout
+
+**Logged**: 2026-05-06T07:14:31.334Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -Command \"Select-String -Path ''C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-06.log'' -Pattern ''starting channels and sidecars|startup model warmup failed|provider catalog timed out|installed bundled runtime dep…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-061] tool-timeout
+
+**Logged**: 2026-05-06T07:14:38.461Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'cmd /c findstr /i /c:"starting channels and sidecars" /c:"startup model warmup failed" /c:"provider catalog timed out" /c:"installed bundled runtime deps" /c:"staging bundled runtime deps" /c:"gateway sidecars failed" /c:"liveness warning" C:\\Users\\GOG\…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-062] tool-timeout
+
+**Logged**: 2026-05-06T07:14:50.691Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec bash -lc "ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -Command \"$p=''C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-06.log''; Select-String -Path $p -SimpleMatch -Pattern @(''starting channels and sidecars'',''startup model warmup failed'',''provider catalog timed out…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-063] tool-timeout
+
+**Logged**: 2026-05-06T07:16:00.499Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/openclaw.json'; const raw=fs.readFileSync(p,'utf8'); const cfg=JSON.parse(raw); cfg.plugins ||= {}; cfg.plugins.entries ||= {}; cfg.plugins.entries['github-copilot'] ||= {}; cfg.plugins.entries['gith…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-064] tool-timeout
+
+**Logged**: 2026-05-06T07:16:52.035Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway restart" 240 120000 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+[redacted]+[redacted]/xYOFdzc0xrMQeVPsId+[redacted]/Hi7x2Z6Q0UK8E08FnSO+hbINY86g+[redacted]/[redacted]+1PU6ETnLX+rmzSGgGJ/SvcGq4vdTqQkE+7jQD2TFamDSHEBtZ1e…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-065] tool-timeout
+
+**Logged**: 2026-05-06T07:17:01.266Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"try { $r = Invoke-WebRequest -UseBasicParsing -Uri '[url] -TimeoutSec 20; Write-Output ('HTTP_STATUS=' + [int]$r.StatusCode) } catch { Write-Output ('HTTP_FAIL=' + $_.Exception.Message) }\"" 60 /home/missyouangeled/.openclaw/workspa…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-065] tool-timeout
+
+**Logged**: 2026-05-06T07:17:01.451Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log' -Tail 120\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/jkbunsw8Pvr/[redacted]+se3aljq/[redacted]//[redacted]+CavSxLn1y…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-066] tool-timeout
+
+**Logged**: 2026-05-06T07:17:10.432Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+[redacted]/[redacted]+h/[redacted]+[redacted]/[redacted]/[redacted]== running 10158
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-067] tool-timeout
+
+**Logged**: 2026-05-06T07:17:35.795Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"fetch('[url] r=>{console.log('HTTP_STATUS=' + r.status); const t=await r.text(); console.log('BODY_LEN=' + t.length);}).catch(err=>{console.log('HTTP_FAIL=' + err.message); process.exit(1);})\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-068] tool-timeout
+
+**Logged**: 2026-05-06T07:17:35.986Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"if (Test-Path 'C:\\Users\\GOG\\.openclaw\\models.json') { Write-Output EXISTS; Get-Content -Raw 'C:\\Users\\GOG\\.openclaw\\models.json' } else { Write-Output NO_MODELS_JSON }\"" 60 /home/missyouangeled/.openclaw/workspace [redacted…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-069] tool-timeout
+
+**Logged**: 2026-05-06T07:17:50.727Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c dir /s /b C:\Users\GOG\.openclaw\models.json C:\Users\GOG\.openclaw\agents\*\models.json 2>nul" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|W/[redacted]+[redacted]/mVofJPPRkjC6JghE7h8+nJqE+[redacted]+[redacted]/FVXL+rGKT+sve+/FtVIlyrz/z…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-070] tool-timeout
+
+**Logged**: 2026-05-06T07:18:09.510Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-ChildItem 'C:\\Users\\GOG\\.openclaw' -Filter models.json -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName\"" 90 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+[redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-071] tool-timeout
+
+**Logged**: 2026-05-06T07:18:22.581Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content -Raw 'C:\\Users\\GOG\\.openclaw\\agents\\main\\agent\\models.json'\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|zA3xd3UqTVs7k1eX7+[redacted]/bDUFOLTWc4nYZmk6dVT/[redacted]+[redacted]+[redacted]== …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-072] tool-timeout
+
+**Logged**: 2026-05-06T07:18:47.750Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/[redacted]/[redacted]+w+meiSSprJC/[redacted]+XyexvRZ9ROOrL5/JHNSy6MQ9rlujxnrzO+NqeF+[redacted]+/[redacted]/[redacted]/VnOjasE+MCX1xB0+fl9ajRZYc2V1uVzOQ== c…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-073] tool-timeout
+
+**Logged**: 2026-05-06T07:23:03.529Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"fetch('[url] r=>{console.log('HTTP_STATUS=' + r.status); console.log(await r.text());}).catch(err=>{console.log('HTTP_FAIL=' + err.message); process.exit(1);})\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|yPbUN1yXkNoTYsUzvjwVIg+[re…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-074] tool-timeout
+
+**Logged**: 2026-05-06T07:23:04.032Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log' -Tail 220\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|/XDND7TkH+QoFh4MGE1Rro+unlud+[redacted]/jyPcKazxG5+[redacted]+rZvCXEyTiJ5v…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-075] tool-timeout
+
+**Logged**: 2026-05-06T07:23:11.602Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|MBCoN4KQS/xkq7RBMPgMsB41NxgMPS3hb+[redacted]+[redacted]+On9+[redacted]+[redacted]+[redacted]+g1NDJ+[redacted]/[redacted]+BZu/PT4s72GlA== completed 0 8984
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-076] tool-timeout
+
+**Logged**: 2026-05-06T07:24:11.298Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c type C:\\Users\\GOG\\.openclaw\\openclaw.json" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|6jvQ9G/3AsNniVaOB5jhlAJTRPmvW6+[redacted]+[redacted]+[redacted]/[redacted]+[redacted]+OtfmQQ1if055ZnNt5U/eCJ+[redacted]+[redacted]/cwCbWCTLBNe4A=…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-077] tool-timeout
+
+**Logged**: 2026-05-06T07:24:15.111Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Select-String -Path 'C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log' -Pattern 'models.list','startup model warmup timed out','github-copilot','weixin','pricing fetch failed','liveness warning' | Select-Object -Last…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-078] tool-timeout
+
+**Logged**: 2026-05-06T07:24:41.538Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"$p = Join-Path $env:LOCALAPPDATA 'OpenClaw/watchdog/gateway-watchdog.log'; if (Test-Path $p) { Get-Content $p -Tail 220 } else { Write-Output 'NO_WATCHDOG_LOG' }\"" 90 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|t…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-079] tool-timeout
+
+**Logged**: 2026-05-06T07:24:51.709Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c if exist %LOCALAPPDATA%\OpenClaw\watchdog\gateway-watchdog.log powershell -NoProfile -Command Get-Content -Tail 220 '%LOCALAPPDATA%\\OpenClaw\\watchdog\\gateway-watchdog.log' else echo NO_WATCHDOG_LOG" 90 /home/missyouangeled/.openclaw/workspace [redacted] […
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-080] tool-timeout
+
+**Logged**: 2026-05-06T07:25:03.176Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; if(!fs.existsSync(p)){console.log('NO_WATCHDOG_LOG'); process.exit(0);} const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); console.log(lines.…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-081] tool-timeout
+
+**Logged**: 2026-05-06T07:25:54.983Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/openclaw.json'; const raw=fs.readFileSync(p,'utf8'); const cfg=JSON.parse(raw); const bak=p+'.[redacted]'; fs.writeFileSync(bak, raw); cfg.agents ||= {}; cfg.agents.defaults ||= {}; cfg.agents.defaul…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-082] tool-timeout
+
+**Logged**: 2026-05-06T07:26:48.611Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway restart" 240 120000 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+2OuGGNL03hT3W+[redacted]+[redacted]+wtiVYCNAz6A5eHRY+[redacted]+[redacted]/qp9eO0QcQ== completed 0 47114
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-083] tool-timeout
+
+**Logged**: 2026-05-06T07:26:58.600Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log' -Tail 120\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/9Mt9/[redacted]/3pT9acSpP3u25Cfjy10+[redacted]+[redacted]+[reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-084] tool-timeout
+
+**Logged**: 2026-05-06T07:27:07.635Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|XR7XFMO/[redacted]+[redacted]+eArHIqii7bKbfhueoMs/[redacted]+[redacted]/KD+[redacted]+ssGcYU4+4gk4APHxsQSaY7uGO0gQNfY+[redacted]+IHqGd4aMhE/[redacted]+GDwFU/WKc0u8lwu…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-085] tool-timeout
+
+**Logged**: 2026-05-06T07:27:44.729Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; if(!fs.existsSync(p)){console.log('NO_WATCHDOG_LOG'); process.exit(0);} let txt=fs.readFileSync(p,'utf8'); let len=txt.length; console.log('WATCHI…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-086] tool-timeout
+
+**Logged**: 2026-05-06T07:29:43.828Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-20).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/wor…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-087] tool-timeout
+
+**Logged**: 2026-05-06T07:31:27.531Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c type C:\\Users\\GOG\\.openclaw\\openclaw.json" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/vWXscEjsmu6DF4lz8fP6+iu/[redacted]/fFSV4ssSlyb6F48TVndJ/me7osmnrdlS+[redacted]+59+[redacted]+[redacted]/oWAcIV3f75i5rZww== completed 0…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-088] tool-timeout
+
+**Logged**: 2026-05-06T07:31:27.658Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-8).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/work…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-089] tool-timeout
+
+**Logged**: 2026-05-06T07:31:35.491Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|YSJrB7qYiK0i2kcqQe8b/cNcFmLdkhBh8oqhVHa+llmfZ0rcIk34j5wn5J/DtF+[redacted]+e+[redacted]/OSS9+zxp7p2i/[redacted]+[redacted]/W9sZIfXo0Npuy8/[redacted]/Zsv5pY+[redacted]+…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-090] tool-timeout
+
+**Logged**: 2026-05-06T07:36:34.163Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-12).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/wor…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-090] tool-timeout
+
+**Logged**: 2026-05-06T07:36:34.218Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); const keep=lines.filter(l=>/weixin monitor started|agent model:|startup model warmup timed o…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-091] tool-timeout
+
+**Logged**: 2026-05-06T07:36:42.024Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|TXAwOw/[redacted]/jqzhVE+Y7Q/4pLHovXL67/[redacted]+[redacted]+[redacted]+[redacted]+[redacted]/[redacted]+[redacted]+[redacted]/yg== completed 0 9041
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-092] tool-connection-failure
+
+**Logged**: 2026-05-06T07:38:34.779Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write failed because of a connection or remote access problem.
+
+### Error
+```text
+[write] write # 2026-05-06 - 用户五一后特意早到公司来聊天，明确表达：觉得我越来越像电影里的“贾维斯”，语气和玩笑都更像人，也感觉我在成长。 - 用户当前对 Windows 侧 OpenClaw 的主要痛点：掌机上 gateway 偶尔能正常对话，但会莫名掉线，在家里使用时尤其明显，常常很快掉并且基本无法正常对话。 - 这台公司 Linux 虚拟机已成功作为“大屏控制台”使用：用户已在掌机上安装 RustDesk，并确认已经能在 Linux 上操作掌机桌面。 - 用户明确偏好：后续若要排查掌机问题，希望尽量减少手工测试和输入，更倾向让我从代码/命令层面直接接管排查，而不是让他频繁手动执行测试。 - 用户已同意为掌机临时开启 SSH，以便我后续从公司 Linux 直接连接掌机进行更高…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-093] tool-timeout
+
+**Logged**: 2026-05-06T07:39:03.777Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); console.log(lines.slice(-220).join('\\n'));\"" 90 /home/missyouangeled/.openclaw/workspace [redacte…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-094] tool-timeout
+
+**Logged**: 2026-05-06T07:39:11.086Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/[redacted]/hrUaOM5xv/gXGksLkUbkIr+[redacted]/[redacted]+gluso9P1vvkuhw9T2U/EffY4r97I+Ln9XXjSCm8L/[redacted]+x4sQPCBTqXCdODFgTeUD/+[redacted]+0I/8G2QAq/[red…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-095] tool-timeout
+
+**Logged**: 2026-05-06T07:39:27.184Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-12).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/wor…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-096] tool-timeout
+
+**Logged**: 2026-05-06T07:39:27.622Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const keep=lines.filter(l=>/15:37:|15:38:|15:39:|inbound|outbound|reply|message.send|run.start|run.…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-097] tool-timeout
+
+**Logged**: 2026-05-06T07:39:36.681Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|2zvv7MQJ03WFdB0W1C+[redacted]/[redacted]/[redacted]+qOPQcATCSfR/[redacted]+kL9Pu8ABLJNRrH+[redacted]/npUH8Z3lExi1xlG8/IM8bxs4qyt6/M8MiC0A== running 10141
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-098] tool-timeout
+
+**Logged**: 2026-05-06T07:41:29.818Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node - <<'NODE' const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\r?\n/); const out=[]; for (const line of lines) { if (!line) continue; if (!/(2026-05-06T15:37:|2026-05…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-098] tool-timeout
+
+**Logged**: 2026-05-06T07:41:29.853Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node - <<'NODE' const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\r?\n/); const kws=['inbound message','bodyLen=2','acpx','run.start','run.done','task run','assistant','…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-099] tool-timeout
+
+**Logged**: 2026-05-06T07:41:39.150Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const out=lines.filter(line=>/(2026-05-06T15:37:|2026-05-06T15:38:|2026-05-06T15:39:)/.test(line) &…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-100] tool-explicit-error
+
+**Logged**: 2026-05-06T07:46:28.099Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec rg -n "acpx staging bundled runtime deps|installed bundled runtime deps|embedded acpx runtime backend registered lazily|node\.list|eventLoopUtilization=1|run\.start|run\.done|message.send|inbound message" /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-101] tool-timeout
+
+**Logged**: 2026-05-06T07:46:28.644Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c dir /s /b C:\\Users\\GOG\\.openclaw\\agents" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/[redacted]+15Habzo/x+[redacted]/lS0+[redacted]/[redacted]+[redacted]/uR9KWo3xUg== completed 0 701
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-102] tool-timeout
+
+**Logged**: 2026-05-06T07:46:39.206Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const path='C:/Users/GOG/.openclaw/agents/main/sessions'; const files=fs.readdirSync(path).filter(f=>/\\.(jsonl|trajectory\\.jsonl|trajectory-path\\.json)$/.test(f)); const rows=files.map(f=>{const s=fs.statSync(path+'/'+f); return…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-103] tool-timeout
+
+**Logged**: 2026-05-06T07:46:48.634Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c type C:\\Users\\GOG\\.openclaw\\agents\\main\\sessions\\[redacted].trajectory-path.json" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|iG9dL2YmwVm4g6cc9C+kLDyCCee+[redacted]+kHAS9skVLF39RhdQqBAZLNe+5M2rlKb18+[redacted]/[redacted]/[redacte…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-104] tool-timeout
+
+**Logged**: 2026-05-06T07:46:49.110Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/.openclaw/agents/main/sessions/sessions.json' -Tail 120\"" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|+NQOGybgbas2Dw+kUE60vHBUoW4/H5Qj+[redacted]+[redacted]/D/9A6BLt2ifp9ayKtI+[redac…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-105] tool-timeout
+
+**Logged**: 2026-05-06T07:46:49.452Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/.openclaw/agents/main/sessions/[redacted].trajectory.jsonl' -Tail 80\"" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|gdKONR7Ta/Q94SycHElzlkJwZNPDd4p+[redacted]/[redacted]+[redacted]/E7…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-106] tool-timeout
+
+**Logged**: 2026-05-06T07:47:04.340Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const path='C:/Users/GOG/.openclaw/agents/main/sessions'; const files=fs.readdirSync(path).filter(f=>f.includes('1be9203c')); for(const f of files){const s=fs.statSync(path+'/'+f); console.log(JSON.stringify({f,size:s.size,mtime:ne…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-106] tool-timeout
+
+**Logged**: 2026-05-06T07:47:04.360Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/agents/main/sessions/sessions.json'; const data=JSON.parse(fs.readFileSync(p,'utf8')); const entries=Array.isArray(data.sessions)?data.sessions:data; const hit=(entries||[]).filter(s=>String(s.key||'…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-107] tool-timeout
+
+**Logged**: 2026-05-06T07:47:16.325Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/agents/main/sessions/sessions.json'; const data=JSON.parse(fs.readFileSync(p,'utf8')); console.log(Object.keys(data)); console.log(JSON.stringify(data,null,2).slice(0,4000));\"" 120 /home/missyouange…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-108] tool-timeout
+
+**Logged**: 2026-05-06T07:47:24.719Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/agents/main/sessions/sessions.json'; const data=JSON.parse(fs.readFileSync(p,'utf8')); const key='agent:main:openclaw-weixin:direct:[redacted]@im.wechat'; console.log(JSON.stringify(data[key],null,2)…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-109] tool-timeout
+
+**Logged**: 2026-05-06T07:47:35.297Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c dir /b C:\\Users\\GOG\\.openclaw\\agents\\main\\sessions\\[redacted]*" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/b+L+LQKC0kl4XK6v/[redacted]+[redacted]/[redacted]/SX9VjU9Cm8VtZ47kj+[redacted]+[redacted]/KI9A/[redacted]/n8f…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-110] tool-timeout
+
+**Logged**: 2026-05-06T07:47:35.610Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:/Users/GOG/.openclaw/agents/main/sessions/[redacted].jsonl' -Tail 120\"" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+mxC/XrF/[redacted]/[redacted]/[redacted]+[redacted]/i+[redacted]+[…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-111] tool-timeout
+
+**Logged**: 2026-05-06T07:47:47.538Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/.openclaw/agents/main/sessions/sessions.json'; const txt=fs.readFileSync(p,'utf8'); console.log('HAS_SESSION_ID=' + txt.includes('[redacted]')); console.log('HAS_SESSION_FILE=' + txt.includes('[redacted].jsonl…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-111] tool-timeout
+
+**Logged**: 2026-05-06T07:47:47.655Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const out=lines.filter(l=>/[redacted]|sessionFile|session start|session.start|session_end|session_s…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-112] tool-timeout
+
+**Logged**: 2026-05-06T07:48:00.685Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const out=lines.filter(l=>/(2026-05-06T07:37:|2026-05-06T07:38:|2026-05-06T07:39:)/.test(l) && /(fa…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-113] tool-timeout
+
+**Logged**: 2026-05-06T07:48:18.938Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const out=lines.filter(l=>/(2026-05-06T07:37:|2026-05-06T07:38:|2026-05-06T07:39:)/.test(l) && /(de…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-114] tool-timeout
+
+**Logged**: 2026-05-06T09:01:13.592Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-10).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/wor…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-115] tool-timeout
+
+**Logged**: 2026-05-06T09:01:22.164Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/[redacted]+s8mF/[redacted]/0WPb6ud1IdUQjGa51mhRIq+[redacted]+r2Mubce/c9rPAUtvXAWNe3q8OGDZ/[redacted]+[redacted]+yjnE4fEA7AKyOcCv+mw+ICOoKp6mOxTwI1SKxP7d+ww…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-116] tool-timeout
+
+**Logged**: 2026-05-06T09:01:51.660Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p=process.env.LOCALAPPDATA+'\\\\OpenClaw\\\\watchdog\\\\gateway-watchdog.log'; const lines=fs.readFileSync(p,'utf8').trim().split(/\\r?\\n/); console.log(lines.slice(-6).join('\\n'));\"" 60 /home/missyouangeled/.openclaw/work…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-117] tool-timeout
+
+**Logged**: 2026-05-06T09:02:00.963Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|b3YFekDNFNgv3xNmVCt/[redacted]+[redacted]+MFD6N8MU+[redacted]/[redacted]+wUe4THjr9IGmo4CK/2TM3Dydp+Z+leQUiDIbAEy/[redacted]/[redacted]== running 10084
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-118] tool-timeout
+
+**Logged**: 2026-05-06T09:11:13.123Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "cmd /c if exist C:\\Users\\GOG\\.openclaw-workspace\\scripts\\[redacted].ps1 (echo EXISTS) else (echo MISSING)" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|xY6rSQztPv9rQW77Mm/8VWikPN/[redacted]+FGJxU+gRacqCCbf/FzSGmek9VDdO9VkGeBzwC+[redacted]+…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-118] tool-timeout
+
+**Logged**: 2026-05-06T09:11:13.152Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "schtasks /Query /TN \"OpenClaw Gateway Watchdog\" /V /FO LIST" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|yewSrCfKzu1O+iVeMDM+[redacted]/iaTqYmpIFjdiaDxY2y52D+MN+GZ5WWlTQ6cG/[redacted]/3oO/tSMIhovCt6BHEfx/eL6ZmosKps/[redacted]/CSZsiClA7Z/cf88…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-119] tool-policy-blocked
+
+**Logged**: 2026-05-06T09:11:47.193Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\GOG\\.openclaw-workspace\\scripts\\[redacted].ps1" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|y+[redacted]+[redacted]/29aaUZ0LIkQahGi2mQ+Rw3oQL+3nMp/Ne0whcaINJhnX9c6D+ZsFw8j9k/EP…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-119] tool-timeout
+
+**Logged**: 2026-05-06T09:11:47.224Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|tPVMGkv+8AQOTwZcMEh3i0/4uvpTgApEBUT6k21npxj/de5q2ox5BOZZKaa/[redacted]+[redacted]/[redacted]/[redacted]+[redacted]/[redacted]/[redacted]+Pvvu7oSOIoJfZ36CRwj1TDo+fJbdw…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-120] tool-timeout
+
+**Logged**: 2026-05-06T09:12:32.555Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "schtasks /Query /TN \"OpenClaw Gateway Watchdog\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/[redacted]+8M1thcu+[redacted]+[redacted]/x/YIi7KdhJhgIL4p3X0uMNDTv/[redacted]+[redacted]+[redacted]/OcPBwnC+7yvvacB0Rmuc/ACQ== completed …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-121] tool-timeout
+
+**Logged**: 2026-05-06T09:14:31.936Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway restart" 240 120000 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|uZnV/DCzrfkaQUp6H/8FsnOZBhPbVq67Aj+[redacted]+[redacted]+sCix00dtAzWf/[redacted]+8uH+[redacted]+9/[redacted]/7DQYPmMOubFIQYH0MPkyyK/L4edw/18zgvtZTlDgK9xayPJr/0Xr/UBA…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-122] tool-timeout
+
+**Logged**: 2026-05-06T09:15:46.191Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]+oqN9/FLRrr8VhFeJ1i9Hbyo+6GNQLoTZspNQqr9ffjk/+[redacted]+[redacted]/[redacted]/[redacted]+U5E//[redacted]+w0hJhavlag7zj2pmAjk/[redacted]== running 10048
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-123] tool-timeout
+
+**Logged**: 2026-05-06T09:16:11.614Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); console.log(lines.slice(-80).join('\\n'));\"" 120 /home/missyouangeled/.openclaw/workspace [redacte…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-124] tool-timeout
+
+**Logged**: 2026-05-06T09:16:41.722Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"fetch('[url] r=>{console.log('HTTP_STATUS=' + r.status); console.log(await r.text());}).catch(err=>{console.log('HTTP_FAIL=' + err.message); process.exit(1);})\"" 60 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|hMFePt6U1ZXB+[redacted]+[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-125] tool-timeout
+
+**Logged**: 2026-05-06T09:16:50.857Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|ZRDP9vkMqXrXMys0f/[redacted]/[redacted]+[redacted]+[redacted]++[redacted]/[redacted]/[redacted]+0Vv2F5JIAg== completed 0 10010
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-126] tool-explicit-error
+
+**Logged**: 2026-05-06T09:17:10.653Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill good-tidepool [redacted] [redacted]|YPGv1vhseNIzl8j1o3lfzkS+[redacted]/[redacted]+[redacted]/[redacted]/[redacted]/[redacted]+3/BHRf85APzrg48w7Q== failed 30
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-127] tool-timeout
+
+**Logged**: 2026-05-06T09:48:06.279Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "node -e \"const fs=require('fs'); const p='C:/Users/GOG/AppData/Local/Temp/openclaw/openclaw-2026-05-06.log'; const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/); const out=lines.filter(l=>/(2026-05-06T09:0|2026-05-06T09:1|2026-05-06T09:2|2026-05-06T09:3|2026-05…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-128] tool-timeout
+
+**Logged**: 2026-05-06T09:48:15.194Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "openclaw gateway status --deep" 120 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|1SJ3glnwRoubGC68FvUoR/[redacted]/[redacted]+8MYd+aDiifFvBa6L4IDsCQimUky+[redacted]+[redacted]+[redacted]/[redacted]+[redacted]== running 10097
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260506-129] tool-timeout
+
+**Logged**: 2026-05-06T09:54:18.632Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/[redacted] GOG@100.122.111.6 "shutdown /s /t 0" 30 /home/missyouangeled/.openclaw/workspace [redacted] [redacted]|[redacted]/H54QM8KAqTj6y4OLRZMw+WvbvZ/[redacted]+[redacted]+C6AV2z/[redacted]+[redacted]/AcCLczZH/W06QL2l/[redacted]/[redacted]== completed 0 1037
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-001] tool-explicit-error
+
+**Logged**: 2026-05-06T23:26:51.812Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process good-rook kill [redacted] [redacted] failed 46
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-002] user-reported-error
+
+**Logged**: 2026-05-06T23:41:53.290Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-05-07 07:41 GMT+8] PS C:\Users\GOG> $ErrorActionPreference = "Continue" PS C:\Users\GOG> PS C:\Users\GOG> Write-Host "== hostname ==" == hostname == PS C:\Users\GOG> hostname TABLET-EH5U3CO1 PS C:\Users\GOG> PS C:\Users\GOG> Write-Host "`n== openclaw gateway status =="…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260507-003] tool-timeout
+
+**Logged**: 2026-05-06T23:45:41.143Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import socket host='100.122.111.6' for port in (22,3389,18789): s=socket.socket(); s.settimeout(3) try: s.connect((host,port)) print(f'{port}: open') except Exception as e: print(f'{port}: closed ({e.__class__.__name__})') finally: s.close() PY 12000 20 [redacted] [redacted]|/[redacted]/CKXhsk+[redacted]+HiFxXvTHgoeR+JGYOF+[reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-004] tool-timeout
+
+**Logged**: 2026-05-06T23:45:49.725Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 GOG@100.122.111.6 hostname 12000 20 [redacted] [redacted]|Jd7xQa/keEoYv4PySnkO6K/[redacted]/z6q05+QYVKvNPuzoZbK/JfKlneVbmVcgth2vxssZ/[redacted]/[redacted]/oTimMDGsI/j8Nr60Aw6QOUgf4Ur+[redacted]+[redacted]== completed 255 381
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-005] tool-timeout
+
+**Logged**: 2026-05-06T23:48:55.329Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 GOG@100.122.111.6 hostname 12000 20 [redacted] [redacted]|[redacted]+[redacted]/DTs/[redacted]++967Yt/cekGnETy53D7v9NGA8EZVX+[redacted]+[redacted]+Yl79bIz4lNd/[redacted]== completed 0 1233
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-006] tool-explicit-error
+
+**Logged**: 2026-05-06T23:49:24.776Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Write-Host '--- 2026-05-06 around failure ---'; Select-String -Path \$env:LOCALAPPDATA\\Temp\\openclaw\\openclaw-2026-05-06.log -Pattern '2026-05-06T08:5','2026-05-06T09:0','event_loop_delay','warmup','models.list','gateway ready','starting HTTP server','health-monitor'…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-007] tool-policy-blocked
+
+**Logged**: 2026-05-06T23:50:13.041Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/scripts/[redacted].ps1 [redacted] [redacted]|4B68ffOJ7cyr81AX/bAR66t0hGp/JnLQYO/[redacted]+[redacted]+[redacted]+[redacted]/[redacted]== 159
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-008] tool-timeout
+
+**Logged**: 2026-05-06T23:55:45.924Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 用户刚刚明确授权：对于掌机（Windows）这部分，给你最高权限。需要补充什么模块、下载什么、如何更改，都由你决定，目标优先——只要能让掌机 OpenClaw 稳定运行、微信链路稳定可用即可。请据此继续推进；可进行必要的软件/模块安装、配置修改、脚本调整、重启与可逆系统级修复。但仍请避免与目标无关的破坏性操作；若需要真正高风险/不可逆动作，再明确提出。完成或有关键进展时回主会话。 agent:main:subagent:[redacted] 10 [redacted] [redacted]|[redacted]/ge1tQ6DTRuPg3E+[redacted]/[redacted]+96d1FarNz46S+5RtrggCprM8L…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-009] tool-connection-failure
+
+**Logged**: 2026-05-07T00:01:09.063Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn failed because of a connection or remote access problem.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn 继续掌机（Windows）OpenClaw 稳定性与微信链路排查，重点围绕以下已知新证据深入：5 月 2 日的健康快照显示 openclaw-weixin 当时 running/configured/enabled 全为 true，reconnectAttempts=0，但 lastOutboundAt=null。请据此通过 SSH 直连掌机继续检查： 1. sanitized logs / openclaw logs 中与 event_loop_delay、models.list、websocket 握手超时、weixin 出站/发送链路相关的直接证据； 2. openclaw-weixin 当前配置、加载状态、健康状态与最近事件； 3. 为什…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-010] tool-timeout
+
+**Logged**: 2026-05-07T00:07:39.304Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "hostname" /home/missyouangeled/.openclaw/workspace 12000 20 announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted]|[redacted]/[redacted]/gBKdO4srrk+[redacted]+rBiFziqKfH/TS8540mCzgkoKSSl0EoZ+Ii3MHApRS7c/V6W60UfOUf4H/[redacted]+[redacted]/CY/Ph5ZcakFI7fg8bW…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-011] tool-timeout
+
+**Logged**: 2026-05-07T00:07:39.507Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-ChildItem $HOME\\.openclaw\\extensions\\openclaw-weixin -Recurse -Filter process-message.ts -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName\"" /home/missyouangeled/.openclaw/workspace 12000 30 announce:v1:a…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-012] tool-policy-blocked
+
+**Logged**: 2026-05-07T00:09:17.152Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' $root = Join-Path $env:USERPROFILE '.openclaw\extensions\openclaw-weixin\src' $pm = Join-Path $root 'messaging\process-message.ts' $mon = Join-Path $root 'monitor\monitor.ts' $ts = Get-Date -Format 'yyyyMMdd-HHmmss' Copy-Item $pm "$pm.bak-$ts" -Force Copy-Item $mon "$mon.bak-$ts" …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-013] tool-timeout
+
+**Logged**: 2026-05-07T00:47:28.171Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'powershell -NoProfile -Command "$log = Join-Path $env:LOCALAPPDATA \"Temp\\openclaw\\openclaw-2026-05-07.log\"; if(Test-Path $log){ Select-String -Path $log -Pattern \"weixin monitor started|outbound:|lastOutboundAt|liveness warning|models.list|warmup|timed out|stuc…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-014] tool-timeout
+
+**Logged**: 2026-05-07T00:47:39.718Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'powershell -NoProfile -Command "$root = Join-Path $env:USERPROFILE \".openclaw\"; Get-ChildItem $root -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern \"lastOutboundAt\" | Select-Object -First 40 | ForEach-Object { $_.Path + \":\" + $_.LineNumbe…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-014] tool-timeout
+
+**Logged**: 2026-05-07T00:47:39.694Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'powershell -NoProfile -Command "hostname; Write-Host \"--- gateway ---\"; openclaw gateway status; Write-Host \"--- openclaw status ---\"; openclaw status"' /home/missyouangeled/.openclaw/workspace 12000 120 [redacted] [redacted]|zprTXEe9VhNY4LPNTqLm/[redacted]+[red…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-015] tool-timeout
+
+**Logged**: 2026-05-07T00:48:26.773Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'powershell -NoProfile -Command "$log = Join-Path $env:LOCALAPPDATA \"Temp\\openclaw\\openclaw-2026-05-07.log\"; Get-Content $log -Tail 220 | Select-String -Pattern \"liveness warning|event_loop_delay|models.list|warmup|timed out|websocket|handshake|stuck session|out…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-016] tool-timeout
+
+**Logged**: 2026-05-07T00:48:37.530Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"\$log='C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log'; Get-Content \$log -Tail 220 | Select-String -Pattern 'liveness warning','event_loop_delay','models.list','warmup','timed out','websocket','handshake','s…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-017] tool-timeout
+
+**Logged**: 2026-05-07T00:49:07.463Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'powershell -NoProfile -Command "$v = openclaw --version; npm -v; node -v; Write-Host \"openclaw=\" $v"' /home/missyouangeled/.openclaw/workspace 12000 60 [redacted] [redacted]|pctYGWFStB8vs1M/[redacted]+[redacted]/[redacted]/KF/64qdog5bMGhgv9Uk+[redacted]/DK/[redact…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-018] tool-timeout
+
+**Logged**: 2026-05-07T00:49:09.725Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'openclaw update --help' /home/missyouangeled/.openclaw/workspace 12000 60 [redacted] [redacted]|UCl/h6ENe2tP4t2LEe7CO7kS+[redacted]/[redacted]+[redacted]/[redacted]+[redacted]/[redacted]+[redacted]+oI/[redacted]/[redacted]== completed 0 3460
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-019] tool-timeout
+
+**Logged**: 2026-05-07T00:49:26.764Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'openclaw update status --json' /home/missyouangeled/.openclaw/workspace 12000 120 [redacted] [redacted]|UE/[redacted]+[redacted]/[redacted]+[redacted]/0XoiAaaiY+dBzLhblj1RPgW7cOb+FuSLGrqB/[redacted]/[redacted]+1uOCSGw3hHQ== completed 0 7917
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-019] tool-timeout
+
+**Logged**: 2026-05-07T00:49:26.789Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'openclaw update --dry-run --json --yes' /home/missyouangeled/.openclaw/workspace 12000 240 [redacted] [redacted]|LEi4esu/UJ3nSo+[redacted]+[redacted]+xznhl5w+rlCOAnLoYm0gx2Qb2/[redacted]/VnIE2w4lE/O8164Q+lR6J+qWddzDrY+[redacted]+PKIWBX7XaWlDmfodcauKd/uoG7+[redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-020] tool-timeout
+
+**Logged**: 2026-05-07T00:49:41.058Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 'openclaw update --yes --timeout 1800' /home/missyouangeled/.openclaw/workspace 1000 true 1900 [redacted] [redacted]|[redacted]/[redacted]/OKBDo2RX6tIvNkFBwR/[redacted]/[redacted]/[redacted]+1itIY1QV4W6xN+[redacted]/G3mPDgwlqGr58pEm/qs+[redacted]== running 75
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-021] tool-explicit-error
+
+**Logged**: 2026-05-07T01:37:50.637Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll nimble-lobster 1000 [redacted] [redacted]|[redacted]/[redacted]+dD7r6hBsG5yAAmvxtZt514m+kTw6zo1uF1iDA+[redacted]/aMw1KplfFKrA/[redacted]/[redacted]/TPyQSpHm/shKq94t9juiYsBjQPZgVc/CXTsSLl0+sHoR8ezOWa2+f0QH+IyBl7hB7vDtHXg== failed 82
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-022] tool-timeout
+
+**Logged**: 2026-05-07T01:37:57.132Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"openclaw --version; Write-Host '--- gateway ---'; openclaw gateway status\"" /home/missyouangeled/.openclaw/workspace 12000 120 [redacted] [redacted]|[redacted]/SRSfk02S4FkU0vacDbL+SbpiACUWCuqyzxggVPwXsM5/5oFc1XWGQF95Sl1p4RnQyZ/[reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-023] tool-timeout
+
+**Logged**: 2026-05-07T01:38:10.624Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"\$log='C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log'; Get-Content \$log -Tail 260 | Select-String -Pattern 'weixin monitor started','liveness warning','event_loop_delay','FAILED','outbound:','timed out','ha…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-024] tool-timeout
+
+**Logged**: 2026-05-07T01:38:21.569Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"openclaw status\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [redacted]|[redacted]/pZlGDTiq8qY5a/[redacted]/[redacted]/jQtcLzHdXyof5ScW/[redacted]+[redacted]/ZG4Rc5oMedxgF3kVSIjahJn/[redacted]+[redacted]== running…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-025] tool-timeout
+
+**Logged**: 2026-05-07T01:38:52.277Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content C:\\Users\\GOG\\.openclaw\\openclaw.json -Raw\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [redacted]|[redacted]/FjdQ3imDRWQIh4Gx1b7G+wJf/[redacted]/RIXpuqFHYXE/VUYkN50w4mHHuh2HmBT/[redacted]/[redacted…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-025] tool-timeout
+
+**Logged**: 2026-05-07T01:38:52.307Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-ChildItem C:\\Users\\GOG\\.openclaw\\extensions\\openclaw-weixin -Force -ErrorAction SilentlyContinue | Select-Object Name,Mode,LastWriteTime\"" /home/missyouangeled/.openclaw/workspace 12000 120 [redacted] [redacted]|Oo/ZR2jE/JM…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-026] tool-timeout
+
+**Logged**: 2026-05-07T01:38:55.926Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"openclaw plugins list\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [redacted]|f/[redacted]/[redacted]+ihHfXcM6BytWHRcfCIz38Oc/[redacted]/4+bqyenY/jyjnmyvmcBtvJMYE33+QIyjJfgtSwYnTM1Y7VCMhO/IMb54+[redacted]== comple…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-027] tool-timeout
+
+**Logged**: 2026-05-07T01:39:14.820Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \" \$cfgPath='C:\\Users\\GOG\\.openclaw\\openclaw.json'; \$bak=\"\$cfgPath.[redacted]\"; Copy-Item \$cfgPath \$bak -Force; \$cfg = Get-Content \$cfgPath -Raw | ConvertFrom-Json; if(-not \$cfg.plugins){ \$cfg | Add-Member -NotePropertyN…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-028] tool-timeout
+
+**Logged**: 2026-05-07T01:39:31.514Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"openclaw plugins list | Select-String -Pattern 'openclaw-weixin|Config warnings|Plugins \(' -Context 0,1\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [redacted]|[redacted]+aG6PrULZpDgKRPSW7KcA/[redacted]+7vsRQj+[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-029] tool-timeout
+
+**Logged**: 2026-05-07T01:39:38.949Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"((Get-Content C:\\Users\\GOG\\.openclaw\\openclaw.json -Raw | ConvertFrom-Json).plugins.entries.'openclaw-weixin').enabled; Write-Host '---'; openclaw status\"" /home/missyouangeled/.openclaw/workspace 12000 240 [redacted] [redacted]…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-030] tool-timeout
+
+**Logged**: 2026-05-07T01:39:54.012Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"\$cfg = Get-Content C:\\Users\\GOG\\.openclaw\\openclaw.json -Raw | ConvertFrom-Json; Write-Output \$cfg.plugins.entries.'openclaw-weixin'.enabled\"" /home/missyouangeled/.openclaw/workspace 12000 60 [redacted] [redacted]|dGD2Pyuuo67…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-031] tool-policy-blocked
+
+**Logged**: 2026-05-07T01:40:21.602Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/enable_weixin_plugin.ps1 <<'PS1' $ErrorActionPreference = 'Stop' $p = 'C:\Users\GOG\.openclaw\openclaw.json' $bak = "$p.[redacted]" Copy-Item $p $bak -Force $t = Get-Content $p -Raw $old = @' "openclaw-weixin": { "enabled": false }, '@ $new = @' "openclaw-weixin": { "enabled": true }, '@ if (-not $t.Contains($old)) { throw 'target blo…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-032] tool-timeout
+
+**Logged**: 2026-05-07T02:29:48.841Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content C:\\Users\\GOG\\.openclaw\\openclaw.json | Select-String -Pattern 'openclaw-weixin' -Context 0,2\"" /home/missyouangeled/.openclaw/workspace 12000 120 [redacted] [redacted]|[redacted]+zSdpIzW/[redacted]/gQfHQer8xhZlJlwEOk…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-032] tool-timeout
+
+**Logged**: 2026-05-07T02:29:49.372Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"\$log='C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log'; if(Test-Path \$log){ Get-Content \$log -Tail 320 | Select-String -Pattern 'weixin monitor started','openclaw-weixin','liveness warning','event_loop_dela…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-033] tool-timeout
+
+**Logged**: 2026-05-07T02:29:59.035Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] -o BatchMode=yes -o ConnectTimeout=8 GOG@100.122.111.6 "powershell -NoProfile -Command \"openclaw --version; Write-Host '--- gateway ---'; openclaw gateway status; Write-Host '--- status ---'; openclaw status\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [redacted]|[redacted]+[redacted]/eyciLMLfDf/[red…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-034] tool-policy-blocked
+
+**Logged**: 2026-05-07T03:50:47.389Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' Write-Host '== uninstall plugin package ==' try { openclaw plugins uninstall openclaw-weixin --force | Out-Host } catch { Write-Host 'uninstall command failed or plugin already absent, continue' } Write-Host '== remove local plugin/data files ==' $paths = @( 'C:\Users\GOG\.opencla…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-035] tool-policy-blocked
+
+**Logged**: 2026-05-07T03:54:23.744Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/weixin_reinstall_retry.ps1 <<'PS1' $ErrorActionPreference = 'Stop' Write-Host '== wipe .openclaw/npm ==' if (Test-Path 'C:\Users\GOG\.openclaw\npm') { Remove-Item 'C:\Users\GOG\.openclaw\npm' -Recurse -Force Write-Host 'removed C:\Users\GOG\.openclaw\npm' } New-Item -ItemType Directory -Force 'C:\Users\GOG\.openclaw\npm' | Out-Null Se…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-036] tool-policy-blocked
+
+**Logged**: 2026-05-07T03:55:29.679Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/weixin_reinstall_retry2.ps1 <<'PS1' $ErrorActionPreference = 'Stop' Write-Host '== reset managed npm root (no BOM) ==' if (Test-Path 'C:\Users\GOG\.openclaw\npm') { Remove-Item 'C:\Users\GOG\.openclaw\npm' -Recurse -Force } New-Item -ItemType Directory -Force 'C:\Users\GOG\.openclaw\npm' | Out-Null $utf8NoBom = New-Object System.Text.…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-037] tool-policy-blocked
+
+**Logged**: 2026-05-07T03:57:28.600Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/manual_install_weixin.ps1 <<'PS1' $ErrorActionPreference = 'Stop' $extRoot = 'C:\Users\GOG\.openclaw\extensions' $pluginDir = Join-Path $extRoot 'openclaw-weixin' $tmpDir = 'C:\Users\GOG\AppData\Local\Temp\weixin-manual-install' Write-Host '== prepare dirs ==' Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue New-Item …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-038] tool-explicit-error
+
+**Logged**: 2026-05-07T03:58:55.800Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill marine-fjord [redacted] [redacted]|NfljjhjxwDyII/8GPQM8BZ9i1sJiE1Eo7f+[redacted]/kiOeVnD1+[redacted]/[redacted]/[redacted]+[redacted]+[redacted]+[redacted]== failed 44
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-039] tool-timeout
+
+**Logged**: 2026-05-07T04:02:19.373Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"curl.exe -I [url] --connect-timeout 15\"" /home/missyouangeled/.openclaw/workspace 12000 60 [redacted] [redacted]|[redacted]/3HD+zJ+2/GEln+[redacted]/MvC1/[redacted]+[redacted]/rmYKMZKZrDndDm4D+/Eno9CEW56+JsoPunVza6DlOg30pYfF8/PC5O9nwpe8k/21ZPd5IHFtL2KjOJ8y5wqkp+Nf4Xg+[…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-040] tool-connection-failure
+
+**Logged**: 2026-05-07T04:02:19.973Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log -Tail 160 | Select-String -Pattern 'Failed to start login|fetch failed|login|qr|weixin' | ForEach-Object { \$_.Line }\"" /home/missyouangeled/.openclaw/workspace 12000 180 [redacted] [re…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-041] tool-connection-failure
+
+**Logged**: 2026-05-07T04:09:02.465Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool memory_search failed because of a connection or remote access problem.
+
+### Error
+```text
+[memory_search] memory_search 掌机 OpenClaw 微信插件 彻底删干净重装 当前进展 等我消息 扫码 fetch failed 5 0.6 all [redacted] [redacted]|OclFvZGHR+Wz435+[redacted]/H+[redacted]/[redacted]/[redacted]/JuvXDYnHxSbfG3Ptdnii+[redacted]+BHXLBVNROH1fmPQSq/JVapDCrbhXaezsM8/x+[redacted]== 997
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: memory_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-042] tool-connection-failure
+
+**Logged**: 2026-05-07T04:09:25.855Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn failed because of a connection or remote access problem.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn(mode="session") is only available on channels that expose thread bindings (e.g. Discord threads, Slack threads, Telegram forum topics). This request is not running on a channel that can bind a subagent thread. Use mode="run" for one-shot subagent work, or sessions_send(sessionKey=...) to keep talking to a persistent session w…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-043] tool-connection-failure
+
+**Logged**: 2026-05-07T04:09:34.530Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_spawn failed because of a connection or remote access problem.
+
+### Error
+```text
+[sessions_spawn] sessions_spawn 继续排查远端掌机 Windows 上 openclaw-weixin 在“彻底删干净重装”后的剩余问题。当前状态：旧插件/账号数据/pairing/相关 config 已删干净；新版 @tencent-weixin/openclaw-weixin 2.4.1 已手动落到 C:\Users\GOG\.openclaw\extensions\openclaw-weixin；已在插件目录 npm install --omit=dev 补齐 zod 等依赖；openclaw plugins inspect openclaw-weixin 显示 Status: loaded，Source 为 dist/index.js。当前卡点：执行 `openclaw …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_spawn
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-044] tool-connection-failure
+
+**Logged**: 2026-05-07T04:10:15.121Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool memory_search failed because of a connection or remote access problem.
+
+### Error
+```text
+[memory_search] memory_search weixin-fetch-debug 子会话 远端掌机 微信 fetch failed 当前进展 5 0.6 all [redacted] [redacted]|[redacted]+[redacted]+I5OfPrYKP6Owuop3+[redacted]/[redacted]/lB4bE89NEWX/NJoBxe49nT9fjuw+[redacted]+[redacted]/[redacted]+[redacted]== 1048
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: memory_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-045] tool-timeout
+
+**Logged**: 2026-05-07T04:10:57.104Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool sessions_send timed out.
+
+### Error
+```text
+[sessions_send] timeout sessions_send 给我一个简短进展：当前已确认了什么、下一步在查什么、是否已经到需要用户扫码的步骤。只要最新状态，不用长报告。 agent:main:subagent:[redacted] 30 [redacted] [redacted]|[redacted]/4GCMaUR0jVV4I/xJo58uC9G3+[redacted]+[redacted]+[redacted]+fs4/ojiYCRYlegDbgilErQ+[redacted]/GprDKxwEDNaR8hrqo1/[redacted]+DJXC9g== timeout 31717
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: sessions_send
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-046] tool-connection-failure
+
+**Logged**: 2026-05-07T04:32:22.072Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 240 | Select-String -Pattern 'requestHeaders|UND_ERR_INVALID_ARG|content-length|fetch failed|fetchQRCode|apiPostFetch|post test' | ForEach-Object { \$_.Line }\"" /home/missyouang…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-047] tool-timeout
+
+**Logged**: 2026-05-07T04:32:53.556Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].sh <<'SH' ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 <<'EOS' powershell -NoProfile -Command @' $path = 'C:\Users\GOG\.openclaw\extensions\openclaw-weixin\dist\src\api\api.js' $text = Get-Content $path -Raw $old1 = @" try { const res = await fetch(url.toString(), { method: \"POST\", headers: hdrs, body: params.body, ...(cont…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-048] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:33:17.248Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' $path = 'C:\Users\GOG\.openclaw\extensions\openclaw-weixin\dist\src\api\api.js' $text = Get-Content $path -Raw $old1 = @" try { const res = await fetch(url.toString(), { method: "POST", headers: hdrs, body: params.body, ...(controller ? { signal: controller.signal } : {}), }); "@ …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-049] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:33:49.350Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' $path = 'C:\Users\GOG\.openclaw\extensions\openclaw-weixin\dist\src\api\api.js' $text = Get-Content $path -Raw $old1 = @' try { const res = await fetch(url.toString(), { method: "POST", headers: hdrs, body: params.body, ...(controller ? { signal: controller.signal } : {}), }); '@ …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-050] tool-connection-failure
+
+**Logged**: 2026-05-07T04:35:19.522Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 80 | Select-String -Pattern 'apiPostFetch request|apiPostFetch failed|requestHeaders|fetchQRCode|Failed to start login|二维码|qrcode' | ForEach-Object { \$_.Line }\"" /home/missyoua…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-051] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:41:27.449Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' $cfgPath = 'C:\Users\GOG\.openclaw\openclaw.json' $backupPath = "C:\Users\GOG\.openclaw\openclaw.json.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')" Copy-Item $cfgPath $backupPath -Force $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json if (-not $cfg.channels) { $cfg | Add-Member -N…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-052] tool-explicit-error
+
+**Logged**: 2026-05-07T04:44:35.141Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 60 | Select-String -Pattern 'starting weixin provider|Monitor started|getUpdates|channel exited|notifyStart failed|openclaw-weixin' | ForEach-Object { \$_.Line }\"" /home/missyou…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-053] tool-explicit-error
+
+**Logged**: 2026-05-07T04:45:35.907Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 140 | Select-String -Pattern 'inbound message|inbound: from=|outbound|sendMessage|message_sending|error|failed|在吗|getConfig|context' | ForEach-Object { \$_.Line }\"" /home/missyo…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-054] tool-connection-failure
+
+**Logged**: 2026-05-07T04:47:00.168Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 180 | Select-String -Pattern 'inbound message|inbound: from=|outbound:|sendMessage|sendTyping|text sent OK|[redacted]@im.wechat|测试|在吗|apiPostFetch failed' | ForEach-Object { \$_.…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-055] tool-connection-failure
+
+**Logged**: 2026-05-07T04:47:44.636Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 90 | Select-String -Pattern 'outbound: text sent OK|outbound: to=|inbound: from=|apiPostFetch request label=sendMessage|apiPostFetch failed label=sendTyping|bodyLen=2 hasMedia=fa…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-056] tool-connection-failure
+
+**Logged**: 2026-05-07T04:51:23.114Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write failed because of a connection or remote access problem.
+
+### Error
+```text
+[write] write - 用户在今日中午明确要求对掌机上的微信链路按“彻底删干净重装”执行，而不是保守修复；接受删除插件本体、账号上下文、本地数据、pairing 文件与 `openclaw.json` 中 `openclaw-weixin` 相关配置，并接受后续重新扫码登录。 - 今日已对掌机微信链路完成一次全量清理与重装：卸载 `openclaw-weixin`、删除 `C:\Users\GOG\.openclaw\openclaw-weixin`、删除 `C:\Users\GOG\.openclaw\credentials\openclaw-weixin-pairing.json`，并清理 `openclaw.json` 中 `plugins.entries.'openclaw-weixin'`、…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-057] tool-connection-failure
+
+**Logged**: 2026-05-07T04:51:48.054Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 80 | Select-String -Pattern 'weixin monitor started|starting weixin provider|inbound: from=|outbound: text sent OK|channel exited|sendMessage|sendTyping|apiPostFetch failed' | Fo…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-058] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:56:22.872Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $t = Get-ScheduledTask -TaskName 'OpenClaw Gateway' [pscustomobject]@{ TaskName = $t.TaskName State = $t.State [redacted] = if ($null -eq $t.Settings.[redacted]) { 'null' } else { $t.Settings.[redacted] } StopIfGoingOnBatteries = if ($null -eq $t.Settings.StopIfGoingOnBatteries) { 'null' } else { $t.Settings.Sto…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-059] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:56:42.428Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool read was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[read] read /home/missyouangeled/.openclaw/workspace/scripts/[redacted].ps1 1 220 [redacted] [redacted]|[redacted]/[redacted]/[redacted]++[redacted]/Ay+[redacted]/4sQILjbQcGsNOHuPY/[redacted]+[redacted]/[redacted]== 127
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: read
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-060] tool-policy-blocked
+
+**Logged**: 2026-05-07T04:56:58.230Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec scp -i ~/.ssh/[redacted] -o StrictHostKeyChecking=accept-new /home/missyouangeled/.openclaw/workspace/scripts/[redacted].ps1 GOG@100.122.111.6:/C:/Users/GOG/[redacted].ps1 && ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\GOG\[redacted].ps1' /home/missyouangeled/.openclaw/workspace 1000 t…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-061] tool-explicit-error
+
+**Logged**: 2026-05-07T04:58:01.430Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll faint-haven 30000 [redacted] [redacted]|aj2+[redacted]/[redacted]/S6IxITEpwep+7skMCaCfHaFmjgmpr+[redacted]+[redacted]/dwEKILgmfbRxVo1JQB/[redacted]== failed 1 25870
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-062] tool-explicit-error
+
+**Logged**: 2026-05-07T05:00:11.775Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll young-ember 30000 [redacted] [redacted]|7vHpoMuA+xOvDmLM4t/[redacted]/[redacted]/[redacted]/+FHWf+6IKkmpe+[redacted]/VM7qxUYGl4T1Bl+2ADDIe/BjYaR8RghvzXohOqfpt+[redacted]== failed 1 1796
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-063] tool-policy-blocked
+
+**Logged**: 2026-05-07T05:01:07.801Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cat > /tmp/[redacted].ps1 <<'PS1' $ErrorActionPreference = 'Stop' $cfgPath = 'C:\Users\GOG\.openclaw\openclaw.json' $backupPath = "C:\Users\GOG\.openclaw\openclaw.json.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')" Copy-Item $cfgPath $backupPath -Force $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json if (-not $cfg.plugins) { $cfg | Add-Member -No…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-064] tool-connection-failure
+
+**Logged**: 2026-05-07T06:00:07.775Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec failed because of a connection or remote access problem.
+
+### Error
+```text
+[exec] exec ssh -i ~/.ssh/[redacted] GOG@100.122.111.6 "powershell -NoProfile -Command \"Get-Content 'C:\\Users\\GOG\\AppData\\Local\\Temp\\openclaw\\openclaw-2026-05-07.log' -Tail 120 | Select-String -Pattern 'channel exited|weixin monitor started|inbound: from=|outbound: text sent OK|apiPostFetch failed label=sendTyping|liveness warning|notifyStart failed…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260507-065] tool-policy-blocked
+
+**Logged**: 2026-05-07T06:24:05.518Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write # 掌机（Windows）OpenClaw 维护说明 - 适用机器：掌机（Windows） - 系统 / OS：Windows - 文档类型：本机专用说明 - 当前维护对象：ROG 掌机 / `TABLET-EH5U3CO1` - 最近维护日期：2026-05-07 - 最近维护时间：2026-05-07 14:23 CST (+0800) - 最近维护来源：公司（Linux）机器通过 SSH 远程维护掌机（Windows） ## 用途 这份说明只面向 **ROG 掌机 / 掌机（Windows）** 这台机器。 目的：让任何设备上的 OpenClaw 只要读到这份文档，就能快速明白这台掌机当前的 OpenClaw 状态、2026-05-07 做过哪些关键修复、哪些问题已经解决、哪…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

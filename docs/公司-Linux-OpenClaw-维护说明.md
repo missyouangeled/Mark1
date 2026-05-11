@@ -65,6 +65,51 @@
 
 ## 当前已知 Linux 维护点
 
+### 0. 双盘空间预检与落盘规则（公司 Linux）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-09
+- 背景：当前公司 Linux 机有两块 50G 盘：根盘 `/` 与数据盘 `/mnt/data`。以后凡是下载大文件、解压模型、同步大仓库、生成大体积中间产物，都不要上来就直接写根盘。
+
+当前固定规则：
+
+1. **先预估，再执行**
+   - 在下载、解压、模型转换、批量生成音频/视频、缓存大模型、复制大目录前，先估算一次体积。
+   - 默认按“**预计大小 × 2**”估算峰值占用，覆盖下载包 + 解压中转 + 临时缓存。
+
+2. **根盘保底空余**
+   - 执行后根盘 `/` 剩余空间不应低于 **8G**。
+   - 更稳妥的目标是长期尽量保持 **10G** 以上空余。
+
+3. **大于等于 1G 的新增占用默认优先去 `/mnt/data`**
+   - 包括但不限于：模型文件、语音/视频素材、研究样本、临时导入包、批量输出目录。
+   - 默认 staging 目录：`/mnt/data/openclaw/download-staging/`
+
+4. **只有小而短命的东西才优先放根盘**
+   - 例如 `<300M` 的临时脚本输出、很快会删除的小文件、明显依赖固定相对路径的轻量缓存。
+   - 但如果根盘本身已紧张，即便是中等体积文件，也应转去 `/mnt/data`。
+
+5. **能用软链接保路径，就不要硬改上层调用路径**
+   - 如果某些既有工具已经写死在 `~/.openclaw/workspace/tmp/...`、`~/.cache/...` 这类路径，优先考虑把实际大目录迁到 `/mnt/data/openclaw/...`，再在原处放回 symlink。
+   - 这样既能减轻根盘压力，也能尽量避免改动主链路。
+
+已新增辅助脚本：
+
+- `scripts/storage-preflight.sh`
+
+用法示例：
+
+```bash
+bash scripts/storage-preflight.sh 1.5G ChatTTS-assets
+bash scripts/storage-preflight.sh 800M 临时解压包
+```
+
+当前已落地的迁移策略（2026-05-09）：
+
+- `~/.openclaw/workspace/tmp/voice-replies` → 迁到 `/mnt/data/openclaw/workspace-tmp/voice-replies` 后用 symlink 回挂
+- `~/.cache/modelscope` → 迁到 `/mnt/data/openclaw/modelscope-cache` 后用 symlink 回挂
+
 ### 1. 恢复后自愈 watcher
 
 相关脚本：

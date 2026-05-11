@@ -1,7 +1,7 @@
 {
   "meta": {
-    "lastTouchedVersion": "2026.4.25",
-    "lastTouchedAt": "2026-04-28T00:22:15.470Z"
+    "lastTouchedVersion": "2026.5.6",
+    "lastTouchedAt": "2026-05-09T09:12:32.440Z"
   },
   "wizard": {
     "lastRunAt": "2026-04-28T00:22:15.025Z",
@@ -46,7 +46,8 @@
           "alias": "DeepSeek"
         },
         "nvidia/nvidia/nemotron-3-super-120b-a12b": {},
-        "nvidia/moonshotai/kimi-k2.5": {}
+        "nvidia/moonshotai/kimi-k2.5": {},
+        "nvidia/google/gemma-4-31b-it": {}
       },
       "workspace": "/home/missyouangeled/.openclaw/workspace",
       "compaction": {
@@ -59,7 +60,16 @@
       "imageModel": {
         "primary": "nvidia/nvidia/nemotron-nano-12b-v2-vl"
       }
-    }
+    },
+    "list": [
+      {
+        "id": "main",
+        "identity": {
+          "name": "贾维斯",
+          "avatar": "avatars/jarvis-neon-20260507.png"
+        }
+      }
+    ]
   },
   "memory": {
     "backend": "qmd",
@@ -108,10 +118,18 @@
     }
   },
   "tools": {
-    "profile": "coding"
+    "profile": "coding",
+    "web": {
+      "search": {
+        "provider": "tavily"
+      }
+    }
   },
   "messages": {
-    "ackReactionScope": "group-mentions"
+    "ackReactionScope": "group-mentions",
+    "groupChat": {
+      "visibleReplies": "automatic"
+    }
   },
   "commands": {
     "native": "auto",
@@ -120,7 +138,12 @@
     "ownerDisplay": "raw"
   },
   "session": {
-    "dmScope": "per-channel-peer"
+    "dmScope": "per-channel-peer",
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "14d",
+      "maxEntries": 120
+    }
   },
   "hooks": {
     "internal": {
@@ -141,7 +164,7 @@
     "bind": "loopback",
     "auth": {
       "mode": "token",
-      "token": "d488a7***0a8f"
+      "token": "d488a7bb89c5fd8a69d4fe23c53c109017c0a5b8ca2d0a8f"
     },
     "tailscale": {
       "mode": "off",
@@ -160,19 +183,21 @@
     },
     "controlUi": {
       "allowInsecureAuth": true
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
     }
   },
   "skills": {
     "entries": {
       "tavily-search": {
         "enabled": true,
-        "apiKey": "tvly-d***MGTz"
+        "apiKey": "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"
       }
-    }
-  },
-  "channels": {
-    "openclaw-weixin": {
-      "channelConfigUpdatedAt": "2026-04-22T09:30:24.428Z"
     }
   },
   "models": {
@@ -181,7 +206,7 @@
       "ollama": {
         "baseUrl": "http://192.168.18.13:11434",
         "api": "ollama",
-        "apiKey": "OLLAMA***_KEY",
+        "apiKey": "OLLAMA_API_KEY",
         "models": [
           {
             "id": "gemma4",
@@ -267,7 +292,7 @@
       "nvidia": {
         "baseUrl": "https://integrate.api.nvidia.com/v1",
         "api": "openai-completions",
-        "apiKey": "nvapi-***cHxb",
+        "apiKey": "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",
         "models": [
           {
             "id": "nvidia/nemotron-3-super-120b-a12b",
@@ -312,10 +337,10 @@
       "github-copilot",
       "browser",
       "memory-core",
-      "openclaw-weixin",
       "ollama",
       "deepseek",
-      "nvidia"
+      "nvidia",
+      "tavily"
     ],
     "entries": {
       "browser": {
@@ -327,9 +352,6 @@
       "self-improvement-tool-errors": {
         "enabled": true
       },
-      "openclaw-weixin": {
-        "enabled": true
-      },
       "ollama": {
         "enabled": true
       },
@@ -338,7 +360,16 @@
       },
       "nvidia": {
         "enabled": true
+      },
+      "tavily": {
+        "config": {
+          "webSearch": {
+            "apiKey": "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"
+          }
+        },
+        "enabled": true
       }
-    }
+    },
+    "bundledDiscovery": "allowlist"
   }
 }

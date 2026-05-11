@@ -297,6 +297,50 @@ Think of it like a human reviewing their journal and updating their mental model
 
 The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
 
+## 前台常驻 / 后台插播 规则
+
+当用户明确要求“前台正常聊天、后台继续跑”时，按以下方式执行：
+
+- 主会话必须保持可随时回复，不要为了等待后台结果而主动把前台收成等待态。
+- 默认不要用 `sessions_yield` 结束主会话来“等后台结果”，除非用户明确接受这种等待方式，或当前已经没有继续对话的需要。
+- 正确默认：前台继续正常对话；后台分身继续执行；仅在关键里程碑、阻塞点、或最终完成时，用简短自然语言主动插播进度。
+- 如果后台分身误结束、空返回、或回报异常，前台先直接接住用户，再立刻修正后台流程；不要先让用户追问“为什么没反应”。
+- **前台可见性兜底**：只要已经开始后台工作，而用户侧还看不到明确结果，就必须先给一条短反馈说明“正在做什么 / 卡在哪 / 下一次何时回报”；不要因为还在跑工具、等网络、等网页、等下载、等验证码、等外部 API 而长时间静默。
+- **静默时长上限**：后台相关工作开始后，若约 30 秒内还没有可见产出，应先补一条简短进度；若出现重试、限流、连接失败、验证码、长下载、长转码等阻塞，也要主动说明当前卡点与下一步动作，避免前台体感像“没反应”。
+
+## 视频平台下载默认工作流
+
+当用户要求“去抖音/其他平台搜索并下载视频”时，默认按以下顺序执行：
+
+1. 先判断这是**搜索型任务**还是**已给公开视频页 / 分享链接**的任务
+2. 若已给公开视频页 / 分享链接，优先直接走已落地入口：`scripts/download-platform-video.py`
+3. 若只有关键词 / 作者名：
+   - 先试平台内直达
+   - 若被验证码、登录墙、作品流异常或懒加载拦住，立刻切到外部搜索 / 公开页面定位候选，不要原地卡死在站内搜索入口
+4. 一旦已经拿到多个候选视频页 URL，把“目标位”当变量处理，不要写死成“第一条”；优先用 `--pick first|last|random|index:N|video:<id>`
+5. 若作者主页作品流本身异常（如“服务异常，重新刷新拉取数据”），不要为了给结果而误把热点/推荐视频当成作者作品；此时应明确报阻塞，并切回公开视频页 / 外搜候选链路
+6. 下载前先做容量预检；下载后至少做文件存在 + `ffprobe` 校验
+
+当前已验证事实：
+
+- 抖音站内搜索可能直接进验证码中间页
+- 作者主页作品流可能返回“服务异常”且 API 响应体为空
+- `scripts/download-platform-video.py` 已支持：
+  - 抖音公开视频页 URL → 下载 → 校验
+  - 多候选 URL + `--pick`
+  - 作者主页 URL（主页正常时提候选；异常时拒绝误选）
+  - 混合文本 / 搜索片段 / 分享文案 / `--input-file` 自动提取 URL
+  - `--list-only` 候选整理 + `--candidates-out` / `--report-out`
+  - 输出 `next_download_command` / `replay_download_command` 便于接力
++
++当当前阶段还拿不到稳定下载结果、但已经拿到候选搜索片段时，优先先做一次“候选整理”而不是继续口头描述：
++
++```bash
++python3 scripts/download-platform-video.py --list-only --pick=first --candidates-out tmp/video-downloads/candidates.txt --report-out tmp/video-downloads/candidates.json '这里放搜索片段/混合文本'
++```
++
++随后优先使用输出里的 `next_download_command` 继续执行，不要再手工临场重拼下一条命令。
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.

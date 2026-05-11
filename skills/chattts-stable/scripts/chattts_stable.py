@@ -103,6 +103,16 @@ def read_text(text: str | None, text_file: str | None) -> str:
     raise SystemExit("Text is required. Use --text or --text-file")
 
 
+def recommend_max_new_token(text: str, explicit: int | None) -> int:
+    if explicit is not None:
+        return explicit
+    normalized = "".join(text.split())
+    units = max(1, len(normalized))
+    estimated = max(384, units * 12)
+    rounded = ((estimated + 127) // 128) * 128
+    return min(1024, rounded)
+
+
 def patch_chattts_runtime() -> None:
     import torch
     import ChatTTS.utils.dl as dl_mod
@@ -357,7 +367,7 @@ def main() -> None:
     ap.add_argument("--temperature", type=float, default=0.3)
     ap.add_argument("--top-p", type=float, default=0.7)
     ap.add_argument("--top-k", type=int, default=20)
-    ap.add_argument("--max-new-token", type=int, default=384)
+    ap.add_argument("--max-new-token", type=int, default=None)
     args = ap.parse_args()
 
     if args.list_presets:
@@ -375,6 +385,8 @@ def main() -> None:
     if spk_file:
         spk_emb = (ASSETS_DIR / spk_file).read_text(encoding="utf-8").strip()
 
+    max_new_token = recommend_max_new_token(text, args.max_new_token)
+
     with tempfile.TemporaryDirectory(prefix="chattts-stable-") as tmpdir:
         temp_wav = Path(tmpdir) / f"{preset_name}.wav"
         synthesize_wav(
@@ -385,7 +397,7 @@ def main() -> None:
             temperature=args.temperature,
             top_p=args.top_p,
             top_k=args.top_k,
-            max_new_token=args.max_new_token,
+            max_new_token=max_new_token,
         )
         finalize_audio(temp_wav, out_path, fmt, args.tempo, args.bitrate)
 
