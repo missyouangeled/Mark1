@@ -10027,3 +10027,64 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260511-NVIDIA-FLUXDEV-PARAMS] nvidia-build-flux1dev
+
+**Logged**: 2026-05-11T06:21:36.124417+00:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+NVIDIA Build `black-forest-labs/flux.1-dev` rejected `guidance_scale` and `aspect_ratio` as unsupported request fields.
+
+### Error
+```
+422 Unprocessable Entity
+extra_forbidden: guidance_scale
+extra_forbidden: aspect_ratio
+```
+
+### Context
+- Operation: direct POST to `https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev`
+- Prompting task: single-subject night-street portrait refinement
+- The endpoint accepted basic fields like `prompt`, `seed`, and `steps`, but not those two extras.
+
+### Suggested Fix
+Probe supported payload shape per model before reusing params across NVIDIA Build image endpoints; keep `flux.1-dev` requests minimal unless docs explicitly list extra fields.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tmp/nvidia-image-test
+
+---
+
+## [ERR-20260511-NVIDIA-SEED-RANGE] nvidia-build-flux-seed-range
+
+**Logged**: 2026-05-11T06:35:38.758005+00:00
+**Priority**: low
+**Status**: pending
+**Area**: infra
+
+### Summary
+NVIDIA Build FLUX image endpoint rejects seeds >= 4294967296.
+
+### Error
+```
+422 Unprocessable Entity
+seed: Input should be less than 4294967296
+```
+
+### Context
+- Endpoint: `https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev`
+- Attempted seed: `202605111434`
+- Valid range inferred from response: 32-bit unsigned upper bound.
+
+### Suggested Fix
+Clamp comparison-test seeds to `< 4294967296`; prefer compact deterministic seeds like `20260511`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tmp/nvidia-image-test
+
+---

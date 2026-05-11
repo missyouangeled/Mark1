@@ -102,6 +102,43 @@ Things like:
   - 当前用户态 service：`~/.config/systemd/user/openclaw-nvidia-audio-bridge.service`
   - 用途：让本机 OpenClaw gateway 通过本地 bridge 暴露 NVIDIA 免费 TTS / ASR 路径
   - 快速定位规则：新机器若要复用这一套，先看 README，再按公司 Linux 维护说明执行
+- NVIDIA Build 文生图（当前已在公司 / Linux 机器验证打通）：
+  - 适用机器：公司（Linux）（其他机器若已配置 `nvidia:default` 也可复用）
+  - 系统 / OS：Linux
+  - 当前已验证认证来源：`~/.openclaw/agents/main/agent/auth-profiles.json` 里的 `nvidia:default`
+  - 关键结论：OpenClaw 的 `nvidia:default` 不只是给文本模型用，也能直接复用到 `https://ai.api.nvidia.com/v1/genai/...` 的 NVIDIA Build 官方文生图接口
+  - 当前已打通的官方模型：
+    - `black-forest-labs/flux.1-schnell`：适合快速 smoke test / 首次通路验证
+    - `black-forest-labs/flux.1-dev`：更适合人物图、真实感、人像比例稳定性
+  - 当前已在 NVIDIA Build 页面看到相关条目、但本轮未找到可直接复用的 hosted 公开路由或未打通的模型：
+    - `qwen/qwen-image`
+    - `qwen/qwen-image-edit`
+    - `nvidia/consistory`
+  - 当前未查到可直接用的 NVIDIA Build **Gemini 文生图**模型；`build.nvidia.com/google` 这边目前看到的是 `Gemma` / `PaliGemma` / 图像理解类，不是 Gemini image generation
+  - 当前已验证的接口坑：
+    - `flux.1-dev` 不接受我临时猜加的 `guidance_scale` / `aspect_ratio`，会返回 422
+    - `seed` 必须 `< 4294967296`，超出会返回 422
+    - 当前这台机器走的 NVIDIA Build **hosted** 路线，对本地图片直传图生图会报 `Expected: example_id, got: base64`；这点不只出现在 `flux.1-dev canny/depth`，连 `flux.1-kontext-dev` 也同样卡住
+    - NVIDIA Visual GenAI NIM 文档里虽有 `/v1/images/edits` 与 OpenAI-compatible image generation/editing 说明，但当前 `ai.api.nvidia.com` / `integrate.api.nvidia.com` 上未发现可直接调用的对应 hosted 根路由；至少在本轮认证与路径下，`/v1/images/generations`、`/v1/images/edits` 都返回 404
+  - 当前用户偏好（很重要）：在同模型同 seed 的对比里，用户明确更喜欢 **自然直说式 prompt**，不喜欢过于模板化、结构化、像表单一样的 prompt；以后做“真实、好看”的女性人像，优先沿 `FLUX.1-dev + 自然语言描述 + 少模板感` 这条线继续微调
+  - 本轮公平测试结论（同一模型 `FLUX.1-dev`、同一 seed、同一主题）：
+    - `01-raw`（自然 prompt）= 用户最喜欢
+    - `02-claude-office-style` / `03-supercent-style` = 可借结构，但不应替代自然 prompt 主线
+  - 本轮找到的外部 skill 候选及适配判断：
+    - `claude-office-skills/skills@image-generation`：更适合作为 prompt 工程参考，可与 NVIDIA Build 结合
+    - `secondsky/claude-skills@nano-banana-prompts`：对“更像真人摄影的人像 prompt”很有参考价值
+    - `eachlabs/skills@portrait-enhancement`：适合借鉴“自然人像更耐看”的修饰方向
+    - `supercent-io/skills-template@image-generation`：更偏 Gemini / MCP 思路，不适合直接拿来接 NVIDIA Build
+    - `inference-sh*/...@ai-image-generation` / `@flux-image`：后端是 inference.sh，不适合和 NVIDIA Build 做同一条链路混用
+  - 当前测试输出目录：`tmp/nvidia-image-test/`
+  - 当前三张公平对比图目录：`tmp/nvidia-image-test/comparison-20260511-143556/`
+  - 本地 skill 原型：`skills/nvidia-build-image/`
+    - 用途：把 NVIDIA Build 的文生图 / 模型切换收成固定入口，后续不必每次手写脚本
+    - 主脚本：`skills/nvidia-build-image/scripts/nvidia_build_image.py`
+    - 当前首发支持：`flux-dev`（主线质量文生图）、`flux-schnell`（快速 smoke test）、`flux-klein`（快速切另一条官方文生图模型比较）
+    - 当前明确未打通：Build hosted 路线下的“任意本地图片直传图生图”
+    - 已验证：脚本可直接复用 OpenClaw 的 `nvidia:default`，并已完成 `flux-schnell` 与 `flux-klein` 的最小成功探活
+    - 打包校验产物：`tmp/skill-dist/nvidia-build-image.skill`
 - 临时文件下载分享（公司 / Linux 机器）：
   - 适用机器：公司（Linux）
   - 系统 / OS：Linux
