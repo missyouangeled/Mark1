@@ -9,7 +9,6 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 import requests
@@ -17,6 +16,8 @@ import requests
 WORKSPACE = Path.home() / ".openclaw" / "workspace"
 AUTH_PROFILES = Path.home() / ".openclaw" / "agents" / "main" / "agent" / "auth-profiles.json"
 DEFAULT_OUT_DIR = WORKSPACE / "tmp" / "nvidia-image-test"
+DEFAULT_NIM_BASE_URL = os.environ.get("NVIDIA_IMAGE_NIM_BASE_URL") or os.environ.get("NIM_BASE_URL") or "http://127.0.0.1:8000"
+DEFAULT_NIM_API_KEY = os.environ.get("NVIDIA_IMAGE_NIM_API_KEY") or os.environ.get("NIM_API_KEY") or ""
 
 RATIO_SIZES = {
     "1:1": (1024, 1024),
@@ -28,32 +29,49 @@ RATIO_SIZES = {
     "2:3": (1216, 832),
 }
 
-MODELS = {
+BUILD_HOSTED_MODELS = {
     "flux-dev": {
         "endpoint": "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
         "default_steps": 28,
         "supports_ratio": True,
         "supports_cfg_scale": True,
-        "supports_image_modes": False,
-        "default_cfg_scale": 3.5,
     },
     "flux-schnell": {
         "endpoint": "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell",
         "default_steps": 4,
         "supports_ratio": False,
         "supports_cfg_scale": False,
-        "supports_image_modes": False,
-        "default_cfg_scale": None,
     },
     "flux-klein": {
         "endpoint": "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b",
         "default_steps": 4,
         "supports_ratio": False,
         "supports_cfg_scale": False,
-        "supports_image_modes": False,
-        "default_cfg_scale": None,
     },
 }
+
+NIM_HTTP_MODELS = {
+    "flux-dev": {
+        "path": "/v1/infer",
+        "default_steps": 28,
+        "supports_image_modes": True,
+        "requires_image": False,
+    },
+    "flux-schnell": {
+        "path": "/v1/infer",
+        "default_steps": 4,
+        "supports_image_modes": False,
+        "requires_image": False,
+    },
+    "flux-kontext": {
+        "path": "/v1/infer",
+        "default_steps": 30,
+        "supports_image_modes": False,
+        "requires_image": True,
+    },
+}
+
+ALL_MODELS = sorted(set(BUILD_HOSTED_MODELS) | set(NIM_HTTP_MODELS))
 
 
 def load_api_key() -> str:
@@ -76,7 +94,6 @@ def is_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-
 def image_to_api_value(image: str) -> str:
     if is_url(image):
         return image
@@ -90,16 +107,14 @@ def image_to_api_value(image: str) -> str:
     return f"data:{mime};base64,{b64}"
 
 
-
-def choose_output_path(out: str | None, model: str) -> Path:
+def choose_output_path(out: str | None, backend: str, model: str) -> Path:
     if out:
         path = Path(out).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
     DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return DEFAULT_OUT_DIR / f"{model}-{ts}.jpg"
-
+    return DEFAULT_OUT_DIR / f"{backend}-{model}-{ts}.jpg"
 
 
 def normalize_seed(value: int | None) -> int:
@@ -110,9 +125,21 @@ def normalize_seed(value: int | None) -> int:
     return value
 
 
+def normalize_base_url(value: str) -> str:
+    return value.rstrip("/")
 
-def build_payload(args: argparse.Namespace, model_cfg: dict[str, Any]) -> dict[str, Any]:
-    payload: dict[str, Any] = {
+
+def build_hosted_payload(args: argparse.Namespace, model_cfg: dict) -> dict:
+    if args.mode != "base" or args.image:
+        if args.model == "flux-dev":
+            raise SystemExit(
+                "当前接入的 NVIDIA Build hosted 路线还不支持本地图片直传图生图："
+                "实测返回 `Expected: example_id, got: base64`。"
+                "若后续要继续补这条能力，请切到 `--backend nim-http` 并接 self-hosted Visual GenAI NIM。"
+            )
+        raise SystemExit(f"后端 {args.backend} 下的模型 {args.model} 当前只支持纯文生图")
+
+    payload = {
         "prompt": args.prompt,
         "seed": normalize_seed(args.seed),
         "steps": args.steps if args.steps is not None else model_cfg["default_steps"],
@@ -125,40 +152,69 @@ def build_payload(args: argparse.Namespace, model_cfg: dict[str, Any]) -> dict[s
 
     if model_cfg["supports_cfg_scale"] and args.cfg_scale is not None:
         payload["cfg_scale"] = args.cfg_scale
-    elif model_cfg["supports_cfg_scale"] and args.mode != "base":
-        payload["cfg_scale"] = model_cfg["default_cfg_scale"]
 
-    if model_cfg["supports_image_modes"]:
+    return payload
+
+
+def build_nim_payload(args: argparse.Namespace, model_cfg: dict) -> dict:
+    if args.ratio != "1:1":
+        raise SystemExit("当前 `nim-http` 后端还没把 ratio/size 参数接进正式入口；先保持默认 1:1。")
+    if args.cfg_scale is not None:
+        raise SystemExit("当前 `nim-http` 后端还没把 cfg_scale 接进正式入口；先不要传。")
+
+    payload = {
+        "prompt": args.prompt,
+        "seed": normalize_seed(args.seed),
+        "steps": args.steps if args.steps is not None else model_cfg["default_steps"],
+    }
+
+    if model_cfg.get("requires_image"):
+        if not args.image:
+            raise SystemExit(f"模型 {args.model} 在 `nim-http` 后端下必须提供 --image")
+        if args.mode != "base":
+            raise SystemExit(f"模型 {args.model} 在 `nim-http` 后端下不使用 canny/depth 模式")
+        payload["image"] = image_to_api_value(args.image)
+        return payload
+
+    if model_cfg.get("supports_image_modes"):
         payload["mode"] = args.mode
         if args.mode != "base":
             if not args.image:
                 raise SystemExit("使用 canny/depth 模式时必须提供 --image")
             payload["image"] = image_to_api_value(args.image)
+            payload["preprocess_image"] = True
         elif args.image:
-            raise SystemExit("mode=base 时不要同时传 --image；如需图生图请使用 --mode canny 或 --mode depth")
-    else:
-        if args.mode != "base":
-            if args.model == "flux-dev":
-                raise SystemExit(
-                    "当前接入的 NVIDIA Build hosted 路线还不支持本地图片直传图生图："
-                    "实测返回 `Expected: example_id, got: base64`。"
-                    "self-hosted Visual GenAI NIM 文档支持 image/base64，但这台机器当前走的 hosted 接口未打通。"
-                )
-            raise SystemExit(f"模型 {args.model} 不支持模式 {args.mode}")
-        if args.image:
-            if args.model == "flux-dev":
-                raise SystemExit(
-                    "当前接入的 NVIDIA Build hosted 路线还不支持本地图片直传图生图："
-                    "实测返回 `Expected: example_id, got: base64`。"
-                    "self-hosted Visual GenAI NIM 文档支持 image/base64，但这台机器当前走的 hosted 接口未打通。"
-                )
-            raise SystemExit(f"模型 {args.model} 当前未接入图生图输入")
+            raise SystemExit("mode=base 时不要同时传 --image；如需图像引导请使用 --mode canny 或 --mode depth")
+        return payload
 
+    if args.mode != "base":
+        raise SystemExit(f"模型 {args.model} 在 `nim-http` 后端下不支持模式 {args.mode}")
+    if args.image:
+        raise SystemExit(f"模型 {args.model} 在 `nim-http` 后端下当前不接收 --image")
     return payload
 
 
+def resolve_request(args: argparse.Namespace) -> tuple[dict, str, dict]:
+    if args.backend == "build-hosted":
+        if args.model not in BUILD_HOSTED_MODELS:
+            raise SystemExit(f"后端 {args.backend} 当前不支持模型 {args.model}")
+        model_cfg = BUILD_HOSTED_MODELS[args.model]
+        payload = build_hosted_payload(args, model_cfg)
+        return model_cfg, model_cfg["endpoint"], payload
 
-def invoke(endpoint: str, api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if args.backend == "nim-http":
+        if args.model not in NIM_HTTP_MODELS:
+            raise SystemExit(f"后端 {args.backend} 当前不支持模型 {args.model}")
+        model_cfg = NIM_HTTP_MODELS[args.model]
+        payload = build_nim_payload(args, model_cfg)
+        endpoint = normalize_base_url(args.base_url) + model_cfg["path"]
+        return model_cfg, endpoint, payload
+
+    raise SystemExit(f"未知 backend: {args.backend}")
+
+
+def invoke_build_hosted(endpoint: str, payload: dict) -> dict:
+    api_key = load_api_key()
     resp = requests.post(
         endpoint,
         headers={
@@ -174,8 +230,32 @@ def invoke(endpoint: str, api_key: str, payload: dict[str, Any]) -> dict[str, An
     return resp.json()
 
 
+def invoke_nim_http(endpoint: str, payload: dict, nim_api_key: str | None) -> dict:
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    key = (nim_api_key or "").strip()
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    resp = requests.post(endpoint, headers=headers, json=payload, timeout=300)
+    if resp.status_code != 200:
+        raise SystemExit(
+            f"self-hosted NIM 调用失败 ({resp.status_code}): {resp.text[:1200]}\n"
+            "请先确认目标 NIM 服务已启动，并且当前模型容器与所选 model/backend 匹配。"
+        )
+    return resp.json()
 
-def save_result(out_path: Path, response: dict[str, Any], meta_path: Path, payload: dict[str, Any], endpoint: str) -> None:
+
+def save_result(
+    out_path: Path,
+    response: dict,
+    meta_path: Path,
+    payload: dict,
+    endpoint: str,
+    backend: str,
+    model: str,
+) -> None:
     artifacts = response.get("artifacts") or []
     if not artifacts:
         raise SystemExit("返回里没有 artifacts")
@@ -185,6 +265,8 @@ def save_result(out_path: Path, response: dict[str, Any], meta_path: Path, paylo
         raise SystemExit("返回里没有图片 base64 字段")
     out_path.write_bytes(base64.b64decode(image_b64))
     meta = {
+        "backend": backend,
+        "model": model,
         "endpoint": endpoint,
         "payload": payload,
         "response_meta": {
@@ -196,46 +278,69 @@ def save_result(out_path: Path, response: dict[str, Any], meta_path: Path, paylo
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-
 def make_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description="NVIDIA Build 文生图最小入口（当前 hosted 图生图未打通）")
-    ap.add_argument("--model", choices=sorted(MODELS.keys()), default="flux-dev", help="模型别名")
+    ap = argparse.ArgumentParser(description="NVIDIA 图像技能入口：默认 Build hosted，预留 self-hosted NIM backend")
+    ap.add_argument("--backend", choices=["build-hosted", "nim-http"], default="build-hosted", help="图像后端")
+    ap.add_argument("--model", choices=ALL_MODELS, default="flux-dev", help="模型别名（不同 backend 可用集不同）")
     ap.add_argument("--prompt", required=True, help="生成提示词")
-    ap.add_argument("--image", help="图生图输入；支持本地路径或 http(s) URL")
-    ap.add_argument("--mode", choices=["base", "canny", "depth"], default="base", help="flux-dev 的生成模式")
-    ap.add_argument("--ratio", choices=sorted(RATIO_SIZES.keys()), default="1:1", help="输出比例（仅 flux-dev 生效）")
+    ap.add_argument("--image", help="输入图片；支持本地路径或 http(s) URL")
+    ap.add_argument("--mode", choices=["base", "canny", "depth"], default="base", help="flux-dev 在 nim-http 下支持的模式")
+    ap.add_argument("--ratio", choices=sorted(RATIO_SIZES.keys()), default="1:1", help="输出比例（当前仅 build-hosted 的 flux-dev 接入）")
     ap.add_argument("--steps", type=int, help="采样步数")
     ap.add_argument("--seed", type=int, help="随机种子，必须 < 4294967296")
-    ap.add_argument("--cfg-scale", type=float, help="引导强度（仅 flux-dev 使用）")
+    ap.add_argument("--cfg-scale", type=float, help="引导强度（当前仅 build-hosted 的 flux-dev 接入）")
+    ap.add_argument("--base-url", default=DEFAULT_NIM_BASE_URL, help="nim-http 后端的服务根地址")
+    ap.add_argument("--nim-api-key", default=DEFAULT_NIM_API_KEY, help="nim-http 后端的可选 Bearer token")
     ap.add_argument("--out", help="输出图片路径")
-    ap.add_argument("--print-payload", action="store_true", help="仅打印最终 payload，不发请求")
+    ap.add_argument("--print-payload", action="store_true", help="仅打印最终 endpoint/payload，不发请求")
     return ap
-
 
 
 def main() -> int:
     parser = make_parser()
     args = parser.parse_args()
-    model_cfg = MODELS[args.model]
-    payload = build_payload(args, model_cfg)
+    _, endpoint, payload = resolve_request(args)
 
     if args.print_payload:
-        print(json.dumps({"endpoint": model_cfg["endpoint"], "payload": payload}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {
+                    "backend": args.backend,
+                    "model": args.model,
+                    "endpoint": endpoint,
+                    "payload": payload,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
 
-    out_path = choose_output_path(args.out, args.model)
+    out_path = choose_output_path(args.out, args.backend, args.model)
     meta_path = out_path.with_suffix(out_path.suffix + ".json")
-    api_key = load_api_key()
-    response = invoke(model_cfg["endpoint"], api_key, payload)
-    save_result(out_path, response, meta_path, payload, model_cfg["endpoint"])
 
-    print(json.dumps({
-        "ok": True,
-        "model": args.model,
-        "output": str(out_path),
-        "metadata": str(meta_path),
-        "seed": payload["seed"],
-    }, ensure_ascii=False))
+    if args.backend == "build-hosted":
+        response = invoke_build_hosted(endpoint, payload)
+    elif args.backend == "nim-http":
+        response = invoke_nim_http(endpoint, payload, args.nim_api_key)
+    else:
+        raise SystemExit(f"未知 backend: {args.backend}")
+
+    save_result(out_path, response, meta_path, payload, endpoint, args.backend, args.model)
+
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "backend": args.backend,
+                "model": args.model,
+                "output": str(out_path),
+                "metadata": str(meta_path),
+                "seed": payload["seed"],
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 

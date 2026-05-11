@@ -133,11 +133,19 @@ Things like:
   - 当前测试输出目录：`tmp/nvidia-image-test/`
   - 当前三张公平对比图目录：`tmp/nvidia-image-test/comparison-20260511-143556/`
   - 本地 skill 原型：`skills/nvidia-build-image/`
-    - 用途：把 NVIDIA Build 的文生图 / 模型切换收成固定入口，后续不必每次手写脚本
+    - 用途：把 NVIDIA Build 的文生图 / 模型切换收成固定入口，并提前预留 self-hosted NIM 的第二后端接口，后续不必每次手写脚本
     - 主脚本：`skills/nvidia-build-image/scripts/nvidia_build_image.py`
-    - 当前首发支持：`flux-dev`（主线质量文生图）、`flux-schnell`（快速 smoke test）、`flux-klein`（快速切另一条官方文生图模型比较）
+    - 当前正式可用主线：`--backend build-hosted`
+      - `flux-dev`：主线质量文生图
+      - `flux-schnell`：快速 smoke test
+      - `flux-klein`：快速切另一条官方文生图模型比较
+    - 当前已预留但未在本机实测跑通的第二后端：`--backend nim-http`
+      - `flux-dev`：按 Visual GenAI NIM 文档预留 `base/canny/depth`
+      - `flux-schnell`：预留基础文生图
+      - `flux-kontext`：预留本地图编辑入口
     - 当前明确未打通：Build hosted 路线下的“任意本地图片直传图生图”
-    - 已验证：脚本可直接复用 OpenClaw 的 `nvidia:default`，并已完成 `flux-schnell` 与 `flux-klein` 的最小成功探活
+    - 当前机器现实边界：本轮检查里 `nvidia-smi` 不可用，因此不能把“这台机器已具备 self-hosted NIM 条件”当成事实
+    - 已验证：脚本可直接复用 OpenClaw 的 `nvidia:default`，并已完成 `flux-schnell` 与 `flux-klein` 的最小成功探活；skill 已通过打包校验
     - 打包校验产物：`tmp/skill-dist/nvidia-build-image.skill`
 - 临时文件下载分享（公司 / Linux 机器）：
   - 适用机器：公司（Linux）
