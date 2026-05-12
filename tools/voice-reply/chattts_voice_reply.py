@@ -52,6 +52,7 @@ TTS_TIMEOUT_SECONDS = 180
 REPLY_AUDIO_RETENTION_SECONDS = 4 * 60 * 60
 DEFAULT_FIRST_CHUNK_TARGET = 18
 DEFAULT_MAX_CHUNK_CHARS = 36
+DEFAULT_PREFER_SINGLE_CLIP_CHARS = int(os.environ.get("OPENCLAW_VOICE_REPLY_PREFER_SINGLE_CLIP_CHARS", "60"))
 
 GREETING_OPENING_PREFIXES = (
     "好呀",
@@ -80,6 +81,20 @@ GREETING_OPENING_HINTS = (
 )
 
 
+def soften_tts_ending(text: str) -> str:
+    """Soften known abrupt endings that tend to sound clipped or drift in timbre."""
+    replacements = (
+        ("嗯，我在。", "嗯，我在呢。"),
+        ("我在。", "我在呢。"),
+        ("我听着。", "我听着呢。"),
+        ("我一直听着。", "我一直听着呢。"),
+    )
+    for old, new in replacements:
+        if text.endswith(old):
+            return f"{text[:-len(old)]}{new}"
+    return text
+
+
 def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
     """
     Preprocess agent reply text for TTS consumption.
@@ -90,6 +105,7 @@ def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
     - Remove excessive whitespace
     - Collapse to single line
     - Trim to max_chars, keeping the last complete sentence
+    - Soften known abrupt endings that often sound clipped in TTS
     """
     # Remove code blocks
     text = re.sub(r'```[\s\S]*?```', '', text)
@@ -120,7 +136,7 @@ def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
                 truncated = truncated[:idx + 1]
                 break
         text = truncated.strip()
-    return text
+    return soften_tts_ending(text)
 
 
 def split_text_for_tts_chunks(
@@ -128,10 +144,13 @@ def split_text_for_tts_chunks(
     first_chunk_target: int = DEFAULT_FIRST_CHUNK_TARGET,
     max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
 ) -> list[str]:
-    """Split cleaned text into short speech-friendly chunks for future incremental playback."""
+    """Split cleaned text into speech-friendly chunks, but prefer a single clip unless the text is clearly long."""
     cleaned = clean_text_for_tts(text, max_chars=MAX_TTS_CHARS)
     if not cleaned:
         return []
+
+    if len(cleaned) <= max(DEFAULT_PREFER_SINGLE_CLIP_CHARS, max_chunk_chars):
+        return [cleaned]
 
     pieces = [p.strip() for p in re.split(r'(?<=[。！？!?…，,])', cleaned) if p.strip()]
     if not pieces:
