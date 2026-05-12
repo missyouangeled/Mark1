@@ -11,7 +11,7 @@
 // Current prototype architecture:
 //   before_agent_finalize(lastAssistantMessage)
 //     -> stage final assistant text by runId
-//   reply_dispatch(webchat/direct front-session default)
+//   reply_dispatch(current main-session only)
 //     -> exec voice-reply-chunked-deliver.sh on the staged text
 //     -> dispatcher.sendFinalReply({ text: agentReply })
 //     -> fall back to the normal text reply on any failure
@@ -112,6 +112,25 @@ function isWebchatDirectReply(event) {
   return surface === "webchat" && chatType === "direct";
 }
 
+function getAllowedSessionKeys(api) {
+  const configured = api.pluginConfig?.allowedSessionKeys;
+  if (!Array.isArray(configured)) {
+    return [];
+  }
+  return configured
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean);
+}
+
+function isAllowedMainSession(event, api) {
+  const sessionKey = typeof event?.sessionKey === "string" ? event.sessionKey.trim() : "";
+  if (!sessionKey) {
+    return false;
+  }
+  const allowedSessionKeys = getAllowedSessionKeys(api);
+  return allowedSessionKeys.includes(sessionKey);
+}
+
 export default definePluginEntry({
   id: "voice-reply-hard-default",
   name: "Voice Reply Hard Default",
@@ -137,7 +156,7 @@ export default definePluginEntry({
     api.on(
       "reply_dispatch",
       async (event, ctx) => {
-        if (!isWebchatDirectReply(event)) {
+        if (!isWebchatDirectReply(event) || !isAllowedMainSession(event, api)) {
           return;
         }
         if (event.sendPolicy === "deny" || event.suppressUserDelivery) {
