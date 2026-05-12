@@ -787,3 +787,79 @@ Review the correction and update the working understanding or prompt guidance if
 - Tags: main-session, subagent, media, stability, workflow
 
 ---
+## [LRN-20260512-main-session-current-session] correction
+
+**Logged**: 2026-05-12T10:32:04.729225+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: config
+
+### Summary
+在当前 WebChat / Control UI 直聊里，“主会话”必须理解为用户当前正在说话的这个会话，不能再混同为内部基础会话（如 `agent:main:main`）。
+
+### Details
+用户明确纠正：以后凡是“回主会话 / 向主会话汇报 / 发回前台 / 默认发送流程”，都必须绑定当前会话。之前把“用户所说的主会话”和系统内部 `main` 基础会话混为一谈，已经导致 watchdog 绑错会话、前台体感异常。
+
+### Suggested Action
+后续所有主会话相关的回报、媒体回传、默认发送流程与 watchdog 绑定，默认都以当前会话为准；若渠道是当前直聊，不要回落到 `agent:main:main`。
+
+### Metadata
+- Source: conversation | user_feedback
+- Related Files: AGENTS.md, MEMORY.md, memory/daily/2026-05-12.md
+- Tags: main-session, current-session, webchat, watchdog
+
+### Resolution
+- **Resolved**: 2026-05-12T10:32:04.729225+08:00
+- **Notes**: 已同步提升到 AGENTS.md、MEMORY.md 和当日日志，并已通知正在运行的语音回复分身按该口径继续。
+
+---
+## [LRN-20260512-watchdog-interval-3m] correction
+
+**Logged**: 2026-05-12T10:48:12+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: config
+
+### Summary
+当前 WebChat / Control UI 直聊里的进度兜底检查不应按 1 分钟频繁触发，默认改为 3 分钟以降低可见内部消息和额外 token 消耗。
+
+### Details
+用户明确指出：当前这种每 1 分钟一次的 watchdog / inter-session 往返消息会在直聊界面里可见，既打扰也可能带来无谓 token 成本。后续这类定时兜底应更克制，优先自然里程碑汇报，只有在长任务确实需要兜底时才挂检查，且默认至少 3 分钟。
+
+### Suggested Action
+把 AGENTS.md、TOOLS.md、MEMORY.md 与当日日志中的 1 分钟兜底口径统一改为 3 分钟，并在当前直聊里尽量减少可见内部消息型 watchdog。
+
+### Metadata
+- Source: conversation | user_feedback
+- Related Files: AGENTS.md, TOOLS.md, MEMORY.md, memory/2026-05-12.md, memory/daily/2026-05-12.md
+- Tags: watchdog, token-cost, webchat, status-update
+
+### Resolution
+- **Resolved**: 2026-05-12T10:48:12+08:00
+- **Notes**: 已将规则口径统一改为 3 分钟；当前无活跃用户可见 watchdog cron。
+
+---
+
+## [LRN-20260512-002] correction
+
+**Logged**: 2026-05-12T03:48:57.582Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Tue 2026-05-12 11:48 GMT+8] 第一句 还是没说完，最后一个词 应该是配置 只是说了一个配 后面就没了。 第二条很好。第三条语速有点慢。 那就按照你说的 如果回答的句子足够长，且结构完整，停顿自然，那就不用降低语速。正常说话。能说完就行。如果句子短。那么就降低语速。但是也别降低太多。刚才不是说降低百分之8吗 我觉得降低百分之4就好。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:dashboard:0f8c81b3-cf9f-4ed2-a6f1-d1772fed8395
+
+---
