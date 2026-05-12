@@ -29,6 +29,7 @@ Constraints (hard):
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import re
@@ -40,12 +41,14 @@ WORKSPACE = Path.home() / ".openclaw" / "workspace"
 ON_DEMAND_SH = WORKSPACE / "tools" / "chattts-on-demand" / "chattts-on-demand.sh"
 CLEANUP_SH = WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"
 DEFAULT_OUT_DIR = WORKSPACE / "tmp" / "voice-replies"
+STAGED_OUT_DIR = WORKSPACE / "tmp" / "voice-replies-staged"
 DEFAULT_PRESET = os.environ.get("OPENCLAW_VOICE_REPLY_PRESET", "default")
 DEFAULT_TEMPO = float(os.environ.get("OPENCLAW_VOICE_REPLY_TEMPO", "1.32"))
 GREETING_TEMPO_FACTOR = float(os.environ.get("OPENCLAW_VOICE_REPLY_GREETING_TEMPO_FACTOR", "0.85"))
 MAX_TTS_CHARS = 120  # 用户已确认更看重说完整，其次才是速度
 DEFAULT_MAX_NEW_TOKEN = int(os.environ.get("OPENCLAW_VOICE_REPLY_MAX_NEW_TOKEN", "768"))
 TTS_TIMEOUT_SECONDS = 180
+REPLY_AUDIO_RETENTION_SECONDS = 4 * 60 * 60
 
 GREETING_OPENING_PREFIXES = (
     "好呀",
@@ -119,16 +122,28 @@ def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
 
 def prune_expired_audio() -> None:
     """Best-effort cleanup for generated reply audio older than retention policy."""
-    if not CLEANUP_SH.exists():
-        return
+    if CLEANUP_SH.exists():
+        try:
+            subprocess.run(
+                [str(CLEANUP_SH), "--quiet"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
     try:
-        subprocess.run(
-            [str(CLEANUP_SH), "--quiet"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
+        if not STAGED_OUT_DIR.exists():
+            return
+        now = datetime.now().timestamp()
+        for candidate in STAGED_OUT_DIR.glob("*.mp3"):
+            try:
+                if now - candidate.stat().st_mtime > REPLY_AUDIO_RETENTION_SECONDS:
+                    candidate.unlink()
+            except Exception:
+                continue
     except Exception:
         pass
 
@@ -150,6 +165,34 @@ def choose_tempo(text: str, base_tempo: float) -> float:
     if is_greeting_opening(text):
         return round(base_tempo * GREETING_TEMPO_FACTOR, 4)
     return base_tempo
+
+
+def stage_media_for_main_session(output_path: str) -> str | None:
+    """Return a main-session-safe media path inside the real workspace when needed."""
+    source = Path(output_path)
+    try:
+        source_real = source.resolve(strict=True)
+    except FileNotFoundError:
+        return None
+    except Exception:
+        source_real = source.resolve()
+
+    try:
+        workspace_real = WORKSPACE.resolve(strict=True)
+    except Exception:
+        workspace_real = WORKSPACE.resolve()
+
+    if source_real == workspace_real or workspace_real in source_real.parents:
+        return str(source)
+
+    try:
+        STAGED_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        staged_name = f"staged-{source.name}"
+        staged_path = STAGED_OUT_DIR / staged_name
+        shutil.copy2(source_real, staged_path)
+        return str(staged_path)
+    except Exception:
+        return None
 
 
 def synthesize(
@@ -205,7 +248,7 @@ def synthesize(
         )
         if result.returncode == 0 and Path(out_path).exists():
             # on-demand.sh outputs "DONE: /path/to/file" on success
-            return out_path
+            return stage_media_for_main_session(out_path)
         return None
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return None

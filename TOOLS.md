@@ -38,8 +38,29 @@ Things like:
 - 适用机器：通用（其中带“掌机”字样的条目仅适用于掌机（Windows））
 - 系统 / OS：通用 / Windows / Linux（按各条目说明执行）
 
+- 口袋速记：纯日常聊天 = 可不开监工；工作型任务 = 默认监工在位；有任务分身 = 必须有且只有一个监工；30 秒无反馈 = 监工补状态；无后台任务 2 分钟 = 监工可收掉；媒体必须按主会话真实可用验收。
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
+- WebChat / Control UI 直聊里的轻量后台分身，不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话；默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
+- 本地健康诊断层（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）
+  - 系统 / OS：Linux
+  - 诊断脚本：`scripts/openclaw-local-health-diagnose.py`
+  - README：`tools/openclaw-local-health/README.md`
+  - systemd 模板：`tools/openclaw-local-health/openclaw-local-health-watch.service` / `tools/openclaw-local-health/openclaw-local-health-watch.timer`
+  - 当前状态目录：`~/.local/state/openclaw/local-health/`
+  - 用途：在不依赖 AI 回复的前提下，对 gateway、本机外联、主线 provider 路由做周期探测，并把结果写入本地状态文件
+  - 默认频率：开机后约 2 分钟首次运行，之后约每 5 分钟一次
+  - 边界：不负责页面主会话消息超时监听；那部分继续由 `main-supervisor-lite` 负责
+- 监工分身保留标签：`main-supervisor-lite`
+- 监工唯一标号格式：`main-supervisor-lite@<runtime-host>`（`<runtime-host>` 优先取运行时 host 元数据）
+- 规则：这个标签只给主会话监工分身使用；普通任务分身不要复用。监工分身整体数量应为 `0 或 1`：工作型任务期保留 1 个，无后台任务持续约 2 分钟后可回到 0。关闭任务分身时不要顺手关闭它。监工分身只看“是否还有后台任务”，不看主会话是不是还在聊天；只要“无后台任务”持续约 2 分钟后，就允许把它收掉。若未来出现监工重复，先比较唯一标号；标号相同则保留最新且健康的一个（健康 = 未失败、未超时、未被杀，且近期仍有活动或可见进度）。
+- 工作型任务默认要求：除纯日常聊天外，默认都应有 `main-supervisor-lite` 在位；若工作不阻塞前台，可只保留监工分身待命，不必强开普通任务分身；若已经有普通任务分身，则必须同时存在且只存在一个监工分身。
+- 当前直聊可落地实现：`保留标签 + 单例语义 + 按需轻量拉起 + 无后台任务 2 分钟后收掉`；不要把当前 WebChat / Control UI 直聊误当成支持线程绑定持久监工会话的环境。
+- 场景速记：纯日常聊天 = 可不开监工；工作型但不阻塞 = 监工在位、任务分身可不开；工作型且阻塞 = 监工在位 + 按需开任务分身；拿不准 = 按工作型任务处理。
+- 异常处置速记：任务空返回 = 先由监工报告，再检查；任务异常结束 = 先由监工报告，再修复；30 秒无可见产出 = 监工必须补一句短进度，不等于任务必须 30 秒内完成。
+- 能力边界速记：监工是兜底层，不是独立于 Gateway/渠道/模型链路之外的万能保险；若 Gateway 整体卡死、前端连接断开、渠道投递失效或同一路由模型调用全局阻塞，监工也可能一起失效。
+- 主会话本地媒体附件（音频 / 视频 / 图片）会按 realpath 做允许路径校验；如果工作区内路径实际是软链并跳到 workspace 外（例如 `/mnt/data/...`），Control UI 可能把它拦成 `path-not-allowed`。这类文件发回主会话前，应先 stage/copy 回 workspace 内真实目录。
 - Windows 更新脚本（掌机）：
   - 适用机器：掌机（Windows）
   - 系统 / OS：Windows

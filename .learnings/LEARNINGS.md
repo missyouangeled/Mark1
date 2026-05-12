@@ -764,3 +764,26 @@ Review the correction and update the working understanding or prompt guidance if
 - Source: user_feedback
 - Related Files: AGENTS.md, .learnings/LEARNINGS.md
 - Tags: feedback, responsiveness, git, workflow
+
+## [LRN-20260512-001] best_practice
+
+**Logged**: 2026-05-12T08:15:00+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: docs
+
+### Summary
+主会话稳定性应被当成硬性规则：默认保留轻量后台分身兜底，并把音频/视频/图片的真实可播放性纳入主会话验收。
+
+### Details
+用户再次明确指出：主会话“莫名其妙没反应”已经不是第一次，因此不能只在任务重时临时想起前后台协作，而应把主会话流畅性提升为硬性默认。新的要求包括两层：一是主会话活跃期默认保留或尽快拉起轻量后台分身，用于监工、补位和状态回报；二是主会话里的媒体能力（音频、视频、图片）也属于稳定性的一部分，修复和改动必须以主会话里真实可查看/可播放/可打开为验收标准，而不是只看文件是否生成成功。
+
+### Suggested Action
+把这条规则写入 AGENTS.md 与 MEMORY.md，并同步记录到当天 daily memory；后续凡是长排查、长推理、下载、转码、外部等待或媒体链路改动，都优先围绕主会话体感稳定来设计与验收。
+
+### Metadata
+- Source: user_feedback
+- Related Files: AGENTS.md, MEMORY.md, memory/daily/2026-05-12.md, tools/voice-reply/chattts_voice_reply.py
+- Tags: main-session, subagent, media, stability, workflow
+
+---

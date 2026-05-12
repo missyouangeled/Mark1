@@ -110,7 +110,54 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 - `~/.openclaw/workspace/tmp/voice-replies` → 迁到 `/mnt/data/openclaw/workspace-tmp/voice-replies` 后用 symlink 回挂
 - `~/.cache/modelscope` → 迁到 `/mnt/data/openclaw/modelscope-cache` 后用 symlink 回挂
 
-### 1. 恢复后自愈 watcher
+### 1. 本地健康诊断层（公司 Linux）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-12
+- 用途：在不依赖 AI 模型回复的前提下，周期检查本机 OpenClaw 的 gateway、本机外联、以及主线模型 provider 路由可达性，尽量把“为什么这次像死掉了”归类成更具体的原因。
+
+相关文件：
+
+- 诊断脚本：`scripts/openclaw-local-health-diagnose.py`
+- README：`tools/openclaw-local-health/README.md`
+- service 模板：`tools/openclaw-local-health/openclaw-local-health-watch.service`
+- timer 模板：`tools/openclaw-local-health/openclaw-local-health-watch.timer`
+- 当前用户态 systemd：`~/.config/systemd/user/openclaw-local-health-watch.service`
+- 当前用户态 timer：`~/.config/systemd/user/openclaw-local-health-watch.timer`
+- 运行期状态目录：`~/.local/state/openclaw/local-health/`
+
+当前最小检查项：
+
+1. `openclaw status --json` 本地探测
+2. Gateway reachability / service runtime 判断
+3. 通用外网探测（当前默认：GitHub API、百度首页）
+4. `~/.openclaw/openclaw.json` 中主线 provider 的 `baseUrl` 路由探测
+
+当前职责边界：
+
+- 只负责：本地网络、Gateway、主线 provider 路由
+- 不负责：页面主会话消息级超时监听
+- 页面主会话“长时间没回复”的体感问题，继续交给 `main-supervisor-lite` 负责
+
+当前产物：
+
+- `~/.local/state/openclaw/local-health/last-report.json`
+- `~/.local/state/openclaw/local-health/last-summary.txt`
+- `~/.local/state/openclaw/local-health/health-diagnostic.log`
+
+当前默认频率：
+
+- 开机后约 2 分钟首次运行
+- 之后约每 5 分钟运行一次
+
+说明：
+
+- 这层不是“万能保险”，但只要本机、gateway、本地脚本环境还活着，它就能尽量把故障归类成 gateway、本机外联、或 provider 路由问题。
+- 当前主线 provider 会在摘要中标 `*`；非主线 provider 失败只作补充线索，不单独拉高整体告警等级。
+- 当前还额外预留了一个未来本地 fallback 模型接口位：诊断输出 JSON 中会带 `fallback` 字段，后续若用户在本机部署了小模型，可再把自动接管逻辑挂到这一层后面。
+
+### 2. 恢复后自愈 watcher
 
 相关脚本：
 
@@ -120,7 +167,7 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 
 - 检测休眠恢复或长时间暂停后，自动重启 `openclaw-gateway.service`
 
-### 2. systemd 用户单元
+### 3. systemd 用户单元
 
 相关文件：
 

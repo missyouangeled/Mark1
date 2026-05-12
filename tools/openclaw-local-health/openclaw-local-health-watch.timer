@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodic OpenClaw local health diagnosis
+
+[Timer]
+Unit=openclaw-local-health-watch.service
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
