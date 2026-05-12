@@ -226,6 +226,10 @@ def synthesize_wav(
     top_p: float,
     top_k: int,
     max_new_token: int,
+    infer_prompt: str,
+    use_refine_text: bool,
+    refine_text_prompt: str,
+    refine_text_only: bool,
 ) -> None:
     patch_chattts_runtime()
 
@@ -259,20 +263,32 @@ def synthesize_wav(
 
     print("\n[2/3] Running inference...")
     params = chat.InferCodeParams(
+        prompt=infer_prompt,
         temperature=temperature,
         top_P=top_p,
         top_K=top_k,
         max_new_token=max_new_token,
         spk_emb=spk_emb or None,
     )
-    wavs = chat.infer(
+    refine_params = chat.RefineTextParams(prompt=refine_text_prompt)
+    inference = chat.infer(
         [text],
-        skip_refine_text=True,
+        skip_refine_text=not use_refine_text,
+        refine_text_only=refine_text_only,
         use_decoder=True,
         do_text_normalization=False,
         do_homophone_replacement=False,
+        params_refine_text=refine_params,
         params_infer_code=params,
     )
+
+    if refine_text_only:
+        print("\n[3/3] Refined text only...")
+        refined_text = inference[0] if isinstance(inference, list) else inference
+        print(refined_text)
+        return
+
+    wavs = inference
 
     print("\n[3/3] Saving wav...")
     wav = wavs[0] if isinstance(wavs, list) else wavs
@@ -368,6 +384,14 @@ def main() -> None:
     ap.add_argument("--top-p", type=float, default=0.7)
     ap.add_argument("--top-k", type=int, default=20)
     ap.add_argument("--max-new-token", type=int, default=None)
+    ap.add_argument("--infer-prompt", default="[speed_5]",
+                    help="ChatTTS InferCodeParams prompt, e.g. [speed_5]")
+    ap.add_argument("--use-refine-text", action="store_true",
+                    help="enable ChatTTS refine_text stage for side experiments")
+    ap.add_argument("--refine-text-prompt", default="",
+                    help="ChatTTS RefineTextParams prompt, e.g. [oral_2][break_4]")
+    ap.add_argument("--refine-text-only", action="store_true",
+                    help="print refined text only for side experiments, do not render audio")
     args = ap.parse_args()
 
     if args.list_presets:
@@ -398,7 +422,13 @@ def main() -> None:
             top_p=args.top_p,
             top_k=args.top_k,
             max_new_token=max_new_token,
+            infer_prompt=args.infer_prompt,
+            use_refine_text=args.use_refine_text,
+            refine_text_prompt=args.refine_text_prompt,
+            refine_text_only=args.refine_text_only,
         )
+        if args.refine_text_only:
+            return
         finalize_audio(temp_wav, out_path, fmt, args.tempo, args.bitrate)
 
     print("Final output:", out_path)

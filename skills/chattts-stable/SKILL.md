@@ -73,6 +73,20 @@ bash tools/chattts-on-demand/chattts-on-demand.sh --text '第二次' --out /tmp/
 | Crash recovery (`--cold` fallback) | ✅ Verified — works independently of daemon state |
 | Concurrent request queuing | ✅ Verified — serial processing, 3 rapid requests queued |
 
+### Side experiment hooks for humanization (2026-05-12)
+
+The formal entry now also exposes side-experiment flags so we can test
+"more human / more delicate" prosody layers **without touching the current
+main-session default template**:
+
+- `--infer-prompt` → override `InferCodeParams.prompt` (default stays `[speed_5]`)
+- `--use-refine-text` → enable ChatTTS refine-text stage for experiments only
+- `--refine-text-prompt` → pass control tokens such as `oral_*` / `break_*`
+- `--refine-text-only` → inspect how ChatTTS rewrites the utterance before rendering audio
+
+These flags are for A/B experiments and research. Do not enable them in the
+main default route unless a concrete combination has already been accepted.
+
 ### Improved stale-socket handling (2026-05-09)
 
 The `chattts-daemon.sh request` handler now includes a stale socket detection step:
