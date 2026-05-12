@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openclaw.dev/schemas/openclaw.plugin.json",
+  "id": "voice-reply-hard-default",
+  "name": "Voice Reply Hard Default",
+  "description": "Routes every agent reply through the ChatTTS voice pipeline",
+  "kind": "hooks",
+  "version": "0.1.0",
+  "entry": "./voice-reply-hook.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

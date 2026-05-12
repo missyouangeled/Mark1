@@ -1,0 +1,18 @@
+{
+  "name": "voice-reply-hard-default",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw plugin: routes all agent replies through ChatTTS audio pipeline",
+  "openclaw": {
+    "extensions": ["./voice-reply-hook.js"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.5.7",
+      "pluginSdkVersion": "2026.5.7"
+    }
+  }
+}

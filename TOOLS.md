@@ -38,7 +38,7 @@ Things like:
 - 适用机器：通用（其中带“掌机”字样的条目仅适用于掌机（Windows））
 - 系统 / OS：通用 / Windows / Linux（按各条目说明执行）
 
-- 口袋速记：纯日常聊天 = 可不开监工；工作型任务 = 默认监工在位；有任务分身 = 必须有且只有一个监工；30 秒无反馈 = 监工补状态；无后台任务 2 分钟 = 监工可收掉；媒体必须按主会话真实可用验收。
+- 口袋速记：纯日常聊天 = 可不开监工；工作型任务 = 默认监工在位；有任务分身 = 必须有且只有一个监工；3 分钟无反馈 = 监工补状态；无后台任务 2 分钟 = 监工可收掉；媒体必须按主会话真实可用验收。
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
 - WebChat / Control UI 直聊里的轻量后台分身，不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话；默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
@@ -58,7 +58,7 @@ Things like:
 - 工作型任务默认要求：除纯日常聊天外，默认都应有 `main-supervisor-lite` 在位；若工作不阻塞前台，可只保留监工分身待命，不必强开普通任务分身；若已经有普通任务分身，则必须同时存在且只存在一个监工分身。
 - 当前直聊可落地实现：`保留标签 + 单例语义 + 按需轻量拉起 + 无后台任务 2 分钟后收掉`；不要把当前 WebChat / Control UI 直聊误当成支持线程绑定持久监工会话的环境。
 - 场景速记：纯日常聊天 = 可不开监工；工作型但不阻塞 = 监工在位、任务分身可不开；工作型且阻塞 = 监工在位 + 按需开任务分身；拿不准 = 按工作型任务处理。
-- 异常处置速记：任务空返回 = 先由监工报告，再检查；任务异常结束 = 先由监工报告，再修复；30 秒无可见产出 = 监工必须补一句短进度，不等于任务必须 30 秒内完成。
+- 异常处置速记：任务空返回 = 先由监工报告，再检查；任务异常结束 = 先由监工报告，再修复；3 分钟无可见产出 = 监工必须补一句短进度，不等于任务必须 3 分钟内完成；对预计会长于 3 分钟且中间不一定自然产出结果的步骤，默认挂一个当前会话 3 分钟一次性检查兜底。当前直聊里要优先避免为了兜底而频繁制造可见内部消息与额外 token 消耗。
 - 能力边界速记：监工是兜底层，不是独立于 Gateway/渠道/模型链路之外的万能保险；若 Gateway 整体卡死、前端连接断开、渠道投递失效或同一路由模型调用全局阻塞，监工也可能一起失效。
 - 主会话本地媒体附件（音频 / 视频 / 图片）会按 realpath 做允许路径校验；如果工作区内路径实际是软链并跳到 workspace 外（例如 `/mnt/data/...`），Control UI 可能把它拦成 `path-not-allowed`。这类文件发回主会话前，应先 stage/copy 回 workspace 内真实目录。
 - Windows 更新脚本（掌机）：
@@ -283,7 +283,8 @@ Things like:
     - purpose: safety fallback when later experiments sound worse, stiffer, or less natural
     - restore rule: if the user says “恢复到基础女声版本”, revert to this preset directly
     - reference sample chosen by user: `tmp/voice-replies/natural-baseline-xiaoxiao-20260422-164306.mp3`
-  - Prefer mp3 for current OpenClaw / Control UI usage
+  - 当前正式默认：`voice-reply-hard-default` 已挂进运行配置，并在当前公司 Linux 机的 gateway 中启用
+  - 当前 OpenClaw / Control UI 主线默认：优先 `wav` / 尽量少损，不再把 `mp3` 当主默认
   - Example:
     - `node tools/voice-reply/tts.mjs --text '你好，我是贾维斯。' --out /tmp/jarvis-voice.mp3`
 - **Noiz-based helper** for stronger timbre continuity:
@@ -306,6 +307,27 @@ Things like:
   - Default output path: `tmp/voice-replies/local-xtts-YYYYmmdd-HHMMSS.mp3`
   - Example:
     - `bash tools/voice-reply/local-xtts-reply.sh --text '你好，我在。' --out /tmp/local-xtts.mp3`
+- **Chunked voice reply delivery (首句先出，当前会话一次性交付)**:
+  - 核心约定：**主会话 ≡ 当前会话**，一次回复送所有分块音频到当前会话
+  - Script: `tools/voice-reply/voice-reply-chunked-deliver.sh`
+  - 调用现有分块管线，自动把所有分块音频放到一条消息中返回
+  - 输出 JSON 的 `agentReply` 字段包含可直接返回当前会话的文本，格式为：
+    - `分块文字拼接` + `\n\n[[audio_as_voice]]\nMEDIA:块1\nMEDIA:块2（如有）\n...`
+  - Example（agent exec 调用）:
+    - `result=$(bash tools/voice-reply/voice-reply-chunked-deliver.sh "回复文本内容")`
+    - `agentReply=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['agentReply'])")`
+    - 然后将 `$agentReply` 作为当前会话返回内容
+  - Output fields:
+    - `ok`: true/false
+    - `agentReply`: 当前会话可直接返回的文本（含 `[[audio_as_voice]]` + 所有 `MEDIA:`）
+    - `chunkCount`: 分块数
+    - `mediaPaths[]`: 所有音频路径
+    - `audioAsVoice`: 始终为 true（有音频时）
+  - 失败时自动回退纯文本（`ok: false`，`agentReply` 为原始文本）
+  - 向后兼容：`voice-reply.sh` 仍然是稳定的单块默认入口
+- If a helper is used manually, send with:
+  - `[[audio_as_voice]]`
+  - `MEDIA:/path/to/file.mp3`
 - If a helper is used manually, send with:
   - `[[audio_as_voice]]`
   - `MEDIA:/path/to/file.mp3`
@@ -355,7 +377,8 @@ Things like:
 - 当前默认规则：
   - `default` = 当前主线默认音色（model-default）
   - `preset-1` / `preset-2` / `preset-3` = 已保存的可切换候选音色
-  - **默认语速 / 节奏**：`tempo=1.15`（因为这版是用户确认通过的基线）
+  - **默认语速 / 节奏**：`tempo=1.10`（2026-05-12 的 A/B 后，用户确认这档整体感觉最好）
+  - **当前清晰度优先导出方向**：优先 `wav` / 尽量少损的导出；同一文本下，用户明确觉得无损版清晰度最好
 - 推荐运行方式：
   - `python3 skills/chattts-stable/scripts/chattts_stable.py --list-presets`
   - `python3 skills/chattts-stable/scripts/chattts_stable.py --preset default --text '你好，我在。' --out tmp/voice-replies/chattts-stable-default.mp3`

@@ -1,6 +1,6 @@
 {
   "defaultPreset": "default",
-  "defaultTempo": 1.15,
+  "defaultTempo": 1.10,
   "assetDir": "~/.openclaw/workspace/tmp/voice-replies/chattts-hybrid",
   "presets": {
     "default": {

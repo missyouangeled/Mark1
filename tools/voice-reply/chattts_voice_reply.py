@@ -24,10 +24,11 @@ Constraints (hard):
   - Does NOT modify OpenClaw gateway config
   - Does NOT require a persistent daemon (uses on-demand.sh which auto-starts/exits)
   - Falls back to text-only silently on any error
-  - Preserves approved voice quality (default tempo=1.15)
+  - Preserves approved voice quality (current default tempo=1.10, prefer lossless wav on this route when possible)
 """
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -43,12 +44,14 @@ CLEANUP_SH = WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"
 DEFAULT_OUT_DIR = WORKSPACE / "tmp" / "voice-replies"
 STAGED_OUT_DIR = WORKSPACE / "tmp" / "voice-replies-staged"
 DEFAULT_PRESET = os.environ.get("OPENCLAW_VOICE_REPLY_PRESET", "default")
-DEFAULT_TEMPO = float(os.environ.get("OPENCLAW_VOICE_REPLY_TEMPO", "1.32"))
+DEFAULT_TEMPO = float(os.environ.get("OPENCLAW_VOICE_REPLY_TEMPO", "1.10"))
 GREETING_TEMPO_FACTOR = float(os.environ.get("OPENCLAW_VOICE_REPLY_GREETING_TEMPO_FACTOR", "0.85"))
 MAX_TTS_CHARS = 120  # 用户已确认更看重说完整，其次才是速度
 DEFAULT_MAX_NEW_TOKEN = int(os.environ.get("OPENCLAW_VOICE_REPLY_MAX_NEW_TOKEN", "768"))
 TTS_TIMEOUT_SECONDS = 180
 REPLY_AUDIO_RETENTION_SECONDS = 4 * 60 * 60
+DEFAULT_FIRST_CHUNK_TARGET = 18
+DEFAULT_MAX_CHUNK_CHARS = 36
 
 GREETING_OPENING_PREFIXES = (
     "好呀",
@@ -118,6 +121,50 @@ def clean_text_for_tts(text: str, max_chars: int = MAX_TTS_CHARS) -> str:
                 break
         text = truncated.strip()
     return text
+
+
+def split_text_for_tts_chunks(
+    text: str,
+    first_chunk_target: int = DEFAULT_FIRST_CHUNK_TARGET,
+    max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
+) -> list[str]:
+    """Split cleaned text into short speech-friendly chunks for future incremental playback."""
+    cleaned = clean_text_for_tts(text, max_chars=MAX_TTS_CHARS)
+    if not cleaned:
+        return []
+
+    pieces = [p.strip() for p in re.split(r'(?<=[。！？!?…，,])', cleaned) if p.strip()]
+    if not pieces:
+        return [cleaned]
+
+    chunks: list[str] = []
+    current = ""
+    current_limit = max(6, first_chunk_target)
+
+    for piece in pieces:
+        candidate = f"{current}{piece}" if current else piece
+        if len(candidate) <= current_limit:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+        if len(piece) <= max_chunk_chars:
+            current = piece
+            current_limit = max(max_chunk_chars, first_chunk_target)
+            continue
+        start = 0
+        while start < len(piece):
+            limit = current_limit if not chunks else max_chunk_chars
+            end = min(len(piece), start + limit)
+            chunks.append(piece[start:end].strip())
+            start = end
+        current = ""
+        current_limit = max_chunk_chars
+
+    if current:
+        chunks.append(current)
+
+    return [chunk for chunk in chunks if chunk]
 
 
 def prune_expired_audio() -> None:
@@ -269,7 +316,28 @@ def main() -> None:
                     help=f"Max audio token budget (default: {DEFAULT_MAX_NEW_TOKEN})")
     ap.add_argument("--max-chars", type=int, default=MAX_TTS_CHARS,
                     help=f"Max chars for TTS (default: {MAX_TTS_CHARS})")
+    ap.add_argument("--plan-only", action="store_true",
+                    help="Only print future chunking plan JSON; do not synthesize audio")
+    ap.add_argument("--first-chunk-target", type=int, default=DEFAULT_FIRST_CHUNK_TARGET,
+                    help=f"Target chars for the first chunk in plan mode (default: {DEFAULT_FIRST_CHUNK_TARGET})")
+    ap.add_argument("--max-chunk-chars", type=int, default=DEFAULT_MAX_CHUNK_CHARS,
+                    help=f"Max chars per later chunk in plan mode (default: {DEFAULT_MAX_CHUNK_CHARS})")
     args = ap.parse_args()
+
+    if args.plan_only:
+        cleaned = clean_text_for_tts(args.text, max_chars=args.max_chars)
+        chunks = split_text_for_tts_chunks(
+            args.text,
+            first_chunk_target=args.first_chunk_target,
+            max_chunk_chars=args.max_chunk_chars,
+        )
+        print(json.dumps({
+            "cleanedText": cleaned,
+            "chunks": chunks,
+            "firstChunk": chunks[0] if chunks else "",
+            "remainingChunks": chunks[1:] if len(chunks) > 1 else [],
+        }, ensure_ascii=False, indent=2))
+        sys.exit(0)
 
     out_path = synthesize(
         text=args.text,
