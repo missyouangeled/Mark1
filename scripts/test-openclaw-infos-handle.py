@@ -132,7 +132,7 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
-        assert payload["queryContractVersion"] == 3
+        assert payload["queryContractVersion"] == 4
         assert len(payload["events"]) == 2
         assert len(payload["result"]["events"]) == 2
         assert payload["events"][0]["source"] == "supervisor"
@@ -146,7 +146,7 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 3
+        assert payload["queryContractVersion"] == 4
         assert payload["result"]["count"] == 3
         source_rows = {item["source"]: item for item in payload["result"]["sources"]}
         assert source_rows["local-health"]["sourceView"] == "health"
@@ -157,7 +157,17 @@ def main() -> int:
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
+        assert payload["queryContractVersion"] == 4
         assert payload["sourceName"] == "local-health"
+        assert payload["result"]["source"] == "local-health"
+        assert payload["result"]["exists"] is True
+        assert payload["result"]["availableSources"] == ["frontstage-recovery", "local-health", "supervisor"]
+        assert payload["result"]["sourceEventType"] == "local_health.status.changed"
+        assert payload["result"]["sourceView"] == "health"
+        assert payload["result"]["hasContract"] is True
+        assert payload["result"]["hasSourceState"] is True
+        assert payload["result"]["hasDelivery"] is True
+        assert payload["result"]["recentEventCount"] == 1
         assert payload["result"]["contract"]["sourceView"] == "health"
         assert payload["result"]["latestSourceState"]["summary"] == "健康正常"
         assert payload["result"]["latestDelivery"]["message"] == "[本地健康] 当前已恢复正常。"
@@ -166,32 +176,66 @@ def main() -> int:
         result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 3
+        assert payload["queryContractVersion"] == 4
         assert payload["panelName"] == "health"
         assert payload["result"]["panelName"] == "health"
         assert payload["result"]["exists"] is True
+        assert payload["result"]["summary"] == "健康正常"
+        assert payload["result"]["detail"] == "当前网络和 Gateway 可达。"
+        assert payload["result"]["severity"] is None
+        assert payload["result"]["checkedAt"] == "2026-05-15T12:00:00+08:00"
         assert payload["result"]["panel"]["summary"] == "健康正常"
         assert payload["result"]["availablePanels"] == ["health", "recovery", "supervisor"]
 
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 3
+        assert payload["queryContractVersion"] == 4
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
         assert payload["result"]["queryCatalog"]["defaultLimit"] == 6
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["requiredArgs"] == ["source_name"]
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["exists"] == "bool"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentEventCount"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["formats"] == ["text", "json"]
         assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["requiredArgs"] == ["panel_name"]
         assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["resultShape"]["exists"] == "bool"
+        assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["resultShape"]["checkedAt"] == "str|null"
         assert payload["result"]["paths"]["snapshotPath"] == str(snapshot_path)
 
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         assert "source=local-health" in result.stdout
+        assert "exists=true" in result.stdout
+        assert "hasContract=true｜hasState=true｜hasDelivery=true｜recentEvents=1" in result.stdout
         assert "latestState: 健康正常" in result.stdout
+
+        result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["queryContractVersion"] == 4
+        assert payload["sourceName"] == "missing-source"
+        assert payload["result"]["source"] == "missing-source"
+        assert payload["result"]["exists"] is False
+        assert payload["result"]["availableSources"] == ["frontstage-recovery", "local-health", "supervisor"]
+        assert payload["result"]["sourceEventType"] is None
+        assert payload["result"]["sourceView"] is None
+        assert payload["result"]["hasContract"] is False
+        assert payload["result"]["hasSourceState"] is False
+        assert payload["result"]["hasDelivery"] is False
+        assert payload["result"]["recentEventCount"] == 0
+        assert payload["result"]["contract"] == {}
+        assert payload["result"]["latestSourceState"] == {}
+        assert payload["result"]["latestDelivery"] == {}
+        assert payload["result"]["recentEvents"] == []
+
+        result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "source=missing-source" in result.stdout
+        assert "exists=false" in result.stdout
+        assert "availableSources: frontstage-recovery, local-health, supervisor" in result.stdout
 
         result = run("query", "--kind", "sources.catalog", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
@@ -202,6 +246,27 @@ def main() -> int:
         assert "panel=health" in result.stdout
         assert "exists=true" in result.stdout
         assert "summary: 健康正常" in result.stdout
+        assert "checkedAt: 2026-05-15T12:00:00+08:00" in result.stdout
+
+        result = run("query", "--kind", "panel.inspect", "--panel-name", "missing-panel", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["queryContractVersion"] == 4
+        assert payload["panelName"] == "missing-panel"
+        assert payload["result"]["panelName"] == "missing-panel"
+        assert payload["result"]["exists"] is False
+        assert payload["result"]["availablePanels"] == ["health", "recovery", "supervisor"]
+        assert payload["result"]["summary"] is None
+        assert payload["result"]["detail"] is None
+        assert payload["result"]["severity"] is None
+        assert payload["result"]["checkedAt"] is None
+        assert payload["result"]["panel"] == {}
+
+        result = run("query", "--kind", "panel.inspect", "--panel-name", "missing-panel", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "panel=missing-panel" in result.stdout
+        assert "exists=false" in result.stdout
+        assert "availablePanels: health, recovery, supervisor" in result.stdout
 
         print("ALL PASS")
     return 0

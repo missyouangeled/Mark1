@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 3
+QUERY_CONTRACT_VERSION = 4
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -198,6 +198,10 @@ def build_query_catalog() -> dict[str, Any]:
                 "panelName": "str",
                 "exists": "bool",
                 "availablePanels": "array[str]",
+                "summary": "str|null",
+                "detail": "str|null",
+                "severity": "str|null",
+                "checkedAt": "str|null",
                 "panel": "object",
             },
         },
@@ -231,6 +235,14 @@ def build_query_catalog() -> dict[str, Any]:
             "optionalArgs": ["limit"],
             "resultShape": {
                 "source": "str",
+                "exists": "bool",
+                "availableSources": "array[str]",
+                "sourceEventType": "str|null",
+                "sourceView": "str|null",
+                "hasContract": "bool",
+                "hasSourceState": "bool",
+                "hasDelivery": "bool",
+                "recentEventCount": "int",
                 "contract": "object",
                 "latestSourceState": "object",
                 "latestDelivery": "object",
@@ -286,12 +298,36 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
     contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
     contract_sources = contracts.get("sources") if isinstance(contracts.get("sources"), dict) else {}
+    contract = contract_sources.get(source_name) if isinstance(contract_sources.get(source_name), dict) else {}
+    latest_source_state = source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {}
+    latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
+    recent_events = [item for item in events if str(item.get("source") or "") == source_name]
+    source_event_type = (
+        contract.get("sourceEventType")
+        or latest_source_state.get("sourceEventType")
+        or latest_delivery.get("sourceEventType")
+        or (recent_events[0].get("sourceEventType") if recent_events else None)
+    )
+    source_view = (
+        contract.get("sourceView")
+        or latest_source_state.get("sourceView")
+        or latest_delivery.get("sourceView")
+        or (recent_events[0].get("sourceView") if recent_events else None)
+    )
     return {
         "source": source_name,
-        "contract": contract_sources.get(source_name) if isinstance(contract_sources.get(source_name), dict) else {},
-        "latestSourceState": source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {},
-        "latestDelivery": deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {},
-        "recentEvents": [item for item in events if str(item.get("source") or "") == source_name],
+        "exists": bool(contract or latest_source_state or latest_delivery or recent_events),
+        "availableSources": list_source_names(snapshot),
+        "sourceEventType": source_event_type,
+        "sourceView": source_view,
+        "hasContract": bool(contract),
+        "hasSourceState": bool(latest_source_state),
+        "hasDelivery": bool(latest_delivery),
+        "recentEventCount": len(recent_events),
+        "contract": contract,
+        "latestSourceState": latest_source_state,
+        "latestDelivery": latest_delivery,
+        "recentEvents": recent_events,
     }
 
 
@@ -304,6 +340,10 @@ def build_panel_detail(snapshot: dict[str, Any], panel_name: str | None) -> dict
         "panelName": panel_name,
         "exists": bool(panel),
         "availablePanels": list_panel_names(snapshot),
+        "summary": panel.get("summary") if isinstance(panel, dict) else None,
+        "detail": panel.get("detail") if isinstance(panel, dict) else None,
+        "severity": panel.get("severity") if isinstance(panel, dict) else None,
+        "checkedAt": panel.get("checkedAt") if isinstance(panel, dict) else None,
         "panel": panel,
     }
 
@@ -347,7 +387,6 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     if kind == "panel.inspect":
         detail = build_panel_detail(snapshot, panel_name)
         resolved_panel_name = str(detail.get("panelName") or panel_name or "unknown")
-        panel = detail.get("panel") if isinstance(detail.get("panel"), dict) else {}
         available_panels = detail.get("availablePanels") if isinstance(detail.get("availablePanels"), list) else []
         if not detail.get("exists"):
             available = ", ".join(str(item) for item in available_panels) or "none"
@@ -355,12 +394,14 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         lines = [
             f"panel={resolved_panel_name}",
             "exists=true",
-            f"summary: {panel.get('summary') or panel.get('detail') or panel.get('severity') or 'unknown'}",
+            f"summary: {detail.get('summary') or detail.get('detail') or detail.get('severity') or 'unknown'}",
         ]
-        if panel.get("detail"):
-            lines.append(f"detail: {panel.get('detail')}")
-        if panel.get("checkedAt"):
-            lines.append(f"checkedAt: {panel.get('checkedAt')}")
+        if detail.get("detail"):
+            lines.append(f"detail: {detail.get('detail')}")
+        if detail.get("severity"):
+            lines.append(f"severity: {detail.get('severity')}")
+        if detail.get("checkedAt"):
+            lines.append(f"checkedAt: {detail.get('checkedAt')}")
         return "\n".join(lines)
 
     if kind == "sources.latest":
@@ -396,17 +437,22 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     if kind == "source.inspect":
         detail = build_source_detail(snapshot, events, source_name)
         source = str(detail.get("source") or source_name or "unknown")
-        contract = detail.get("contract") if isinstance(detail.get("contract"), dict) else {}
         latest_state = detail.get("latestSourceState") if isinstance(detail.get("latestSourceState"), dict) else {}
         latest_delivery = detail.get("latestDelivery") if isinstance(detail.get("latestDelivery"), dict) else {}
         recent_events = detail.get("recentEvents") if isinstance(detail.get("recentEvents"), list) else []
+        available_sources = detail.get("availableSources") if isinstance(detail.get("availableSources"), list) else []
+        if not detail.get("exists"):
+            available = ", ".join(str(item) for item in available_sources) or "none"
+            return f"source={source}\nexists=false\navailableSources: {available}"
         state_text = str(latest_state.get("message") or latest_state.get("summary") or latest_state.get("eventKey") or "无 ingest")
         delivery_text = str(latest_delivery.get("message") or latest_delivery.get("eventKey") or "无 delivery")
-        event_type = str(contract.get("sourceEventType") or "unknown")
-        source_view = str(contract.get("sourceView") or "unknown")
+        event_type = str(detail.get("sourceEventType") or "unknown")
+        source_view = str(detail.get("sourceView") or "unknown")
         lines = [
             f"source={source}",
+            "exists=true",
             f"contract: eventType={event_type}｜view={source_view}",
+            f"hasContract={str(bool(detail.get('hasContract'))).lower()}｜hasState={str(bool(detail.get('hasSourceState'))).lower()}｜hasDelivery={str(bool(detail.get('hasDelivery'))).lower()}｜recentEvents={detail.get('recentEventCount') or 0}",
             f"latestState: {state_text}",
             f"latestDelivery: {delivery_text}",
         ]
