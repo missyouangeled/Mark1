@@ -13,6 +13,19 @@ THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
+# GPU-first backend: if OPENCLAW_VOICE_REPLY_BACKEND=gpu-first, import from
+# the GPU-first wrapper that falls back to CPU stable on failure.
+# Otherwise, default to the existing local CPU stable path.
+_BACKEND = os.environ.get("OPENCLAW_VOICE_REPLY_BACKEND", "local-stable").strip()
+if _BACKEND == "gpu-first":
+    from chattts_gpu_first_wrapper import (  # type: ignore  # noqa: E402
+        synthesize,
+    )
+else:
+    from chattts_voice_reply import (  # noqa: E402
+        synthesize,
+    )
+
 from chattts_voice_reply import (  # noqa: E402
     DEFAULT_FIRST_CHUNK_TARGET,
     DEFAULT_MAX_CHUNK_CHARS,
@@ -22,7 +35,6 @@ from chattts_voice_reply import (  # noqa: E402
     DEFAULT_OUT_DIR,
     MAX_TTS_CHARS,
     split_text_for_tts_chunks,
-    synthesize,
 )
 
 
