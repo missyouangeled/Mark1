@@ -25,6 +25,8 @@
      - `health.summary`
      - `tasks.summary`
      - `recovery.summary`
+     - `panel.inspect`
+     - `panels.catalog`
      - `sources.latest`
      - `sources.catalog`
      - `source.inspect`
@@ -33,9 +35,11 @@
    - 2026-05-15 下午到 17:50 前，这条线连续完成了：
      - `sources.catalog` / `source.inspect` 稳定顶层字段收口
      - `sources.latest` 的 `count / availableSources / sourceItems[]` 收口
+     - `panel.inspect` / `panels.catalog` 已纳入正式 query catalog
      - broker 事件契约正式化，`contract.catalog` 可直接带出 `contracts.recordTypes / contracts.eventFieldCatalog`
      - `events.recent` 稳定 item shape 收口，并新增 `latestBySource`
    - 当前 `QUERY_CONTRACT_VERSION = 13`
+   - 当前 `brokerContractVersion = 2`
 
 3. **这轮最后一个本地代码停点已经存在，可直接从这里续做**
    - 当前代码停点提交：`7396ede` `Tighten broker and infos-handle event contracts`
@@ -44,14 +48,18 @@
      - `3aa091e` `Tighten infos-handle sources.latest contract`
      - `7fe7efd` `Tighten infos-handle source event summaries`
      - `ff07c2f` `Tighten infos-handle source inspect summaries`
+     - `2575456` `Tighten infos-handle source catalog contract`
+     - `4de50fb` `Add panels catalog query to infos handle`
+     - `a862517` `feat: add panel inspect query to infos-handle`
+     - `2f57998` `feat: add infos-handle source catalog contract`
 
 4. **当前验证结果保持全绿**
    - `python3 scripts/test-openclaw-infos-handle.py` → `ALL PASS`
    - `python3 scripts/test-frontstage-broker.py` → `ALL PASS`
    - `python3 -m py_compile scripts/openclaw-infos-handle.py scripts/test-openclaw-infos-handle.py scripts/openclaw-frontstage-broker.py scripts/test-frontstage-broker.py` → 通过
    - live 查询也已确认：
-     - `python3 scripts/openclaw-infos-handle.py query --kind events.recent --format json`
-     - 当前会返回 `result.latestBySource`
+     - `python3 scripts/openclaw-infos-handle.py query --kind events.recent --format json` → 返回 `result.latestBySource`
+     - `python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json` → 当前返回 `queryContractVersion=13 / brokerContractVersion=2`
 
 ### 还没做、但下周一最自然的下一步
 
