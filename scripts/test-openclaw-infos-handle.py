@@ -51,6 +51,26 @@ def main() -> int:
                 "message": "[监工] 后台任务已完成。",
                 "eventKey": "done-1",
             },
+            "sourceStateSnapshots": {
+                "local-health": {
+                    "summary": "健康正常",
+                    "eventKey": "health-ok-1",
+                },
+                "frontstage-recovery": {
+                    "summary": "前台投影稳定",
+                    "eventKey": "recovery-ok-1",
+                },
+            },
+            "sources": {
+                "supervisor": {
+                    "message": "[监工] 后台任务已完成。",
+                    "eventKey": "done-1",
+                },
+                "local-health": {
+                    "message": "[本地健康] 当前已恢复正常。",
+                    "eventKey": "health-delivery-1",
+                },
+            },
         }
         snapshot_path.write_text(json.dumps(snapshot_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         events_path.write_text(
@@ -82,6 +102,11 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         assert "监工：监工待命中" in result.stdout
         assert "恢复观察：前台投影稳定" in result.stdout
+
+        result = run("query", "--kind", "sources.latest", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "local-health｜state=健康正常｜delivery=[本地健康] 当前已恢复正常。" in result.stdout
+        assert "supervisor｜state=无 ingest｜delivery=[监工] 后台任务已完成。" in result.stdout
 
         result = run("query", "--kind", "events.recent", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr

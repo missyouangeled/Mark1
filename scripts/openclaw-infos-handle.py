@@ -26,6 +26,7 @@ QUERY_KINDS = {
     "health.summary",
     "tasks.summary",
     "recovery.summary",
+    "sources.latest",
     "events.recent",
 }
 
@@ -104,6 +105,21 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     if kind == "recovery.summary":
         panel = snapshot.get("panels", {}).get("recovery") if isinstance(snapshot.get("panels"), dict) else {}
         return summarize_panel(panel if isinstance(panel, dict) else {}, "前台恢复状态未知")
+
+    if kind == "sources.latest":
+        source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
+        deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
+        source_names = sorted({*source_states.keys(), *deliveries.keys()})
+        if not source_names:
+            return "当前还没有来源快照。"
+        lines = []
+        for source in source_names:
+            state_payload = source_states.get(source) if isinstance(source_states.get(source), dict) else {}
+            delivery_payload = deliveries.get(source) if isinstance(deliveries.get(source), dict) else {}
+            state_part = str(state_payload.get("summary") or state_payload.get("message") or state_payload.get("eventKey") or "无 ingest")
+            delivery_part = str(delivery_payload.get("message") or delivery_payload.get("eventKey") or "无 delivery")
+            lines.append(f"- {source}｜state={state_part}｜delivery={delivery_part}")
+        return "\n".join(lines)
 
     if kind == "events.recent":
         if not events:
