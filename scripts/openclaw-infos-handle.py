@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 2
+QUERY_CONTRACT_VERSION = 3
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -28,6 +28,7 @@ QUERY_KINDS = {
     "health.summary",
     "tasks.summary",
     "recovery.summary",
+    "panel.inspect",
     "sources.latest",
     "sources.catalog",
     "source.inspect",
@@ -105,6 +106,11 @@ def list_source_names(snapshot: dict[str, Any]) -> list[str]:
     return sorted({*contract_sources.keys(), *source_states.keys(), *deliveries.keys()})
 
 
+def list_panel_names(snapshot: dict[str, Any]) -> list[str]:
+    panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
+    return sorted(name for name, payload in panels.items() if isinstance(payload, dict))
+
+
 def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
     source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
     deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
@@ -140,54 +146,118 @@ def build_query_catalog() -> dict[str, Any]:
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "summary": "str|null",
+                "issueOverview": "str|null",
+                "severity": "str|null",
+                "selfHelpActions": "array[str]",
+                "checkedAt": "str|null",
+            },
         },
         "health.summary": {
             "description": "Health panel summary.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "severity": "str|null",
+                "summary": "str|null",
+                "detail": "str|null",
+                "checkedAt": "str|null",
+            },
         },
         "tasks.summary": {
             "description": "Supervisor and recovery panel summary with latest delivery.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "supervisor": "object",
+                "recovery": "object",
+                "latestDelivery": "object",
+            },
         },
         "recovery.summary": {
             "description": "Recovery panel summary.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "severity": "str|null",
+                "summary": "str|null",
+                "detail": "str|null",
+                "checkedAt": "str|null",
+            },
+        },
+        "panel.inspect": {
+            "description": "Inspect one snapshot panel by panel name.",
+            "formats": ["text", "json"],
+            "requiredArgs": ["panel_name"],
+            "optionalArgs": [],
+            "resultShape": {
+                "panelName": "str",
+                "exists": "bool",
+                "availablePanels": "array[str]",
+                "panel": "object",
+            },
         },
         "sources.latest": {
             "description": "Raw latest source-state and delivery snapshots keyed by source.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "sourceStateSnapshots": "object",
+                "sources": "object",
+                "latestSource": "str|null",
+                "latestSourceState": "object",
+                "latestDelivery": "object",
+            },
         },
         "sources.catalog": {
             "description": "Machine-readable source inventory with contract presence and latest availability.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "count": "int",
+                "sources": "array[object]",
+            },
         },
         "source.inspect": {
             "description": "Inspect one source contract, latest snapshots, and recent events.",
             "formats": ["text", "json"],
             "requiredArgs": ["source_name"],
             "optionalArgs": ["limit"],
+            "resultShape": {
+                "source": "str",
+                "contract": "object",
+                "latestSourceState": "object",
+                "latestDelivery": "object",
+                "recentEvents": "array[object]",
+            },
         },
         "events.recent": {
             "description": "Recent broker events sorted by recorded time descending.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": ["limit"],
+            "resultShape": {
+                "events": "array[object]",
+            },
         },
         "contract.catalog": {
             "description": "Infos-handle and broker contract catalog, including query metadata.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
+            "resultShape": {
+                "queryContractVersion": "int",
+                "brokerContractVersion": "int|null",
+                "contracts": "object",
+                "snapshotContract": "object",
+                "queryCatalog": "object",
+            },
         },
     }
     return {
@@ -200,8 +270,9 @@ def build_query_catalog() -> dict[str, Any]:
             "eventsPath": "str",
             "result": "object",
             "sourceName": "str|null",
+            "panelName": "str|null",
             "snapshot": "object",
-            "events": "array",
+            "events": "array[object]",
             "text": "str",
         },
         "queries": query_catalog,
@@ -224,7 +295,20 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     }
 
 
-def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None = None) -> str:
+def build_panel_detail(snapshot: dict[str, Any], panel_name: str | None) -> dict[str, Any]:
+    if not panel_name:
+        raise ValueError("panel.inspect requires panel_name")
+    panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
+    panel = panels.get(panel_name) if isinstance(panels.get(panel_name), dict) else {}
+    return {
+        "panelName": panel_name,
+        "exists": bool(panel),
+        "availablePanels": list_panel_names(snapshot),
+        "panel": panel,
+    }
+
+
+def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None = None, panel_name: str | None = None) -> str:
     if kind == "snapshot.summary":
         summary = str(snapshot.get("summary") or "前台状态未知")
         issue_overview = str(snapshot.get("issueOverview") or summary)
@@ -259,6 +343,25 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     if kind == "recovery.summary":
         panel = snapshot.get("panels", {}).get("recovery") if isinstance(snapshot.get("panels"), dict) else {}
         return summarize_panel(panel if isinstance(panel, dict) else {}, "前台恢复状态未知")
+
+    if kind == "panel.inspect":
+        detail = build_panel_detail(snapshot, panel_name)
+        resolved_panel_name = str(detail.get("panelName") or panel_name or "unknown")
+        panel = detail.get("panel") if isinstance(detail.get("panel"), dict) else {}
+        available_panels = detail.get("availablePanels") if isinstance(detail.get("availablePanels"), list) else []
+        if not detail.get("exists"):
+            available = ", ".join(str(item) for item in available_panels) or "none"
+            return f"panel={resolved_panel_name}\nexists=false\navailablePanels: {available}"
+        lines = [
+            f"panel={resolved_panel_name}",
+            "exists=true",
+            f"summary: {panel.get('summary') or panel.get('detail') or panel.get('severity') or 'unknown'}",
+        ]
+        if panel.get("detail"):
+            lines.append(f"detail: {panel.get('detail')}")
+        if panel.get("checkedAt"):
+            lines.append(f"checkedAt: {panel.get('checkedAt')}")
+        return "\n".join(lines)
 
     if kind == "sources.latest":
         source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
@@ -345,7 +448,13 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     raise ValueError(f"unsupported kind: {kind}")
 
 
-def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None = None) -> dict[str, Any]:
+def build_query_result(
+    kind: str,
+    snapshot: dict[str, Any],
+    events: list[dict[str, Any]],
+    source_name: str | None = None,
+    panel_name: str | None = None,
+) -> dict[str, Any]:
     panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
     if kind == "snapshot.summary":
         return {
@@ -365,6 +474,8 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
         }
     if kind == "recovery.summary":
         return panels.get("recovery") if isinstance(panels.get("recovery"), dict) else {}
+    if kind == "panel.inspect":
+        return build_panel_detail(snapshot, panel_name)
     if kind == "sources.latest":
         return {
             "sourceStateSnapshots": snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {},
@@ -390,13 +501,20 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
     raise ValueError(f"unsupported kind: {kind}")
 
 
-def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit: int, source_name: str | None = None) -> dict[str, Any]:
+def build_query_payload(
+    kind: str,
+    snapshot_path: Path,
+    events_path: Path,
+    limit: int,
+    source_name: str | None = None,
+    panel_name: str | None = None,
+) -> dict[str, Any]:
     if kind not in QUERY_KINDS:
         raise ValueError(f"unsupported kind: {kind}")
     snapshot = load_json(snapshot_path)
     events = load_recent_source_events(events_path, source_name, limit) if kind == "source.inspect" and source_name else load_recent_events(events_path, limit)
-    text = render_text(kind, snapshot, events, source_name=source_name)
-    result = build_query_result(kind, snapshot, events, source_name=source_name)
+    text = render_text(kind, snapshot, events, source_name=source_name, panel_name=panel_name)
+    result = build_query_result(kind, snapshot, events, source_name=source_name, panel_name=panel_name)
     if kind == "contract.catalog":
         result = {
             **result,
@@ -413,6 +531,7 @@ def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit
         "eventsPath": str(events_path),
         "result": result,
         "sourceName": source_name,
+        "panelName": panel_name,
         "snapshot": snapshot if isinstance(snapshot, dict) else {},
         "events": events,
         "text": text,
@@ -488,6 +607,7 @@ def main() -> int:
     parser.add_argument("action", choices=["query", "notify-frontstage"], help="Operation to run")
     parser.add_argument("--kind", choices=sorted(QUERY_KINDS), help="What info to query")
     parser.add_argument("--source-name", help="Source name for source.inspect")
+    parser.add_argument("--panel-name", help="Panel name for panel.inspect")
     parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format for query")
     parser.add_argument("--snapshot-path", default=str(DEFAULT_SNAPSHOT_PATH), help="Broker snapshot.json path")
     parser.add_argument("--events-path", default=str(DEFAULT_EVENTS_PATH), help="Broker events.jsonl path")
@@ -505,7 +625,14 @@ def main() -> int:
     if args.action == "query":
         if not args.kind:
             raise SystemExit("query requires --kind")
-        payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit, source_name=args.source_name)
+        payload = build_query_payload(
+            args.kind,
+            snapshot_path,
+            events_path,
+            args.limit,
+            source_name=args.source_name,
+            panel_name=args.panel_name,
+        )
         if args.format == "json":
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
@@ -526,7 +653,14 @@ def main() -> int:
     if not query_text:
         if not args.kind:
             raise SystemExit("notify-frontstage requires --message or --kind")
-        query_payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit, source_name=args.source_name)
+        query_payload = build_query_payload(
+            args.kind,
+            snapshot_path,
+            events_path,
+            args.limit,
+            source_name=args.source_name,
+            panel_name=args.panel_name,
+        )
         query_text = str(query_payload.get("text") or "").strip()
     if not query_text:
         raise SystemExit("notify-frontstage resolved to empty message")

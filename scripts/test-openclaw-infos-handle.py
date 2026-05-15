@@ -132,7 +132,7 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
-        assert payload["queryContractVersion"] == 2
+        assert payload["queryContractVersion"] == 3
         assert len(payload["events"]) == 2
         assert len(payload["result"]["events"]) == 2
         assert payload["events"][0]["source"] == "supervisor"
@@ -146,7 +146,7 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 2
+        assert payload["queryContractVersion"] == 3
         assert payload["result"]["count"] == 3
         source_rows = {item["source"]: item for item in payload["result"]["sources"]}
         assert source_rows["local-health"]["sourceView"] == "health"
@@ -163,16 +163,29 @@ def main() -> int:
         assert payload["result"]["latestDelivery"]["message"] == "[本地健康] 当前已恢复正常。"
         assert len(payload["result"]["recentEvents"]) == 1
 
+        result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["queryContractVersion"] == 3
+        assert payload["panelName"] == "health"
+        assert payload["result"]["panelName"] == "health"
+        assert payload["result"]["exists"] is True
+        assert payload["result"]["panel"]["summary"] == "健康正常"
+        assert payload["result"]["availablePanels"] == ["health", "recovery", "supervisor"]
+
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 2
+        assert payload["queryContractVersion"] == 3
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
         assert payload["result"]["queryCatalog"]["defaultLimit"] == 6
+        assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["requiredArgs"] == ["source_name"]
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["formats"] == ["text", "json"]
+        assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["requiredArgs"] == ["panel_name"]
+        assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["resultShape"]["exists"] == "bool"
         assert payload["result"]["paths"]["snapshotPath"] == str(snapshot_path)
 
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
@@ -183,6 +196,12 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         assert "local-health｜view=health｜eventType=local_health.status.changed｜hasState=true｜hasDelivery=true" in result.stdout
+
+        result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "panel=health" in result.stdout
+        assert "exists=true" in result.stdout
+        assert "summary: 健康正常" in result.stdout
 
         print("ALL PASS")
     return 0
