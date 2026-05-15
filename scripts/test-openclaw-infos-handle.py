@@ -143,6 +143,15 @@ def main() -> int:
         assert payload["result"]["sourceStateSnapshots"]["local-health"]["summary"] == "健康正常"
         assert payload["result"]["sources"]["supervisor"]["message"] == "[监工] 后台任务已完成。"
 
+        result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["sourceName"] == "local-health"
+        assert payload["result"]["contract"]["sourceView"] == "health"
+        assert payload["result"]["latestSourceState"]["summary"] == "健康正常"
+        assert payload["result"]["latestDelivery"]["message"] == "[本地健康] 当前已恢复正常。"
+        assert len(payload["result"]["recentEvents"]) == 1
+
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
@@ -151,6 +160,11 @@ def main() -> int:
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
         assert payload["result"]["paths"]["snapshotPath"] == str(snapshot_path)
+
+        result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "source=local-health" in result.stdout
+        assert "latestState: 健康正常" in result.stdout
 
         print("ALL PASS")
     return 0

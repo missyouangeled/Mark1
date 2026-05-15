@@ -28,6 +28,7 @@ QUERY_KINDS = {
     "tasks.summary",
     "recovery.summary",
     "sources.latest",
+    "source.inspect",
     "events.recent",
     "contract.catalog",
 }
@@ -60,6 +61,28 @@ def load_recent_events(path: Path, limit: int) -> list[dict[str, Any]]:
     return rows[: max(1, limit)]
 
 
+def load_recent_source_events(path: Path, source_name: str, limit: int) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if str(payload.get("source") or "") != source_name:
+                continue
+            rows.append(payload)
+    rows.sort(key=lambda item: str(item.get("recordedAt") or item.get("sentAt") or ""), reverse=True)
+    return rows[: max(1, limit)]
+
+
 def summarize_panel(panel: dict[str, Any], fallback_title: str) -> str:
     summary = str(panel.get("summary") or fallback_title)
     detail = str(panel.get("detail") or "").strip()
@@ -72,7 +95,23 @@ def summarize_panel(panel: dict[str, Any], fallback_title: str) -> str:
     return "｜".join(parts)
 
 
-def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]]) -> str:
+def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None) -> dict[str, Any]:
+    if not source_name:
+        raise ValueError("source.inspect requires source_name")
+    source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
+    deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
+    contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
+    contract_sources = contracts.get("sources") if isinstance(contracts.get("sources"), dict) else {}
+    return {
+        "source": source_name,
+        "contract": contract_sources.get(source_name) if isinstance(contract_sources.get(source_name), dict) else {},
+        "latestSourceState": source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {},
+        "latestDelivery": deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {},
+        "recentEvents": [item for item in events if str(item.get("source") or "") == source_name],
+    }
+
+
+def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None = None) -> str:
     if kind == "snapshot.summary":
         summary = str(snapshot.get("summary") or "前台状态未知")
         issue_overview = str(snapshot.get("issueOverview") or summary)
@@ -123,6 +162,32 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             lines.append(f"- {source}｜state={state_part}｜delivery={delivery_part}")
         return "\n".join(lines)
 
+    if kind == "source.inspect":
+        detail = build_source_detail(snapshot, events, source_name)
+        source = str(detail.get("source") or source_name or "unknown")
+        contract = detail.get("contract") if isinstance(detail.get("contract"), dict) else {}
+        latest_state = detail.get("latestSourceState") if isinstance(detail.get("latestSourceState"), dict) else {}
+        latest_delivery = detail.get("latestDelivery") if isinstance(detail.get("latestDelivery"), dict) else {}
+        recent_events = detail.get("recentEvents") if isinstance(detail.get("recentEvents"), list) else []
+        state_text = str(latest_state.get("message") or latest_state.get("summary") or latest_state.get("eventKey") or "无 ingest")
+        delivery_text = str(latest_delivery.get("message") or latest_delivery.get("eventKey") or "无 delivery")
+        event_type = str(contract.get("sourceEventType") or "unknown")
+        source_view = str(contract.get("sourceView") or "unknown")
+        lines = [
+            f"source={source}",
+            f"contract: eventType={event_type}｜view={source_view}",
+            f"latestState: {state_text}",
+            f"latestDelivery: {delivery_text}",
+        ]
+        if recent_events:
+            for item in recent_events[:3]:
+                lines.append(
+                    f"- [{item.get('recordType') or 'unknown'}] {item.get('recordedAt') or item.get('sentAt') or ''}｜{item.get('message') or item.get('eventKey') or ''}"
+                )
+        else:
+            lines.append("- 最近没有这个 source 的事件记录。")
+        return "\n".join(lines)
+
     if kind == "events.recent":
         if not events:
             return "最近没有 broker 事件。"
@@ -151,7 +216,7 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     raise ValueError(f"unsupported kind: {kind}")
 
 
-def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
+def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None = None) -> dict[str, Any]:
     panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
     if kind == "snapshot.summary":
         return {
@@ -179,6 +244,8 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
             "latestSourceState": snapshot.get("latestSourceState") if isinstance(snapshot.get("latestSourceState"), dict) else {},
             "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
         }
+    if kind == "source.inspect":
+        return build_source_detail(snapshot, events, source_name)
     if kind == "events.recent":
         return {"events": events}
     if kind == "contract.catalog":
@@ -191,13 +258,13 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
     raise ValueError(f"unsupported kind: {kind}")
 
 
-def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit: int) -> dict[str, Any]:
+def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit: int, source_name: str | None = None) -> dict[str, Any]:
     if kind not in QUERY_KINDS:
         raise ValueError(f"unsupported kind: {kind}")
     snapshot = load_json(snapshot_path)
-    events = load_recent_events(events_path, limit)
-    text = render_text(kind, snapshot, events)
-    result = build_query_result(kind, snapshot, events)
+    events = load_recent_source_events(events_path, source_name, limit) if kind == "source.inspect" and source_name else load_recent_events(events_path, limit)
+    text = render_text(kind, snapshot, events, source_name=source_name)
+    result = build_query_result(kind, snapshot, events, source_name=source_name)
     if kind == "contract.catalog":
         result = {
             **result,
@@ -213,6 +280,7 @@ def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit
         "snapshotPath": str(snapshot_path),
         "eventsPath": str(events_path),
         "result": result,
+        "sourceName": source_name,
         "snapshot": snapshot if isinstance(snapshot, dict) else {},
         "events": events,
         "text": text,
@@ -287,6 +355,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Minimal infos-handle layer for broker-backed text/json queries")
     parser.add_argument("action", choices=["query", "notify-frontstage"], help="Operation to run")
     parser.add_argument("--kind", choices=sorted(QUERY_KINDS), help="What info to query")
+    parser.add_argument("--source-name", help="Source name for source.inspect")
     parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format for query")
     parser.add_argument("--snapshot-path", default=str(DEFAULT_SNAPSHOT_PATH), help="Broker snapshot.json path")
     parser.add_argument("--events-path", default=str(DEFAULT_EVENTS_PATH), help="Broker events.jsonl path")
@@ -304,7 +373,7 @@ def main() -> int:
     if args.action == "query":
         if not args.kind:
             raise SystemExit("query requires --kind")
-        payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit)
+        payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit, source_name=args.source_name)
         if args.format == "json":
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
@@ -325,7 +394,7 @@ def main() -> int:
     if not query_text:
         if not args.kind:
             raise SystemExit("notify-frontstage requires --message or --kind")
-        query_payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit)
+        query_payload = build_query_payload(args.kind, snapshot_path, events_path, args.limit, source_name=args.source_name)
         query_text = str(query_payload.get("text") or "").strip()
     if not query_text:
         raise SystemExit("notify-frontstage resolved to empty message")

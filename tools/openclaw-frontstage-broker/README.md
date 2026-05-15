@@ -184,6 +184,7 @@ python3 scripts/test-frontstage-broker.py
 python3 scripts/test-openclaw-infos-handle.py
 python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text
 python3 scripts/openclaw-infos-handle.py query --kind sources.latest --format text
+python3 scripts/openclaw-infos-handle.py query --kind source.inspect --source-name local-health --format json
 python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json
 python3 scripts/apply-openclaw-frontstage-broker-data.py
 python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock
