@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 7
+QUERY_CONTRACT_VERSION = 8
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -124,6 +124,12 @@ def summarize_source_delivery(record: dict[str, Any]) -> str | None:
     return record.get("message") or record.get("eventKey")
 
 
+def summarize_source_event(record: dict[str, Any]) -> str | None:
+    if not record:
+        return None
+    return record.get("message") or record.get("summary") or record.get("eventKey")
+
+
 def build_source_overview(
     source_name: str,
     contract: dict[str, Any],
@@ -154,9 +160,13 @@ def build_source_overview(
         "hasDelivery": bool(latest_delivery),
         "latestEventAt": latest_summary.get("latestEventAt"),
         "latestRecordType": latest_summary.get("latestRecordType"),
+        "latestEventSummary": latest_summary.get("latestEventSummary"),
+        "latestEventKey": latest_summary.get("latestEventKey"),
         "latestSourceStateSummary": summarize_source_state(latest_source_state),
         "latestSourceStateRecordedAt": latest_source_state.get("recordedAt") or latest_source_state.get("sentAt"),
         "latestDeliveryMessage": summarize_source_delivery(latest_delivery),
+        "latestDeliveryEventKey": latest_delivery.get("eventKey"),
+        "latestDeliveryRecordType": (latest_delivery.get("recordType") or "frontstage.delivery.latest") if latest_delivery else None,
         "latestDeliverySentAt": latest_delivery.get("sentAt") or latest_delivery.get("recordedAt"),
     }
 
@@ -217,20 +227,28 @@ def build_latest_source_summary(
         return {
             "latestEventAt": latest_event.get("recordedAt") or latest_event.get("sentAt"),
             "latestRecordType": latest_event.get("recordType"),
+            "latestEventSummary": summarize_source_event(latest_event),
+            "latestEventKey": latest_event.get("eventKey"),
         }
     if latest_delivery:
         return {
             "latestEventAt": latest_delivery.get("recordedAt") or latest_delivery.get("sentAt"),
             "latestRecordType": latest_delivery.get("recordType") or "frontstage.delivery.latest",
+            "latestEventSummary": summarize_source_delivery(latest_delivery),
+            "latestEventKey": latest_delivery.get("eventKey"),
         }
     if latest_source_state:
         return {
             "latestEventAt": latest_source_state.get("recordedAt") or latest_source_state.get("sentAt"),
             "latestRecordType": latest_source_state.get("recordType") or "broker.source.latest",
+            "latestEventSummary": summarize_source_state(latest_source_state),
+            "latestEventKey": latest_source_state.get("eventKey"),
         }
     return {
         "latestEventAt": None,
         "latestRecordType": None,
+        "latestEventSummary": None,
+        "latestEventKey": None,
     }
 
 
@@ -349,9 +367,13 @@ def build_query_catalog() -> dict[str, Any]:
                     "hasDelivery": "bool",
                     "latestEventAt": "str|null",
                     "latestRecordType": "str|null",
+                    "latestEventSummary": "str|null",
+                    "latestEventKey": "str|null",
                     "latestSourceStateSummary": "str|null",
                     "latestSourceStateRecordedAt": "str|null",
                     "latestDeliveryMessage": "str|null",
+                    "latestDeliveryEventKey": "str|null",
+                    "latestDeliveryRecordType": "str|null",
                     "latestDeliverySentAt": "str|null",
                     "contract": "object",
                     "latestSourceState": "object",
@@ -374,11 +396,16 @@ def build_query_catalog() -> dict[str, Any]:
                 "hasSourceState": "bool",
                 "hasDelivery": "bool",
                 "recentEventCount": "int",
+                "recentDeliveryCount": "int",
                 "latestEventAt": "str|null",
                 "latestRecordType": "str|null",
+                "latestEventSummary": "str|null",
+                "latestEventKey": "str|null",
                 "latestSourceStateSummary": "str|null",
                 "latestSourceStateRecordedAt": "str|null",
                 "latestDeliveryMessage": "str|null",
+                "latestDeliveryEventKey": "str|null",
+                "latestDeliveryRecordType": "str|null",
                 "latestDeliverySentAt": "str|null",
                 "contract": "object",
                 "latestSourceState": "object",
@@ -439,11 +466,13 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     latest_source_state = source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {}
     latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
     recent_events = [item for item in events if str(item.get("source") or "") == source_name]
+    recent_delivery_count = sum(1 for item in recent_events if str(item.get("recordType") or "") == "frontstage.delivery.sent")
     return {
         **build_source_overview(source_name, contract, latest_source_state, latest_delivery, recent_events),
         "exists": bool(contract or latest_source_state or latest_delivery or recent_events),
         "availableSources": list_source_names(snapshot),
         "recentEventCount": len(recent_events),
+        "recentDeliveryCount": recent_delivery_count,
         "contract": contract,
         "latestSourceState": latest_source_state,
         "latestDelivery": latest_delivery,
@@ -586,7 +615,7 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             f"source={source}",
             "exists=true",
             f"contract: eventType={event_type}｜view={source_view}",
-            f"hasContract={str(bool(detail.get('hasContract'))).lower()}｜hasState={str(bool(detail.get('hasSourceState'))).lower()}｜hasDelivery={str(bool(detail.get('hasDelivery'))).lower()}｜recentEvents={detail.get('recentEventCount') or 0}",
+            f"hasContract={str(bool(detail.get('hasContract'))).lower()}｜hasState={str(bool(detail.get('hasSourceState'))).lower()}｜hasDelivery={str(bool(detail.get('hasDelivery'))).lower()}｜recentEvents={detail.get('recentEventCount') or 0}｜recentDeliveries={detail.get('recentDeliveryCount') or 0}",
         ]
         if detail.get("latestEventAt") or detail.get("latestRecordType"):
             lines.append(f"latestRecord: {detail.get('latestRecordType') or 'unknown'} @ {detail.get('latestEventAt') or '-'}")
