@@ -54,22 +54,38 @@ def main() -> int:
             "sourceStateSnapshots": {
                 "local-health": {
                     "summary": "健康正常",
+                    "sourceEventType": "local_health.status.changed",
+                    "sourceView": "health",
                     "eventKey": "health-ok-1",
                     "recordedAt": "2026-05-15T12:00:00+08:00",
                 },
                 "frontstage-recovery": {
-                    "summary": "前台投影稳定",
+                    "recordType": "broker.source.latest",
+                    "sourceEventType": "frontstage_recovery.status.changed",
+                    "sourceView": "recovery",
+                    "message": "前台恢复状态已记录",
                     "eventKey": "recovery-ok-1",
                     "recordedAt": "2026-05-15T12:00:02+08:00",
+                    "data": {
+                        "summary": "前台投影稳定",
+                        "detail": "未发现明显异常。",
+                        "status": "recovered",
+                        "checkedAt": "2026-05-15T12:00:02+08:00"
+                    },
                 },
             },
             "sources": {
                 "supervisor": {
+                    "sourceEventType": "supervisor.status.changed",
+                    "sourceView": "tasks",
                     "message": "[监工] 后台任务已完成。",
                     "eventKey": "done-1",
                     "sentAt": "2026-05-15T12:00:03+08:00",
                 },
                 "local-health": {
+                    "recordType": "frontstage.delivery.latest",
+                    "sourceEventType": "local_health.status.changed",
+                    "sourceView": "health",
                     "message": "[本地健康] 当前已恢复正常。",
                     "eventKey": "health-delivery-1",
                     "sentAt": "2026-05-15T12:00:01+08:00",
@@ -103,23 +119,37 @@ def main() -> int:
                     json.dumps({
                         "recordType": "broker.source.event",
                         "source": "local-health",
+                        "sourceEventType": "local_health.status.changed",
+                        "sourceView": "health",
                         "recordedAt": "2026-05-15T12:00:00+08:00",
                         "eventKey": "health-ok-1",
                         "message": "本地健康状态已记录",
+                        "ingestStatus": "recorded",
+                        "data": {
+                            "summary": "健康正常",
+                            "severity": "ok",
+                            "checkedAt": "2026-05-15T12:00:00+08:00"
+                        },
                     }, ensure_ascii=False),
                     json.dumps({
                         "recordType": "frontstage.delivery.sent",
                         "source": "local-health",
+                        "sourceEventType": "local_health.status.changed",
+                        "sourceView": "health",
                         "recordedAt": "2026-05-15T12:00:01+08:00",
                         "eventKey": "health-delivery-1",
                         "message": "[本地健康] 当前已恢复正常。",
+                        "deliveryStatus": "sent",
                     }, ensure_ascii=False),
                     json.dumps({
                         "recordType": "frontstage.delivery.sent",
                         "source": "supervisor",
+                        "sourceEventType": "supervisor.status.changed",
+                        "sourceView": "tasks",
                         "recordedAt": "2026-05-15T12:00:03+08:00",
                         "eventKey": "done-1",
                         "message": "[监工] 后台任务已完成。",
+                        "deliveryStatus": "sent",
                     }, ensure_ascii=False),
                 ]
             ) + "\n",
@@ -145,7 +175,7 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert len(payload["events"]) == 3
         assert len(payload["result"]["events"]) == 3
         assert payload["events"][0]["source"] == "supervisor"
@@ -159,7 +189,7 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["result"]["count"] == 3
         source_rows = {item["source"]: item for item in payload["result"]["sources"]}
         assert source_rows["local-health"]["sourceView"] == "health"
@@ -168,6 +198,11 @@ def main() -> int:
         assert source_rows["local-health"]["latestRecordType"] == "frontstage.delivery.latest"
         assert source_rows["local-health"]["latestEventSummary"] == "[本地健康] 当前已恢复正常。"
         assert source_rows["local-health"]["latestEventKey"] == "health-delivery-1"
+        assert source_rows["local-health"]["latestEventItem"]["recordType"] == "frontstage.delivery.latest"
+        assert source_rows["local-health"]["latestEventItem"]["sourceEventType"] == "local_health.status.changed"
+        assert source_rows["local-health"]["latestEventItem"]["sourceView"] == "health"
+        assert source_rows["local-health"]["latestEventItem"]["summary"] == "[本地健康] 当前已恢复正常。"
+        assert source_rows["local-health"]["latestEventItem"]["deliveryStatus"] is None
         assert source_rows["local-health"]["latestSourceStateSummary"] == "健康正常"
         assert source_rows["local-health"]["latestSourceStateRecordedAt"] == "2026-05-15T12:00:00+08:00"
         assert source_rows["local-health"]["latestDeliveryMessage"] == "[本地健康] 当前已恢复正常。"
@@ -180,13 +215,16 @@ def main() -> int:
         assert source_rows["frontstage-recovery"]["hasDelivery"] is False
         assert source_rows["frontstage-recovery"]["latestEventSummary"] == "前台投影稳定"
         assert source_rows["frontstage-recovery"]["latestEventKey"] == "recovery-ok-1"
+        assert source_rows["frontstage-recovery"]["latestEventItem"]["summary"] == "前台投影稳定"
+        assert source_rows["frontstage-recovery"]["latestEventItem"]["detail"] == "未发现明显异常。"
+        assert source_rows["frontstage-recovery"]["latestEventItem"]["reportStatus"] == "recovered"
         assert source_rows["frontstage-recovery"]["latestSourceStateSummary"] == "前台投影稳定"
         assert source_rows["frontstage-recovery"]["latestDeliveryMessage"] is None
 
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["sourceName"] == "local-health"
         assert payload["result"]["source"] == "local-health"
         assert payload["result"]["exists"] is True
@@ -202,6 +240,11 @@ def main() -> int:
         assert payload["result"]["latestRecordType"] == "frontstage.delivery.sent"
         assert payload["result"]["latestEventSummary"] == "[本地健康] 当前已恢复正常。"
         assert payload["result"]["latestEventKey"] == "health-delivery-1"
+        assert payload["result"]["latestEventItem"]["recordType"] == "frontstage.delivery.sent"
+        assert payload["result"]["latestEventItem"]["source"] == "local-health"
+        assert payload["result"]["latestEventItem"]["sourceEventType"] == "local_health.status.changed"
+        assert payload["result"]["latestEventItem"]["sourceView"] == "health"
+        assert payload["result"]["latestEventItem"]["summary"] == "[本地健康] 当前已恢复正常。"
         assert payload["result"]["latestSourceStateSummary"] == "健康正常"
         assert payload["result"]["latestSourceStateRecordedAt"] == "2026-05-15T12:00:00+08:00"
         assert payload["result"]["latestDeliveryMessage"] == "[本地健康] 当前已恢复正常。"
@@ -211,12 +254,21 @@ def main() -> int:
         assert payload["result"]["contract"]["sourceView"] == "health"
         assert payload["result"]["latestSourceState"]["summary"] == "健康正常"
         assert payload["result"]["latestDelivery"]["message"] == "[本地健康] 当前已恢复正常。"
+        assert len(payload["result"]["recentEventItems"]) == 2
+        assert payload["result"]["recentEventItems"][0]["recordType"] == "frontstage.delivery.sent"
+        assert payload["result"]["recentEventItems"][0]["summary"] == "[本地健康] 当前已恢复正常。"
+        assert payload["result"]["recentEventItems"][0]["deliveryStatus"] == "sent"
+        assert payload["result"]["recentEventItems"][1]["recordType"] == "broker.source.event"
+        assert payload["result"]["recentEventItems"][1]["summary"] == "健康正常"
+        assert payload["result"]["recentEventItems"][1]["severity"] == "ok"
+        assert payload["result"]["recentEventItems"][1]["checkedAt"] == "2026-05-15T12:00:00+08:00"
+        assert payload["result"]["recentEventItems"][1]["ingestStatus"] == "recorded"
         assert len(payload["result"]["recentEvents"]) == 2
 
         result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["panelName"] == "health"
         assert payload["result"]["panelName"] == "health"
         assert payload["result"]["exists"] is True
@@ -230,7 +282,7 @@ def main() -> int:
         result = run("query", "--kind", "panels.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["result"]["count"] == 3
         panel_rows = {item["panelName"]: item for item in payload["result"]["panels"]}
         assert panel_rows["health"]["available"] is True
@@ -242,7 +294,7 @@ def main() -> int:
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
@@ -256,13 +308,19 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestRecordType"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestEventSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestEventKey"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestEventItem"] == "sourceEventItem"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestSourceStateSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryMessage"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryEventKey"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryRecordType"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentEventItems"] == "array[sourceEventItem]"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["summary"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["isDelivery"] == "bool"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["formats"] == ["text", "json"]
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestEventSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestEventKey"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestEventItem"] == "sourceEventItem"
+        assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceEventItem"]["summary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestSourceStateSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryMessage"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryEventKey"] == "str|null"
@@ -283,11 +341,12 @@ def main() -> int:
         assert "hasContract=true｜hasState=true｜hasDelivery=true｜recentEvents=2｜recentDeliveries=1" in result.stdout
         assert "latestRecord: frontstage.delivery.sent @ 2026-05-15T12:00:01+08:00" in result.stdout
         assert "latestState: 健康正常" in result.stdout
+        assert "- [broker.source.event] 2026-05-15T12:00:00+08:00｜健康正常" in result.stdout
 
         result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["sourceName"] == "missing-source"
         assert payload["result"]["source"] == "missing-source"
         assert payload["result"]["exists"] is False
@@ -310,8 +369,10 @@ def main() -> int:
         assert payload["result"]["latestDeliveryRecordType"] is None
         assert payload["result"]["latestDeliverySentAt"] is None
         assert payload["result"]["contract"] == {}
+        assert payload["result"]["latestEventItem"] == {}
         assert payload["result"]["latestSourceState"] == {}
         assert payload["result"]["latestDelivery"] == {}
+        assert payload["result"]["recentEventItems"] == []
         assert payload["result"]["recentEvents"] == []
 
         result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
@@ -331,6 +392,9 @@ def main() -> int:
         assert payload["result"]["latestRecordType"] == "broker.source.latest"
         assert payload["result"]["latestEventSummary"] == "前台投影稳定"
         assert payload["result"]["latestEventKey"] == "recovery-ok-1"
+        assert payload["result"]["latestEventItem"]["summary"] == "前台投影稳定"
+        assert payload["result"]["latestEventItem"]["detail"] == "未发现明显异常。"
+        assert payload["result"]["latestEventItem"]["reportStatus"] == "recovered"
         assert payload["result"]["latestSourceStateSummary"] == "前台投影稳定"
         assert payload["result"]["latestSourceStateRecordedAt"] == "2026-05-15T12:00:02+08:00"
         assert payload["result"]["latestDeliveryMessage"] is None
@@ -357,7 +421,7 @@ def main() -> int:
         result = run("query", "--kind", "panel.inspect", "--panel-name", "missing-panel", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 8
+        assert payload["queryContractVersion"] == 9
         assert payload["panelName"] == "missing-panel"
         assert payload["result"]["panelName"] == "missing-panel"
         assert payload["result"]["exists"] is False

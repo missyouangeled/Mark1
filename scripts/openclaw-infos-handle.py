@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 8
+QUERY_CONTRACT_VERSION = 9
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -112,22 +112,68 @@ def list_panel_names(snapshot: dict[str, Any]) -> list[str]:
     return sorted(name for name, payload in panels.items() if isinstance(payload, dict))
 
 
+def record_data(record: dict[str, Any]) -> dict[str, Any]:
+    return record.get("data") if isinstance(record.get("data"), dict) else {}
+
+
+def first_text(*values: Any) -> str | None:
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def summarize_source_state(record: dict[str, Any]) -> str | None:
     if not record:
         return None
-    return record.get("summary") or record.get("message") or record.get("eventKey")
+    payload = record_data(record)
+    return first_text(record.get("summary"), payload.get("summary"), record.get("message"), record.get("eventKey"))
 
 
 def summarize_source_delivery(record: dict[str, Any]) -> str | None:
     if not record:
         return None
-    return record.get("message") or record.get("eventKey")
+    return first_text(record.get("message"), record.get("summary"), record.get("eventKey"))
 
 
 def summarize_source_event(record: dict[str, Any]) -> str | None:
     if not record:
         return None
-    return record.get("message") or record.get("summary") or record.get("eventKey")
+    payload = record_data(record)
+    record_type = str(record.get("recordType") or "")
+    if record_type in {"broker.source.event", "broker.source.latest"} or (payload.get("summary") and not record.get("sentAt")):
+        return first_text(payload.get("summary"), record.get("summary"), record.get("message"), payload.get("detail"), record.get("eventKey"))
+    return first_text(record.get("message"), record.get("summary"), payload.get("summary"), payload.get("detail"), record.get("eventKey"))
+
+
+def build_source_event_item(record: dict[str, Any]) -> dict[str, Any]:
+    payload = record_data(record)
+    record_type = first_text(record.get("recordType"))
+    return {
+        "recordType": record_type,
+        "source": first_text(record.get("source")),
+        "sourceEventType": first_text(record.get("sourceEventType")),
+        "sourceView": first_text(record.get("sourceView")),
+        "eventAt": first_text(record.get("recordedAt"), record.get("sentAt")),
+        "recordedAt": first_text(record.get("recordedAt")),
+        "sentAt": first_text(record.get("sentAt")),
+        "checkedAt": first_text(record.get("checkedAt"), payload.get("checkedAt"), payload.get("updatedAt")),
+        "eventKey": first_text(record.get("eventKey")),
+        "summary": summarize_source_event(record),
+        "message": first_text(record.get("message")),
+        "detail": first_text(record.get("detail"), payload.get("detail"), payload.get("issueOverview")),
+        "severity": first_text(record.get("severity"), payload.get("severity")),
+        "reportStatus": first_text(payload.get("status")),
+        "deliveryStatus": first_text(record.get("deliveryStatus")),
+        "ingestStatus": first_text(record.get("ingestStatus")),
+        "isDelivery": record_type in {"frontstage.delivery.sent", "frontstage.delivery.latest"},
+    }
+
+
+def build_source_event_items(records: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if not isinstance(records, list):
+        return []
+    return [build_source_event_item(item) for item in records if isinstance(item, dict)]
 
 
 def build_source_overview(
@@ -162,6 +208,7 @@ def build_source_overview(
         "latestRecordType": latest_summary.get("latestRecordType"),
         "latestEventSummary": latest_summary.get("latestEventSummary"),
         "latestEventKey": latest_summary.get("latestEventKey"),
+        "latestEventItem": latest_summary.get("latestEventItem"),
         "latestSourceStateSummary": summarize_source_state(latest_source_state),
         "latestSourceStateRecordedAt": latest_source_state.get("recordedAt") or latest_source_state.get("sentAt"),
         "latestDeliveryMessage": summarize_source_delivery(latest_delivery),
@@ -229,6 +276,7 @@ def build_latest_source_summary(
             "latestRecordType": latest_event.get("recordType"),
             "latestEventSummary": summarize_source_event(latest_event),
             "latestEventKey": latest_event.get("eventKey"),
+            "latestEventItem": build_source_event_item(latest_event),
         }
     if latest_delivery:
         return {
@@ -236,6 +284,7 @@ def build_latest_source_summary(
             "latestRecordType": latest_delivery.get("recordType") or "frontstage.delivery.latest",
             "latestEventSummary": summarize_source_delivery(latest_delivery),
             "latestEventKey": latest_delivery.get("eventKey"),
+            "latestEventItem": build_source_event_item(latest_delivery),
         }
     if latest_source_state:
         return {
@@ -243,12 +292,14 @@ def build_latest_source_summary(
             "latestRecordType": latest_source_state.get("recordType") or "broker.source.latest",
             "latestEventSummary": summarize_source_state(latest_source_state),
             "latestEventKey": latest_source_state.get("eventKey"),
+            "latestEventItem": build_source_event_item(latest_source_state),
         }
     return {
         "latestEventAt": None,
         "latestRecordType": None,
         "latestEventSummary": None,
         "latestEventKey": None,
+        "latestEventItem": {},
     }
 
 
@@ -358,6 +409,25 @@ def build_query_catalog() -> dict[str, Any]:
             "resultShape": {
                 "count": "int",
                 "sources": "array[sourceCatalogItem]",
+                "sourceEventItem": {
+                    "recordType": "str|null",
+                    "source": "str|null",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "eventAt": "str|null",
+                    "recordedAt": "str|null",
+                    "sentAt": "str|null",
+                    "checkedAt": "str|null",
+                    "eventKey": "str|null",
+                    "summary": "str|null",
+                    "message": "str|null",
+                    "detail": "str|null",
+                    "severity": "str|null",
+                    "reportStatus": "str|null",
+                    "deliveryStatus": "str|null",
+                    "ingestStatus": "str|null",
+                    "isDelivery": "bool",
+                },
                 "sourceCatalogItem": {
                     "source": "str",
                     "sourceEventType": "str|null",
@@ -369,6 +439,7 @@ def build_query_catalog() -> dict[str, Any]:
                     "latestRecordType": "str|null",
                     "latestEventSummary": "str|null",
                     "latestEventKey": "str|null",
+                    "latestEventItem": "sourceEventItem",
                     "latestSourceStateSummary": "str|null",
                     "latestSourceStateRecordedAt": "str|null",
                     "latestDeliveryMessage": "str|null",
@@ -401,6 +472,7 @@ def build_query_catalog() -> dict[str, Any]:
                 "latestRecordType": "str|null",
                 "latestEventSummary": "str|null",
                 "latestEventKey": "str|null",
+                "latestEventItem": "sourceEventItem",
                 "latestSourceStateSummary": "str|null",
                 "latestSourceStateRecordedAt": "str|null",
                 "latestDeliveryMessage": "str|null",
@@ -410,7 +482,27 @@ def build_query_catalog() -> dict[str, Any]:
                 "contract": "object",
                 "latestSourceState": "object",
                 "latestDelivery": "object",
+                "recentEventItems": "array[sourceEventItem]",
                 "recentEvents": "array[object]",
+                "sourceEventItem": {
+                    "recordType": "str|null",
+                    "source": "str|null",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "eventAt": "str|null",
+                    "recordedAt": "str|null",
+                    "sentAt": "str|null",
+                    "checkedAt": "str|null",
+                    "eventKey": "str|null",
+                    "summary": "str|null",
+                    "message": "str|null",
+                    "detail": "str|null",
+                    "severity": "str|null",
+                    "reportStatus": "str|null",
+                    "deliveryStatus": "str|null",
+                    "ingestStatus": "str|null",
+                    "isDelivery": "bool",
+                },
             },
         },
         "events.recent": {
@@ -466,6 +558,7 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     latest_source_state = source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {}
     latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
     recent_events = [item for item in events if str(item.get("source") or "") == source_name]
+    recent_event_items = build_source_event_items(recent_events)
     recent_delivery_count = sum(1 for item in recent_events if str(item.get("recordType") or "") == "frontstage.delivery.sent")
     return {
         **build_source_overview(source_name, contract, latest_source_state, latest_delivery, recent_events),
@@ -476,6 +569,7 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
         "contract": contract,
         "latestSourceState": latest_source_state,
         "latestDelivery": latest_delivery,
+        "recentEventItems": recent_event_items,
         "recentEvents": recent_events,
     }
 
@@ -577,8 +671,8 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         for source in source_names:
             state_payload = source_states.get(source) if isinstance(source_states.get(source), dict) else {}
             delivery_payload = deliveries.get(source) if isinstance(deliveries.get(source), dict) else {}
-            state_part = str(state_payload.get("summary") or state_payload.get("message") or state_payload.get("eventKey") or "无 ingest")
-            delivery_part = str(delivery_payload.get("message") or delivery_payload.get("eventKey") or "无 delivery")
+            state_part = summarize_source_state(state_payload) or "无 ingest"
+            delivery_part = summarize_source_delivery(delivery_payload) or "无 delivery"
             lines.append(f"- {source}｜state={state_part}｜delivery={delivery_part}")
         return "\n".join(lines)
 
@@ -600,15 +694,13 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     if kind == "source.inspect":
         detail = build_source_detail(snapshot, events, source_name)
         source = str(detail.get("source") or source_name or "unknown")
-        latest_state = detail.get("latestSourceState") if isinstance(detail.get("latestSourceState"), dict) else {}
-        latest_delivery = detail.get("latestDelivery") if isinstance(detail.get("latestDelivery"), dict) else {}
-        recent_events = detail.get("recentEvents") if isinstance(detail.get("recentEvents"), list) else []
+        recent_event_items = detail.get("recentEventItems") if isinstance(detail.get("recentEventItems"), list) else []
         available_sources = detail.get("availableSources") if isinstance(detail.get("availableSources"), list) else []
         if not detail.get("exists"):
             available = ", ".join(str(item) for item in available_sources) or "none"
             return f"source={source}\nexists=false\navailableSources: {available}"
-        state_text = str(latest_state.get("message") or latest_state.get("summary") or latest_state.get("eventKey") or "无 ingest")
-        delivery_text = str(latest_delivery.get("message") or latest_delivery.get("eventKey") or "无 delivery")
+        state_text = str(detail.get("latestSourceStateSummary") or "无 ingest")
+        delivery_text = str(detail.get("latestDeliveryMessage") or "无 delivery")
         event_type = str(detail.get("sourceEventType") or "unknown")
         source_view = str(detail.get("sourceView") or "unknown")
         lines = [
@@ -623,10 +715,13 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             f"latestState: {state_text}",
             f"latestDelivery: {delivery_text}",
         ])
-        if recent_events:
-            for item in recent_events[:3]:
+        if recent_event_items:
+            for item in recent_event_items[:3]:
+                summary = str(item.get("summary") or item.get("message") or item.get("eventKey") or "")
+                detail_text = str(item.get("detail") or "").strip()
+                suffix = f"｜{detail_text}" if detail_text and detail_text != summary else ""
                 lines.append(
-                    f"- [{item.get('recordType') or 'unknown'}] {item.get('recordedAt') or item.get('sentAt') or ''}｜{item.get('message') or item.get('eventKey') or ''}"
+                    f"- [{item.get('recordType') or 'unknown'}] {item.get('eventAt') or ''}｜{summary}{suffix}"
                 )
         else:
             lines.append("- 最近没有这个 source 的事件记录。")
