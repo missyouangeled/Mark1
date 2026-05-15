@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 9
+QUERY_CONTRACT_VERSION = 10
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -218,7 +218,7 @@ def build_source_overview(
     }
 
 
-def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
+def build_source_latest_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
     deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
     contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
@@ -236,9 +236,28 @@ def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "latestDelivery": latest_delivery,
             }
         )
+    return items
+
+
+def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
+    items = build_source_latest_items(snapshot)
     return {
         "count": len(items),
         "sources": items,
+    }
+
+
+def build_sources_latest(snapshot: dict[str, Any]) -> dict[str, Any]:
+    items = build_source_latest_items(snapshot)
+    return {
+        "count": len(items),
+        "availableSources": [item.get("source") for item in items if isinstance(item.get("source"), str)],
+        "sourceItems": items,
+        "sourceStateSnapshots": snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {},
+        "sources": snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {},
+        "latestSource": snapshot.get("latestSource"),
+        "latestSourceState": snapshot.get("latestSourceState") if isinstance(snapshot.get("latestSourceState"), dict) else {},
+        "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
     }
 
 
@@ -389,11 +408,55 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "sources.latest": {
-            "description": "Raw latest source-state and delivery snapshots keyed by source.",
+            "description": "Latest source-state and delivery snapshots plus stable per-source items for lightweight consumers.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
             "resultShape": {
+                "count": "int",
+                "availableSources": "array[str]",
+                "sourceItems": "array[sourceLatestItem]",
+                "sourceEventItem": {
+                    "recordType": "str|null",
+                    "source": "str|null",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "eventAt": "str|null",
+                    "recordedAt": "str|null",
+                    "sentAt": "str|null",
+                    "checkedAt": "str|null",
+                    "eventKey": "str|null",
+                    "summary": "str|null",
+                    "message": "str|null",
+                    "detail": "str|null",
+                    "severity": "str|null",
+                    "reportStatus": "str|null",
+                    "deliveryStatus": "str|null",
+                    "ingestStatus": "str|null",
+                    "isDelivery": "bool",
+                },
+                "sourceLatestItem": {
+                    "source": "str",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "hasContract": "bool",
+                    "hasSourceState": "bool",
+                    "hasDelivery": "bool",
+                    "latestEventAt": "str|null",
+                    "latestRecordType": "str|null",
+                    "latestEventSummary": "str|null",
+                    "latestEventKey": "str|null",
+                    "latestEventItem": "sourceEventItem",
+                    "latestSourceStateSummary": "str|null",
+                    "latestSourceStateRecordedAt": "str|null",
+                    "latestDeliveryMessage": "str|null",
+                    "latestDeliveryEventKey": "str|null",
+                    "latestDeliveryRecordType": "str|null",
+                    "latestDeliverySentAt": "str|null",
+                    "contract": "object",
+                    "latestSourceState": "object",
+                    "latestDelivery": "object",
+                },
                 "sourceStateSnapshots": "object",
                 "sources": "object",
                 "latestSource": "str|null",
@@ -662,17 +725,15 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         return "\n".join(lines)
 
     if kind == "sources.latest":
-        source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
-        deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
-        source_names = sorted({*source_states.keys(), *deliveries.keys()})
-        if not source_names:
+        sources_latest = build_sources_latest(snapshot)
+        items = sources_latest.get("sourceItems") if isinstance(sources_latest.get("sourceItems"), list) else []
+        if not items:
             return "当前还没有来源快照。"
         lines = []
-        for source in source_names:
-            state_payload = source_states.get(source) if isinstance(source_states.get(source), dict) else {}
-            delivery_payload = deliveries.get(source) if isinstance(deliveries.get(source), dict) else {}
-            state_part = summarize_source_state(state_payload) or "无 ingest"
-            delivery_part = summarize_source_delivery(delivery_payload) or "无 delivery"
+        for item in items:
+            source = str(item.get("source") or "unknown")
+            state_part = str(item.get("latestSourceStateSummary") or "无 ingest")
+            delivery_part = str(item.get("latestDeliveryMessage") or "无 delivery")
             lines.append(f"- {source}｜state={state_part}｜delivery={delivery_part}")
         return "\n".join(lines)
 
@@ -787,13 +848,7 @@ def build_query_result(
     if kind == "panels.catalog":
         return build_panel_catalog(snapshot)
     if kind == "sources.latest":
-        return {
-            "sourceStateSnapshots": snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {},
-            "sources": snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {},
-            "latestSource": snapshot.get("latestSource"),
-            "latestSourceState": snapshot.get("latestSourceState") if isinstance(snapshot.get("latestSourceState"), dict) else {},
-            "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
-        }
+        return build_sources_latest(snapshot)
     if kind == "sources.catalog":
         return build_source_catalog(snapshot)
     if kind == "source.inspect":
