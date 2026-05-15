@@ -90,6 +90,69 @@ def source_contract(source: str) -> dict[str, Any]:
     }
 
 
+def build_record_type_contract(description: str, required_fields: list[str], optional_fields: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "description": description,
+        "requiredFields": required_fields,
+        "optionalFields": optional_fields or [],
+    }
+
+
+def build_record_type_catalog() -> dict[str, dict[str, Any]]:
+    return {
+        SOURCE_EVENT_RECORD_TYPE: build_record_type_contract(
+            "Append-only source event recorded by broker ingest before any frontstage delivery is required.",
+            ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt"],
+            ["schemaVersion", "contractVersion", "data", "ingestStatus"],
+        ),
+        EVENT_LOG_RECORD_TYPE: build_record_type_contract(
+            "Append-only frontstage delivery event written after a helper message is actually sent.",
+            ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt", "sentAt"],
+            ["schemaVersion", "contractVersion", "targetSessionKey", "messageId", "deliveryStatus"],
+        ),
+        SOURCE_SNAPSHOT_RECORD_TYPE: build_record_type_contract(
+            "Latest successful frontstage delivery snapshot for one source inside frontstage.json / snapshot payloads.",
+            ["recordType", "source", "sourceEventType", "sourceView"],
+            ["eventKey", "sessionKey", "targetSessionKey", "messageId", "message", "sentAt"],
+        ),
+        SOURCE_STATE_SNAPSHOT_RECORD_TYPE: build_record_type_contract(
+            "Latest ingest-side source snapshot for one source, even when no frontstage delivery happened yet.",
+            ["recordType", "source", "sourceEventType", "sourceView"],
+            ["eventKey", "sessionKey", "message", "recordedAt", "data"],
+        ),
+    }
+
+
+def build_event_field_catalog(source_names: list[str]) -> dict[str, dict[str, Any]]:
+    source_contracts = [source_contract(name) for name in source_names]
+    known_source_views = sorted({str(item.get("sourceView")) for item in source_contracts if item.get("sourceView")})
+    known_source_event_types = sorted({str(item.get("sourceEventType")) for item in source_contracts if item.get("sourceEventType")})
+    return {
+        "sourceEventType": {
+            "type": "str",
+            "description": "Stable semantic event type for one broker source.",
+            "knownValues": known_source_event_types,
+        },
+        "sourceView": {
+            "type": "str|null",
+            "description": "Stable logical view bucket used by renderer / infos-handle consumers.",
+            "knownValues": known_source_views,
+        },
+        "eventKey": {
+            "type": "str",
+            "description": "Source-scoped dedupe / correlation key shared across ingest and delivery records.",
+        },
+        "recordedAt": {
+            "type": "str",
+            "description": "Canonical broker event timestamp; always present on append-only events and may also appear on latest snapshots.",
+        },
+        "sentAt": {
+            "type": "str|null",
+            "description": "Frontstage delivery timestamp; expected on delivery records and delivery latest snapshots.",
+        },
+    }
+
+
 def build_contract_catalog(source_names: list[str] | None = None) -> dict[str, Any]:
     ordered_names = list(dict.fromkeys([*SOURCE_SPECS.keys(), *(source_names or [])]))
     return {
@@ -100,6 +163,8 @@ def build_contract_catalog(source_names: list[str] | None = None) -> dict[str, A
         "sourceStateSnapshotRecordType": SOURCE_STATE_SNAPSHOT_RECORD_TYPE,
         "sourceEventTypeField": "sourceEventType",
         "sourceViewField": "sourceView",
+        "recordTypes": build_record_type_catalog(),
+        "eventFieldCatalog": build_event_field_catalog(ordered_names),
         "sources": {name: source_contract(name) for name in ordered_names},
     }
 

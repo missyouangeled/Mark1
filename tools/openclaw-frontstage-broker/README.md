@@ -137,6 +137,8 @@
 
 - `contractVersion`
 - `contracts`
+  - 其中 `contracts.recordTypes` 会正式列出当前四类 broker 记录（`broker.source.event` / `frontstage.delivery.sent` / `frontstage.delivery.latest` / `broker.source.latest`）的 `description / requiredFields / optionalFields`
+  - `contracts.eventFieldCatalog` 会收口 `sourceEventType / sourceView / eventKey / recordedAt / sentAt` 这些字段的正式语义，减少消费方继续靠 README 文本猜字段
 
 其中 `snapshot.json` / `overview.json` / `manifest.json` 还会额外带：
 
@@ -154,12 +156,14 @@
 
 1. `jarvis-frontstage-status.html` 这条状态页链路会直接读取 broker 契约字段，把 `sourceView` 作为主分组语义、把 `sourceEventType` 作为事件语义说明，再保留原始 `source` 作为排查辅助信息；与它同名的 `status.json` 当前只再作为兼容别名保留。
 2. Control UI 顶部“前台状态”小入口 / dock 现在优先读取 `jarvis-frontstage-snapshot.json`，并按统一 snapshot 顶层口径取 `summary / issueOverview / selfHelpActions / panels.*`；live `jarvis-branding-override.js` 里也会显式同时保留 `snapshotJsonHref`（正式入口）与 `legacyStatusJsonHref`（兼容别名），避免旧 `statusJsonHref` 字段名继续表现得像主入口；`jarvis-frontstage-status.json` 只再作为兼容别名保留，不应继续作为新的正式入口。
-3. `infos-handle` 当前已经可以把 broker 视图整理成稳定 text/json 查询；JSON 响应里带 `queryContractVersion=11` 与 `result` 字段，消费方不必直接啃整份 snapshot。
+3. `infos-handle` 当前已经可以把 broker 视图整理成稳定 text/json 查询；JSON 响应里带 `queryContractVersion=13` 与 `result` 字段，消费方不必直接啃整份 snapshot。
 4. source 相关 query 的推荐读取顺序现在明确为：先读 `sources.latest` 做轻量 inventory / handoff，再在需要原始快照或契约时读 `sources.catalog`，最后只对单个 source 深挖时再读 `source.inspect`。
 5. `infos-handle query --kind sources.latest` 现在除了保留原始 `sourceStateSnapshots / sources` keyed snapshot 外，也会额外暴露 `count / availableSources / sourceItems[]`；其中每个 `sourceItems[]` item 会与 `sources.catalog / source.inspect` 对齐，稳定带出 `latestEventSummary / latestEventItem / latestDeliveryItem / latestDeliveryMessage / latestSourceStateSummary` 等字段，减少消费方自己翻 raw broker event。
 6. `infos-handle query --kind sources.catalog` 现在会返回 machine-readable source inventory（来源契约、是否已有 ingest 快照、是否已有 frontstage delivery），并补齐 `latestEventSummary / latestEventKey / latestDeliveryEventKey / latestDeliveryRecordType` 这类稳定顶层摘要字段；同时新增 `latestEventItem / latestDeliveryItem`，把最近一条来源事件与最近一条投递都压平成稳定 item shape，减少消费方自己拼 `recordType / summary / checkedAt / status` 的工作。
 7. `infos-handle query --kind source.inspect` 也会稳定暴露 `recentDeliveryCount`、`latestEventItem`、`latestDeliveryItem`、`recentEventItems[]` 与 `recentDeliveryItems[]`；handoff / 排查脚本优先读取这些 item shape，就不必直接解析 `recentEvents[]` 或 `latestDelivery` 原始对象。
 8. `infos-handle query --kind panels.catalog` 现在会返回稳定的 panel inventory（`panelName / available / summary / severity / checkedAt` 等字段），`contract.catalog` 也会同时公开每个 query kind 的参数/格式约束，方便其他机器先读契约再发请求。
+9. `infos-handle query --kind contract.catalog` 现在除了 query catalog 之外，也会把 broker 自己的 `contracts.recordTypes / contracts.eventFieldCatalog` 原样带出；消费方若只想确认 broker 事件口径，可直接从这里读，不必再去翻 README 或手抠 `manifest.json`。
+10. `infos-handle query --kind events.recent` 现在也会稳定暴露 `count / latestEventAt / availableSources / sourceEventCount / deliveryCount / recordTypeCounts / eventItems[] / latestBySource`；其中 `latestBySource` 会把当前 recent window 内每个 source 的最近事件压成轻量摘要（如 `latestEventSummary / latestEventKey / sourceEventType / sourceView / isDelivery`），handoff / 排查脚本优先读这些稳定字段，不必再直接解析原始 `events[]`。
 
 ## 当前阶段边界
 

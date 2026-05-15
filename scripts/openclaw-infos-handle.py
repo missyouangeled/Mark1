@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 11
+QUERY_CONTRACT_VERSION = 13
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -174,6 +174,69 @@ def build_source_event_items(records: list[dict[str, Any]] | None) -> list[dict[
     if not isinstance(records, list):
         return []
     return [build_source_event_item(item) for item in records if isinstance(item, dict)]
+
+
+def build_record_type_counts(event_items: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in event_items:
+        record_type = first_text(item.get("recordType")) or "unknown"
+        counts[record_type] = counts.get(record_type, 0) + 1
+    return counts
+
+
+def build_latest_by_source(event_items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    latest_by_source: dict[str, dict[str, Any]] = {}
+    for item in event_items:
+        source = first_text(item.get("source"))
+        if not source:
+            continue
+        summary = latest_by_source.get(source)
+        if summary is None:
+            latest_by_source[source] = {
+                "source": source,
+                "eventCount": 1,
+                "deliveryCount": 1 if bool(item.get("isDelivery")) else 0,
+                "latestEventAt": item.get("eventAt"),
+                "latestRecordType": item.get("recordType"),
+                "latestEventSummary": item.get("summary") or item.get("message") or item.get("eventKey"),
+                "latestEventKey": item.get("eventKey"),
+                "sourceEventType": item.get("sourceEventType"),
+                "sourceView": item.get("sourceView"),
+                "isDelivery": bool(item.get("isDelivery")),
+            }
+            continue
+        summary["eventCount"] = int(summary.get("eventCount") or 0) + 1
+        if bool(item.get("isDelivery")):
+            summary["deliveryCount"] = int(summary.get("deliveryCount") or 0) + 1
+        if not summary.get("sourceEventType") and item.get("sourceEventType"):
+            summary["sourceEventType"] = item.get("sourceEventType")
+        if not summary.get("sourceView") and item.get("sourceView"):
+            summary["sourceView"] = item.get("sourceView")
+    return latest_by_source
+
+
+def build_recent_events_result(events: list[dict[str, Any]]) -> dict[str, Any]:
+    event_items = build_source_event_items(events)
+    available_sources = sorted(
+        {
+            source
+            for item in event_items
+            for source in [first_text(item.get("source"))]
+            if source
+        }
+    )
+    delivery_count = sum(1 for item in event_items if bool(item.get("isDelivery")))
+    return {
+        "count": len(event_items),
+        "latestEventAt": event_items[0].get("eventAt") if event_items else None,
+        "availableSources": available_sources,
+        "sourceEventCount": len(event_items) - delivery_count,
+        "deliveryCount": delivery_count,
+        "recordTypeCounts": build_record_type_counts(event_items),
+        "latestBySource": build_latest_by_source(event_items),
+        "eventItems": event_items,
+        "events": events,
+    }
 
 
 def build_source_overview(
@@ -578,12 +641,51 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "events.recent": {
-            "description": "Recent broker events sorted by recorded time descending.",
+            "description": "Recent broker events with stable eventItems[] and lightweight counters for handoff consumers.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": ["limit"],
             "resultShape": {
+                "count": "int",
+                "latestEventAt": "str|null",
+                "availableSources": "array[str]",
+                "sourceEventCount": "int",
+                "deliveryCount": "int",
+                "recordTypeCounts": "object[str,int]",
+                "latestBySource": "object[str,sourceRecentSummary]",
+                "eventItems": "array[brokerEventItem]",
                 "events": "array[object]",
+                "sourceRecentSummary": {
+                    "source": "str",
+                    "eventCount": "int",
+                    "deliveryCount": "int",
+                    "latestEventAt": "str|null",
+                    "latestRecordType": "str|null",
+                    "latestEventSummary": "str|null",
+                    "latestEventKey": "str|null",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "isDelivery": "bool",
+                },
+                "brokerEventItem": {
+                    "recordType": "str|null",
+                    "source": "str|null",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "eventAt": "str|null",
+                    "recordedAt": "str|null",
+                    "sentAt": "str|null",
+                    "checkedAt": "str|null",
+                    "eventKey": "str|null",
+                    "summary": "str|null",
+                    "message": "str|null",
+                    "detail": "str|null",
+                    "severity": "str|null",
+                    "reportStatus": "str|null",
+                    "deliveryStatus": "str|null",
+                    "ingestStatus": "str|null",
+                    "isDelivery": "bool",
+                },
             },
         },
         "contract.catalog": {
@@ -800,15 +902,32 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         return "\n".join(lines)
 
     if kind == "events.recent":
-        if not events:
+        recent_events = build_recent_events_result(events)
+        event_items = recent_events.get("eventItems") if isinstance(recent_events.get("eventItems"), list) else []
+        if not event_items:
             return "最近没有 broker 事件。"
-        lines = []
-        for item in events:
+        record_type_counts = recent_events.get("recordTypeCounts") if isinstance(recent_events.get("recordTypeCounts"), dict) else {}
+        latest_by_source = recent_events.get("latestBySource") if isinstance(recent_events.get("latestBySource"), dict) else {}
+        count_parts = [f"{record_type}:{count}" for record_type, count in record_type_counts.items()]
+        latest_parts = [
+            f"{source}={summary.get('latestRecordType') or 'unknown'}"
+            for source, summary in latest_by_source.items()
+            if isinstance(summary, dict)
+        ]
+        sources = ", ".join(str(item) for item in recent_events.get("availableSources") or []) or "none"
+        lines = [
+            f"count={recent_events.get('count') or 0}｜sources={sources}｜recordTypes={', '.join(count_parts) or 'none'}"
+        ]
+        if latest_parts:
+            lines.append(f"latestBySource: {', '.join(latest_parts)}")
+        for item in event_items:
             record_type = str(item.get("recordType") or "unknown")
             source = str(item.get("source") or "unknown")
-            stamp = str(item.get("recordedAt") or item.get("sentAt") or "")
-            message = str(item.get("message") or item.get("eventKey") or "")
-            lines.append(f"- [{record_type}] {source} @ {stamp}｜{message}")
+            source_view = str(item.get("sourceView") or "unknown")
+            source_event_type = str(item.get("sourceEventType") or "unknown")
+            stamp = str(item.get("eventAt") or "")
+            summary = str(item.get("summary") or item.get("message") or item.get("eventKey") or "")
+            lines.append(f"- [{record_type}] {source}｜view={source_view}｜eventType={source_event_type}｜{stamp}｜{summary}")
         return "\n".join(lines)
 
     if kind == "contract.catalog":
@@ -818,11 +937,13 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         primary_view = snapshot_contract.get("primaryView") or "unknown"
         primary_published = snapshot_contract.get("primaryPublishedJsonKey") or "unknown"
         source_count = len(contracts.get("sources")) if isinstance(contracts.get("sources"), dict) else 0
+        record_type_count = len(contracts.get("recordTypes")) if isinstance(contracts.get("recordTypes"), dict) else 0
         query_count = len(build_query_catalog().get("queries") or {})
         return (
             f"infos-handle queryContractVersion={QUERY_CONTRACT_VERSION}｜"
             f"broker contractVersion={broker_contract_version}｜"
-            f"primaryView={primary_view}｜primaryPublishedJsonKey={primary_published}｜sources={source_count}｜queries={query_count}"
+            f"primaryView={primary_view}｜primaryPublishedJsonKey={primary_published}｜"
+            f"sources={source_count}｜eventRecordTypes={record_type_count}｜queries={query_count}"
         )
 
     raise ValueError(f"unsupported kind: {kind}")
@@ -865,7 +986,7 @@ def build_query_result(
     if kind == "source.inspect":
         return build_source_detail(snapshot, events, source_name)
     if kind == "events.recent":
-        return {"events": events}
+        return build_recent_events_result(events)
     if kind == "contract.catalog":
         return {
             "queryContractVersion": QUERY_CONTRACT_VERSION,

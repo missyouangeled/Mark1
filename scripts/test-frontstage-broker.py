@@ -132,6 +132,10 @@ def main() -> int:
         assert frontstage_view["contractVersion"] == 2
         assert frontstage_view["contracts"]["sourceEventRecordType"] == "broker.source.event"
         assert frontstage_view["contracts"]["deliveryEventRecordType"] == "frontstage.delivery.sent"
+        assert frontstage_view["contracts"]["recordTypes"]["broker.source.event"]["requiredFields"] == ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt"]
+        assert frontstage_view["contracts"]["recordTypes"]["frontstage.delivery.sent"]["optionalFields"] == ["schemaVersion", "contractVersion", "targetSessionKey", "messageId", "deliveryStatus"]
+        assert frontstage_view["contracts"]["eventFieldCatalog"]["sourceView"]["knownValues"] == ["health", "recovery", "tasks"]
+        assert frontstage_view["contracts"]["eventFieldCatalog"]["sentAt"]["type"] == "str|null"
         assert frontstage_view["contracts"]["sources"]["local-health"]["sourceEventType"] == "local_health.status.changed"
         assert "local-health" in frontstage_view["sources"]
         assert "frontstage-recovery" in frontstage_view["sources"]
@@ -148,6 +152,8 @@ def main() -> int:
         assert manifest["contractVersion"] == 2
         assert manifest["contracts"]["sourceSnapshotRecordType"] == "frontstage.delivery.latest"
         assert manifest["contracts"]["sourceStateSnapshotRecordType"] == "broker.source.latest"
+        assert manifest["contracts"]["recordTypes"]["broker.source.latest"]["description"].startswith("Latest ingest-side source snapshot")
+        assert manifest["contracts"]["eventFieldCatalog"]["sourceEventType"]["knownValues"] == ["frontstage_recovery.status.changed", "local_health.status.changed", "supervisor.status.changed"]
         assert manifest["snapshotContract"]["primaryView"] == "snapshot"
         assert manifest["snapshotContract"]["primaryPublishedJsonKey"] == "frontstageSnapshotJson"
         assert manifest["snapshotContract"]["compatibilityViewAliases"]["overview"] == "snapshot"

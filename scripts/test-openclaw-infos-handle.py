@@ -8,6 +8,7 @@ from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
+EXPECTED_QUERY_CONTRACT_VERSION = 13
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -94,6 +95,58 @@ def main() -> int:
             "contractVersion": 2,
             "contracts": {
                 "version": 2,
+                "sourceEventRecordType": "broker.source.event",
+                "deliveryEventRecordType": "frontstage.delivery.sent",
+                "sourceSnapshotRecordType": "frontstage.delivery.latest",
+                "sourceStateSnapshotRecordType": "broker.source.latest",
+                "sourceEventTypeField": "sourceEventType",
+                "sourceViewField": "sourceView",
+                "recordTypes": {
+                    "broker.source.event": {
+                        "description": "Append-only source event recorded by broker ingest before any frontstage delivery is required.",
+                        "requiredFields": ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt"],
+                        "optionalFields": ["schemaVersion", "contractVersion", "data", "ingestStatus"],
+                    },
+                    "frontstage.delivery.sent": {
+                        "description": "Append-only frontstage delivery event written after a helper message is actually sent.",
+                        "requiredFields": ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt", "sentAt"],
+                        "optionalFields": ["schemaVersion", "contractVersion", "targetSessionKey", "messageId", "deliveryStatus"],
+                    },
+                    "frontstage.delivery.latest": {
+                        "description": "Latest successful frontstage delivery snapshot for one source inside frontstage.json / snapshot payloads.",
+                        "requiredFields": ["recordType", "source", "sourceEventType", "sourceView"],
+                        "optionalFields": ["eventKey", "sessionKey", "targetSessionKey", "messageId", "message", "sentAt"],
+                    },
+                    "broker.source.latest": {
+                        "description": "Latest ingest-side source snapshot for one source, even when no frontstage delivery happened yet.",
+                        "requiredFields": ["recordType", "source", "sourceEventType", "sourceView"],
+                        "optionalFields": ["eventKey", "sessionKey", "message", "recordedAt", "data"],
+                    },
+                },
+                "eventFieldCatalog": {
+                    "sourceEventType": {
+                        "type": "str",
+                        "description": "Stable semantic event type for one broker source.",
+                        "knownValues": ["local_health.status.changed", "supervisor.status.changed"],
+                    },
+                    "sourceView": {
+                        "type": "str|null",
+                        "description": "Stable logical view bucket used by renderer / infos-handle consumers.",
+                        "knownValues": ["health", "tasks"],
+                    },
+                    "eventKey": {
+                        "type": "str",
+                        "description": "Source-scoped dedupe / correlation key shared across ingest and delivery records.",
+                    },
+                    "recordedAt": {
+                        "type": "str",
+                        "description": "Canonical broker event timestamp; always present on append-only events and may also appear on latest snapshots.",
+                    },
+                    "sentAt": {
+                        "type": "str|null",
+                        "description": "Frontstage delivery timestamp; expected on delivery records and delivery latest snapshots.",
+                    },
+                },
                 "sources": {
                     "local-health": {
                         "source": "local-health",
@@ -175,15 +228,69 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert len(payload["events"]) == 3
         assert len(payload["result"]["events"]) == 3
         assert payload["events"][0]["source"] == "supervisor"
+        assert payload["result"]["count"] == 3
+        assert payload["result"]["latestEventAt"] == "2026-05-15T12:00:03+08:00"
+        assert payload["result"]["availableSources"] == ["local-health", "supervisor"]
+        assert payload["result"]["sourceEventCount"] == 1
+        assert payload["result"]["deliveryCount"] == 2
+        assert payload["result"]["recordTypeCounts"] == {
+            "frontstage.delivery.sent": 2,
+            "broker.source.event": 1,
+        }
+        assert payload["result"]["latestBySource"] == {
+            "supervisor": {
+                "source": "supervisor",
+                "eventCount": 1,
+                "deliveryCount": 1,
+                "latestEventAt": "2026-05-15T12:00:03+08:00",
+                "latestRecordType": "frontstage.delivery.sent",
+                "latestEventSummary": "[监工] 后台任务已完成。",
+                "latestEventKey": "done-1",
+                "sourceEventType": "supervisor.status.changed",
+                "sourceView": "tasks",
+                "isDelivery": True,
+            },
+            "local-health": {
+                "source": "local-health",
+                "eventCount": 2,
+                "deliveryCount": 1,
+                "latestEventAt": "2026-05-15T12:00:01+08:00",
+                "latestRecordType": "frontstage.delivery.sent",
+                "latestEventSummary": "[本地健康] 当前已恢复正常。",
+                "latestEventKey": "health-delivery-1",
+                "sourceEventType": "local_health.status.changed",
+                "sourceView": "health",
+                "isDelivery": True,
+            },
+        }
+        assert len(payload["result"]["eventItems"]) == 3
+        assert payload["result"]["eventItems"][0]["recordType"] == "frontstage.delivery.sent"
+        assert payload["result"]["eventItems"][0]["source"] == "supervisor"
+        assert payload["result"]["eventItems"][0]["sourceView"] == "tasks"
+        assert payload["result"]["eventItems"][0]["sourceEventType"] == "supervisor.status.changed"
+        assert payload["result"]["eventItems"][0]["summary"] == "[监工] 后台任务已完成。"
+        assert payload["result"]["eventItems"][0]["isDelivery"] is True
+        assert payload["result"]["eventItems"][1]["recordType"] == "frontstage.delivery.sent"
+        assert payload["result"]["eventItems"][2]["recordType"] == "broker.source.event"
+        assert payload["result"]["eventItems"][2]["summary"] == "健康正常"
+        assert payload["result"]["eventItems"][2]["severity"] == "ok"
+        assert payload["result"]["eventItems"][2]["checkedAt"] == "2026-05-15T12:00:00+08:00"
+        assert payload["result"]["eventItems"][2]["ingestStatus"] == "recorded"
+
+        result = run("query", "--kind", "events.recent", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        assert "count=3｜sources=local-health, supervisor｜recordTypes=frontstage.delivery.sent:2, broker.source.event:1" in result.stdout
+        assert "latestBySource: supervisor=frontstage.delivery.sent, local-health=frontstage.delivery.sent" in result.stdout
+        assert "- [frontstage.delivery.sent] supervisor｜view=tasks｜eventType=supervisor.status.changed｜2026-05-15T12:00:03+08:00｜[监工] 后台任务已完成。" in result.stdout
 
         result = run("query", "--kind", "sources.latest", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["result"]["count"] == 3
         assert payload["result"]["availableSources"] == ["frontstage-recovery", "local-health", "supervisor"]
         source_rows = {item["source"]: item for item in payload["result"]["sourceItems"]}
@@ -201,7 +308,7 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["result"]["count"] == 3
         source_rows = {item["source"]: item for item in payload["result"]["sources"]}
         assert source_rows["local-health"]["sourceView"] == "health"
@@ -238,7 +345,7 @@ def main() -> int:
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["sourceName"] == "local-health"
         assert payload["result"]["source"] == "local-health"
         assert payload["result"]["exists"] is True
@@ -287,7 +394,7 @@ def main() -> int:
         result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["panelName"] == "health"
         assert payload["result"]["panelName"] == "health"
         assert payload["result"]["exists"] is True
@@ -301,7 +408,7 @@ def main() -> int:
         result = run("query", "--kind", "panels.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["result"]["count"] == 3
         panel_rows = {item["panelName"]: item for item in payload["result"]["panels"]}
         assert panel_rows["health"]["available"] is True
@@ -313,10 +420,14 @@ def main() -> int:
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
+        assert payload["result"]["contracts"]["recordTypes"]["broker.source.event"]["requiredFields"] == ["recordType", "source", "sourceEventType", "sourceView", "eventKey", "sessionKey", "message", "recordedAt"]
+        assert payload["result"]["contracts"]["recordTypes"]["frontstage.delivery.sent"]["optionalFields"] == ["schemaVersion", "contractVersion", "targetSessionKey", "messageId", "deliveryStatus"]
+        assert payload["result"]["contracts"]["eventFieldCatalog"]["sourceEventType"]["knownValues"] == ["local_health.status.changed", "supervisor.status.changed"]
+        assert payload["result"]["contracts"]["eventFieldCatalog"]["sentAt"]["type"] == "str|null"
         assert payload["result"]["queryCatalog"]["defaultLimit"] == 6
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["count"] == "int"
@@ -343,6 +454,20 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentDeliveryItems"] == "array[sourceEventItem]"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["summary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["isDelivery"] == "bool"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["optionalArgs"] == ["limit"]
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["count"] == "int"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["latestEventAt"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["availableSources"] == "array[str]"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceEventCount"] == "int"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["deliveryCount"] == "int"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["recordTypeCounts"] == "object[str,int]"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["latestBySource"] == "object[str,sourceRecentSummary]"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["eventCount"] == "int"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["latestEventSummary"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["isDelivery"] == "bool"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["eventItems"] == "array[brokerEventItem]"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["brokerEventItem"]["summary"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["brokerEventItem"]["isDelivery"] == "bool"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["formats"] == ["text", "json"]
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestEventSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestEventKey"] == "str|null"
@@ -374,7 +499,7 @@ def main() -> int:
         result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["sourceName"] == "missing-source"
         assert payload["result"]["source"] == "missing-source"
         assert payload["result"]["exists"] is False
@@ -453,7 +578,7 @@ def main() -> int:
         result = run("query", "--kind", "panel.inspect", "--panel-name", "missing-panel", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 11
+        assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert payload["panelName"] == "missing-panel"
         assert payload["result"]["panelName"] == "missing-panel"
         assert payload["result"]["exists"] is False
