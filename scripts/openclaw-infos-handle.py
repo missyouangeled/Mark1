@@ -20,6 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
+QUERY_CONTRACT_VERSION = 1
 
 QUERY_KINDS = {
     "snapshot.summary",
@@ -136,17 +137,53 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
     raise ValueError(f"unsupported kind: {kind}")
 
 
+def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
+    panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
+    if kind == "snapshot.summary":
+        return {
+            "summary": snapshot.get("summary"),
+            "issueOverview": snapshot.get("issueOverview"),
+            "severity": snapshot.get("severity"),
+            "selfHelpActions": snapshot.get("selfHelpActions") if isinstance(snapshot.get("selfHelpActions"), list) else [],
+            "checkedAt": snapshot.get("checkedAt"),
+        }
+    if kind == "health.summary":
+        return panels.get("health") if isinstance(panels.get("health"), dict) else {}
+    if kind == "tasks.summary":
+        return {
+            "supervisor": panels.get("supervisor") if isinstance(panels.get("supervisor"), dict) else {},
+            "recovery": panels.get("recovery") if isinstance(panels.get("recovery"), dict) else {},
+            "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
+        }
+    if kind == "recovery.summary":
+        return panels.get("recovery") if isinstance(panels.get("recovery"), dict) else {}
+    if kind == "sources.latest":
+        return {
+            "sourceStateSnapshots": snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {},
+            "sources": snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {},
+            "latestSource": snapshot.get("latestSource"),
+            "latestSourceState": snapshot.get("latestSourceState") if isinstance(snapshot.get("latestSourceState"), dict) else {},
+            "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
+        }
+    if kind == "events.recent":
+        return {"events": events}
+    raise ValueError(f"unsupported kind: {kind}")
+
+
 def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit: int) -> dict[str, Any]:
     if kind not in QUERY_KINDS:
         raise ValueError(f"unsupported kind: {kind}")
     snapshot = load_json(snapshot_path)
     events = load_recent_events(events_path, limit)
     text = render_text(kind, snapshot, events)
+    result = build_query_result(kind, snapshot, events)
     return {
         "ok": True,
         "kind": kind,
+        "queryContractVersion": QUERY_CONTRACT_VERSION,
         "snapshotPath": str(snapshot_path),
         "eventsPath": str(events_path),
+        "result": result,
         "snapshot": snapshot if isinstance(snapshot, dict) else {},
         "events": events,
         "text": text,

@@ -112,8 +112,16 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
+        assert payload["queryContractVersion"] == 1
         assert len(payload["events"]) == 2
+        assert len(payload["result"]["events"]) == 2
         assert payload["events"][0]["source"] == "supervisor"
+
+        result = run("query", "--kind", "sources.latest", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["result"]["sourceStateSnapshots"]["local-health"]["summary"] == "健康正常"
+        assert payload["result"]["sources"]["supervisor"]["message"] == "[监工] 后台任务已完成。"
 
         print("ALL PASS")
     return 0
