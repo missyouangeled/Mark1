@@ -1,0 +1,18 @@
+{
+  "source": "host-os-example",
+  "updatedAt": "2026-05-13T09:00:00+08:00",
+  "summary": "宿主机温度正常",
+  "detail": "最高 61.5°C（CPU Package）",
+  "tempC": 61.5,
+  "label": "CPU Package",
+  "probes": [
+    {
+      "label": "CPU Package",
+      "tempC": 61.5
+    },
+    {
+      "label": "CPU Core 0",
+      "tempC": 58.0
+    }
+  ]
+}
