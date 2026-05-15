@@ -175,7 +175,7 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert len(payload["events"]) == 3
         assert len(payload["result"]["events"]) == 3
         assert payload["events"][0]["source"] == "supervisor"
@@ -183,13 +183,15 @@ def main() -> int:
         result = run("query", "--kind", "sources.latest", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["result"]["count"] == 3
         assert payload["result"]["availableSources"] == ["frontstage-recovery", "local-health", "supervisor"]
         source_rows = {item["source"]: item for item in payload["result"]["sourceItems"]}
         assert source_rows["local-health"]["latestEventSummary"] == "[本地健康] 当前已恢复正常。"
         assert source_rows["local-health"]["latestEventItem"]["summary"] == "[本地健康] 当前已恢复正常。"
         assert source_rows["local-health"]["latestEventItem"]["isDelivery"] is True
+        assert source_rows["local-health"]["latestDeliveryItem"]["recordType"] == "frontstage.delivery.latest"
+        assert source_rows["local-health"]["latestDeliveryItem"]["summary"] == "[本地健康] 当前已恢复正常。"
         assert source_rows["frontstage-recovery"]["latestEventSummary"] == "前台投影稳定"
         assert source_rows["frontstage-recovery"]["latestEventItem"]["reportStatus"] == "recovered"
         assert source_rows["supervisor"]["latestDeliveryMessage"] == "[监工] 后台任务已完成。"
@@ -199,7 +201,7 @@ def main() -> int:
         result = run("query", "--kind", "sources.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["result"]["count"] == 3
         source_rows = {item["source"]: item for item in payload["result"]["sources"]}
         assert source_rows["local-health"]["sourceView"] == "health"
@@ -219,6 +221,8 @@ def main() -> int:
         assert source_rows["local-health"]["latestDeliveryEventKey"] == "health-delivery-1"
         assert source_rows["local-health"]["latestDeliveryRecordType"] == "frontstage.delivery.latest"
         assert source_rows["local-health"]["latestDeliverySentAt"] == "2026-05-15T12:00:01+08:00"
+        assert source_rows["local-health"]["latestDeliveryItem"]["recordType"] == "frontstage.delivery.latest"
+        assert source_rows["local-health"]["latestDeliveryItem"]["summary"] == "[本地健康] 当前已恢复正常。"
         assert source_rows["local-health"]["contract"]["sourceView"] == "health"
         assert source_rows["supervisor"]["hasDelivery"] is True
         assert source_rows["supervisor"]["latestDeliveryMessage"] == "[监工] 后台任务已完成。"
@@ -234,7 +238,7 @@ def main() -> int:
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["sourceName"] == "local-health"
         assert payload["result"]["source"] == "local-health"
         assert payload["result"]["exists"] is True
@@ -261,6 +265,8 @@ def main() -> int:
         assert payload["result"]["latestDeliveryEventKey"] == "health-delivery-1"
         assert payload["result"]["latestDeliveryRecordType"] == "frontstage.delivery.latest"
         assert payload["result"]["latestDeliverySentAt"] == "2026-05-15T12:00:01+08:00"
+        assert payload["result"]["latestDeliveryItem"]["recordType"] == "frontstage.delivery.latest"
+        assert payload["result"]["latestDeliveryItem"]["summary"] == "[本地健康] 当前已恢复正常。"
         assert payload["result"]["contract"]["sourceView"] == "health"
         assert payload["result"]["latestSourceState"]["summary"] == "健康正常"
         assert payload["result"]["latestDelivery"]["message"] == "[本地健康] 当前已恢复正常。"
@@ -273,12 +279,15 @@ def main() -> int:
         assert payload["result"]["recentEventItems"][1]["severity"] == "ok"
         assert payload["result"]["recentEventItems"][1]["checkedAt"] == "2026-05-15T12:00:00+08:00"
         assert payload["result"]["recentEventItems"][1]["ingestStatus"] == "recorded"
+        assert len(payload["result"]["recentDeliveryItems"]) == 1
+        assert payload["result"]["recentDeliveryItems"][0]["recordType"] == "frontstage.delivery.sent"
+        assert payload["result"]["recentDeliveryItems"][0]["summary"] == "[本地健康] 当前已恢复正常。"
         assert len(payload["result"]["recentEvents"]) == 2
 
         result = run("query", "--kind", "panel.inspect", "--panel-name", "health", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["panelName"] == "health"
         assert payload["result"]["panelName"] == "health"
         assert payload["result"]["exists"] is True
@@ -292,7 +301,7 @@ def main() -> int:
         result = run("query", "--kind", "panels.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["result"]["count"] == 3
         panel_rows = {item["panelName"]: item for item in payload["result"]["panels"]}
         assert panel_rows["health"]["available"] is True
@@ -304,7 +313,7 @@ def main() -> int:
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
@@ -315,6 +324,7 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceItems"] == "array[sourceLatestItem]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceLatestItem"]["latestEventItem"] == "sourceEventItem"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceLatestItem"]["latestDeliveryMessage"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceLatestItem"]["latestDeliveryItem"] == "sourceEventItem"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["requiredArgs"] == ["source_name"]
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["exists"] == "bool"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentEventCount"] == "int"
@@ -328,7 +338,9 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryMessage"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryEventKey"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryRecordType"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["latestDeliveryItem"] == "sourceEventItem"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentEventItems"] == "array[sourceEventItem]"
+        assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["recentDeliveryItems"] == "array[sourceEventItem]"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["summary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["source.inspect"]["resultShape"]["sourceEventItem"]["isDelivery"] == "bool"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["formats"] == ["text", "json"]
@@ -340,6 +352,7 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryMessage"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryEventKey"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryRecordType"] == "str|null"
+        assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["latestDeliveryItem"] == "sourceEventItem"
         assert payload["result"]["queryCatalog"]["queries"]["sources.catalog"]["resultShape"]["sourceCatalogItem"]["contract"] == "object"
         assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["requiredArgs"] == ["panel_name"]
         assert payload["result"]["queryCatalog"]["queries"]["panel.inspect"]["resultShape"]["exists"] == "bool"
@@ -361,7 +374,7 @@ def main() -> int:
         result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["sourceName"] == "missing-source"
         assert payload["result"]["source"] == "missing-source"
         assert payload["result"]["exists"] is False
@@ -383,11 +396,13 @@ def main() -> int:
         assert payload["result"]["latestDeliveryEventKey"] is None
         assert payload["result"]["latestDeliveryRecordType"] is None
         assert payload["result"]["latestDeliverySentAt"] is None
+        assert payload["result"]["latestDeliveryItem"] == {}
         assert payload["result"]["contract"] == {}
         assert payload["result"]["latestEventItem"] == {}
         assert payload["result"]["latestSourceState"] == {}
         assert payload["result"]["latestDelivery"] == {}
         assert payload["result"]["recentEventItems"] == []
+        assert payload["result"]["recentDeliveryItems"] == []
         assert payload["result"]["recentEvents"] == []
 
         result = run("query", "--kind", "source.inspect", "--source-name", "missing-source", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
@@ -416,6 +431,8 @@ def main() -> int:
         assert payload["result"]["latestDeliveryEventKey"] is None
         assert payload["result"]["latestDeliveryRecordType"] is None
         assert payload["result"]["latestDeliverySentAt"] is None
+        assert payload["result"]["latestDeliveryItem"] == {}
+        assert payload["result"]["recentDeliveryItems"] == []
 
         result = run("query", "--kind", "sources.catalog", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
@@ -436,7 +453,7 @@ def main() -> int:
         result = run("query", "--kind", "panel.inspect", "--panel-name", "missing-panel", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["queryContractVersion"] == 10
+        assert payload["queryContractVersion"] == 11
         assert payload["panelName"] == "missing-panel"
         assert payload["result"]["panelName"] == "missing-panel"
         assert payload["result"]["exists"] is False

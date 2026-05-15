@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 10
+QUERY_CONTRACT_VERSION = 11
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -183,6 +183,10 @@ def build_source_overview(
     latest_delivery: dict[str, Any],
     recent_events: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    # Source query alignment:
+    # - sources.latest: cheapest per-source inventory / handoff list
+    # - sources.catalog: same stable summary fields plus raw latest snapshots
+    # - source.inspect: same base fields plus recentEventItems / recentDeliveryItems for one source
     current_events = recent_events if isinstance(recent_events, list) else []
     source_event_type = (
         contract.get("sourceEventType")
@@ -215,6 +219,7 @@ def build_source_overview(
         "latestDeliveryEventKey": latest_delivery.get("eventKey"),
         "latestDeliveryRecordType": (latest_delivery.get("recordType") or "frontstage.delivery.latest") if latest_delivery else None,
         "latestDeliverySentAt": latest_delivery.get("sentAt") or latest_delivery.get("recordedAt"),
+        "latestDeliveryItem": build_source_event_item(latest_delivery) if latest_delivery else {},
     }
 
 
@@ -408,7 +413,7 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "sources.latest": {
-            "description": "Latest source-state and delivery snapshots plus stable per-source items for lightweight consumers.",
+            "description": "Recommended source-query entrypoint: cheap per-source inventory with stable latestEventItem/latestDeliveryItem summaries for handoff consumers.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
@@ -453,6 +458,7 @@ def build_query_catalog() -> dict[str, Any]:
                     "latestDeliveryEventKey": "str|null",
                     "latestDeliveryRecordType": "str|null",
                     "latestDeliverySentAt": "str|null",
+                    "latestDeliveryItem": "sourceEventItem",
                     "contract": "object",
                     "latestSourceState": "object",
                     "latestDelivery": "object",
@@ -465,7 +471,7 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "sources.catalog": {
-            "description": "Machine-readable source inventory with stable summary fields plus raw source snapshots.",
+            "description": "Recommended second step after sources.latest: same stable item shape plus raw latest snapshots and contracts.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
@@ -509,6 +515,7 @@ def build_query_catalog() -> dict[str, Any]:
                     "latestDeliveryEventKey": "str|null",
                     "latestDeliveryRecordType": "str|null",
                     "latestDeliverySentAt": "str|null",
+                    "latestDeliveryItem": "sourceEventItem",
                     "contract": "object",
                     "latestSourceState": "object",
                     "latestDelivery": "object",
@@ -516,7 +523,7 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "source.inspect": {
-            "description": "Inspect one source contract, latest snapshots, and recent events.",
+            "description": "Recommended deep-dive step after sources.latest/sources.catalog: one source with stable recentEventItems/recentDeliveryItems plus raw records.",
             "formats": ["text", "json"],
             "requiredArgs": ["source_name"],
             "optionalArgs": ["limit"],
@@ -542,10 +549,12 @@ def build_query_catalog() -> dict[str, Any]:
                 "latestDeliveryEventKey": "str|null",
                 "latestDeliveryRecordType": "str|null",
                 "latestDeliverySentAt": "str|null",
+                "latestDeliveryItem": "sourceEventItem",
                 "contract": "object",
                 "latestSourceState": "object",
                 "latestDelivery": "object",
                 "recentEventItems": "array[sourceEventItem]",
+                "recentDeliveryItems": "array[sourceEventItem]",
                 "recentEvents": "array[object]",
                 "sourceEventItem": {
                     "recordType": "str|null",
@@ -622,7 +631,8 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
     recent_events = [item for item in events if str(item.get("source") or "") == source_name]
     recent_event_items = build_source_event_items(recent_events)
-    recent_delivery_count = sum(1 for item in recent_events if str(item.get("recordType") or "") == "frontstage.delivery.sent")
+    recent_delivery_items = [item for item in recent_event_items if bool(item.get("isDelivery"))]
+    recent_delivery_count = len(recent_delivery_items)
     return {
         **build_source_overview(source_name, contract, latest_source_state, latest_delivery, recent_events),
         "exists": bool(contract or latest_source_state or latest_delivery or recent_events),
@@ -633,6 +643,7 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
         "latestSourceState": latest_source_state,
         "latestDelivery": latest_delivery,
         "recentEventItems": recent_event_items,
+        "recentDeliveryItems": recent_delivery_items,
         "recentEvents": recent_events,
     }
 
