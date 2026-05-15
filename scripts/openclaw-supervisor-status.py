@@ -493,6 +493,12 @@ def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, 
         str(candidate["sessionKey"]),
         "--message",
         str(candidate["message"]),
+        "--data-json",
+        json.dumps({
+            "status": candidate.get("status"),
+            "taskId": candidate.get("taskId"),
+            "checkedAt": report.get("checkedAt"),
+        }, ensure_ascii=False),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

@@ -534,6 +534,12 @@ def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[
         str(candidate["sessionKey"]),
         "--message",
         str(candidate["message"]),
+        "--data-json",
+        json.dumps({
+            "status": candidate.get("status"),
+            "anomalyCode": candidate.get("anomalyCode"),
+            "checkedAt": current_report.get("checkedAt"),
+        }, ensure_ascii=False),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
