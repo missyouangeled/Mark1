@@ -4,6 +4,90 @@
 
 ## 当前默认接手方式
 
+## 当前临时高优先级接手任务（broker / infos-handle 收尾与下周续做入口）
+
+- 任务目标：把 `broker sidecar 数据层 1.0` + `infos-handle 查询契约层` 在当前阶段收成一个稳定停点，保证下周一回来可以直接沿着 machine-readable contract 继续推，而不是重新扫仓库找口径。
+- 当前机器：`missyouangeled-VMware-Virtual-Platform` / `公司（Linux）`
+- 截至 2026-05-15 17:50 的收口判断：**当前阶段主体已完成，按开发主体看约 90%；现在更适合停在 handoff / 文档 / GitHub 备份前一步，而不是继续开第四刀。**
+
+### 当前已确认结论
+
+1. **broker 当前已可视为本阶段可交付的 sidecar 数据层 1.0**
+   - 已落地：`events.jsonl` / `manifest.json` / `views/frontstage.json` / `views/health.json` / `views/tasks.json` / `views/recovery.json`
+   - 前台链路真烟测已通过：
+     - `frontstage-recovery -> broker -> 当前前台`：通过
+     - `supervisor -> broker -> 当前前台`：通过
+   - 当前 broker manifest 已在位，`schemaVersion: 1`、`contractVersion: 2`
+
+2. **infos-handle 当前主干已经成型，且查询契约连续收紧到可直接消费的程度**
+   - 当前已支持：
+     - `snapshot.summary`
+     - `health.summary`
+     - `tasks.summary`
+     - `recovery.summary`
+     - `sources.latest`
+     - `sources.catalog`
+     - `source.inspect`
+     - `events.recent`
+     - `contract.catalog`
+   - 2026-05-15 下午到 17:50 前，这条线连续完成了：
+     - `sources.catalog` / `source.inspect` 稳定顶层字段收口
+     - `sources.latest` 的 `count / availableSources / sourceItems[]` 收口
+     - broker 事件契约正式化，`contract.catalog` 可直接带出 `contracts.recordTypes / contracts.eventFieldCatalog`
+     - `events.recent` 稳定 item shape 收口，并新增 `latestBySource`
+   - 当前 `QUERY_CONTRACT_VERSION = 13`
+
+3. **这轮最后一个本地代码停点已经存在，可直接从这里续做**
+   - 当前代码停点提交：`7396ede` `Tighten broker and infos-handle event contracts`
+   - 其前一串关键提交：
+     - `eb8aa4f` `Tighten infos-handle source query handoff contract`
+     - `3aa091e` `Tighten infos-handle sources.latest contract`
+     - `7fe7efd` `Tighten infos-handle source event summaries`
+     - `ff07c2f` `Tighten infos-handle source inspect summaries`
+
+4. **当前验证结果保持全绿**
+   - `python3 scripts/test-openclaw-infos-handle.py` → `ALL PASS`
+   - `python3 scripts/test-frontstage-broker.py` → `ALL PASS`
+   - `python3 -m py_compile scripts/openclaw-infos-handle.py scripts/test-openclaw-infos-handle.py scripts/openclaw-frontstage-broker.py scripts/test-frontstage-broker.py` → 通过
+   - live 查询也已确认：
+     - `python3 scripts/openclaw-infos-handle.py query --kind events.recent --format json`
+     - 当前会返回 `result.latestBySource`
+
+### 还没做、但下周一最自然的下一步
+
+按优先级建议：
+
+1. **先做收尾文档同步，而不是继续开新 query**
+   - 补齐 `events.recent.latestBySource` 在 README / 说明里的最终口径
+   - 检查 `PLANS.md` / `tools/openclaw-frontstage-broker/README.md` / `HANDOFF.md` 三处描述是否完全对齐
+
+2. **如果文档已齐，再决定要不要补有序 shape**
+   - 可评估是否给 `events.recent` 增加 `latestBySourceItems[]`
+   - 目的只是提供稳定顺序；不要替代现有 keyed object
+
+3. **继续坚持小步 contract-first 路线**
+   - 只收 machine-readable 输出面
+   - 不碰主对话链
+   - 不做 broker / renderer 大拆
+
+### 明天/下周一继续时的最短恢复路径
+
+1. `git log --oneline -5`
+2. `git status --short`
+3. 读：`PLANS.md`
+4. 读：`tools/openclaw-frontstage-broker/README.md`
+5. 读：`memory/daily/2026-05-15.md`
+6. 跑：
+   - `python3 scripts/test-openclaw-infos-handle.py`
+   - `python3 scripts/test-frontstage-broker.py`
+7. 再决定是先补 README 对齐，还是补 `latestBySourceItems[]`
+
+### 当前边界与注意事项
+
+- 当前这轮**已经有本地 commit，但还没有 push 到 GitHub**；若要满足“系统性修改后及时 GitHub 备份”的偏好，下一步应在用户确认后 push。
+- 当前工作区里还存在一些与本轮无关的脏文件（如 ChatTTS 相关试验脚本、dream/memory 自动写入等）；继续提交时应继续按路径精确 add，不要一锅端。
+- 2026-05-15 下午出现过一轮 dashboard transcript 锁竞争（`SessionWriteLockTimeoutError` / `session file locked`），已按最保守方式修复并归档旧 dashboard transcript 残留；后续若前台再次频繁出现同类锁超时，优先考虑切新前台会话继续，必要时再重启 gateway。
+
 ## 当前临时高优先级接手任务（ChatTTS encoder 补全 / 中文语音链路）
 
 - 任务目标：确认当前公司 Linux 机上的 ChatTTS 是否能从“decoder-only 候选方案”补成“带 encoder 的更完整方案”，从而恢复参考音频编码 / 更完整的 zero-shot 能力。
