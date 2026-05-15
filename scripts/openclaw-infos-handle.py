@@ -29,6 +29,7 @@ QUERY_KINDS = {
     "recovery.summary",
     "sources.latest",
     "events.recent",
+    "contract.catalog",
 }
 
 
@@ -134,6 +135,19 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             lines.append(f"- [{record_type}] {source} @ {stamp}｜{message}")
         return "\n".join(lines)
 
+    if kind == "contract.catalog":
+        contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
+        snapshot_contract = snapshot.get("snapshotContract") if isinstance(snapshot.get("snapshotContract"), dict) else {}
+        broker_contract_version = contracts.get("version")
+        primary_view = snapshot_contract.get("primaryView") or "unknown"
+        primary_published = snapshot_contract.get("primaryPublishedJsonKey") or "unknown"
+        source_count = len(contracts.get("sources")) if isinstance(contracts.get("sources"), dict) else 0
+        return (
+            f"infos-handle queryContractVersion={QUERY_CONTRACT_VERSION}｜"
+            f"broker contractVersion={broker_contract_version}｜"
+            f"primaryView={primary_view}｜primaryPublishedJsonKey={primary_published}｜sources={source_count}"
+        )
+
     raise ValueError(f"unsupported kind: {kind}")
 
 
@@ -167,6 +181,13 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
         }
     if kind == "events.recent":
         return {"events": events}
+    if kind == "contract.catalog":
+        return {
+            "queryContractVersion": QUERY_CONTRACT_VERSION,
+            "brokerContractVersion": snapshot.get("contractVersion"),
+            "contracts": snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {},
+            "snapshotContract": snapshot.get("snapshotContract") if isinstance(snapshot.get("snapshotContract"), dict) else {},
+        }
     raise ValueError(f"unsupported kind: {kind}")
 
 
@@ -177,6 +198,14 @@ def build_query_payload(kind: str, snapshot_path: Path, events_path: Path, limit
     events = load_recent_events(events_path, limit)
     text = render_text(kind, snapshot, events)
     result = build_query_result(kind, snapshot, events)
+    if kind == "contract.catalog":
+        result = {
+            **result,
+            "paths": {
+                "snapshotPath": str(snapshot_path),
+                "eventsPath": str(events_path),
+            },
+        }
     return {
         "ok": True,
         "kind": kind,

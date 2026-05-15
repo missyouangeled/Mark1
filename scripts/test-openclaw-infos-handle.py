@@ -71,6 +71,26 @@ def main() -> int:
                     "eventKey": "health-delivery-1",
                 },
             },
+            "contractVersion": 2,
+            "contracts": {
+                "version": 2,
+                "sources": {
+                    "local-health": {
+                        "source": "local-health",
+                        "sourceEventType": "local_health.status.changed",
+                        "sourceView": "health",
+                    },
+                    "supervisor": {
+                        "source": "supervisor",
+                        "sourceEventType": "supervisor.status.changed",
+                        "sourceView": "tasks",
+                    },
+                },
+            },
+            "snapshotContract": {
+                "primaryView": "snapshot",
+                "primaryPublishedJsonKey": "frontstageSnapshotJson",
+            },
         }
         snapshot_path.write_text(json.dumps(snapshot_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         events_path.write_text(
@@ -122,6 +142,15 @@ def main() -> int:
         payload = json.loads(result.stdout)
         assert payload["result"]["sourceStateSnapshots"]["local-health"]["summary"] == "健康正常"
         assert payload["result"]["sources"]["supervisor"]["message"] == "[监工] 后台任务已完成。"
+
+        result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["queryContractVersion"] == 1
+        assert payload["result"]["brokerContractVersion"] == 2
+        assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
+        assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
+        assert payload["result"]["paths"]["snapshotPath"] == str(snapshot_path)
 
         print("ALL PASS")
     return 0
