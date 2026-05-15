@@ -10088,3 +10088,155 @@ Clamp comparison-test seeds to `< 4294967296`; prefer compact deterministic seed
 - Related Files: tmp/nvidia-image-test
 
 ---
+## [ERR-20260512-001] background-progress-report-gap
+
+**Logged**: 2026-05-12T16:48:45+08:00
+**Priority**: high
+**Status**: pending
+**Area**: config
+
+### Summary
+3 分钟后台进度汇报在切换到新的后台分身后失效，导致前台超过 3 分钟无可见反馈。
+
+### Error
+用户指出："不是说3分钟汇报一次吗 这已经隔了不止3分钟了，没汇报啊。"
+
+### Context
+- 原先的 3 分钟 cron 绑定的是第一条后台分身 `chattts-seetacloud-worker`
+- 在该分身完成后，cron 被移除
+- 随后新建了第二条后台分身 `chattts-seetacloud-smoke`，但没有同步重建新的 3 分钟汇报 cron
+- 结果：后台仍在运行，前台却失去定时兜底汇报
+
+### Suggested Fix
+- 每次切换到新的后台分身时，必须同时重绑新的当前会话 3 分钟汇报 cron
+- 只有在确认“当前已无后续后台分身”时，才允许移除原有汇报 cron
+- 后台链路从一个子任务切到下一个子任务时，先创建新的汇报，再删除旧的汇报，避免中间出现空窗
+
+### Metadata
+- Reproducible: yes
+- Related Files: AGENTS.md, TOOLS.md
+- See Also: none
+
+---
+
+## [ERR-20260513-001] user-reported-error
+
+**Logged**: 2026-05-13T00:34:19.514Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-05-13 08:34 GMT+8] 目前这个样式也行，还有就是对应这些异常问题，能不能在不用与Ai 沟通的情况下，给出一些解决办法，就比如因为浏览器的问题突然卡死，但是网关 网络 都没问题，就算不通过AI
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:da95d757-8ca1-4db4-a40d-78c9d8ad2566
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260513-002] user-reported-error
+
+**Logged**: 2026-05-13T00:37:30.878Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-05-13 08:37 GMT+8] 目前这个样式也行，还有就是对应这些异常问题，能不能在不用与Ai 沟通的情况下，给出一些解决办法，就比如因为浏览器的问题突然卡死，但是网关 网络 都没问题，就算不通过AI也能告诉我 重启浏览器。当然我这只是做了一个很简单的例子，但同时这也是我希望达到的效果。还有能不能把这个本地健康的UI 放到截图中这些红色按钮的下面，并且点开以后，对话框是往下面展开的，不会挡住这些红色按钮。能理解吗
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:da95d757-8ca1-4db4-a40d-78c9d8ad2566
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+
+## [ERR-20260514-001] openclaw-tasks-json-pipe
+
+**Logged**: 2026-05-14T08:12:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+`openclaw tasks list --json` piped into a short Python consumer can fail with EPIPE noise when the downstream reader exits early.
+
+### Error
+```text
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+...
+Error: write EPIPE
+```
+
+### Context
+- Attempted to pipe `openclaw tasks list --runtime subagent --json` directly into an inline Python filter.
+- The downstream command exited before consuming the full stdout stream, and the OpenClaw CLI surfaced `write EPIPE`.
+- Better pattern here is: capture JSON first, then parse it in a second step; or avoid early-closing pipelines.
+
+### Suggested Fix
+Prefer `subprocess.run(..., capture_output=True)` or write JSON to a temp variable/file before filtering.
+
+### Metadata
+- Reproducible: yes
+- Related Files: scripts/openclaw-supervisor-subagent.py
+
+---
+
+## [ERR-20260514-002] user-reported-error
+
+**Logged**: 2026-05-14T03:16:10.097Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-05-14 11:16 GMT+8] 但是我后续还是想把前端，和数据层完全分开，工作层是单独的，就算没有数据层和前端渲染。工作层也能独立运作，然后就是boker 数据层。 没有工作层，渲染层，数据层也可以单独存在独立运行且 不会报错。然后就是渲染层。现在目前前端渲染是这个Control UI 如果独立分出来以后 哪怕只是把对话部分和信息返回部分独立分出来，我就可以把数据渲染到任何平台上了，你说对么。仔细分析一下当前结构，然后考虑一下，如果我真的要这么做有没有什么可行方案。列一个详细计划回复我。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:f464a9b2-12f3-4209-810a-eb11a372f5dd
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

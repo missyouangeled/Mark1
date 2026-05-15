@@ -43,6 +43,52 @@ Docker build fails on Apple Silicon due to platform mismatch
 
 ---
 
+## [LRN-20260514-001] best_practice
+
+**Logged**: 2026-05-14T10:01:00+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: docs
+
+### Summary
+用户要求：对已明确提出诉求的修改类任务，默认先查现有能力，再查与旧逻辑/旧补丁的冲突，最后把结果接成可重复应用的正式补丁，并留下清晰落点。
+
+### Details
+用户在当前 broker / watcher / 前台稳定性修补推进过程中，进一步把修改类任务的默认顺序明确成三步：第一步先查当前仓库里是否已有类似功能、已有补丁、已有入口或半成品能力；第二步检查与现有功能、既有逻辑、自动触发链路之间有没有冲突，如果发现问题要及时回报，并以当前诉求为目标给出解决方案；第三步修改完成后，默认把结果接入正式补丁或自动链路，避免只在当前会话临时有效，同时把文档、记忆和维护落点记清楚，方便以后续改。
+
+### Suggested Action
+把这条规则提升到 `AGENTS.md` 与 `MEMORY.md` 作为长期默认工作流；以后凡是用户已经明确提出修改诉求的任务，都先做现状查重与冲突检查，再实施修改，并在结束时默认补上持久化链路与维护记录。
+
+### Metadata
+- Source: user_feedback
+- Related Files: AGENTS.md, MEMORY.md, memory/daily/2026-05-14.md
+- Tags: workflow, patching, persistence, conflict-check, docs
+
+---
+
+## [LRN-20260513-001] best_practice
+
+**Logged**: 2026-05-13T17:35:00+08:00
+**Priority**: critical
+**Status**: promoted
+**Area**: infra
+
+### Summary
+帮用户本人或其朋友清理/修电脑时，涉及硬件监控、传感器、驱动/内核级或其他可能影响系统稳定性的工具，必须按高风险动作处理，先明确风险并再次确认，默认停在低风险方案。
+
+### Details
+本轮为接宿主机温度读取，尝试在 Windows 宿主机上引入 LibreHardwareMonitor。用户随后明确反馈：打开该工具后宿主机直接崩溃，花了较长时间重装/抢修才恢复工作环境。这个结果说明：即使目标只是“读温度”，也不能把硬件监控类工具默认视为低风险，尤其当机器承载工作环境、第三方重要数据，或任务对象是朋友/他人的电脑时，必须把稳定性和可恢复性放在首位。
+
+### Suggested Action
+以后默认不要主动在宿主机或第三方电脑上尝试硬件监控、传感器、驱动层、内核级或其他可能影响稳定性的工具；若用户仍想继续，必须先说明风险、征得再次确认，并优先选择最小影响、可回滚、低风险方案。把这条规则同步提升到 `MEMORY.md` 与 `AGENTS.md`。
+
+### Metadata
+- Source: user_feedback
+- Related Files: MEMORY.md, AGENTS.md, memory/2026-05-13.md
+- Tags: stability, host-machine, repair, cleanup, safety, hardware-monitoring
+
+---
+
 ## [LRN-20260507-001] best_practice
 
 **Logged**: 2026-05-07T15:40:00+08:00
@@ -861,5 +907,30 @@ Review the correction and update the working understanding or prompt guidance if
 - Related Files: .learnings/LEARNINGS.md
 - Tags: auto-captured, correction
 - Session Key: agent:main:dashboard:0f8c81b3-cf9f-4ed2-a6f1-d1772fed8395
+
+---
+## [LRN-20260512-001] correction
+
+**Logged**: 2026-05-12T17:31:00+08:00
+**Priority**: high
+**Status**: pending
+**Area**: config
+
+### Summary
+用户明确纠正：SeetaCloud GPU 路线只是实验支线，不能碰已确认的本地主线，也不能把 GPU 失败后自动回退本地 CPU 的结果当作 GPU 路线成功。
+
+### Details
+此前在推进 GPU 路线时，开始把“GPU 优先、失败回退本地 stable”的思路往默认语音管线方向收口。用户明确指出这偏离了既定决策：本地主线（默认模板/默认女声/本地 stable）已经确认好，当前 GPU 只是额外测试线路，用来看看能不能做出更好的效果。
+
+### Suggested Action
+- 主线继续保持本地 CPU stable 不变
+- GPU 只作为独立实验入口或 A/B 支线使用
+- 评估 GPU 效果时，GPU 失败就应算 GPU 失败，不用本地回退来“补成功”
+- 只有在用户明确批准后，才讨论是否把 GPU 线路并入正式主线
+
+### Metadata
+- Source: user_feedback
+- Related Files: skills/warm-companion-zh/SKILL.md, memory/daily/2026-05-12.md, MEMORY.md
+- Tags: gpu, voice, routing, correction
 
 ---

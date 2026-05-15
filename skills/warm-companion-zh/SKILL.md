@@ -162,6 +162,14 @@ result=$(bash tools/voice-reply/voice-reply-chunked-deliver.sh "回复文本" pr
 
 可用的 preset 值:`default`, `preset-1`, `preset-2`, `preset-3`
 
+### GPU 实验模式（仅支线测试）
+
+当前主线仍是本地 CPU stable。远端 GPU（SeetaCloud）这条线目前只用于**单独实验 / A/B 测试**，不作为默认主线路径，也不应把 GPU 失败后自动回退到本地 CPU 的结果当成“GPU 成功”。
+
+若要单独测试 GPU，使用独立实验入口即可；默认陪伴管线仍按本地 CPU stable 为准。
+
+> ⚠️ 这条 GPU 路线当前的定位是“看看能不能做出更好的效果”，不是替换已确认通过的主线默认模板。
+
 ### 输出格式
 
 返回 JSON 结构:

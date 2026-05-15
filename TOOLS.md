@@ -38,8 +38,14 @@ Things like:
 - 适用机器：通用（其中带“掌机”字样的条目仅适用于掌机（Windows））
 - 系统 / OS：通用 / Windows / Linux（按各条目说明执行）
 
-- 口袋速记：纯日常聊天 = 可不开监工；工作型任务 = 默认监工在位；有任务分身 = 必须有且只有一个监工；3 分钟无反馈 = 监工补状态；无后台任务 2 分钟 = 监工可收掉；媒体必须按主会话真实可用验收。
+- 口袋速记：纯日常聊天 / 简单工作 = 监工服务默认 `auto + taskInactive`；复杂工程 / 长耗时 / 易阻塞前台 = 默认切到 `auto + taskActive`；用户可随时显式切成 `force_on` / `force_off`；媒体仍必须按主会话真实可用验收。
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
+- 升级后自检入口：`docs/通用-OpenClaw-升级后自检清单.md`
+- 升级后自检脚本：`scripts/openclaw-post-upgrade-self-check.py`
+  - 用途：检测 OpenClaw 版本是否变化；若已升级，则按自检清单主动核对关键补丁 / broker / recovery watcher
+  - 常用命令：`python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
+  - 启动行为：当前 `BOOT.md` 已改成启动时先跑这支脚本；若版本未变，只发普通上线消息；若版本变化，则先做升级后自检，再带结果上线
+  - 状态目录：`~/.local/state/openclaw/post-upgrade-self-check/`
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
 - WebChat / Control UI 直聊里的轻量后台分身，不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话；默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
 - 本地健康诊断层（公司 / Linux 机器）：
@@ -51,14 +57,78 @@ Things like:
   - 当前状态目录：`~/.local/state/openclaw/local-health/`
   - 用途：在不依赖 AI 回复的前提下，对 gateway、本机外联、主线 provider 路由做周期探测，并把结果写入本地状态文件
   - 默认频率：开机后约 2 分钟首次运行，之后约每 5 分钟一次
-  - 边界：不负责页面主会话消息超时监听；那部分继续由 `main-supervisor-lite` 负责
+  - 当前也会读取监工状态文件，并在页面里显示“监工”卡片与明细
+  - 当前也可在 `warn / critical / recovered` 这些健康状态变化时，经由 frontstage broker 把一句摘要回到当前 dashboard 前台
+  - 边界：不负责页面主会话消息超时监听；那部分继续由监工服务 / 监工分身兜底
+- 监工状态脚本：`scripts/openclaw-supervisor-status.py`
+  - 状态文件：`~/.local/state/openclaw/supervisor/supervisor-status.json`
+  - 控制文件：`~/.local/state/openclaw/supervisor/service-control.json`
+  - 通知状态文件：`~/.local/state/openclaw/supervisor/notify-state.json`
+  - 策略模式：`auto` / `force_on` / `force_off`
+  - 当前默认基线：`auto + taskActive=false`
+  - 自动回报：可在 `stalled / failed / done` 这些状态变化时，通过 `send-frontstage + chat.inject` 把一句监工消息直接回到当前前台 dashboard，并做事件去重，避免 timer 每 30 秒重复刷屏
+  - 常用命令：
+    - 查看：`python3 scripts/openclaw-supervisor-status.py --print-human`
+    - 开监工服务：`python3 scripts/openclaw-supervisor-status.py --set-policy-mode force_on --reason 'user-request' --print-human`
+    - 关监工服务：`python3 scripts/openclaw-supervisor-status.py --set-policy-mode force_off --reason 'user-request' --print-human`
+    - 恢复自动：`python3 scripts/openclaw-supervisor-status.py --set-policy-mode auto --deactivate-task --reason 'back-to-auto' --print-human`
+    - 标记当前轮为复杂任务：`python3 scripts/openclaw-supervisor-status.py --set-policy-mode auto --activate-task --reason 'complex-work' --print-human`
+    - 手工触发一次自动回报判定：`python3 scripts/openclaw-supervisor-status.py --notify-transitions --print-json`
+- 前台辅助消息 broker：`scripts/openclaw-frontstage-broker.py`
+  - README：`tools/openclaw-frontstage-broker/README.md`
+  - 兼容状态文件：`~/.local/state/openclaw/frontstage/broker-state.json`
+  - 当前数据源目录：`~/.local/state/openclaw/broker/`
+  - 当前关键产物：`events.jsonl` / `manifest.json` / `views/frontstage.json` / `views/health.json` / `views/tasks.json` / `views/recovery.json`
+  - 最小回归：`scripts/test-frontstage-broker.py`
+  - 重建入口：`scripts/apply-openclaw-frontstage-broker-data.py` / `scripts/openclaw-frontstage-broker.py rebuild-views`
+  - systemd 模板：`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service` / `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
+  - 当前用户态 systemd：`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service` / `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
+  - 默认频率：开机约 75 秒后首次运行，之后约每 60 秒重建一次 broker 视图
+  - 用途：把监工、本地健康、前台恢复观察这类辅助消息统一收口后再发回当前前台 dashboard，并在当前阶段开始沉淀成 sidecar 数据源
+  - 当前来源：`supervisor` / `local-health` / `frontstage-recovery`
+  - 当前动作：`emit` / `rebuild-views`
+  - 路线：broker -> `openclaw-supervisor-subagent.py send-frontstage` -> `chat.inject`
+  - 规则：按 `source + eventKey` 去重；默认不接管正常主回复，只处理辅助消息；升级后可先跑 apply/rebuild 入口恢复视图；当前再由 rebuild timer 周期刷新视图，降低“长时间无新辅助消息时视图变旧”的风险
+- 前台恢复观察 watcher：`scripts/openclaw-frontstage-recovery-watch.py`
+  - 状态目录：`~/.local/state/openclaw/frontstage-recovery/`
+  - 关键文件：`last-report.json` / `notify-state.json` / `frontstage-recovery-events.log`
+  - 用途：对比 durable transcript 与 `chat.history` 投影，观察“主回复在前台没稳定留下 / 前台投影异常”的情况，并在 anomaly / recovered 这些变化时经由 broker 回前台
+  - 当前检测：`assistant_missing_in_history` / `history_oversized_placeholder` / `assistant_text_mismatch` / `assistant_turn_missing_visible_text`
+  - 当前也会识别 `pendingProjection`，把“history 还在追赶最新 transcript”的短窗口排除在异常之外
+  - 当前还会读取目标 dashboard 的 session 活跃态；若 `hasActiveRun=true` 或 session 仍是 `running`，则优先判成“仍在进行中”的 pending，而不是急着报 anomaly
+  - 当前还会把“session 刚结束不久，但 history 还在做最终追赶”的短窗口判成 `pendingProjection(session-recently-ended)`，避免 tool-final / history reload 之后立刻误报
+  - systemd 模板：`tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.service` / `tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.timer`
+  - 当前用户态 systemd：`~/.config/systemd/user/openclaw-frontstage-recovery-watch.service` / `~/.config/systemd/user/openclaw-frontstage-recovery-watch.timer`
+  - 当前默认频率：开机约 60 秒后首次运行，之后约每 15 秒运行一次
+  - 当前已接入 broker 第二阶段：anomaly / recovered 都会按稳定 `eventKey` 去重后再回前台，不会每轮重复刷同一条
+- 监工分身管理脚本：`scripts/openclaw-supervisor-subagent.py`
+  - 用途：通过 gateway RPC 间接调用 `/subagents`，做 `list / spawn / kill / resolve-frontstage / send-frontstage`
+  - 说明：`tools.invoke` 直调 `sessions_spawn` 会被 gateway 拒绝为 `Tool not available: sessions_spawn`；当前可用路线是：
+    - `tools.invoke -> subagents`：做 `list / kill`
+    - `chat.send -> /subagents spawn ...`：做 `spawn`
+    - `chat.inject`：做前台状态回报（不额外跑一轮模型）
+  - 当前前台绑定语义（WebChat / Control UI 直聊）：
+    - dashboard 会话只当“当前前台页”看，不再把它当长期 owner
+    - 脚本会先把 owner 收敛到共享父会话（通常是 `agent:main:main`）
+    - 真正要回报给用户时，再优先解析到同一父会话下**最新的 dashboard 会话**
+    - 调试命令：`python3 scripts/openclaw-supervisor-subagent.py resolve-frontstage --session-key <当前或旧的 dashboard key> --print-json`
+    - 实际投递：`python3 scripts/openclaw-supervisor-subagent.py send-frontstage --session-key <当前或旧的 dashboard key> --message '简短汇报' --print-json`
+  - 当前已验证：即使传入旧 dashboard key，也能解析到较新的 dashboard 前台；`send-frontstage` 会把消息 inject 到那个较新的 dashboard，而不是旧页
+- 监工 systemd 模板（公司 / Linux 机器）：
+  - 适用机器：公司（Linux）
+  - 系统 / OS：Linux
+  - README：`tools/openclaw-supervisor/README.md`
+  - service：`tools/openclaw-supervisor/openclaw-supervisor-watch.service`
+  - timer：`tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
+  - 当前已安装到：`~/.config/systemd/user/openclaw-supervisor-watch.service` / `~/.config/systemd/user/openclaw-supervisor-watch.timer`
+  - 当前状态：timer 已启用并开始周期刷新
+  - 默认频率：开机约 1 分钟后首次运行，之后约每 30 秒刷新一次监工状态
 - 监工分身保留标签：`main-supervisor-lite`
 - 监工唯一标号格式：`main-supervisor-lite@<runtime-host>`（`<runtime-host>` 优先取运行时 host 元数据）
-- 规则：这个标签只给主会话监工分身使用；普通任务分身不要复用。监工分身整体数量应为 `0 或 1`：工作型任务期保留 1 个，无后台任务持续约 2 分钟后可回到 0。关闭任务分身时不要顺手关闭它。监工分身只看“是否还有后台任务”，不看主会话是不是还在聊天；只要“无后台任务”持续约 2 分钟后，就允许把它收掉。若未来出现监工重复，先比较唯一标号；标号相同则保留最新且健康的一个（健康 = 未失败、未超时、未被杀，且近期仍有活动或可见进度）。
-- 工作型任务默认要求：除纯日常聊天外，默认都应有 `main-supervisor-lite` 在位；若工作不阻塞前台，可只保留监工分身待命，不必强开普通任务分身；若已经有普通任务分身，则必须同时存在且只存在一个监工分身。
-- 当前直聊可落地实现：`保留标签 + 单例语义 + 按需轻量拉起 + 无后台任务 2 分钟后收掉`；不要把当前 WebChat / Control UI 直聊误当成支持线程绑定持久监工会话的环境。
-- 场景速记：纯日常聊天 = 可不开监工；工作型但不阻塞 = 监工在位、任务分身可不开；工作型且阻塞 = 监工在位 + 按需开任务分身；拿不准 = 按工作型任务处理。
-- 异常处置速记：任务空返回 = 先由监工报告，再检查；任务异常结束 = 先由监工报告，再修复；3 分钟无可见产出 = 监工必须补一句短进度，不等于任务必须 3 分钟内完成；对预计会长于 3 分钟且中间不一定自然产出结果的步骤，默认挂一个当前会话 3 分钟一次性检查兜底。当前直聊里要优先避免为了兜底而频繁制造可见内部消息与额外 token 消耗。
+- 规则：这个标签只给主会话监工分身使用；普通任务分身不要复用。只有当当前轮确实需要聊天插播 / 额外协作时，才按需拉起监工分身；整体数量应为 `0 或 1`。若未来出现监工重复，先比较唯一标号；标号相同则保留最新且健康的一个（健康 = 未失败、未超时、未被杀，且近期仍有活动或可见进度）。
+- 场景速记：简单工作 = 自动模式下默认不激活监工；复杂工程但不一定阻塞 = 自动模式 + `taskActive=true`，可不强开监工分身；复杂工程且需要前台插播/额外协作 = 自动模式 + `taskActive=true` + 按需监工分身；用户显式开/关 = 优先服从 `force_on` / `force_off`。
+- 自动判定口径：单轮问答、明确命令执行、很小的单文件修改、短解释 = 可视为简单工作；长耗时排错、跨文件改动、需要后台下载/构建/测试、需要分身协作、用户已强调“工程复杂” = 视为复杂工程，默认激活监工。
+- 异常处置速记：任务空返回 = 先由监工报告，再检查；任务异常结束 = 先由监工报告，再修复；3 分钟无可见产出 = 监工必须补一句短进度，不等于任务必须 3 分钟内完成；当前直聊里要优先避免为了兜底而频繁制造可见内部消息与额外 token 消耗。
 - 能力边界速记：监工是兜底层，不是独立于 Gateway/渠道/模型链路之外的万能保险；若 Gateway 整体卡死、前端连接断开、渠道投递失效或同一路由模型调用全局阻塞，监工也可能一起失效。
 - 主会话本地媒体附件（音频 / 视频 / 图片）会按 realpath 做允许路径校验；如果工作区内路径实际是软链并跳到 workspace 外（例如 `/mnt/data/...`），Control UI 可能把它拦成 `path-not-allowed`。这类文件发回主会话前，应先 stage/copy 回 workspace 内真实目录。
 - Windows 更新脚本（掌机）：
@@ -99,6 +169,8 @@ Things like:
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
 
 - 读取 / 更新总规则：`docs/多机器-读取与更新规则.md`
+- 补丁索引：`docs/通用-OpenClaw-补丁注册表.md`
+- 升级后重建清单：`docs/通用-OpenClaw-补丁重建清单.md`
 - 详细维护说明：`docs/掌机-Windows-OpenClaw-维护说明.md`
 - 详细维护说明：`docs/公司-Linux-OpenClaw-维护说明.md`
 - Control UI 品牌补丁（当前已用于把左上角 OpenClaw 品牌改成贾维斯风格）：
@@ -108,6 +180,9 @@ Things like:
   - 应用脚本：`scripts/apply-openclaw-control-ui-branding.py`
   - systemd 自动重应用：`~/.config/systemd/user/openclaw-gateway.service.d/branding.conf`
   - 作用：重复应用 Control UI 左上角品牌名、Logo、浏览器标题、favicon / apple-touch-icon / manifest 名称覆盖，并额外把页面里可见的 `OpenClaw` 文案尽量替换成“贾维斯”，避免 OpenClaw 升级后手工逐个改静态文件
+  - 当前也顺手负责两个前台稳定性补丁：
+    - 把聊天页“进行中”判断补成同时考虑 `loading / sending / stream / canAbort / queue.length > 0 / session.hasActiveRun / session.status=running`，减少“后台仍在跑，但前台没有任何转圈/进行中信号”的空窗
+    - 当 assistant final 为空 / silent 时，不再立刻强制 `chat.history` reload，先压住“前台刚有阶段性内容又被立即清掉”的 ghost/disappear 体感
   - 默认品牌图来源：`avatars/jarvis-neon-20260507.png`
   - 自动生效规则：公司 Linux 机上每次 `openclaw-gateway.service` 启动前，都会先自动执行一次品牌补丁脚本；因此以后只要 OpenClaw 升级后重启 gateway，就会自动重新覆盖
   - 手工用法：`python3 scripts/apply-openclaw-control-ui-branding.py`
@@ -431,6 +506,15 @@ Things like:
   - do **not** set it unless the user has explicitly agreed to the non-commercial CPML / relevant license terms.
 - Current local XTTS smoke test output path:
   - `/home/missyouangeled/.openclaw/workspace/tmp/voice-replies/local-xtts-test.mp3`
+
+### Local-only credential pointers
+
+- SeetaCloud 租用 ChatTTS GPU（westd）：
+  - 用途：远端 GPU 环境，准备给 ChatTTS / 更逼真的主会话语音回复使用
+  - 非敏感连接标识：`root@connect.westd.seetacloud.com:18786`
+  - 敏感凭据本地保存：`credentials/ssh/seetacloud-chattts-westd.md`
+  - 安全规则：该文件位于 `credentials/`（gitignored），只在本机保存，不写进 Git 历史
+  - 若后续再次卡住需要重连，先从这里定位到本地凭据文件，再 SSH 上去看 `/root/autodl-tmp/voice-lab/install_chattts_gpu.log`
 
 ## Why Separate?
 
