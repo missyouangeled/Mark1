@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodic OpenClaw frontstage recovery watcher
+
+[Timer]
+Unit=openclaw-frontstage-recovery-watch.service
+OnBootSec=60s
+OnUnitActiveSec=15s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

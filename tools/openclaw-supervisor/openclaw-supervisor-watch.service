@@ -1,0 +1,10 @@
+[Unit]
+Description=Run OpenClaw supervisor status refresh
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/missyouangeled/.openclaw/workspace
+ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-supervisor-status.py --notify-transitions --print-human
+SuccessExitStatus=1 2
+Environment=HOME=/home/missyouangeled
+Environment=PATH=/home/missyouangeled/.local/bin:/home/missyouangeled/.npm-global/bin:/home/missyouangeled/bin:/home/missyouangeled/.volta/bin:/home/missyouangeled/.asdf/shims:/home/missyouangeled/.bun/bin:/home/missyouangeled/.nvm/current/bin:/home/missyouangeled/.fnm/current/bin:/home/missyouangeled/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin

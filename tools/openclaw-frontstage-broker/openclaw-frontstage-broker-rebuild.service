@@ -1,0 +1,9 @@
+[Unit]
+Description=Rebuild OpenClaw frontstage broker views
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/missyouangeled/.openclaw/workspace
+ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-frontstage-broker.py rebuild-views --print-human
+Environment=HOME=/home/missyouangeled
+Environment=PATH=/home/missyouangeled/.local/bin:/home/missyouangeled/.npm-global/bin:/home/missyouangeled/bin:/home/missyouangeled/.volta/bin:/home/missyouangeled/.asdf/shims:/home/missyouangeled/.bun/bin:/home/missyouangeled/.nvm/current/bin:/home/missyouangeled/.fnm/current/bin:/home/missyouangeled/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin

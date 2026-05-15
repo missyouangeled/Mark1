@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+# 适用机器：通用（当前已在公司（Linux）验证）
+# 系统 / OS：Linux / macOS / Windows（部分 systemd 检查在 Windows 上会自动跳过）
+# 用途：检测 OpenClaw 当前版本是否发生变化；若已升级，则主动按“升级后自检清单”做一轮最小核对，并输出可读摘要。
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+WORKSPACE = Path(__file__).resolve().parents[1]
+CHECKLIST_PATH = WORKSPACE / "docs" / "通用-OpenClaw-升级后自检清单.md"
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "post-upgrade-self-check"
+STATE_PATH = STATE_DIR / "state.json"
+REPORT_PATH = STATE_DIR / "last-report.json"
+DEFAULT_PACKAGE_JSON = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "package.json"
+BRANDING_CONF = Path.home() / ".config" / "systemd" / "user" / "openclaw-gateway.service.d" / "branding.conf"
+CONTROL_UI_DIST = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "dist" / "control-ui"
+CONTROL_UI_OVERRIDE = CONTROL_UI_DIST / "jarvis-branding-override.js"
+DEFAULT_ONLINE_MESSAGE = "贾维斯已上线，我在。要开始干活的话，直接喊我。"
+
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+
+def save_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+
+def run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=WORKSPACE, capture_output=True, text=True, check=False)
+
+
+
+def detect_package_json() -> Path | None:
+    env_override = os.environ.get("OPENCLAW_PACKAGE_ROOT")
+    if env_override:
+        candidate = Path(env_override).expanduser().resolve() / "package.json"
+        if candidate.exists():
+            return candidate
+    if DEFAULT_PACKAGE_JSON.exists():
+        return DEFAULT_PACKAGE_JSON
+    npm_root = run(["npm", "root", "-g"]).stdout.strip()
+    if npm_root:
+        candidate = Path(npm_root).expanduser().resolve() / "openclaw" / "package.json"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+
+def current_openclaw_version() -> tuple[str | None, str | None]:
+    package_json = detect_package_json()
+    if not package_json:
+        return None, None
+    try:
+        data = json.loads(package_json.read_text(encoding="utf-8"))
+    except Exception:
+        return None, str(package_json)
+    version = data.get("version") if isinstance(data, dict) else None
+    return version if isinstance(version, str) else None, str(package_json)
+
+
+
+def make_check(name: str, ok: bool, detail: str, *, required: bool = True) -> dict[str, Any]:
+    return {
+        "name": name,
+        "ok": ok,
+        "required": required,
+        "detail": detail,
+    }
+
+
+
+def check_branding_execstartpre() -> dict[str, Any]:
+    if not BRANDING_CONF.exists():
+        return make_check("branding_execstartpre", False, f"缺少文件：{BRANDING_CONF}")
+    text = BRANDING_CONF.read_text(encoding="utf-8", errors="ignore")
+    needle = f"ExecStartPre=-/usr/bin/python3 {WORKSPACE / 'scripts' / 'apply-openclaw-control-ui-branding.py'}"
+    return make_check(
+        "branding_execstartpre",
+        needle in text,
+        "已挂到 gateway 启动前自动重打" if needle in text else "branding.conf 存在，但未找到自动重打入口",
+    )
+
+
+
+def check_live_control_ui_markers() -> dict[str, Any]:
+    assets_dir = CONTROL_UI_DIST / "assets"
+    asset_candidates = sorted(assets_dir.glob("index-*.js")) if assets_dir.exists() else []
+    asset_path = asset_candidates[-1] if asset_candidates else None
+    if asset_path is None or not CONTROL_UI_OVERRIDE.exists():
+        return make_check("live_control_ui_markers", False, "live Control UI 资产或 override 缺失")
+    asset_text = asset_path.read_text(encoding="utf-8", errors="ignore")
+    override_text = CONTROL_UI_OVERRIDE.read_text(encoding="utf-8", errors="ignore")
+    ok = (
+        "JarvisProjectYieldedHistoryReply" in asset_text
+        and "JarvisShouldShowPendingReadingIndicator" in asset_text
+        and '"snapshotJsonHref": "/jarvis-frontstage-snapshot.json"' in override_text
+    )
+    detail = (
+        f"关键前端补丁标记齐全：{asset_path.name}"
+        if ok
+        else f"关键前端补丁标记不完整：{asset_path.name}"
+    )
+    return make_check("live_control_ui_markers", ok, detail)
+
+
+
+def run_cmd_check(name: str, cmd: list[str], success_substring: str | None = None, *, required: bool = True) -> dict[str, Any]:
+    result = run(cmd)
+    output = ((result.stdout or "") + (result.stderr or "")).strip()
+    ok = result.returncode == 0 and (success_substring is None or success_substring in output)
+    if ok and success_substring:
+        detail = success_substring
+    else:
+        detail = output.splitlines()[-1] if output else f"exit={result.returncode}"
+    return make_check(name, ok, detail, required=required)
+
+
+
+def check_timer(unit: str) -> dict[str, Any]:
+    if sys.platform.startswith("win"):
+        return make_check(unit, True, "Windows 环境跳过 systemd 检查", required=False)
+    result = run(["systemctl", "--user", "show", unit, "-p", "UnitFileState", "-p", "ActiveState", "-p", "SubState"])
+    output = (result.stdout or "") + (result.stderr or "")
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    data = {}
+    for line in lines:
+        if "=" in line:
+            k, v = line.split("=", 1)
+            data[k] = v
+    ok = (
+        result.returncode == 0
+        and data.get("UnitFileState") == "enabled"
+        and data.get("ActiveState") == "active"
+        and data.get("SubState") in {"waiting", "running", "elapsed"}
+    )
+    return make_check(unit, ok, json.dumps(data, ensure_ascii=False))
+
+
+
+def build_report(force: bool = False) -> dict[str, Any]:
+    previous_state = load_json(STATE_PATH)
+    version, package_json_path = current_openclaw_version()
+    previous_version = previous_state.get("lastVerifiedVersion") if isinstance(previous_state.get("lastVerifiedVersion"), str) else None
+    version_changed = bool(version) and version != previous_version
+    should_verify = force or version_changed or previous_version is None
+
+    checks: list[dict[str, Any]] = []
+    if should_verify:
+        checks.append(make_check("checklist_exists", CHECKLIST_PATH.exists(), f"清单：{CHECKLIST_PATH}"))
+        checks.append(check_branding_execstartpre())
+        checks.append(check_live_control_ui_markers())
+        checks.append(run_cmd_check(
+            "broker_snapshot_dock_verify",
+            [sys.executable, str(WORKSPACE / "scripts" / "apply-openclaw-frontstage-broker-data.py"), "--verify-control-ui-snapshot-dock"],
+            '"snapshotFirstReady": true',
+        ))
+        checks.append(run_cmd_check(
+            "broker_test",
+            [sys.executable, str(WORKSPACE / "scripts" / "test-frontstage-broker.py")],
+            "ALL PASS",
+        ))
+        checks.append(run_cmd_check(
+            "recovery_watch_test",
+            [sys.executable, str(WORKSPACE / "scripts" / "test-frontstage-recovery-watch.py")],
+            "ALL PASS",
+        ))
+        checks.append(check_timer("openclaw-frontstage-broker-rebuild.timer"))
+        checks.append(check_timer("openclaw-frontstage-recovery-watch.timer"))
+    ok = all(item.get("ok") for item in checks if item.get("required", True)) if checks else True
+
+    summary = "未检测到版本变化，本轮跳过升级后自检。"
+    boot_message = DEFAULT_ONLINE_MESSAGE
+    if should_verify and ok:
+        summary = f"已完成 OpenClaw {version or 'unknown'} 升级后自检：关键补丁、broker 与 recovery watcher 正常。"
+        boot_message = f"贾维斯已上线，我在。刚核对过 OpenClaw {version or '当前版本'} 升级后自检清单：关键补丁、broker 和恢复观察都正常。"
+    elif should_verify and not ok:
+        failed = [item["name"] for item in checks if item.get("required", True) and not item.get("ok")]
+        summary = f"OpenClaw {version or 'unknown'} 升级后自检未全部通过：{', '.join(failed)}"
+        boot_message = f"贾维斯已上线，我在。检测到 OpenClaw 已更新，但升级后自检没全过：{', '.join(failed)}。先别慌，喊我我来修。"
+
+    report = {
+        "checkedAt": now_iso(),
+        "checklistPath": str(CHECKLIST_PATH),
+        "packageJson": package_json_path,
+        "currentVersion": version,
+        "previousVersion": previous_version,
+        "versionChanged": version_changed,
+        "shouldVerify": should_verify,
+        "ok": ok,
+        "summary": summary,
+        "bootMessage": boot_message,
+        "checks": checks,
+    }
+    save_json(REPORT_PATH, report)
+    if should_verify and ok and version:
+        save_json(STATE_PATH, {
+            "lastCheckedAt": report["checkedAt"],
+            "lastVerifiedVersion": version,
+            "lastChecklistPath": str(CHECKLIST_PATH),
+            "lastReportPath": str(REPORT_PATH),
+        })
+    elif should_verify:
+        save_json(STATE_PATH, {
+            "lastCheckedAt": report["checkedAt"],
+            "lastVerifiedVersion": previous_version,
+            "lastChecklistPath": str(CHECKLIST_PATH),
+            "lastReportPath": str(REPORT_PATH),
+            "lastFailedVersion": version,
+        })
+    return report
+
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the post-upgrade OpenClaw self-check checklist")
+    parser.add_argument("--force", action="store_true", help="Run the self-check even when the version did not change")
+    parser.add_argument("--strict", action="store_true", help="Return non-zero when required checks fail")
+    parser.add_argument("--print-json", action="store_true", help="Print JSON report")
+    parser.add_argument("--print-human", action="store_true", help="Print human-readable summary")
+    parser.add_argument("--print-boot-json", action="store_true", help="Print JSON suitable for BOOT.md handling")
+    args = parser.parse_args()
+
+    report = build_report(force=args.force)
+
+    if args.print_json or args.print_boot_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif args.print_human or True:
+        print(report["summary"])
+        if report.get("shouldVerify"):
+            for item in report.get("checks", []):
+                marker = "PASS" if item.get("ok") else ("SKIP" if not item.get("required", True) else "FAIL")
+                print(f"- {marker} {item.get('name')}: {item.get('detail')}")
+        else:
+            print(f"- checklist: {report.get('checklistPath')}")
+
+    return 1 if args.strict and report.get("shouldVerify") and not report.get("ok") else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

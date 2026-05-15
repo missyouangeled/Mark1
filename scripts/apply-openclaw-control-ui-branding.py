@@ -20,6 +20,30 @@ DEFAULT_PACKAGE_ROOT = Path.home() / ".npm-global" / "lib" / "node_modules" / "o
 INJECT_MARKER_START = "<!-- jarvis-branding:begin -->"
 INJECT_MARKER_END = "<!-- jarvis-branding:end -->"
 SCRIPT_NAME = "jarvis-branding-override.js"
+CHAT_RUNNING_PATCH_PATTERNS = [
+    "let t=e.connected,n=e.sending||e.stream!==null,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),",
+    "let t=e.connected,n=e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),",
+    "let t=e.connected,n=e.loading||e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),",
+]
+CHAT_RUNNING_PATCH_NEW = "let t=e.connected,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),n=e.loading||e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0||a?.hasActiveRun===!0||a?.status===`running`,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,"
+INVALID_FINAL_RELOAD_PATCH_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){Gl(e);return}f&&!o&&Gl(e)"
+INVALID_FINAL_RELOAD_PATCH_OLD_V2 = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){xl(e);return}f&&!o&&xl(e)"
+INVALID_FINAL_RELOAD_PATCH_NEW = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a)return;f&&!o&&Gl(e)"
+INVALID_FINAL_RELOAD_PATCH_NEW_V2 = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a)return;f&&!o&&xl(e)"
+YIELDED_HISTORY_REPLAY_HELPER_OLD = "function Bl(e,t){if(t.length===0)return e;if(e.length===0)return t.filter(e=>Rl(e)&&!Il(e)).length===t.length?t:e;let n=new Map;e.forEach((e,t)=>{let r=zl(e);r&&n.set(r,t)});let r=-1,i=-1;for(let e=t.length-1;e>=0;e--){let a=zl(t[e]),o=a?n.get(a):void 0;if(typeof o==`number`){r=e,i=o;break}}if(r<0||i<e.length-1)return e;let a=[];for(let i of t.slice(r+1)){if(!Rl(i)||Il(i))return e;let t=zl(i);if(!t||n.has(t))return e;a.push(i)}return a.length>0?[...e,...a]:e}"
+YIELDED_HISTORY_REPLAY_HELPER_NEW = "function Bl(e,t){if(t.length===0)return e;if(e.length===0)return t.filter(e=>Rl(e)&&!Il(e)).length===t.length?t:e;let n=new Map;e.forEach((e,t)=>{let r=zl(e);r&&n.set(r,t)});let r=-1,i=-1;for(let e=t.length-1;e>=0;e--){let a=zl(t[e]),o=a?n.get(a):void 0;if(typeof o==`number`){r=e,i=o;break}}if(r<0||i<e.length-1)return e;let a=[];for(let i of t.slice(r+1)){if(!Rl(i)||Il(i))return e;let t=zl(i);if(!t||n.has(t))return e;a.push(i)}return a.length>0?[...e,...a]:e}function JarvisReadYieldedToolResultText(e){let t=g(e?.role);if(t!==`toolresult`)return null;let n=typeof e?.content==`string`?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text==`string`?e.text:``).join(`\n`):typeof e?.text==`string`?e.text:``;if(!n.trim())return null;try{let r=JSON.parse(n),i=typeof r?.message==`string`?r.message.trim():``;return r?.status===`yielded`&&i&&i!==`NO_REPLY`?i:null}catch{return null}}function JarvisProjectYieldedHistoryReply(e){if(!Array.isArray(e)||e.length===0)return[];let t=e.filter(e=>!Il(e)),n=-1;for(let t=e.length-1;t>=0;t--){if(g(e[t]?.role)===`user`){n=t;break}}if(n<0)return t;for(let r=e.length-1;r>n;r--){let i=e[r];if(Rl(i)&&!Il(i)&&g(i?.role)===`assistant`)return t}for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;let a={role:`assistant`,content:[{type:`text`,text:i}],timestamp:typeof e[r]?.timestamp==`number`?e[r].timestamp:Date.now()},o=zl(a);return o&&!t.some(e=>zl(e)===o)?[...t,a]:t}return t}"
+YIELDED_HISTORY_REPLAY_HELPER_V2 = "function Bl(e,t){if(t.length===0)return e;if(e.length===0)return t.filter(e=>Rl(e)&&!Il(e)).length===t.length?t:e;let n=new Map;e.forEach((e,t)=>{let r=zl(e);r&&n.set(r,t)});let r=-1,i=-1;for(let e=t.length-1;e>=0;e--){let a=zl(t[e]),o=a?n.get(a):void 0;if(typeof o==`number`){r=e,i=o;break}}if(r<0||i<e.length-1)return e;let a=[];for(let i of t.slice(r+1)){if(!Rl(i)||Il(i))return e;let t=zl(i);if(!t||n.has(t))return e;a.push(i)}return a.length>0?[...e,...a]:e}function JarvisReadYieldedToolResultText(e){let t=g(e?.role);if(t!==`toolresult`)return null;let n=typeof e?.content==`string`?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text==`string`?e.text:``).join(`\n`):typeof e?.text==`string`?e.text:``;if(!n.trim())return null;try{let r=JSON.parse(n),i=typeof r?.message==`string`?r.message.trim():``;return r?.status===`yielded`&&i&&i!==`NO_REPLY`?i:null}catch{return null}}function JarvisProjectYieldedHistoryReply(e){if(!Array.isArray(e)||e.length===0)return[];let t=e.filter(e=>!Il(e)),n=-1;for(let t=e.length-1;t>=0;t--){if(g(e[t]?.role)===`user`){n=t;break}}if(n<0)return t;for(let r=e.length-1;r>n;r--){let i=e[r];if(Rl(i)&&!Il(i)&&g(i?.role)===`assistant`)return t}for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;let a={role:`assistant`,content:[{type:`text`,text:i}],timestamp:typeof e[r]?.timestamp==`number`?e[r].timestamp:Date.now()},o=zl(a);return o&&!t.some(e=>zl(e)===o)?[...t,a]:t}return t}function JarvisAssistantHasVisibleContent(e){let t=JT(e),n=LT(t.role).toLowerCase();if(n!==`assistant`)return!1;for(let r of t.content){if(!r||typeof r!=`object`)continue;if(r.type===`text`&&typeof r.text==`string`){let e=r.text.trim();if(e&&e!==`NO_REPLY`)return!0}if(r.type===`attachment`||r.type===`canvas`)return!0}return!1}function JarvisShouldShowPendingReadingIndicator(e){if(!e||typeof e!=`object`)return!1;let t=e.sessionHasActiveRun===!0||e.sessionStatus===`running`,n=typeof e.sessionEndedAt==`number`&&Date.now()-e.sessionEndedAt<=2e4;if(!t&&!n)return!1;let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;for(let e=r.length-1;e>=0;e--){if(g(r[e]?.role)===`user`){a=e;break}}if(a<0)return!1;let o=!1,s=!1,c=0;for(let e=a+1;e<r.length;e++){let t=r[e];if(!t||typeof t!=`object`)continue;if(JarvisAssistantHasVisibleContent(t)){o=!0;break}let n=LT(JT(t).role).toLowerCase();(n===`assistant`||n===`toolresult`)&&(s=!0);let i=typeof t.timestamp==`number`?t.timestamp:0;i>c&&(c=i)}if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
+YIELDED_HISTORY_REPLAY_HELPER_CURRENT = "function JarvisReadYieldedToolResultText(e){let t=typeof e?.role==`string`?e.role.toLowerCase():``;if(t!==`toolresult`&&t!==`tool_result`&&t!==`tool`&&t!==`function`)return null;let n=typeof e?.content==`string`?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text==`string`?e.text:``).join(`\n`):typeof e?.text==`string`?e.text:``;if(!n.trim())return null;try{let r=JSON.parse(n),i=typeof r?.message==`string`?r.message.trim():``;return r?.status===`yielded`&&i&&!/^\\s*NO_REPLY\\s*$/.test(i)?i:null}catch{return null}}function JarvisProjectYieldedHistoryReply(e){if(!Array.isArray(e)||e.length===0)return[];let t=e.filter(e=>!Uc(e)),n=-1;for(let t=e.length-1;t>=0;t--){let r=typeof e[t]?.role==`string`?e[t].role.toLowerCase():``;if(r===`user`){n=t;break}}if(n<0)return t;for(let r=e.length-1;r>n;r--){let i=MT(e[r]),a=yT(i.role).toLowerCase();if(a===`assistant`&&i.content.length>0)return t}for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;let a={role:`assistant`,content:[{type:`text`,text:i}],timestamp:typeof e[r]?.timestamp==`number`?e[r].timestamp:Date.now()};return[...t,a]}return t}function JarvisAssistantHasVisibleContent(e){let t=MT(e),n=yT(t.role).toLowerCase();if(n!==`assistant`)return!1;for(let r of t.content){if(!r||typeof r!=`object`)continue;if(r.type===`text`&&typeof r.text==`string`){let e=r.text.trim();if(e&&!/^\\s*NO_REPLY\\s*$/.test(e))return!0}if(r.type===`attachment`||r.type===`canvas`)return!0}return!1}function JarvisShouldShowPendingReadingIndicator(e){if(!e||typeof e!=`object`)return!1;let t=e.sessionHasActiveRun===!0||e.sessionStatus===`running`,n=typeof e.sessionEndedAt==`number`&&Date.now()-e.sessionEndedAt<=2e4;if(!t&&!n)return!1;let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;for(let e=r.length-1;e>=0;e--){let t=typeof r[e]?.role==`string`?r[e].role.toLowerCase():``;if(t===`user`){a=e;break}}if(a<0)return!1;let o=!1,s=!1,c=0;for(let e=a+1;e<r.length;e++){let t=r[e];if(!t||typeof t!=`object`)continue;if(JarvisAssistantHasVisibleContent(t)){o=!0;break}let n=yT(MT(t).role).toLowerCase();(n===`assistant`||n===`tool`)&&(s=!0);let i=typeof t.timestamp==`number`?t.timestamp:0;i>c&&(c=i)}if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
+YIELDED_HISTORY_REPLAY_APPLY_OLD = "e.chatMessages=Bl((Array.isArray(a.messages)?a.messages:[]).filter(e=>!Il(e)),i),"
+YIELDED_HISTORY_REPLAY_APPLY_NEW = "e.chatMessages=Bl(JarvisProjectYieldedHistoryReply(Array.isArray(a.messages)?a.messages:[]),i),"
+YIELDED_HISTORY_REPLAY_APPLY_OLD_V2 = "let t=[],n=(Array.isArray(e.messages)?e.messages:[]).filter(e=>!Uc(e)),r=Array.isArray(e.toolMessages)?e.toolMessages:[],"
+YIELDED_HISTORY_REPLAY_APPLY_NEW_V2 = "let t=[],n=JarvisProjectYieldedHistoryReply((Array.isArray(e.messages)?e.messages:[]).filter(e=>!Uc(e))),r=Array.isArray(e.toolMessages)?e.toolMessages:[],"
+PENDING_READING_INDICATOR_ARGS_OLD = "x=kD({sessionKey:e.sessionKey,messages:e.messages,toolMessages:e.toolMessages,streamSegments:e.streamSegments,stream:e.stream,streamStartedAt:e.streamStartedAt,showToolCalls:e.showToolCalls,searchOpen:Z.searchOpen,searchQuery:Z.searchQuery});"
+PENDING_READING_INDICATOR_ARGS_NEW = "x=kD({sessionKey:e.sessionKey,messages:e.messages,toolMessages:e.toolMessages,streamSegments:e.streamSegments,stream:e.stream,streamStartedAt:e.streamStartedAt,sessionHasActiveRun:a?.hasActiveRun===!0,sessionStatus:a?.status??null,sessionEndedAt:a?.endedAt??null,showToolCalls:e.showToolCalls,searchOpen:Z.searchOpen,searchQuery:Z.searchQuery});"
+PENDING_READING_INDICATOR_APPLY_OLD = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++)i<o.length&&o[i].text.trim().length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:o[i].text,startedAt:o[i].ts}),i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]});if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`;e.stream.trim().length>0?t.push({kind:`stream`,key:n,text:e.stream,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}return ED(OD(t))}"
+PENDING_READING_INDICATOR_APPLY_NEW = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++)i<o.length&&o[i].text.trim().length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:o[i].text,startedAt:o[i].ts}),i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]});let c=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||c){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`;e.stream!==null&&e.stream.trim().length>0?t.push({kind:`stream`,key:n,text:e.stream,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}return ED(OD(t))}"
+PENDING_READING_INDICATOR_APPLY_OLD_V2 = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++){if(i<o.length){let n=OD(o[i].text);n.length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:n,startedAt:o[i].ts})}i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]})}if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=OD(e.stream);r.length>0?Bc(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}return wD(ED(t))}"
+PENDING_READING_INDICATOR_APPLY_NEW_V2 = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++){if(i<o.length){let n=OD(o[i].text);n.length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:n,startedAt:o[i].ts})}i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]})}let c=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||c){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=e.stream!==null?OD(e.stream):``;r.length>0?Bc(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}return wD(ED(t))}"
 
 
 def die(message: str) -> "NoReturn":
@@ -102,6 +126,81 @@ def inject_head_block(html: str, version: str) -> str:
 
 
 
+def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
+    assets_dir = dist_root / "assets"
+    if not assets_dir.exists():
+        die(f"Control UI assets 目录不存在：{assets_dir}")
+
+    patched_paths: list[Path] = []
+    for asset_path in sorted(assets_dir.glob("index-*.js")):
+        content = asset_path.read_text(encoding="utf-8")
+        updated = content
+        changed = False
+
+        if CHAT_RUNNING_PATCH_NEW not in updated:
+            for pattern in CHAT_RUNNING_PATCH_PATTERNS:
+                if pattern in updated:
+                    updated = updated.replace(pattern, CHAT_RUNNING_PATCH_NEW, 1)
+                    changed = True
+                    break
+
+        if INVALID_FINAL_RELOAD_PATCH_OLD in updated:
+            updated = updated.replace(INVALID_FINAL_RELOAD_PATCH_OLD, INVALID_FINAL_RELOAD_PATCH_NEW, 1)
+            changed = True
+        if INVALID_FINAL_RELOAD_PATCH_OLD_V2 in updated:
+            updated = updated.replace(INVALID_FINAL_RELOAD_PATCH_OLD_V2, INVALID_FINAL_RELOAD_PATCH_NEW_V2, 1)
+            changed = True
+
+        if YIELDED_HISTORY_REPLAY_HELPER_NEW not in updated and YIELDED_HISTORY_REPLAY_HELPER_OLD in updated:
+            updated = updated.replace(YIELDED_HISTORY_REPLAY_HELPER_OLD, YIELDED_HISTORY_REPLAY_HELPER_NEW, 1)
+            changed = True
+
+        if YIELDED_HISTORY_REPLAY_HELPER_V2 not in updated and YIELDED_HISTORY_REPLAY_HELPER_NEW in updated:
+            updated = updated.replace(YIELDED_HISTORY_REPLAY_HELPER_NEW, YIELDED_HISTORY_REPLAY_HELPER_V2, 1)
+            changed = True
+
+        if YIELDED_HISTORY_REPLAY_HELPER_CURRENT not in updated and "function OD(e){let t=kT(e);return t.trim().length>0?t:``}function kD(e){" in updated:
+            updated = updated.replace(
+                "function OD(e){let t=kT(e);return t.trim().length>0?t:``}function kD(e){",
+                "function OD(e){let t=kT(e);return t.trim().length>0?t:``}" + YIELDED_HISTORY_REPLAY_HELPER_CURRENT + "function kD(e){",
+                1,
+            )
+            changed = True
+
+        if YIELDED_HISTORY_REPLAY_APPLY_NEW not in updated and YIELDED_HISTORY_REPLAY_APPLY_OLD in updated:
+            updated = updated.replace(YIELDED_HISTORY_REPLAY_APPLY_OLD, YIELDED_HISTORY_REPLAY_APPLY_NEW, 1)
+            changed = True
+        if YIELDED_HISTORY_REPLAY_APPLY_NEW_V2 not in updated and YIELDED_HISTORY_REPLAY_APPLY_OLD_V2 in updated:
+            updated = updated.replace(YIELDED_HISTORY_REPLAY_APPLY_OLD_V2, YIELDED_HISTORY_REPLAY_APPLY_NEW_V2, 1)
+            changed = True
+
+        if PENDING_READING_INDICATOR_ARGS_NEW not in updated and PENDING_READING_INDICATOR_ARGS_OLD in updated:
+            updated = updated.replace(PENDING_READING_INDICATOR_ARGS_OLD, PENDING_READING_INDICATOR_ARGS_NEW, 1)
+            changed = True
+
+        if PENDING_READING_INDICATOR_APPLY_NEW not in updated and PENDING_READING_INDICATOR_APPLY_OLD in updated:
+            updated = updated.replace(PENDING_READING_INDICATOR_APPLY_OLD, PENDING_READING_INDICATOR_APPLY_NEW, 1)
+            changed = True
+        if PENDING_READING_INDICATOR_APPLY_NEW_V2 not in updated and PENDING_READING_INDICATOR_APPLY_OLD_V2 in updated:
+            updated = updated.replace(PENDING_READING_INDICATOR_APPLY_OLD_V2, PENDING_READING_INDICATOR_APPLY_NEW_V2, 1)
+            changed = True
+
+        if (
+            INVALID_FINAL_RELOAD_PATCH_NEW in updated
+            or CHAT_RUNNING_PATCH_NEW in updated
+            or YIELDED_HISTORY_REPLAY_APPLY_NEW in updated
+            or PENDING_READING_INDICATOR_APPLY_NEW in updated
+        ):
+            if changed:
+                asset_path.write_text(updated, encoding="utf-8")
+            patched_paths.append(asset_path)
+
+    if not patched_paths:
+        die("未能定位聊天页补丁入口；请检查 Control UI 前端结构是否已变化")
+    return patched_paths
+
+
+
 def write_override_script(
     path: Path,
     *,
@@ -121,6 +220,17 @@ def write_override_script(
         "faviconHref": f"./{favicon_file}?v={version}",
         "appleTouchHref": f"./{apple_touch_file}?v={version}",
         "logoAlt": brand_title,
+        "healthEntry": {
+            "label": "前台状态",
+            "title": "前台状态总览",
+            "description": "查看 broker / 监工 / 恢复观察 / 本地健康",
+            "href": "/jarvis-frontstage-status.html",
+            "snapshotJsonHref": "/jarvis-frontstage-snapshot.json",
+            "legacyStatusJsonHref": "/jarvis-frontstage-status.json",
+            "statusJsonHref": "/jarvis-frontstage-status.json",
+            "refreshMs": 60000,
+            "openLabel": "打开状态页",
+        },
         "visibleTextReplacements": [
             ["OpenClaw Control", window_title],
             ["OpenClaw", brand_title],
@@ -150,6 +260,10 @@ def write_override_script(
     script = f"""(() => {{
   const BRAND = {json.dumps(payload, ensure_ascii=False, indent=2)};
   const TOOL_NOISE_STYLE_ID = 'jarvis-tool-noise-filter';
+  const HEALTH_DOCK_ID = 'jarvis-health-dock';
+  const HEALTH_DOCK_STYLE_ID = 'jarvis-health-dock-style';
+  let healthRefreshTimerId = null;
+  let healthDockExpanded = false;
 
   function setAttr(node, name, value) {{
     if (node && node.getAttribute(name) !== value) node.setAttribute(name, value);
@@ -157,6 +271,15 @@ def write_override_script(
 
   function setText(node, value) {{
     if (node && value && node.textContent !== value) node.textContent = value;
+  }}
+
+  function escapeHtml(value) {{
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }}
 
   function replaceLiterals(value) {{
@@ -242,6 +365,342 @@ def write_override_script(
     document.head.appendChild(style);
   }}
 
+  function ensureHealthDockStyle() {{
+    if (document.getElementById(HEALTH_DOCK_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = HEALTH_DOCK_STYLE_ID;
+    style.textContent = `
+      #${{HEALTH_DOCK_ID}} {{
+        position: fixed;
+        right: 18px;
+        top: 148px;
+        z-index: 80;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
+      }}
+      #${{HEALTH_DOCK_ID}}[data-expanded="false"] .jarvis-health-dock__panel {{
+        display: none;
+      }}
+      #${{HEALTH_DOCK_ID}}[data-expanded="true"] .jarvis-health-dock__fab {{
+        display: none;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab {{
+        appearance: none;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.92));
+        box-shadow: 0 18px 48px rgba(2, 6, 23, 0.28);
+        backdrop-filter: blur(14px);
+        color: #e5eefb;
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab-label {{
+        letter-spacing: 0.02em;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab-badge {{
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: rgba(148, 163, 184, 0.16);
+        color: #d9e6f5;
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="ok"] .jarvis-health-dock__fab,
+      #${{HEALTH_DOCK_ID}}[data-severity="ok"] .jarvis-health-dock__panel {{
+        border-color: rgba(34, 197, 94, 0.30);
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="warn"] .jarvis-health-dock__fab,
+      #${{HEALTH_DOCK_ID}}[data-severity="warn"] .jarvis-health-dock__panel {{
+        border-color: rgba(245, 158, 11, 0.34);
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="critical"] .jarvis-health-dock__fab,
+      #${{HEALTH_DOCK_ID}}[data-severity="critical"] .jarvis-health-dock__panel {{
+        border-color: rgba(239, 68, 68, 0.38);
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="ok"] .jarvis-health-dock__fab-badge,
+      #${{HEALTH_DOCK_ID}}[data-severity="ok"] .jarvis-health-dock__badge {{
+        background: rgba(34, 197, 94, 0.16);
+        color: #97f0b3;
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="warn"] .jarvis-health-dock__fab-badge,
+      #${{HEALTH_DOCK_ID}}[data-severity="warn"] .jarvis-health-dock__badge {{
+        background: rgba(245, 158, 11, 0.18);
+        color: #ffd796;
+      }}
+      #${{HEALTH_DOCK_ID}}[data-severity="critical"] .jarvis-health-dock__fab-badge,
+      #${{HEALTH_DOCK_ID}}[data-severity="critical"] .jarvis-health-dock__badge {{
+        background: rgba(239, 68, 68, 0.18);
+        color: #ffb1b1;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__panel {{
+        width: min(288px, calc(100vw - 24px));
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.92));
+        box-shadow: 0 18px 48px rgba(2, 6, 23, 0.36);
+        backdrop-filter: blur(14px);
+        color: #e5eefb;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__top {{
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__top-right {{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__eyebrow {{
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #8ea5c0;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__badge {{
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(148, 163, 184, 0.16);
+        color: #d9e6f5;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__close {{
+        appearance: none;
+        border: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background: rgba(255,255,255,0.08);
+        color: #d6e3f5;
+        font-size: 16px;
+        line-height: 1;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__title {{
+        font-size: 17px;
+        font-weight: 800;
+        line-height: 1.3;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__desc,
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__meta {{
+        font-size: 12px;
+        color: #a8bdd5;
+        line-height: 1.45;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__tips {{
+        margin: 2px 0 0;
+        padding-left: 18px;
+        color: #d6e2f0;
+        font-size: 12px;
+        line-height: 1.45;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__tips li + li {{
+        margin-top: 6px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__actions {{
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__open {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 700;
+        color: #eff6ff;
+        background: linear-gradient(180deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.90));
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__open:hover,
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab:hover {{
+        filter: brightness(1.05);
+      }}
+      @media (max-width: 900px) {{
+        #${{HEALTH_DOCK_ID}} {{
+          right: 12px;
+          top: 140px;
+        }}
+        #${{HEALTH_DOCK_ID}} .jarvis-health-dock__panel {{
+          width: min(320px, calc(100vw - 20px));
+        }}
+      }}
+    `;
+    document.head.appendChild(style);
+  }}
+
+  function setHealthDockExpanded(nextExpanded) {{
+    healthDockExpanded = !!nextExpanded;
+    const dock = document.getElementById(HEALTH_DOCK_ID);
+    if (dock) dock.dataset.expanded = healthDockExpanded ? 'true' : 'false';
+  }}
+
+  function positionHealthDock() {{
+    const dock = document.getElementById(HEALTH_DOCK_ID);
+    if (!dock) return;
+
+    const margin = 12;
+    const fallbackTop = window.innerWidth <= 900 ? 140 : 148;
+    let top = fallbackTop;
+
+    const topbar = document.querySelector('.topbar');
+    if (topbar) {{
+      const rect = topbar.getBoundingClientRect();
+      if (Number.isFinite(rect.bottom) && rect.bottom > 0) top = Math.max(top, Math.round(rect.bottom + margin));
+    }}
+
+    const actionCandidates = Array.from(document.querySelectorAll('button, a, [role="button"]')).filter((node) => {{
+      if (!(node instanceof Element) || node === dock || dock.contains(node)) return false;
+      const rect = node.getBoundingClientRect();
+      if (!Number.isFinite(rect.bottom) || rect.width <= 0 || rect.height <= 0) return false;
+      if (rect.bottom <= 0 || rect.top >= Math.min(window.innerHeight * 0.4, 240)) return false;
+      if (rect.right < window.innerWidth * 0.45) return false;
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) return false;
+      return true;
+    }});
+
+    for (const node of actionCandidates) {{
+      const rect = node.getBoundingClientRect();
+      top = Math.max(top, Math.round(rect.bottom + margin));
+    }}
+
+    dock.style.top = `${{top}}px`;
+  }}
+
+  function ensureHealthDock() {{
+    let dock = document.getElementById(HEALTH_DOCK_ID);
+    if (dock) return dock;
+    dock = document.createElement('section');
+    dock.id = HEALTH_DOCK_ID;
+    dock.dataset.severity = 'unknown';
+    dock.dataset.expanded = healthDockExpanded ? 'true' : 'false';
+    dock.innerHTML = `
+      <button class="jarvis-health-dock__fab" type="button" aria-label="展开前台状态详情" title="前台状态">
+        <span class="jarvis-health-dock__fab-label">${{BRAND.healthEntry.label}}</span>
+        <span class="jarvis-health-dock__fab-badge">读取中</span>
+      </button>
+      <div class="jarvis-health-dock__panel">
+        <div class="jarvis-health-dock__top">
+          <div class="jarvis-health-dock__eyebrow">${{BRAND.healthEntry.label}}</div>
+          <div class="jarvis-health-dock__top-right">
+            <div class="jarvis-health-dock__badge">读取中</div>
+            <button class="jarvis-health-dock__close" type="button" aria-label="收起前台状态卡片" title="收起">×</button>
+          </div>
+        </div>
+        <div class="jarvis-health-dock__title">${{BRAND.healthEntry.title}}</div>
+        <div class="jarvis-health-dock__desc">${{BRAND.healthEntry.description}}</div>
+        <div class="jarvis-health-dock__meta">等待前台状态快照…</div>
+        <ul class="jarvis-health-dock__tips"><li>等待前台状态快照…</li></ul>
+        <div class="jarvis-health-dock__actions">
+          <a class="jarvis-health-dock__open" href="${{BRAND.healthEntry.href}}" target="_blank" rel="noopener noreferrer">${{BRAND.healthEntry.openLabel || '打开状态页'}}</a>
+        </div>
+      </div>
+    `;
+    const fabButton = dock.querySelector('.jarvis-health-dock__fab');
+    const closeButton = dock.querySelector('.jarvis-health-dock__close');
+    if (fabButton) fabButton.addEventListener('click', () => setHealthDockExpanded(true));
+    if (closeButton) closeButton.addEventListener('click', () => setHealthDockExpanded(false));
+    (document.body || document.documentElement).appendChild(dock);
+    positionHealthDock();
+    return dock;
+  }}
+
+  function healthBadgeText(severity) {{
+    return severity === 'critical' ? '严重异常' : severity === 'warn' ? '告警' : severity === 'ok' ? '正常' : '未知';
+  }}
+
+  function formatCheckedAt(raw) {{
+    if (!raw) return '更新时间未知';
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return '更新时间未知';
+    const diffMinutes = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 60000));
+    if (diffMinutes <= 1) return '刚更新';
+    return `${{diffMinutes}} 分钟前更新`;
+  }}
+
+  function normalizeFrontstageSnapshot(payload) {{
+    const snapshot = payload && typeof payload === 'object' ? payload : {{}};
+    const panels = snapshot && typeof snapshot.panels === 'object' ? snapshot.panels : null;
+    const healthPanel = panels && panels.health && typeof panels.health === 'object'
+      ? panels.health
+      : (snapshot.health && typeof snapshot.health === 'object' ? snapshot.health : null);
+    return {{
+      severity: snapshot && snapshot.severity ? snapshot.severity : (healthPanel && healthPanel.severity ? healthPanel.severity : 'unknown'),
+      summary: snapshot && snapshot.summary ? snapshot.summary : (healthPanel && healthPanel.summary ? healthPanel.summary : BRAND.healthEntry.title),
+      issueOverview: snapshot && snapshot.issueOverview ? snapshot.issueOverview : (healthPanel && healthPanel.detail ? healthPanel.detail : BRAND.healthEntry.description),
+      checkedAt: snapshot && snapshot.checkedAt ? snapshot.checkedAt : (healthPanel && healthPanel.checkedAt ? healthPanel.checkedAt : null),
+      host: snapshot && snapshot.host ? snapshot.host : '',
+      selfHelpActions: Array.isArray(snapshot && snapshot.selfHelpActions) ? snapshot.selfHelpActions : [],
+    }};
+  }}
+
+  function updateHealthDock(payload) {{
+    const dock = ensureHealthDock();
+    if (!dock) return;
+    const snapshot = normalizeFrontstageSnapshot(payload);
+    const severity = snapshot.severity || 'unknown';
+    dock.dataset.severity = severity;
+    const fabBadge = dock.querySelector('.jarvis-health-dock__fab-badge');
+    const badge = dock.querySelector('.jarvis-health-dock__badge');
+    const title = dock.querySelector('.jarvis-health-dock__title');
+    const desc = dock.querySelector('.jarvis-health-dock__desc');
+    const meta = dock.querySelector('.jarvis-health-dock__meta');
+    const tips = dock.querySelector('.jarvis-health-dock__tips');
+    const badgeText = healthBadgeText(severity);
+    if (fabBadge) fabBadge.textContent = badgeText;
+    if (badge) badge.textContent = badgeText;
+    if (title) title.textContent = snapshot.summary || BRAND.healthEntry.title;
+    if (desc) desc.textContent = snapshot.issueOverview || BRAND.healthEntry.description;
+    if (meta) meta.textContent = formatCheckedAt(snapshot.checkedAt) + (snapshot.host ? ` · ${{snapshot.host}}` : '');
+    if (tips) {{
+      const actions = Array.isArray(snapshot.selfHelpActions) ? snapshot.selfHelpActions.slice(0, 3) : [];
+      tips.innerHTML = actions.length
+        ? actions.map((item) => `<li>${{escapeHtml(item)}}</li>`).join('')
+        : '<li>如果页面卡住但这里显示正常，优先刷新页面；仍无效再重开浏览器。</li>';
+    }}
+    positionHealthDock();
+  }}
+
+  async function refreshHealthDock() {{
+    const dock = ensureHealthDock();
+    if (!dock) return;
+    try {{
+      const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
+      const resp = await fetch(snapshotJsonHref, {{ cache: 'no-store' }});
+      if (!resp.ok) throw new Error(`http_${{resp.status}}`);
+      const payload = await resp.json();
+      updateHealthDock(payload);
+    }} catch (err) {{
+      console.warn('[jarvis-branding] health dock fetch failed:', err);
+      updateHealthDock({{
+        severity: 'warn',
+        summary: '前台状态暂时不可读',
+        issueOverview: '静态状态文件读取失败；请刷新页面或检查本机 gateway 是否仍在提供最新状态文件',
+      }});
+    }}
+  }}
+
   function isVisible(node) {{
     if (!(node instanceof Element)) return false;
     const style = window.getComputedStyle(node);
@@ -286,6 +745,8 @@ def write_override_script(
       setAttr(logo, 'alt', BRAND.logoAlt);
 
       ensureToolNoiseStyle();
+      ensureHealthDockStyle();
+      ensureHealthDock();
       applyTargetedTextOverrides();
       replaceVisibleText(root);
       refreshHiddenToolGroups(root instanceof Element ? root : document.body || document.documentElement);
@@ -306,6 +767,10 @@ def write_override_script(
 
   function boot() {{
     applyBranding(document.body || document.documentElement);
+    refreshHealthDock();
+    if (!healthRefreshTimerId) {{
+      healthRefreshTimerId = window.setInterval(refreshHealthDock, Number(BRAND.healthEntry.refreshMs) || 60000);
+    }}
     const observer = new MutationObserver((mutations) => {{
       for (const mutation of mutations) {{
         if (mutation.type === 'childList') {{
@@ -316,8 +781,13 @@ def write_override_script(
       }}
     }});
     observer.observe(document.documentElement, {{ childList: true, subtree: true, characterData: true }});
-    window.addEventListener('pageshow', () => applyBranding(document.body || document.documentElement));
-    document.addEventListener('visibilitychange', () => applyBranding(document.body || document.documentElement));
+    window.addEventListener('pageshow', () => {{ applyBranding(document.body || document.documentElement); refreshHealthDock(); positionHealthDock(); }});
+    window.addEventListener('resize', positionHealthDock);
+    document.addEventListener('visibilitychange', () => {{
+      applyBranding(document.body || document.documentElement);
+      positionHealthDock();
+      if (document.visibilityState === 'visible') refreshHealthDock();
+    }});
   }}
 
   if (document.readyState === 'loading') {{
@@ -379,6 +849,7 @@ def main() -> int:
         apple_touch_file=apple_touch_file,
         version=version,
     )
+    patched_assets = patch_chat_running_indicator(dist_root)
 
     manifest_path = dist_root / "manifest.webmanifest"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -410,6 +881,9 @@ def main() -> int:
     print(f"- runtimeLogo: {runtime_logo_path}")
     print(f"- windowTitle: {window_title}")
     print(f"- brandTitle: {brand_title}")
+    print("- chatRunningPatched:")
+    for path in patched_assets:
+        print(f"  - {path}")
     return 0
 
 

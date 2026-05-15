@@ -28,9 +28,13 @@
 
 1. `HOST_CONTEXT.md`
 2. `docs/多机器-读取与更新规则.md`
-3. 本文档 `docs/公司-Linux-OpenClaw-维护说明.md`
-4. `TOOLS.md` 里与 Linux 相关的条目
-5. Linux 相关脚本 / 配置：
+3. `docs/通用-OpenClaw-补丁注册表.md`
+4. `docs/通用-OpenClaw-补丁重建清单.md`（当怀疑补丁因升级失效时）
+5. 本文档 `docs/公司-Linux-OpenClaw-维护说明.md`
+6. `TOOLS.md` 里与 Linux 相关的条目
+7. 相关 broker / patch README（例如 `tools/openclaw-frontstage-broker/README.md`）
+8. broker / watcher 的 Linux user systemd 模板与已安装单元
+9. Linux 相关脚本 / 配置：
    - `scripts/openclaw-resume-watch.sh`
    - `~/.config/systemd/user/openclaw-resume-watch.service`
    - `~/.config/systemd/user/openclaw-resume-watch.timer`
@@ -145,6 +149,19 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 - `~/.local/state/openclaw/local-health/last-report.json`
 - `~/.local/state/openclaw/local-health/last-summary.txt`
 - `~/.local/state/openclaw/local-health/health-diagnostic.log`
+- `~/.local/state/openclaw/local-health/host-thermal-bridge.json`（宿主机温度桥接输入，若存在则优先读取）
+- `tools/openclaw-local-health/host-thermal-bridge-windows.ps1`（宿主机是 Windows 时的温度采集脚本）
+- `tools/openclaw-local-health/install-host-thermal-bridge-task-windows.ps1`（Windows 宿主机计划任务安装脚本）
+- `~/.openclaw/canvas/documents/local-health-status/index.html`（固定健康监督页面）
+
+当前稳定性补充：
+
+- 页面会按 `checkedAt` 自动判断数据是否过期：超过约 12 分钟提示“可能过期”，超过约 20 分钟提示“可能已失效”
+- 诊断日志会做保守留存：超过约 2MB 时自动裁到最近约 1MB
+- `openclaw-local-health-watch.service` 应保留 `SuccessExitStatus=1 2`，避免 systemd 把“告警结果”误判成“脚本执行失败”
+- 当前还已接入：`温度` 与 `负载 / 内存` 两条本地诊断维度；其中温度优先尝试读取宿主机桥接 JSON，读不到时再退回当前机器自身传感器
+- 若当前是 VMware 客体，脚本也会自动尝试 `/mnt/hgfs/*/host-thermal-bridge.json`；推荐宿主机共享名直接使用 `OpenClawBridge`
+- 2026-05-13 当前实测：客体内 `open-vm-tools` / `vmhgfs-fuse` / `vmware-hgfsclient` 已安装且 `open-vm-tools.service` 正常运行，但 `vmware-hgfsclient` 返回空，用户态测试 `vmhgfs-fuse .host:/ <mountpoint>` 返回 `Error -107 cannot open connection!`；这更像宿主机尚未启用/提供共享文件夹，而不是客体缺少 VMware 工具。
 
 当前默认频率：
 
@@ -167,7 +184,97 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 
 - 检测休眠恢复或长时间暂停后，自动重启 `openclaw-gateway.service`
 
-### 3. systemd 用户单元
+### 3. 前台恢复观察 watcher（broker 第二阶段）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-14
+- 用途：周期对比当前前台 dashboard 的 durable transcript 与 `chat.history` 投影，尽早发现“回复 live 里出现过、但最终没稳定留在前台/history”的异常，并把 anomaly / recovered 这些辅助信息统一经由 frontstage broker 回到当前 dashboard。
+
+相关文件：
+
+- 观察脚本：`scripts/openclaw-frontstage-recovery-watch.py`
+- README：`tools/openclaw-frontstage-recovery/README.md`
+- service 模板：`tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.service`
+- timer 模板：`tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.timer`
+- 当前用户态 systemd：`~/.config/systemd/user/openclaw-frontstage-recovery-watch.service`
+- 当前用户态 timer：`~/.config/systemd/user/openclaw-frontstage-recovery-watch.timer`
+- 运行期状态目录：`~/.local/state/openclaw/frontstage-recovery/`
+
+当前产物：
+
+- `~/.local/state/openclaw/frontstage-recovery/last-report.json`
+- `~/.local/state/openclaw/frontstage-recovery/notify-state.json`
+- `~/.local/state/openclaw/frontstage-recovery/frontstage-recovery-events.log`
+
+当前最小检测项：
+
+1. `assistant_missing_in_history`
+2. `history_oversized_placeholder`
+3. `assistant_text_mismatch`
+4. `assistant_turn_missing_visible_text`（assistant turn 已发生，但最终稳定可见文本为空；当前已用于兜住“边回边消失”的 silent / empty final 情况）
+5. `pendingProjection`（仅作缓冲判断，不当成异常；当前既覆盖“history 还在追赶 transcript”，也覆盖目标 dashboard 仍 `hasActiveRun=true` / session 仍 `running` 的进行中窗口，以及 session 刚结束不久、history 仍在最终追赶的短窗口）
+
+当前默认频率：
+
+- 开机后约 60 秒首次运行
+- 之后约每 15 秒运行一次
+
+当前 service 模板默认会带上：
+
+```ini
+ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-frontstage-recovery-watch.py --notify-frontstage --print-human
+```
+
+含义是：除了持续写本地状态，它也会在 anomaly / recovered 这些变化时，经由 `scripts/openclaw-frontstage-broker.py` 把一句辅助摘要回到当前 dashboard 前台。
+
+当前边界：
+
+- 只做观察 + 辅助回报，不接管正常主回复
+- 依赖 Gateway / transcript / `chat.history` / Python / user systemd
+- 若更底层整体阻塞，这条链也可能只能留下本地证据，不能保证一定送达前台
+
+2026-05-15 当前又补了一处与监工自动回报直接相关的前台绑定修补：
+
+- `scripts/openclaw-supervisor-subagent.py` 现在在 `requestedSessionKey=agent:main:main` 且同一 owner 下存在 dashboard 前台时，会优先解析到最新 dashboard，而不再因为 `agent:main:main` 的时间戳较新就误回落到 owner 本身
+- `scripts/openclaw-supervisor-status.py` 已兼容 broker `emit` 返回顶层 `messageId`，避免 `notify-state.json` / `supervisor-events.log` 把成功注入误记成 `messageId=null`
+- 当怀疑 supervisor 仍没真正打到当前页时，优先检查：
+  - `python3 scripts/openclaw-supervisor-subagent.py resolve-frontstage --session-key 'agent:main:main' --print-json`
+  - `~/.local/state/openclaw/supervisor/supervisor-events.log`
+  - 当前 dashboard transcript 里是否实际存在对应 `messageId`
+- 2026-05-15 11:08 的真烟测已确认：`notify_sent ... target=agent:main:dashboard:0e238e2b-0e3c-4e63-9c1d-790e3f2794cf messageId=ab0baee2-9cc5-4301-9cee-bcd554d10942`，且该 id 已真实出现在当前 dashboard transcript 中
+
+### 4. broker 周期重建（broker 数据层 1.0）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-14
+- 用途：即使当前没有新的辅助消息进入 broker，也定期从 `supervisor / local-health / frontstage-recovery` 的现有状态文件重建 broker 视图，避免 sidecar 数据源长期停留在旧快照。
+
+相关文件：
+
+- broker 脚本：`scripts/openclaw-frontstage-broker.py`
+- apply 入口：`scripts/apply-openclaw-frontstage-broker-data.py`
+- service 模板：`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service`
+- timer 模板：`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
+- 当前用户态 systemd：`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service`
+- 当前用户态 timer：`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
+
+当前默认频率：
+
+- 开机后约 75 秒首次运行
+- 之后约每 60 秒运行一次
+
+当前最小验收：
+
+```bash
+python3 scripts/openclaw-frontstage-broker.py rebuild-views --print-json
+systemctl --user start openclaw-frontstage-broker-rebuild.service
+systemctl --user show openclaw-frontstage-broker-rebuild.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+systemctl --user show openclaw-frontstage-broker-rebuild.timer -p UnitFileState -p ActiveState -p SubState
+```
+
+### 5. systemd 用户单元
 
 相关文件：
 
@@ -178,7 +285,7 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 
 - 在 Linux 用户态下调度 resume-watch 逻辑
 
-### 3. Control UI 品牌覆盖（贾维斯）
+### 6. Control UI 品牌覆盖（贾维斯）
 
 - 适用机器：公司（Linux）
 - 系统 / OS：Linux
@@ -197,6 +304,14 @@ bash scripts/storage-preflight.sh 800M 临时解压包
 - 重复应用 Control UI 左上角品牌名与 logo 覆盖
 - 同步覆盖浏览器标题、favicon / apple-touch-icon、manifest 名称与默认通知标题
 - 通过页面注入脚本，把 Control UI 里可见的 `OpenClaw` 文案尽量替换成“贾维斯”（保留聊天内容 / 代码块等常见高风险区域的跳过规则）
+- 在 Control UI 顶部工具栏下方稳定挂一个统一的“前台状态”固定入口；当前默认折叠成小圆角按钮，点击后向下展开详情卡片，尽量不遮挡上方按钮
+- 当前这枚入口优先读取 broker sidecar 重建出来的统一 snapshot 公共副本：`/jarvis-frontstage-snapshot.json`，并打开 `/jarvis-frontstage-status.html`
+- 本地健康自己的独立公开页仍继续保留：`/jarvis-local-health-status.json` / `/jarvis-local-health-status.html`
+- 健康页与入口卡片都应携带一组无需 AI 参与的本地自救建议；例如“状态正常但页面卡住”时直接提示刷新页面 / 重开浏览器
+- 当前也负责重复应用三个前台状态补丁：
+  - 把聊天页“进行中”判断补成同时考虑 `loading / sending / stream / canAbort / queue.length > 0 / session.hasActiveRun / session.status=running`，避免后台仍在工作但前台既不流字、也不转圈的空窗
+  - 当 assistant final 为空 / silent 时，不再立刻强制 `chat.history` reload，先压住“前台刚有阶段性内容又被立即清掉”的 ghost/disappear 体感
+  - 当 `chat.history` 里出现 `sessions_yield` 的 `toolResult(status=yielded,message=...)`，但没有对应可见 assistant 回复时，前端会补投影出一条临时 assistant 文本，避免出现“三个点消失了，但一行字都没回”的空窗
 - 尽量避免每次升级后再手工去改 `dist/control-ui/` 里的静态产物
 
 当前默认配置：
@@ -214,12 +329,18 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 说明：
 
 - 该脚本会把配置中的品牌图复制到本机 OpenClaw 安装目录下的 `dist/control-ui/`，并注入一个额外的 `jarvis-branding-override.js` 覆盖脚本。
+- 同一个脚本现在还会顺手给 `dist/control-ui/assets/index-*.js` 打三条最小前台状态补丁：
+  - 把聊天页的“进行中”条件从只看 `sending / stream`，补成也看 `loading / canAbort / queue.length > 0`，并把 `session.hasActiveRun / session.status=running` 一并算作“前台仍活着”
+  - 把 `assistant final 为空 / silent 时立刻强制 reload history` 这条路径改成更保守的收口，减少前台内容一闪而空
+  - 当 reload 回来的 `chat.history` 里只有 `yielded toolResult`、却没有可见 assistant 文本时，补投影出 `yielded.message`，把“已生成但没显示出来”的那句话稳定留在前台
 - 另外已在公司 Linux 机的 `openclaw-gateway.service` 上挂了一个 `ExecStartPre`：每次 gateway 启动前，都会自动先跑一遍这个品牌补丁脚本；即使以后 OpenClaw 升级覆盖了静态资源，只要重启 gateway，就会自动重新覆盖。
 - 该 `ExecStartPre` 使用了前缀 `-` 忽略失败，避免品牌补丁偶发出错时直接把 gateway 启动也一并卡死。
 - 如果以后用户想把左上角名称改成 `J.A.R.V.I.S.`、改别的图、或继续往电影风格靠，只需要改 `config/control-ui-branding.json` 再重跑脚本。
+- 当前这个“前台状态”入口刻意做成固定悬浮入口，而不是强依赖某个侧边栏内部节点；这样对 Control UI 升级后的 DOM 变化更稳。
+- 当前交互为：默认折叠成小圆角按钮；点击后展开详情卡片；点击卡片右上角 `×` 再收起回小按钮。
 - 这是“可重复应用补丁”，不是官方配置项；如果以后 OpenClaw 前端结构变化很大，补丁脚本可能需要跟着调整，但总体维护点已经集中到这几个文件里，不需要再手工逐个改 dist 文件。
 
-### 4. NVIDIA 免费语音模型桥接（公司 Linux）
+### 6. NVIDIA 免费语音模型桥接（公司 Linux）
 
 - 适用机器：公司（Linux）
 - 系统 / OS：Linux
