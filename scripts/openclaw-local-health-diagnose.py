@@ -1347,11 +1347,11 @@ def maybe_send_frontstage(previous: dict[str, Any], current: dict[str, Any], ena
         event_key = f"{severity}|{summary}|{current.get('checkedAt')}"
         message = f"{prefix}{summary}"
 
-    helper_path = Path(__file__).with_name("openclaw-frontstage-broker.py")
+    helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
     cmd = [
         sys.executable,
         str(helper_path),
-        "emit",
+        "notify-frontstage",
         "--source",
         "local-health",
         "--event-key",
@@ -1360,7 +1360,8 @@ def maybe_send_frontstage(previous: dict[str, Any], current: dict[str, Any], ena
         "agent:main:main",
         "--message",
         message,
-        "--print-json",
+        "--data-json",
+        json.dumps({"severity": severity, "summary": summary, "checkedAt": current.get("checkedAt")}, ensure_ascii=False),
     ]
     subprocess.run(cmd, capture_output=True, text=True, check=False)
 

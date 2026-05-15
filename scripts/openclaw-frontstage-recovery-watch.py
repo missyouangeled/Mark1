@@ -521,11 +521,11 @@ def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[
     if previous_notify.get("eventKey") == candidate["eventKey"]:
         return
 
-    helper_path = Path(__file__).with_name("openclaw-frontstage-broker.py")
+    helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
     cmd = [
         sys.executable,
         str(helper_path),
-        "emit",
+        "notify-frontstage",
         "--source",
         "frontstage-recovery",
         "--event-key",
@@ -534,7 +534,6 @@ def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[
         str(candidate["sessionKey"]),
         "--message",
         str(candidate["message"]),
-        "--print-json",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

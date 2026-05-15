@@ -480,11 +480,11 @@ def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, 
     if previous.get("eventKey") == candidate["eventKey"]:
         return
 
-    helper_path = Path(__file__).with_name("openclaw-frontstage-broker.py")
+    helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
     cmd = [
         sys.executable,
         str(helper_path),
-        "emit",
+        "notify-frontstage",
         "--source",
         "supervisor",
         "--event-key",
@@ -493,7 +493,6 @@ def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, 
         str(candidate["sessionKey"]),
         "--message",
         str(candidate["message"]),
-        "--print-json",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

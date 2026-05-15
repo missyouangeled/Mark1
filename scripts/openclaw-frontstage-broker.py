@@ -31,15 +31,18 @@ SOURCE_VIEW_LABELS = {
     "recovery": "恢复观察",
 }
 SOURCE_EVENT_LABELS = {
+    "broker.source.ingested": "broker 已收下来源事件",
     "frontstage.delivery.sent": "前台辅助消息已投递",
     "local_health.status.changed": "本地健康状态变化",
     "supervisor.status.changed": "监工状态变化",
     "frontstage_recovery.status.changed": "前台恢复状态变化",
 }
 SCHEMA_VERSION = 1
-EVENT_CONTRACT_VERSION = 1
+EVENT_CONTRACT_VERSION = 2
+SOURCE_EVENT_RECORD_TYPE = "broker.source.event"
 EVENT_LOG_RECORD_TYPE = "frontstage.delivery.sent"
 SOURCE_SNAPSHOT_RECORD_TYPE = "frontstage.delivery.latest"
+SOURCE_STATE_SNAPSHOT_RECORD_TYPE = "broker.source.latest"
 FRONTSTAGE_SNAPSHOT_RECORD_TYPE = "frontstage.snapshot"
 SNAPSHOT_VERSION = 1
 PRIMARY_BROKER_VIEW = "snapshot"
@@ -91,8 +94,10 @@ def build_contract_catalog(source_names: list[str] | None = None) -> dict[str, A
     ordered_names = list(dict.fromkeys([*SOURCE_SPECS.keys(), *(source_names or [])]))
     return {
         "version": EVENT_CONTRACT_VERSION,
-        "eventLogRecordType": EVENT_LOG_RECORD_TYPE,
+        "sourceEventRecordType": SOURCE_EVENT_RECORD_TYPE,
+        "deliveryEventRecordType": EVENT_LOG_RECORD_TYPE,
         "sourceSnapshotRecordType": SOURCE_SNAPSHOT_RECORD_TYPE,
+        "sourceStateSnapshotRecordType": SOURCE_STATE_SNAPSHOT_RECORD_TYPE,
         "sourceEventTypeField": "sourceEventType",
         "sourceViewField": "sourceView",
         "sources": {name: source_contract(name) for name in ordered_names},
@@ -121,6 +126,56 @@ def canonical_sources_map(sources: dict[str, Any]) -> dict[str, dict[str, Any]]:
         source_name: canonical_source_record(source_name, record)
         for source_name, record in sources.items()
         if isinstance(record, dict)
+    }
+
+
+def canonical_source_state_record(source: str, record: dict[str, Any] | None) -> dict[str, Any]:
+    current = record if isinstance(record, dict) else {}
+    contract = source_contract(source)
+    data = current.get("data") if isinstance(current.get("data"), dict) else None
+    return {
+        "recordType": SOURCE_STATE_SNAPSHOT_RECORD_TYPE,
+        "source": source,
+        "sourceEventType": str(current.get("sourceEventType") or contract["sourceEventType"]),
+        "sourceView": current.get("sourceView") or contract.get("sourceView"),
+        "eventKey": current.get("eventKey"),
+        "sessionKey": current.get("sessionKey"),
+        "message": current.get("message"),
+        "recordedAt": current.get("recordedAt"),
+        "data": data,
+    }
+
+
+def canonical_source_states_map(source_states: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        source_name: canonical_source_state_record(source_name, record)
+        for source_name, record in source_states.items()
+        if isinstance(record, dict)
+    }
+
+
+def build_source_event_record(
+    source: str,
+    event_key: str,
+    session_key: str,
+    message: str,
+    recorded_at: str,
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    contract = source_contract(source)
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "contractVersion": EVENT_CONTRACT_VERSION,
+        "recordType": SOURCE_EVENT_RECORD_TYPE,
+        "source": source,
+        "sourceEventType": contract["sourceEventType"],
+        "sourceView": contract.get("sourceView"),
+        "eventKey": event_key,
+        "sessionKey": session_key,
+        "message": message,
+        "recordedAt": recorded_at,
+        "data": data if isinstance(data, dict) else None,
+        "ingestStatus": "recorded",
     }
 
 
@@ -155,6 +210,22 @@ def build_event_record(
 def canonical_event_record(record: dict[str, Any]) -> dict[str, Any]:
     current = record if isinstance(record, dict) else {}
     source = str(current.get("source") or "").strip()
+    record_type = str(current.get("recordType") or EVENT_LOG_RECORD_TYPE)
+    if record_type == SOURCE_EVENT_RECORD_TYPE:
+        recorded_at = str(current.get("recordedAt") or now_iso())
+        canonical = dict(current)
+        canonical.update(
+            build_source_event_record(
+                source,
+                str(current.get("eventKey") or ""),
+                str(current.get("sessionKey") or ""),
+                str(current.get("message") or ""),
+                recorded_at,
+                current.get("data") if isinstance(current.get("data"), dict) else None,
+            )
+        )
+        return canonical
+
     recorded_at = str(current.get("recordedAt") or current.get("sentAt") or now_iso())
     canonical = dict(current)
     canonical.update(
@@ -606,6 +677,7 @@ def build_frontstage_status_payload(
     )
 
     source_records = frontstage_view.get("sources") if isinstance(frontstage_view.get("sources"), dict) else {}
+    source_state_records = frontstage_view.get("sourceStates") if isinstance(frontstage_view.get("sourceStates"), dict) else {}
     deliveries: list[dict[str, Any]] = []
     for source_name, record in source_records.items():
         if not isinstance(record, dict):
@@ -629,6 +701,30 @@ def build_frontstage_status_payload(
         )
     deliveries.sort(key=lambda item: item.get("sentAt") or "", reverse=True)
     latest_delivery = deliveries[0] if deliveries else None
+
+    source_state_snapshots: list[dict[str, Any]] = []
+    for source_name, record in source_state_records.items():
+        if not isinstance(record, dict):
+            continue
+        contract_fields = resolve_source_contract_fields(source_name, record, contracts)
+        source_state_snapshots.append(
+            {
+                "recordType": record.get("recordType") or SOURCE_STATE_SNAPSHOT_RECORD_TYPE,
+                "source": source_name,
+                "sourceEventType": contract_fields["sourceEventType"],
+                "sourceEventLabel": contract_fields["sourceEventLabel"],
+                "sourceView": contract_fields["sourceView"],
+                "sourceViewLabel": contract_fields["sourceViewLabel"],
+                "contractSummary": contract_fields["contractSummary"],
+                "eventKey": record.get("eventKey"),
+                "sessionKey": record.get("sessionKey"),
+                "message": record.get("message"),
+                "recordedAt": record.get("recordedAt"),
+                "data": record.get("data") if isinstance(record.get("data"), dict) else None,
+            }
+        )
+    source_state_snapshots.sort(key=lambda item: item.get("recordedAt") or "", reverse=True)
+    latest_source_state = source_state_snapshots[0] if source_state_snapshots else None
 
     issue_labels: list[str] = []
     issue_details: list[str] = []
@@ -711,7 +807,10 @@ def build_frontstage_status_payload(
         "selfHelpActions": actions,
         "panels": panels,
         "latestDelivery": latest_delivery,
+        "latestSourceState": latest_source_state,
         "sourceSnapshots": source_records,
+        "sourceStateSnapshots": source_state_records,
+        "sourceStateTimeline": source_state_snapshots[:12],
         "frontstage": frontstage_panel,
         "health": health_panel,
         "supervisor": supervisor_panel,
@@ -945,8 +1044,10 @@ def build_views(state_path: Path, broker_data_dir: Path, *, updated_at: str | No
     normalize_event_log(paths["events"])
     state = load_json(state_path)
     raw_sources = state.get("sources") if isinstance(state.get("sources"), dict) else {}
+    raw_source_states = state.get("sourceStates") if isinstance(state.get("sourceStates"), dict) else {}
     sources = canonical_sources_map(raw_sources)
-    contract_catalog = build_contract_catalog(list(sources))
+    source_states = canonical_source_states_map(raw_source_states)
+    contract_catalog = build_contract_catalog(list(dict.fromkeys([*sources.keys(), *source_states.keys()])))
     effective_updated_at = updated_at or now_iso()
 
     health_report = load_json(paths["localHealthReport"])
@@ -971,6 +1072,7 @@ def build_views(state_path: Path, broker_data_dir: Path, *, updated_at: str | No
         "updatedAt": effective_updated_at,
         "latestSource": latest_source,
         "sources": sources,
+        "sourceStates": source_states,
         "freshness": freshness,
     }
     save_json(paths["frontstageView"], frontstage_view)
@@ -1067,9 +1169,75 @@ def build_views(state_path: Path, broker_data_dir: Path, *, updated_at: str | No
     return all_paths
 
 
-def emit_event(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
+def ingest_event(
+    source: str,
+    event_key: str,
+    session_key: str,
+    message: str,
+    state_path: Path,
+    broker_data_dir: Path,
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     state = load_json(state_path)
     sources = state.get("sources") if isinstance(state.get("sources"), dict) else {}
+    source_states = state.get("sourceStates") if isinstance(state.get("sourceStates"), dict) else {}
+    previous = source_states.get(source) if isinstance(source_states.get(source), dict) else {}
+    previous_snapshot = canonical_source_state_record(source, previous)
+    paths = broker_paths(state_path, broker_data_dir)
+    contract = source_contract(source)
+
+    if previous.get("eventKey") == event_key:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "duplicate-source-event",
+            "source": source,
+            "sourceEventType": contract["sourceEventType"],
+            "sourceView": contract.get("sourceView"),
+            "eventKey": event_key,
+            "sessionKey": previous_snapshot.get("sessionKey") or session_key,
+            "message": previous_snapshot.get("message"),
+            "recordedAt": previous_snapshot.get("recordedAt"),
+            "paths": {key: str(value) for key, value in paths.items()},
+        }
+
+    recorded_at = now_iso()
+    record = build_source_event_record(source, event_key, session_key, message, recorded_at, data)
+    source_states[source] = canonical_source_state_record(source, record)
+    save_json(
+        state_path,
+        {
+            "schemaVersion": SCHEMA_VERSION,
+            "contractVersion": EVENT_CONTRACT_VERSION,
+            "sources": canonical_sources_map(sources),
+            "sourceStates": canonical_source_states_map(source_states),
+            "updatedAt": recorded_at,
+        },
+    )
+    append_jsonl(paths["events"], record)
+    all_paths = build_views(state_path, broker_data_dir, updated_at=record["recordedAt"], latest_source=source)
+    return {
+        "ok": True,
+        "skipped": False,
+        "source": source,
+        **record,
+        "paths": all_paths,
+    }
+
+
+def record_delivery_event(
+    source: str,
+    event_key: str,
+    session_key: str,
+    target_session_key: str | None,
+    message_id: Any,
+    message: str,
+    state_path: Path,
+    broker_data_dir: Path,
+) -> dict[str, Any]:
+    state = load_json(state_path)
+    sources = state.get("sources") if isinstance(state.get("sources"), dict) else {}
+    source_states = state.get("sourceStates") if isinstance(state.get("sourceStates"), dict) else {}
     previous = sources.get(source) if isinstance(sources.get(source), dict) else {}
     previous_snapshot = canonical_source_record(source, previous)
     paths = broker_paths(state_path, broker_data_dir)
@@ -1091,15 +1259,13 @@ def emit_event(source: str, event_key: str, session_key: str, message: str, stat
             "paths": {key: str(value) for key, value in paths.items()},
         }
 
-    response = emit_frontstage(session_key, message)
-    helper_response = response.get("response") if isinstance(response.get("response"), dict) else {}
     recorded_at = now_iso()
     record = build_event_record(
         source,
         event_key,
         session_key,
-        response.get("targetSessionKey"),
-        helper_response.get("messageId"),
+        target_session_key,
+        message_id,
         message,
         recorded_at,
     )
@@ -1109,7 +1275,8 @@ def emit_event(source: str, event_key: str, session_key: str, message: str, stat
         {
             "schemaVersion": SCHEMA_VERSION,
             "contractVersion": EVENT_CONTRACT_VERSION,
-            "sources": sources,
+            "sources": canonical_sources_map(sources),
+            "sourceStates": canonical_source_states_map(source_states),
             "updatedAt": recorded_at,
         },
     )
@@ -1124,13 +1291,31 @@ def emit_event(source: str, event_key: str, session_key: str, message: str, stat
     }
 
 
+def emit_event(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
+    response = emit_frontstage(session_key, message)
+    helper_response = response.get("response") if isinstance(response.get("response"), dict) else {}
+    return record_delivery_event(
+        source,
+        event_key,
+        session_key,
+        response.get("targetSessionKey"),
+        helper_response.get("messageId"),
+        message,
+        state_path,
+        broker_data_dir,
+    )
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Unified frontstage broker for auxiliary messages")
-    parser.add_argument("action", choices=["emit", "rebuild-views"], help="Operation to run")
+    parser = argparse.ArgumentParser(description="Unified frontstage broker for auxiliary messages and sidecar data")
+    parser.add_argument("action", choices=["emit", "ingest", "record-delivery", "rebuild-views"], help="Operation to run")
     parser.add_argument("--source", help="Source channel, e.g. supervisor or local-health")
     parser.add_argument("--event-key", help="Stable event key for de-duplication")
     parser.add_argument("--session-key", default=DEFAULT_SESSION_KEY, help="Owner/current session key used to resolve current frontstage")
-    parser.add_argument("--message", help="Final user-facing message")
+    parser.add_argument("--message", help="Message or summary text")
+    parser.add_argument("--target-session-key", help="Target session key for record-delivery")
+    parser.add_argument("--message-id", help="Message id for record-delivery")
+    parser.add_argument("--data-json", help="Optional JSON object payload for ingest")
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR), help="State directory for broker dedupe")
     parser.add_argument("--broker-data-dir", default=str(DEFAULT_BROKER_DATA_DIR), help="Directory for broker events and views")
     parser.add_argument("--print-json", action="store_true", help="Print machine-readable JSON")
@@ -1152,20 +1337,63 @@ def main() -> int:
     else:
         missing = [name for name, value in {"source": args.source, "event-key": args.event_key, "message": args.message}.items() if not (isinstance(value, str) and value.strip())]
         if missing:
-            raise SystemExit(f"emit requires: {', '.join(missing)}")
-        payload = emit_event(
-            args.source.strip(),
-            args.event_key.strip(),
-            args.session_key.strip(),
-            args.message.strip(),
-            state_path,
-            broker_data_dir,
-        )
+            raise SystemExit(f"{args.action} requires: {', '.join(missing)}")
+        data_payload = None
+        if args.data_json:
+            try:
+                parsed = json.loads(args.data_json)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"--data-json must be a JSON object: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise SystemExit("--data-json must be a JSON object")
+            data_payload = parsed
+        if args.action == "ingest":
+            payload = ingest_event(
+                args.source.strip(),
+                args.event_key.strip(),
+                args.session_key.strip(),
+                args.message.strip(),
+                state_path,
+                broker_data_dir,
+                data=data_payload,
+            )
+        elif args.action == "record-delivery":
+            payload = record_delivery_event(
+                args.source.strip(),
+                args.event_key.strip(),
+                args.session_key.strip(),
+                args.target_session_key.strip() if isinstance(args.target_session_key, str) and args.target_session_key.strip() else None,
+                args.message_id.strip() if isinstance(args.message_id, str) and args.message_id.strip() else None,
+                args.message.strip(),
+                state_path,
+                broker_data_dir,
+            )
+        else:
+            payload = emit_event(
+                args.source.strip(),
+                args.event_key.strip(),
+                args.session_key.strip(),
+                args.message.strip(),
+                state_path,
+                broker_data_dir,
+            )
     if args.print_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         if args.action == "rebuild-views":
             print(f"rebuilt: views={payload.get('paths', {}).get('viewsDir')}")
+        elif args.action == "ingest":
+            prefix = "skipped" if payload.get("skipped") else "ingested"
+            print(
+                f"{prefix}: source={payload.get('source')} eventKey={payload.get('eventKey')} "
+                f"recordedAt={payload.get('recordedAt')} events={payload.get('paths', {}).get('events')}"
+            )
+        elif args.action == "record-delivery":
+            prefix = "skipped" if payload.get("skipped") else "recorded"
+            print(
+                f"{prefix}: source={payload.get('source')} target={payload.get('targetSessionKey') or payload.get('sessionKey')} "
+                f"messageId={payload.get('messageId')} events={payload.get('paths', {}).get('events')}"
+            )
         else:
             prefix = "skipped" if payload.get("skipped") else "sent"
             print(

@@ -70,7 +70,8 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 
 ```bash
 python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock
-python3 scripts/openclaw-frontstage-broker.py emit --source broker-smoke --event-key broker-smoke-rebuild --session-key 'agent:main:main' --message '[Broker 重建烟测] frontstage broker 可用。' --print-json
+python3 scripts/openclaw-frontstage-broker.py ingest --source broker-smoke --event-key broker-smoke-rebuild --session-key 'agent:main:main' --message 'broker source event smoke' --data-json '{"severity":"ok"}' --print-json
+python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text
 ```
 
 若当前机器是 Linux，且希望一并把 broker 周期重建 timer 装好，可直接改用：
@@ -81,9 +82,9 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
 
 验收：
 
-- `targetSessionKey` 指向当前 dashboard
 - `~/.local/state/openclaw/frontstage/broker-state.json` 更新
 - `~/.local/state/openclaw/broker/events.jsonl` 更新
+- `events.jsonl` 中应至少能看到 `broker.source.event`
 - `~/.local/state/openclaw/broker/manifest.json` 存在
 - `~/.local/state/openclaw/broker/views/frontstage.json` 存在
 - `~/.local/state/openclaw/broker/views/snapshot.json` 存在
@@ -96,6 +97,7 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
 - live `jarvis-branding-override.js` 里 `snapshotJsonHref` 已指向 `/jarvis-frontstage-snapshot.json`，`legacyStatusJsonHref` 已指向 `/jarvis-frontstage-status.json`
 - apply 输出里的 `frontstagePublication.snapshotFirstReady` 为 `true`
 - `rebuild-views` 能在不依赖新事件触发的情况下重建视图与前台状态页
+- `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 能直接返回摘要，不依赖 Control UI
 
 ### 2.2 broker 周期重建 timer
 

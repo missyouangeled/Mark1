@@ -8,6 +8,8 @@
 
 - broker 脚本：`scripts/openclaw-frontstage-broker.py`
 - broker 最小回归：`scripts/test-frontstage-broker.py`
+- infos-handle 最小入口：`scripts/openclaw-infos-handle.py`
+- infos-handle 最小回归：`scripts/test-openclaw-infos-handle.py`
 - broker 数据层 apply 入口：`scripts/apply-openclaw-frontstage-broker-data.py`
 - broker 周期重建 systemd 模板：`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service` / `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
 
@@ -41,7 +43,7 @@
 
 用途：
 
-- `events.jsonl`：append-only 结构化事件流（当前阶段记录 broker 实际已完成的前台投递）
+- `events.jsonl`：append-only 结构化事件流（当前阶段同时记录 broker 已收下的 source 事件，以及已完成的前台投递事件）
 - `views/frontstage.json`：按 source 汇总后的统一前台快照；现在明确降级为**支撑视图**，供 `snapshot` 组装，不再当顶层主入口
 - `views/health.json`：`local-health` 的最新视图；同样是支撑视图，不再当顶层主入口
 - `views/tasks.json`：当前先汇总 `supervisor` / `frontstage-recovery`；同样是支撑视图，不再当顶层主入口
@@ -56,37 +58,74 @@
 
 本轮开始，broker sidecar 对外默认提供一套最小正式事件口径，避免 renderer / 排查脚本继续只靠 `source` 名临场猜语义。
 
+同时，这一轮也开始把 broker 往“数据中心优先”推进：
+
+- `ingest`：只入 broker 数据层，不直接打前台
+- `emit`：兼容旧链路，仍会打前台
+- `infos-handle`：作为 broker 与消费方之间的最小信息处理层，当前先支持 text/json 查询与前台通知
+
 ### 1. `events.jsonl` 的正式含义
 
-`events.jsonl` 记录的是 **broker 已经成功完成的一次前台投递**，不是 watcher 原始状态文件的逐条镜像。
+`events.jsonl` 现在是一个**统一 broker 事件流**，当前至少包含两类记录：
 
-每条记录当前至少包含：
+#### A. `broker.source.event`
 
-- `recordType`
-  - 固定为 `frontstage.delivery.sent`
+表示 broker 已经把某个来源事件收下并写入数据层，但**还没有要求它一定打到前台**。
+
+最小字段：
+
+- `recordType = broker.source.event`
 - `source`
-  - 兼容旧链路使用的原始 source 名，例如 `local-health`
 - `sourceEventType`
-  - source 对应的正式语义事件类型，例如 `local_health.status.changed`
 - `sourceView`
-  - 这个 source 默认应落到哪个 broker view，例如 `health` / `tasks` / `recovery`
 - `eventKey`
-  - 仍作为按 source 去重的稳定键
+- `sessionKey`
+- `message`
+- `recordedAt`
+- `data`（可选，给来源事件带结构化附加信息）
+
+#### B. `frontstage.delivery.sent`
+
+表示 broker 或 infos-handle 已经成功完成了一次前台投递。
+
+最小字段：
+
+- `recordType = frontstage.delivery.sent`
+- `source`
+- `sourceEventType`
+- `sourceView`
+- `eventKey`
 - `sessionKey` / `targetSessionKey` / `messageId` / `message` / `sentAt` / `recordedAt`
-  - 继续表达这次投递实际发到了哪里、发了什么、何时记录
 
-### 2. `views/frontstage.json` 里 `sources.<name>` 的正式含义
+因此当前的口径变成：
 
-`frontstage.json` 里的每个 `sources.<name>` 现在都表示：
+- 要看“来源事件先后发生了什么” → 读 `broker.source.event`
+- 要看“哪些内容真正打到前台了” → 读 `frontstage.delivery.sent`
+
+### 2. `views/frontstage.json` 里的两组快照
+
+`frontstage.json` 里现在分成两组快照：
+
+#### A. `sources.<name>`
+
+表示：
 
 - `recordType = frontstage.delivery.latest`
 - 这是该 source **最近一次已成功投递** 的快照
-- 字段口径与 `events.jsonl` 对齐：同样带 `sourceEventType` / `sourceView` / `eventKey` / `message*`
 
-因此：
+#### B. `sourceStates.<name>`
+
+表示：
+
+- `recordType = broker.source.latest`
+- 这是该 source **最近一次已被 broker ingest** 的来源事件快照
+- 即使当前没有前台 renderer、没有 Control UI、或者本轮没有发生前台投递，这组快照也应能独立存在
+
+因此当前建议读取顺序是：
 
 - 要看 append-only 历史 → 读 `events.jsonl`
-- 要看每个 source 的最近一条已发事件 → 读 `views/frontstage.json`
+- 要看每个 source 最近一次前台已发事件 → 读 `views/frontstage.json` 的 `sources`
+- 要看每个 source 最近一次被 broker 收下的来源状态 → 读 `views/frontstage.json` 的 `sourceStates`
 
 ### 3. 当前已正式收口的 source → event type 映射
 
@@ -136,9 +175,12 @@
 ## 手工运行
 
 ```bash
+python3 scripts/openclaw-frontstage-broker.py ingest --source local-health --event-key local-health-smoke --session-key 'agent:main:main' --message '本地健康状态已记录' --data-json '{"severity":"ok"}' --print-json
 python3 scripts/openclaw-frontstage-broker.py emit --source broker-smoke --event-key broker-smoke-readme --session-key 'agent:main:main' --message '[Broker README 烟测] frontstage broker 可用。' --print-json
 python3 scripts/openclaw-frontstage-broker.py rebuild-views --print-json
 python3 scripts/test-frontstage-broker.py
+python3 scripts/test-openclaw-infos-handle.py
+python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text
 python3 scripts/apply-openclaw-frontstage-broker-data.py
 python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock
 python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd

@@ -85,15 +85,17 @@
 ### PATCH-FRONTSTAGE-BROKER
 
 - **结果目标**：把监工、本地健康、前台恢复观察等辅助消息统一收口后，再稳定投递到“当前前台 dashboard”，并沉淀成统一 snapshot 口径的 sidecar 数据源，供 renderer / dock 等消费方直接复用；`overview` / `frontstage-status.json` 等旧名字只保留为兼容层。
-- **当前实现**：`scripts/openclaw-frontstage-broker.py` + `scripts/apply-openclaw-frontstage-broker-data.py`
+- **当前实现**：`scripts/openclaw-frontstage-broker.py` + `scripts/openclaw-infos-handle.py` + `scripts/apply-openclaw-frontstage-broker-data.py`
 - **自动触发**：由 `supervisor` / `local-health` / `frontstage-recovery` 等调用方间接触发；当前另外有 `openclaw-frontstage-broker-rebuild.service` + `openclaw-frontstage-broker-rebuild.timer` 周期刷新视图
 - **适用范围**：当前主落地为 公司（Linux）
-- **升级风险点**：`openclaw-supervisor-subagent.py send-frontstage` 调用约定变化；`chat.inject` 路由变化；broker 视图模型后续演进时的兼容性
-- **失效判断**：辅助消息仍回到旧 dashboard，或 `broker-state.json` / `events.jsonl` / `views/*.json` 不再更新
-- **最小验收**：执行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock` 应成功；执行一次 `emit` 烟测后，确认 `targetSessionKey` 指向当前 dashboard，且 `~/.local/state/openclaw/broker/` 下的事件、manifest 与视图文件更新，`views/snapshot.json` 与 `jarvis-frontstage-snapshot.json` 已刷新，`manifest.json` / `snapshot.json` 都声明 `snapshotContract.primaryView = snapshot`，并把 `overview` / `frontstage-status.json` 标成 `legacy_alias`、把 `frontstage / health / tasks / recovery` 标成 `supporting_view`；apply 输出里的 `controlUiSnapshotDock.snapshotJsonHref` 应指向 `/jarvis-frontstage-snapshot.json`，`frontstagePublication.snapshotFirstReady` 应为 `true`；`openclaw-frontstage-broker-rebuild.timer` 处于 `enabled + active(waiting)`
+- **升级风险点**：`openclaw-supervisor-subagent.py send-frontstage` 调用约定变化；`chat.inject` 路由变化；broker 视图模型与事件契约从“纯 delivery”演进为“source + delivery 双记录”后的兼容性；`infos-handle` 与 broker CLI 参数约定变化
+- **失效判断**：辅助消息仍回到旧 dashboard，或 `broker-state.json` / `events.jsonl` / `views/*.json` 不再更新；或 `events.jsonl` 里不再出现 `broker.source.event`；或 `openclaw-infos-handle.py query` 不能正常返回 text/json
+- **最小验收**：执行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock` 应成功；执行一次 `ingest` 烟测后，确认 `~/.local/state/openclaw/broker/events.jsonl` 出现 `broker.source.event`；执行 `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 应能正常返回；`views/snapshot.json` 与 `jarvis-frontstage-snapshot.json` 已刷新，`manifest.json` / `snapshot.json` 都声明 `snapshotContract.primaryView = snapshot`，并把 `overview` / `frontstage-status.json` 标成 `legacy_alias`、把 `frontstage / health / tasks / recovery` 标成 `supporting_view`；apply 输出里的 `controlUiSnapshotDock.snapshotJsonHref` 应指向 `/jarvis-frontstage-snapshot.json`，`frontstagePublication.snapshotFirstReady` 应为 `true`；`openclaw-frontstage-broker-rebuild.timer` 处于 `enabled + active(waiting)`
 - **维护落点**：
   - `scripts/openclaw-frontstage-broker.py`
   - `scripts/test-frontstage-broker.py`
+  - `scripts/openclaw-infos-handle.py`
+  - `scripts/test-openclaw-infos-handle.py`
   - `scripts/apply-openclaw-frontstage-broker-data.py`
   - `scripts/openclaw-supervisor-subagent.py`
   - `tools/openclaw-frontstage-broker/README.md`

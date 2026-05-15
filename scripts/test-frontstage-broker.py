@@ -42,6 +42,18 @@ def main() -> int:
             "response": {"messageId": f"msg-{message}"},
         }
 
+        ingested = mod.ingest_event(
+            "local-health",
+            "health-source-1",
+            "agent:main:main",
+            "本地健康状态已记录",
+            state_path,
+            broker_data_dir,
+            data={"severity": "ok", "summary": "健康正常"},
+        )
+        assert ingested["ok"] is True and ingested["skipped"] is False
+        assert ingested["recordType"] == "broker.source.event"
+
         first = mod.emit_event(
             "local-health",
             "health-1",
@@ -87,7 +99,7 @@ def main() -> int:
             }, ensure_ascii=False) + "\n")
 
         events_lines = paths["events"].read_text(encoding="utf-8").strip().splitlines()
-        assert len(events_lines) == 3, f"expected 3 total events after legacy append, got {len(events_lines)}"
+        assert len(events_lines) == 4, f"expected 4 total events after legacy append, got {len(events_lines)}"
 
         (tmp_path / 'local-health').mkdir(parents=True, exist_ok=True)
         (tmp_path / 'supervisor').mkdir(parents=True, exist_ok=True)
@@ -100,8 +112,8 @@ def main() -> int:
         rebuilt_paths = mod.build_views(state_path, broker_data_dir)
 
         migrated_event_records = [json.loads(line) for line in paths["events"].read_text(encoding="utf-8").strip().splitlines()]
-        assert len(migrated_event_records) == 3
-        assert {item["recordType"] for item in migrated_event_records} == {"frontstage.delivery.sent"}
+        assert len(migrated_event_records) == 4
+        assert {item["recordType"] for item in migrated_event_records} == {"broker.source.event", "frontstage.delivery.sent"}
         assert {item["sourceEventType"] for item in migrated_event_records} >= {"local_health.status.changed", "frontstage_recovery.status.changed", "supervisor.status.changed"}
         assert {item["sourceView"] for item in migrated_event_records} >= {"health", "recovery", "tasks"}
         assert Path(rebuilt_paths['frontstageView']).exists()
@@ -117,21 +129,25 @@ def main() -> int:
 
         frontstage_view = json.loads(paths["frontstageView"].read_text(encoding="utf-8"))
         assert frontstage_view["schemaVersion"] == 1
-        assert frontstage_view["contractVersion"] == 1
-        assert frontstage_view["contracts"]["eventLogRecordType"] == "frontstage.delivery.sent"
+        assert frontstage_view["contractVersion"] == 2
+        assert frontstage_view["contracts"]["sourceEventRecordType"] == "broker.source.event"
+        assert frontstage_view["contracts"]["deliveryEventRecordType"] == "frontstage.delivery.sent"
         assert frontstage_view["contracts"]["sources"]["local-health"]["sourceEventType"] == "local_health.status.changed"
         assert "local-health" in frontstage_view["sources"]
         assert "frontstage-recovery" in frontstage_view["sources"]
         assert frontstage_view["sources"]["local-health"]["recordType"] == "frontstage.delivery.latest"
         assert frontstage_view["sources"]["local-health"]["sourceEventType"] == "local_health.status.changed"
         assert frontstage_view["sources"]["frontstage-recovery"]["sourceView"] == "recovery"
+        assert frontstage_view["sourceStates"]["local-health"]["recordType"] == "broker.source.latest"
+        assert frontstage_view["sourceStates"]["local-health"]["message"] == "本地健康状态已记录"
         assert frontstage_view["updatedAt"] == frontstage_view["freshness"]["rebuiltAt"]
         assert frontstage_view["freshness"]["sources"]["localHealthReport"]["reportTimestamp"] == "2026-05-14T16:30:00+08:00"
 
         manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
         assert manifest["schemaVersion"] == 1
-        assert manifest["contractVersion"] == 1
+        assert manifest["contractVersion"] == 2
         assert manifest["contracts"]["sourceSnapshotRecordType"] == "frontstage.delivery.latest"
+        assert manifest["contracts"]["sourceStateSnapshotRecordType"] == "broker.source.latest"
         assert manifest["snapshotContract"]["primaryView"] == "snapshot"
         assert manifest["snapshotContract"]["primaryPublishedJsonKey"] == "frontstageSnapshotJson"
         assert manifest["snapshotContract"]["compatibilityViewAliases"]["overview"] == "snapshot"
@@ -177,7 +193,7 @@ def main() -> int:
         assert snapshot_view["recordType"] == "frontstage.snapshot"
         assert snapshot_view["snapshotVersion"] == 1
         assert snapshot_view["severity"] == "ok"
-        assert snapshot_view["contractVersion"] == 1
+        assert snapshot_view["contractVersion"] == 2
         assert snapshot_view["snapshotContract"]["primaryView"] == "snapshot"
         assert snapshot_view["snapshotContract"]["compatibilityViewAliases"]["overview"] == "snapshot"
         assert snapshot_view["snapshotContract"]["viewCatalog"]["snapshot"]["role"] == "primary"
@@ -195,6 +211,8 @@ def main() -> int:
         assert snapshot_view["panels"]["health"]["summary"] == "健康正常"
         assert snapshot_view["panels"]["supervisor"]["summary"] == "监工待命中"
         assert snapshot_view["sourceSnapshots"]["local-health"]["sourceEventType"] == "local_health.status.changed"
+        assert snapshot_view["sourceStateSnapshots"]["local-health"]["recordType"] == "broker.source.latest"
+        assert snapshot_view["latestSourceState"]["eventKey"] == "health-source-1"
 
         overview_view = json.loads(paths["overviewView"].read_text(encoding="utf-8"))
         assert overview_view == snapshot_view

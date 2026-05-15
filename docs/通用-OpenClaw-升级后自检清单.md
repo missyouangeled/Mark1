@@ -14,6 +14,7 @@
 
 - 想快速确认“更新后还能不能用” → 看这份
 - 想逐项重建所有补丁 → 看 `docs/通用-OpenClaw-补丁重建清单.md`
+- 当前 broker / infos-handle 已开始分层：broker 更偏数据中心，infos-handle 负责最小 text/json 查询与前台通知
 
 ---
 
@@ -95,10 +96,11 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-sna
 
 ---
 
-### 4. 两个最小回归仍通过
+### 4. 三个最小回归仍通过
 
 ```bash
 python3 scripts/test-frontstage-broker.py
+python3 scripts/test-openclaw-infos-handle.py
 python3 scripts/test-frontstage-recovery-watch.py
 ```
 

@@ -17,6 +17,8 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 BROKER_TEST = WORKSPACE / "scripts" / "test-frontstage-broker.py"
+INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
+INFOS_HANDLE_TEST = WORKSPACE / "scripts" / "test-openclaw-infos-handle.py"
 BROKER_REBUILD_SERVICE = WORKSPACE / "tools" / "openclaw-frontstage-broker" / "openclaw-frontstage-broker-rebuild.service"
 BROKER_REBUILD_TIMER = WORKSPACE / "tools" / "openclaw-frontstage-broker" / "openclaw-frontstage-broker-rebuild.timer"
 BRANDING_SCRIPT = WORKSPACE / "scripts" / "apply-openclaw-control-ui-branding.py"
@@ -194,8 +196,9 @@ def main() -> int:
     args = parser.parse_args()
 
     steps = [
-        [sys.executable, "-m", "py_compile", str(BROKER_SCRIPT), str(BROKER_TEST), str(BRANDING_SCRIPT)],
+        [sys.executable, "-m", "py_compile", str(BROKER_SCRIPT), str(BROKER_TEST), str(INFOS_HANDLE_SCRIPT), str(INFOS_HANDLE_TEST), str(BRANDING_SCRIPT)],
         [sys.executable, str(BROKER_TEST)],
+        [sys.executable, str(INFOS_HANDLE_TEST)],
     ]
     if args.apply_control_ui_branding:
         steps.append([sys.executable, str(BRANDING_SCRIPT)])
@@ -217,7 +220,7 @@ def main() -> int:
         if result.returncode != 0:
             sys.stderr.write(result.stderr or result.stdout or f"command failed: {' '.join(cmd)}\n")
             return result.returncode
-        if cmd[1:] and cmd[1:] != ["-m", "py_compile", str(BROKER_SCRIPT), str(BROKER_TEST)]:
+        if cmd[1:3] != ["-m", "py_compile"]:
             output = (result.stdout or "").strip()
             if output.startswith("{"):
                 try:
