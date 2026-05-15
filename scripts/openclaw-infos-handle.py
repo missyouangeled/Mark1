@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 5
+QUERY_CONTRACT_VERSION = 6
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -29,6 +29,7 @@ QUERY_KINDS = {
     "tasks.summary",
     "recovery.summary",
     "panel.inspect",
+    "panels.catalog",
     "sources.latest",
     "sources.catalog",
     "source.inspect",
@@ -139,6 +140,28 @@ def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_panel_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
+    panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
+    items = []
+    for panel_name in list_panel_names(snapshot):
+        panel = panels.get(panel_name) if isinstance(panels.get(panel_name), dict) else {}
+        items.append(
+            {
+                "panelName": panel_name,
+                "available": bool(panel),
+                "summary": panel.get("summary"),
+                "detail": panel.get("detail"),
+                "severity": panel.get("severity"),
+                "checkedAt": panel.get("checkedAt"),
+                "panel": panel,
+            }
+        )
+    return {
+        "count": len(items),
+        "panels": items,
+    }
+
+
 def build_latest_source_summary(
     recent_events: list[dict[str, Any]],
     latest_source_state: dict[str, Any],
@@ -230,6 +253,25 @@ def build_query_catalog() -> dict[str, Any]:
                 "severity": "str|null",
                 "checkedAt": "str|null",
                 "panel": "object",
+            },
+        },
+        "panels.catalog": {
+            "description": "Machine-readable snapshot panel inventory with stable summary fields.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+            "resultShape": {
+                "count": "int",
+                "panels": "array[panelCatalogItem]",
+                "panelCatalogItem": {
+                    "panelName": "str",
+                    "available": "bool",
+                    "summary": "str|null",
+                    "detail": "str|null",
+                    "severity": "str|null",
+                    "checkedAt": "str|null",
+                    "panel": "object",
+                },
             },
         },
         "sources.latest": {
@@ -436,6 +478,20 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             lines.append(f"checkedAt: {detail.get('checkedAt')}")
         return "\n".join(lines)
 
+    if kind == "panels.catalog":
+        panel_catalog = build_panel_catalog(snapshot)
+        items = panel_catalog.get("panels") if isinstance(panel_catalog.get("panels"), list) else []
+        if not items:
+            return "当前还没有 panel 快照。"
+        lines = []
+        for item in items:
+            panel_name = str(item.get("panelName") or "unknown")
+            summary = str(item.get("summary") or item.get("detail") or item.get("severity") or "unknown")
+            severity = str(item.get("severity") or "unknown")
+            checked_at = str(item.get("checkedAt") or "-")
+            lines.append(f"- {panel_name}｜available=true｜severity={severity}｜summary={summary}｜checkedAt={checked_at}")
+        return "\n".join(lines)
+
     if kind == "sources.latest":
         source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
         deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
@@ -558,6 +614,8 @@ def build_query_result(
         return panels.get("recovery") if isinstance(panels.get("recovery"), dict) else {}
     if kind == "panel.inspect":
         return build_panel_detail(snapshot, panel_name)
+    if kind == "panels.catalog":
+        return build_panel_catalog(snapshot)
     if kind == "sources.latest":
         return {
             "sourceStateSnapshots": snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {},

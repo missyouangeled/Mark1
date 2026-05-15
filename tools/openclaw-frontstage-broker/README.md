@@ -154,8 +154,9 @@
 
 1. `jarvis-frontstage-status.html` 这条状态页链路会直接读取 broker 契约字段，把 `sourceView` 作为主分组语义、把 `sourceEventType` 作为事件语义说明，再保留原始 `source` 作为排查辅助信息；与它同名的 `status.json` 当前只再作为兼容别名保留。
 2. Control UI 顶部“前台状态”小入口 / dock 现在优先读取 `jarvis-frontstage-snapshot.json`，并按统一 snapshot 顶层口径取 `summary / issueOverview / selfHelpActions / panels.*`；live `jarvis-branding-override.js` 里也会显式同时保留 `snapshotJsonHref`（正式入口）与 `legacyStatusJsonHref`（兼容别名），避免旧 `statusJsonHref` 字段名继续表现得像主入口；`jarvis-frontstage-status.json` 只再作为兼容别名保留，不应继续作为新的正式入口。
-3. `infos-handle` 当前已经可以把 broker 视图整理成稳定 text/json 查询；JSON 响应里带 `queryContractVersion=2` 与 `result` 字段，消费方不必直接啃整份 snapshot。
-4. `infos-handle query --kind sources.catalog` 现在会返回 machine-readable source inventory（来源契约、是否已有 ingest 快照、是否已有 frontstage delivery），`contract.catalog` 也会同时公开每个 query kind 的参数/格式约束，方便其他机器先读契约再发请求。
+3. `infos-handle` 当前已经可以把 broker 视图整理成稳定 text/json 查询；JSON 响应里带 `queryContractVersion=6` 与 `result` 字段，消费方不必直接啃整份 snapshot。
+4. `infos-handle query --kind sources.catalog` 现在会返回 machine-readable source inventory（来源契约、是否已有 ingest 快照、是否已有 frontstage delivery）。
+5. `infos-handle query --kind panels.catalog` 现在会返回稳定的 panel inventory（`panelName / available / summary / severity / checkedAt` 等字段），`contract.catalog` 也会同时公开每个 query kind 的参数/格式约束，方便其他机器先读契约再发请求。
 
 ## 当前阶段边界
 
@@ -186,6 +187,7 @@ python3 scripts/test-openclaw-infos-handle.py
 python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text
 python3 scripts/openclaw-infos-handle.py query --kind sources.latest --format text
 python3 scripts/openclaw-infos-handle.py query --kind sources.catalog --format json
+python3 scripts/openclaw-infos-handle.py query --kind panels.catalog --format json
 python3 scripts/openclaw-infos-handle.py query --kind source.inspect --source-name local-health --format json
 python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json
 python3 scripts/apply-openclaw-frontstage-broker-data.py
