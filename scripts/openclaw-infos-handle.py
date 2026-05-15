@@ -20,7 +20,7 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 6
+QUERY_CONTRACT_VERSION = 7
 DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
@@ -112,6 +112,55 @@ def list_panel_names(snapshot: dict[str, Any]) -> list[str]:
     return sorted(name for name, payload in panels.items() if isinstance(payload, dict))
 
 
+def summarize_source_state(record: dict[str, Any]) -> str | None:
+    if not record:
+        return None
+    return record.get("summary") or record.get("message") or record.get("eventKey")
+
+
+def summarize_source_delivery(record: dict[str, Any]) -> str | None:
+    if not record:
+        return None
+    return record.get("message") or record.get("eventKey")
+
+
+def build_source_overview(
+    source_name: str,
+    contract: dict[str, Any],
+    latest_source_state: dict[str, Any],
+    latest_delivery: dict[str, Any],
+    recent_events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    current_events = recent_events if isinstance(recent_events, list) else []
+    source_event_type = (
+        contract.get("sourceEventType")
+        or latest_source_state.get("sourceEventType")
+        or latest_delivery.get("sourceEventType")
+        or (current_events[0].get("sourceEventType") if current_events else None)
+    )
+    source_view = (
+        contract.get("sourceView")
+        or latest_source_state.get("sourceView")
+        or latest_delivery.get("sourceView")
+        or (current_events[0].get("sourceView") if current_events else None)
+    )
+    latest_summary = build_latest_source_summary(current_events, latest_source_state, latest_delivery)
+    return {
+        "source": source_name,
+        "sourceEventType": source_event_type,
+        "sourceView": source_view,
+        "hasContract": bool(contract),
+        "hasSourceState": bool(latest_source_state),
+        "hasDelivery": bool(latest_delivery),
+        "latestEventAt": latest_summary.get("latestEventAt"),
+        "latestRecordType": latest_summary.get("latestRecordType"),
+        "latestSourceStateSummary": summarize_source_state(latest_source_state),
+        "latestSourceStateRecordedAt": latest_source_state.get("recordedAt") or latest_source_state.get("sentAt"),
+        "latestDeliveryMessage": summarize_source_delivery(latest_delivery),
+        "latestDeliverySentAt": latest_delivery.get("sentAt") or latest_delivery.get("recordedAt"),
+    }
+
+
 def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
     source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
     deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
@@ -124,12 +173,8 @@ def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
         latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
         items.append(
             {
-                "source": source_name,
-                "sourceEventType": contract.get("sourceEventType"),
-                "sourceView": contract.get("sourceView"),
-                "hasContract": bool(contract),
-                "hasSourceState": bool(latest_state),
-                "hasDelivery": bool(latest_delivery),
+                **build_source_overview(source_name, contract, latest_state, latest_delivery),
+                "contract": contract,
                 "latestSourceState": latest_state,
                 "latestDelivery": latest_delivery,
             }
@@ -288,13 +333,30 @@ def build_query_catalog() -> dict[str, Any]:
             },
         },
         "sources.catalog": {
-            "description": "Machine-readable source inventory with contract presence and latest availability.",
+            "description": "Machine-readable source inventory with stable summary fields plus raw source snapshots.",
             "formats": ["text", "json"],
             "requiredArgs": [],
             "optionalArgs": [],
             "resultShape": {
                 "count": "int",
-                "sources": "array[object]",
+                "sources": "array[sourceCatalogItem]",
+                "sourceCatalogItem": {
+                    "source": "str",
+                    "sourceEventType": "str|null",
+                    "sourceView": "str|null",
+                    "hasContract": "bool",
+                    "hasSourceState": "bool",
+                    "hasDelivery": "bool",
+                    "latestEventAt": "str|null",
+                    "latestRecordType": "str|null",
+                    "latestSourceStateSummary": "str|null",
+                    "latestSourceStateRecordedAt": "str|null",
+                    "latestDeliveryMessage": "str|null",
+                    "latestDeliverySentAt": "str|null",
+                    "contract": "object",
+                    "latestSourceState": "object",
+                    "latestDelivery": "object",
+                },
             },
         },
         "source.inspect": {
@@ -314,6 +376,10 @@ def build_query_catalog() -> dict[str, Any]:
                 "recentEventCount": "int",
                 "latestEventAt": "str|null",
                 "latestRecordType": "str|null",
+                "latestSourceStateSummary": "str|null",
+                "latestSourceStateRecordedAt": "str|null",
+                "latestDeliveryMessage": "str|null",
+                "latestDeliverySentAt": "str|null",
                 "contract": "object",
                 "latestSourceState": "object",
                 "latestDelivery": "object",
@@ -373,31 +439,11 @@ def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], 
     latest_source_state = source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {}
     latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
     recent_events = [item for item in events if str(item.get("source") or "") == source_name]
-    source_event_type = (
-        contract.get("sourceEventType")
-        or latest_source_state.get("sourceEventType")
-        or latest_delivery.get("sourceEventType")
-        or (recent_events[0].get("sourceEventType") if recent_events else None)
-    )
-    source_view = (
-        contract.get("sourceView")
-        or latest_source_state.get("sourceView")
-        or latest_delivery.get("sourceView")
-        or (recent_events[0].get("sourceView") if recent_events else None)
-    )
-    latest_summary = build_latest_source_summary(recent_events, latest_source_state, latest_delivery)
     return {
-        "source": source_name,
+        **build_source_overview(source_name, contract, latest_source_state, latest_delivery, recent_events),
         "exists": bool(contract or latest_source_state or latest_delivery or recent_events),
         "availableSources": list_source_names(snapshot),
-        "sourceEventType": source_event_type,
-        "sourceView": source_view,
-        "hasContract": bool(contract),
-        "hasSourceState": bool(latest_source_state),
-        "hasDelivery": bool(latest_delivery),
         "recentEventCount": len(recent_events),
-        "latestEventAt": latest_summary.get("latestEventAt"),
-        "latestRecordType": latest_summary.get("latestRecordType"),
         "contract": contract,
         "latestSourceState": latest_source_state,
         "latestDelivery": latest_delivery,
