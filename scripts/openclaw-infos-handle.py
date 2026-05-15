@@ -20,7 +20,8 @@ DEFAULT_SESSION_KEY = "agent:main:main"
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 FRONTSTAGE_HELPER = WORKSPACE / "scripts" / "openclaw-supervisor-subagent.py"
-QUERY_CONTRACT_VERSION = 1
+QUERY_CONTRACT_VERSION = 2
+DEFAULT_QUERY_LIMIT = 6
 
 QUERY_KINDS = {
     "snapshot.summary",
@@ -28,6 +29,7 @@ QUERY_KINDS = {
     "tasks.summary",
     "recovery.summary",
     "sources.latest",
+    "sources.catalog",
     "source.inspect",
     "events.recent",
     "contract.catalog",
@@ -93,6 +95,117 @@ def summarize_panel(panel: dict[str, Any], fallback_title: str) -> str:
     if checked_at:
         parts.append(f"checkedAt={checked_at}")
     return "｜".join(parts)
+
+
+def list_source_names(snapshot: dict[str, Any]) -> list[str]:
+    source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
+    deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
+    contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
+    contract_sources = contracts.get("sources") if isinstance(contracts.get("sources"), dict) else {}
+    return sorted({*contract_sources.keys(), *source_states.keys(), *deliveries.keys()})
+
+
+def build_source_catalog(snapshot: dict[str, Any]) -> dict[str, Any]:
+    source_states = snapshot.get("sourceStateSnapshots") if isinstance(snapshot.get("sourceStateSnapshots"), dict) else {}
+    deliveries = snapshot.get("sources") if isinstance(snapshot.get("sources"), dict) else {}
+    contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
+    contract_sources = contracts.get("sources") if isinstance(contracts.get("sources"), dict) else {}
+    items = []
+    for source_name in list_source_names(snapshot):
+        contract = contract_sources.get(source_name) if isinstance(contract_sources.get(source_name), dict) else {}
+        latest_state = source_states.get(source_name) if isinstance(source_states.get(source_name), dict) else {}
+        latest_delivery = deliveries.get(source_name) if isinstance(deliveries.get(source_name), dict) else {}
+        items.append(
+            {
+                "source": source_name,
+                "sourceEventType": contract.get("sourceEventType"),
+                "sourceView": contract.get("sourceView"),
+                "hasContract": bool(contract),
+                "hasSourceState": bool(latest_state),
+                "hasDelivery": bool(latest_delivery),
+                "latestSourceState": latest_state,
+                "latestDelivery": latest_delivery,
+            }
+        )
+    return {
+        "count": len(items),
+        "sources": items,
+    }
+
+
+def build_query_catalog() -> dict[str, Any]:
+    query_catalog: dict[str, Any] = {
+        "snapshot.summary": {
+            "description": "Top-level snapshot summary for lightweight consumers.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "health.summary": {
+            "description": "Health panel summary.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "tasks.summary": {
+            "description": "Supervisor and recovery panel summary with latest delivery.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "recovery.summary": {
+            "description": "Recovery panel summary.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "sources.latest": {
+            "description": "Raw latest source-state and delivery snapshots keyed by source.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "sources.catalog": {
+            "description": "Machine-readable source inventory with contract presence and latest availability.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+        "source.inspect": {
+            "description": "Inspect one source contract, latest snapshots, and recent events.",
+            "formats": ["text", "json"],
+            "requiredArgs": ["source_name"],
+            "optionalArgs": ["limit"],
+        },
+        "events.recent": {
+            "description": "Recent broker events sorted by recorded time descending.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": ["limit"],
+        },
+        "contract.catalog": {
+            "description": "Infos-handle and broker contract catalog, including query metadata.",
+            "formats": ["text", "json"],
+            "requiredArgs": [],
+            "optionalArgs": [],
+        },
+    }
+    return {
+        "defaultLimit": DEFAULT_QUERY_LIMIT,
+        "responseEnvelope": {
+            "ok": "bool",
+            "kind": "str",
+            "queryContractVersion": "int",
+            "snapshotPath": "str",
+            "eventsPath": "str",
+            "result": "object",
+            "sourceName": "str|null",
+            "snapshot": "object",
+            "events": "array",
+            "text": "str",
+        },
+        "queries": query_catalog,
+    }
 
 
 def build_source_detail(snapshot: dict[str, Any], events: list[dict[str, Any]], source_name: str | None) -> dict[str, Any]:
@@ -162,6 +275,21 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
             lines.append(f"- {source}｜state={state_part}｜delivery={delivery_part}")
         return "\n".join(lines)
 
+    if kind == "sources.catalog":
+        source_catalog = build_source_catalog(snapshot)
+        items = source_catalog.get("sources") if isinstance(source_catalog.get("sources"), list) else []
+        if not items:
+            return "当前还没有来源契约或快照。"
+        lines = []
+        for item in items:
+            source = str(item.get("source") or "unknown")
+            source_view = str(item.get("sourceView") or "unknown")
+            event_type = str(item.get("sourceEventType") or "unknown")
+            lines.append(
+                f"- {source}｜view={source_view}｜eventType={event_type}｜hasState={str(bool(item.get('hasSourceState'))).lower()}｜hasDelivery={str(bool(item.get('hasDelivery'))).lower()}"
+            )
+        return "\n".join(lines)
+
     if kind == "source.inspect":
         detail = build_source_detail(snapshot, events, source_name)
         source = str(detail.get("source") or source_name or "unknown")
@@ -207,10 +335,11 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
         primary_view = snapshot_contract.get("primaryView") or "unknown"
         primary_published = snapshot_contract.get("primaryPublishedJsonKey") or "unknown"
         source_count = len(contracts.get("sources")) if isinstance(contracts.get("sources"), dict) else 0
+        query_count = len(build_query_catalog().get("queries") or {})
         return (
             f"infos-handle queryContractVersion={QUERY_CONTRACT_VERSION}｜"
             f"broker contractVersion={broker_contract_version}｜"
-            f"primaryView={primary_view}｜primaryPublishedJsonKey={primary_published}｜sources={source_count}"
+            f"primaryView={primary_view}｜primaryPublishedJsonKey={primary_published}｜sources={source_count}｜queries={query_count}"
         )
 
     raise ValueError(f"unsupported kind: {kind}")
@@ -244,6 +373,8 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
             "latestSourceState": snapshot.get("latestSourceState") if isinstance(snapshot.get("latestSourceState"), dict) else {},
             "latestDelivery": snapshot.get("latestDelivery") if isinstance(snapshot.get("latestDelivery"), dict) else {},
         }
+    if kind == "sources.catalog":
+        return build_source_catalog(snapshot)
     if kind == "source.inspect":
         return build_source_detail(snapshot, events, source_name)
     if kind == "events.recent":
@@ -254,6 +385,7 @@ def build_query_result(kind: str, snapshot: dict[str, Any], events: list[dict[st
             "brokerContractVersion": snapshot.get("contractVersion"),
             "contracts": snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {},
             "snapshotContract": snapshot.get("snapshotContract") if isinstance(snapshot.get("snapshotContract"), dict) else {},
+            "queryCatalog": build_query_catalog(),
         }
     raise ValueError(f"unsupported kind: {kind}")
 
@@ -359,7 +491,7 @@ def main() -> int:
     parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format for query")
     parser.add_argument("--snapshot-path", default=str(DEFAULT_SNAPSHOT_PATH), help="Broker snapshot.json path")
     parser.add_argument("--events-path", default=str(DEFAULT_EVENTS_PATH), help="Broker events.jsonl path")
-    parser.add_argument("--limit", type=int, default=6, help="Max recent events for events.recent")
+    parser.add_argument("--limit", type=int, default=DEFAULT_QUERY_LIMIT, help="Max recent events for events.recent or source.inspect")
     parser.add_argument("--session-key", default=DEFAULT_SESSION_KEY, help="Target session key for frontstage notify")
     parser.add_argument("--source", help="Optional source name when notify-frontstage should also ingest/record delivery")
     parser.add_argument("--event-key", help="Optional event key when notify-frontstage should also ingest/record delivery")
