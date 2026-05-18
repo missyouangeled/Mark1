@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from openclaw_infos_handle_contract import invoke_handle_query
+
 WORKSPACE = Path(__file__).resolve().parents[1]
 CHECKLIST_PATH = WORKSPACE / "docs" / "通用-OpenClaw-升级后自检清单.md"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "post-upgrade-self-check"
@@ -23,6 +25,7 @@ DEFAULT_PACKAGE_JSON = Path.home() / ".npm-global" / "lib" / "node_modules" / "o
 BRANDING_CONF = Path.home() / ".config" / "systemd" / "user" / "openclaw-gateway.service.d" / "branding.conf"
 CONTROL_UI_DIST = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "dist" / "control-ui"
 CONTROL_UI_OVERRIDE = CONTROL_UI_DIST / "jarvis-branding-override.js"
+INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
 DEFAULT_ONLINE_MESSAGE = "贾维斯已上线，我在。要开始干活的话，直接喊我。"
 
 
@@ -141,6 +144,119 @@ def run_cmd_check(name: str, cmd: list[str], success_substring: str | None = Non
 
 
 
+def check_infos_handle_contract_entry() -> dict[str, Any]:
+    request_id = "post-upgrade-self-check:contract.catalog"
+    try:
+        snapshot = invoke_handle_query(
+            INFOS_HANDLE_SCRIPT,
+            kind="contract.catalog",
+            output_format="json",
+            request_id=request_id,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError as exc:
+        return make_check("infos_handle_contract_entry", False, str(exc))
+
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    request_catalog = result.get("requestCatalog") if isinstance(result.get("requestCatalog"), dict) else {}
+    actions = request_catalog.get("actions") if isinstance(request_catalog.get("actions"), dict) else {}
+    handle_catalog = actions.get("handle") if isinstance(actions.get("handle"), dict) else {}
+    helper_functions = handle_catalog.get("clientHelperFunctions") if isinstance(handle_catalog.get("clientHelperFunctions"), list) else []
+    ok = (
+        snapshot.get("ok")
+        and snapshot.get("requestId") == request_id
+        and snapshot.get("kind") == "contract.catalog"
+        and snapshot.get("requestInputMode") == "request_file"
+        and snapshot.get("responseOutputMode") == "stdout"
+        and handle_catalog.get("preferredRequestInputMode") == "request_file"
+        and handle_catalog.get("clientHelperModule") == "openclaw_infos_handle_contract.py"
+        and "invoke_handle_query" in helper_functions
+        and "extract_handle_response_snapshot" in helper_functions
+    )
+    detail = (
+        f"requestId={snapshot.get('requestId') or '-'} "
+        f"input={snapshot.get('requestInputMode') or '-'} "
+        f"kind={snapshot.get('kind') or '-'} "
+        f"helper={handle_catalog.get('clientHelperModule') or '-'}"
+    )
+    return make_check("infos_handle_contract_entry", bool(ok), detail)
+
+
+
+def check_infos_handle_snapshot_summary_entry() -> dict[str, Any]:
+    request_id = "post-upgrade-self-check:snapshot.summary"
+    try:
+        snapshot = invoke_handle_query(
+            INFOS_HANDLE_SCRIPT,
+            kind="snapshot.summary",
+            output_format="json",
+            request_id=request_id,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError as exc:
+        return make_check("infos_handle_snapshot_summary_entry", False, str(exc))
+
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    ok = (
+        snapshot.get("ok")
+        and snapshot.get("requestId") == request_id
+        and snapshot.get("kind") == "snapshot.summary"
+        and snapshot.get("format") == "json"
+        and snapshot.get("requestInputMode") == "request_file"
+        and snapshot.get("responseOutputMode") == "stdout"
+        and isinstance(result.get("summary"), str)
+        and bool(str(result.get("summary") or "").strip())
+    )
+    detail = (
+        f"requestId={snapshot.get('requestId') or '-'} "
+        f"kind={snapshot.get('kind') or '-'} "
+        f"severity={result.get('severity') or '-'} "
+        f"summary={result.get('summary') or '-'}"
+    )
+    return make_check("infos_handle_snapshot_summary_entry", bool(ok), detail)
+
+
+
+def check_infos_handle_sources_latest_entry() -> dict[str, Any]:
+    request_id = "post-upgrade-self-check:sources.latest"
+    try:
+        snapshot = invoke_handle_query(
+            INFOS_HANDLE_SCRIPT,
+            kind="sources.latest",
+            output_format="json",
+            request_id=request_id,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError as exc:
+        return make_check("infos_handle_sources_latest_entry", False, str(exc))
+
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    source_items = result.get("sourceItems") if isinstance(result.get("sourceItems"), list) else None
+    available_sources = result.get("availableSources") if isinstance(result.get("availableSources"), list) else None
+    ok = (
+        snapshot.get("ok")
+        and snapshot.get("requestId") == request_id
+        and snapshot.get("kind") == "sources.latest"
+        and snapshot.get("format") == "json"
+        and snapshot.get("requestInputMode") == "request_file"
+        and snapshot.get("responseOutputMode") == "stdout"
+        and isinstance(result.get("count"), int)
+        and source_items is not None
+        and available_sources is not None
+    )
+    detail = (
+        f"requestId={snapshot.get('requestId') or '-'} "
+        f"kind={snapshot.get('kind') or '-'} "
+        f"count={result.get('count') if isinstance(result.get('count'), int) else '-'} "
+        f"sources={len(source_items) if isinstance(source_items, list) else '-'}"
+    )
+    return make_check("infos_handle_sources_latest_entry", bool(ok), detail)
+
+
+
 def check_timer(unit: str) -> dict[str, Any]:
     if sys.platform.startswith("win"):
         return make_check(unit, True, "Windows 环境跳过 systemd 检查", required=False)
@@ -179,6 +295,9 @@ def build_report(force: bool = False) -> dict[str, Any]:
             [sys.executable, str(WORKSPACE / "scripts" / "apply-openclaw-frontstage-broker-data.py"), "--verify-control-ui-snapshot-dock"],
             '"snapshotFirstReady": true',
         ))
+        checks.append(check_infos_handle_contract_entry())
+        checks.append(check_infos_handle_snapshot_summary_entry())
+        checks.append(check_infos_handle_sources_latest_entry())
         checks.append(run_cmd_check(
             "broker_test",
             [sys.executable, str(WORKSPACE / "scripts" / "test-frontstage-broker.py")],

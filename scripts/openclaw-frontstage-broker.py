@@ -12,6 +12,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from openclaw_infos_handle_contract import build_compat_delivery_bundle, build_handle_request_payload, extract_handle_response_snapshot, invoke_handle_request
+
 DEFAULT_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "frontstage"
 STATE_PATH_NAME = "broker-state.json"
 DEFAULT_BROKER_DATA_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "broker"
@@ -19,6 +21,7 @@ EVENTS_PATH_NAME = "events.jsonl"
 VIEWS_DIR_NAME = "views"
 DEFAULT_SESSION_KEY = "agent:main:main"
 DEFAULT_CONTROL_UI_DIST_ROOT = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "dist" / "control-ui"
+INFOS_HANDLE_SCRIPT = Path(__file__).with_name("openclaw-infos-handle.py")
 PUBLIC_STATUS_HTML_NAME = "jarvis-frontstage-status.html"
 PUBLIC_STATUS_JSON_NAME = "jarvis-frontstage-status.json"
 PUBLIC_SNAPSHOT_JSON_NAME = "jarvis-frontstage-snapshot.json"
@@ -1049,37 +1052,54 @@ def build_frontstage_status_html(payload: dict[str, Any]) -> str:
 """
 
 
-def publish_frontstage_status(payload: dict[str, Any]) -> dict[str, str]:
+def record_publication_result(
+    published: dict[str, str],
+    warnings: list[dict[str, str]],
+    artifact_key: str,
+    artifact_path: Path,
+    writer: Any,
+) -> None:
+    try:
+        writer()
+    except Exception as exc:
+        warnings.append(
+            {
+                "artifact": artifact_key,
+                "path": str(artifact_path),
+                "error": f"{exc.__class__.__name__}: {exc}",
+            }
+        )
+        return
+    published[artifact_key] = str(artifact_path)
+
+
+
+def publish_frontstage_status(payload: dict[str, Any]) -> dict[str, Any]:
     html = build_frontstage_status_html(payload)
+    published: dict[str, str] = {}
+    warnings: list[dict[str, str]] = []
+
     canvas_dir = resolve_frontstage_canvas_dir()
-    canvas_dir.mkdir(parents=True, exist_ok=True)
     canvas_html = canvas_dir / "index.html"
     canvas_status_json = canvas_dir / "status.json"
     canvas_snapshot_json = canvas_dir / "snapshot.json"
-    save_text(canvas_html, html)
-    save_json(canvas_status_json, payload)
-    save_json(canvas_snapshot_json, payload)
-
-    published = {
-        "frontstageStatusCanvasHtml": str(canvas_html),
-        "frontstageStatusCanvasJson": str(canvas_status_json),
-        "frontstageSnapshotCanvasJson": str(canvas_snapshot_json),
-    }
+    record_publication_result(published, warnings, "frontstageStatusCanvasHtml", canvas_html, lambda: save_text(canvas_html, html))
+    record_publication_result(published, warnings, "frontstageStatusCanvasJson", canvas_status_json, lambda: save_json(canvas_status_json, payload))
+    record_publication_result(published, warnings, "frontstageSnapshotCanvasJson", canvas_snapshot_json, lambda: save_json(canvas_snapshot_json, payload))
 
     control_ui_dist_root = resolve_control_ui_dist_root()
     if control_ui_dist_root:
-        control_ui_dist_root.mkdir(parents=True, exist_ok=True)
         public_html = control_ui_dist_root / PUBLIC_STATUS_HTML_NAME
         public_status_json = control_ui_dist_root / PUBLIC_STATUS_JSON_NAME
         public_snapshot_json = control_ui_dist_root / PUBLIC_SNAPSHOT_JSON_NAME
-        save_text(public_html, html)
-        save_json(public_status_json, payload)
-        save_json(public_snapshot_json, payload)
-        published["frontstageStatusHtml"] = str(public_html)
-        published["frontstageStatusJson"] = str(public_status_json)
-        published["frontstageSnapshotJson"] = str(public_snapshot_json)
+        record_publication_result(published, warnings, "frontstageStatusHtml", public_html, lambda: save_text(public_html, html))
+        record_publication_result(published, warnings, "frontstageStatusJson", public_status_json, lambda: save_json(public_status_json, payload))
+        record_publication_result(published, warnings, "frontstageSnapshotJson", public_snapshot_json, lambda: save_json(public_snapshot_json, payload))
 
-    return published
+    return {
+        "paths": published,
+        "warnings": warnings,
+    }
 
 
 def emit_frontstage(session_key: str, message: str) -> dict[str, Any]:
@@ -1197,7 +1217,9 @@ def build_views(state_path: Path, broker_data_dir: Path, *, updated_at: str | No
     snapshot_payload = build_frontstage_status_payload(frontstage_view, health_view_payload, tasks_view_payload, recovery_view_payload)
     save_json(paths["snapshotView"], snapshot_payload)
     save_json(paths["overviewView"], snapshot_payload)
-    published_paths = publish_frontstage_status(snapshot_payload)
+    publication = publish_frontstage_status(snapshot_payload)
+    published_paths = publication["paths"] if isinstance(publication.get("paths"), dict) else {}
+    publication_warnings = publication["warnings"] if isinstance(publication.get("warnings"), list) else []
 
     manifest_payload = {
         "schemaVersion": SCHEMA_VERSION,
@@ -1207,6 +1229,8 @@ def build_views(state_path: Path, broker_data_dir: Path, *, updated_at: str | No
         "artifacts": build_artifact_catalog(paths, published_paths),
         "updatedAt": effective_updated_at,
         "freshness": freshness,
+        "publicationMode": "best_effort",
+        "publicationWarnings": publication_warnings,
         "state": {
             "brokerState": str(paths["state"]),
             "events": str(paths["events"]),
@@ -1356,10 +1380,12 @@ def record_delivery_event(
     }
 
 
-def emit_event(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
+def emit_compatibility_event(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
     response = emit_frontstage(session_key, message)
+    handle_snapshot = extract_handle_response_snapshot(response)
     helper_response = response.get("response") if isinstance(response.get("response"), dict) else {}
-    return record_delivery_event(
+    compat_bundle = build_compat_delivery_bundle(response, delivery_mode="frontstage", delivery_status="sent")
+    recorded = record_delivery_event(
         source,
         event_key,
         session_key,
@@ -1369,6 +1395,109 @@ def emit_event(source: str, event_key: str, session_key: str, message: str, stat
         state_path,
         broker_data_dir,
     )
+    delivery = compat_bundle.get("delivery") if isinstance(compat_bundle.get("delivery"), dict) else {}
+    return {
+        **recorded,
+        "requestId": handle_snapshot.get("requestId"),
+        "compatibilityMode": "legacy_emit",
+        "transport": "legacy_broker_emit",
+        "artifactRef": compat_bundle.get("artifactRef"),
+        "artifact": compat_bundle.get("artifact"),
+        "notice": compat_bundle.get("notice"),
+        "deliveryNotice": compat_bundle.get("deliveryNotice"),
+        "frontstage": compat_bundle.get("frontstage"),
+        "frontstageDelivery": compat_bundle.get("frontstageDelivery"),
+        "artifactNotice": compat_bundle.get("artifactNotice"),
+        "notify": compat_bundle.get("notify"),
+        "delivery": {
+            **delivery,
+            "mode": "frontstage",
+            "status": "skipped" if recorded.get("skipped") else str(delivery.get("status") or "sent"),
+            "message": delivery.get("message") or message,
+        },
+    }
+
+
+def emit_via_infos_handle(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
+    request_payload = build_handle_request_payload(
+        request_id=f"broker.emit:{source}:{event_key}",
+        message=message,
+        output_format="text",
+        delivery_mode="frontstage",
+        session_key=session_key,
+        frontstage_source=source,
+        frontstage_event_key=event_key,
+        broker_state_dir=str(state_path.parent),
+        broker_data_dir=str(broker_data_dir),
+    )
+    payload = invoke_handle_request(
+        INFOS_HANDLE_SCRIPT,
+        request_payload,
+        python_executable=sys.executable,
+        run=subprocess.run,
+    )
+    if not payload.get("ok"):
+        raise RuntimeError(str((payload or {}).get("error") or "infos-handle emit failed"))
+
+    handle_snapshot = extract_handle_response_snapshot(payload)
+    compat_bundle = build_compat_delivery_bundle(payload, delivery_mode="frontstage")
+    notify = compat_bundle.get("notify") if isinstance(compat_bundle.get("notify"), dict) else None
+    frontstage = compat_bundle.get("frontstage") if isinstance(compat_bundle.get("frontstage"), dict) else None
+    if not notify and frontstage:
+        notify = {
+            "targetSessionKey": handle_snapshot.get("targetSessionKey") or frontstage.get("targetSessionKey"),
+            "response": {
+                "messageId": handle_snapshot.get("messageId") or frontstage.get("messageId"),
+            },
+        }
+        compat_bundle["notify"] = notify
+        delivery_payload = compat_bundle.get("delivery") if isinstance(compat_bundle.get("delivery"), dict) else {}
+        compat_bundle["delivery"] = {
+            **delivery_payload,
+            "notify": notify,
+        }
+
+    broker_payload = notify.get("broker") if isinstance(notify, dict) and isinstance(notify.get("broker"), dict) else {}
+    recorded = broker_payload.get("delivery") if isinstance(broker_payload.get("delivery"), dict) else {}
+    if not recorded:
+        recorded = record_delivery_event(
+            source,
+            event_key,
+            session_key,
+            handle_snapshot.get("targetSessionKey"),
+            handle_snapshot.get("messageId"),
+            message,
+            state_path,
+            broker_data_dir,
+        )
+    delivery = compat_bundle.get("delivery") if isinstance(compat_bundle.get("delivery"), dict) else {}
+    return {
+        **recorded,
+        "requestId": compat_bundle.get("requestId"),
+        "compatibilityMode": "legacy_emit",
+        "transport": "infos_handle_handle",
+        "artifactRef": compat_bundle.get("artifactRef"),
+        "artifact": compat_bundle.get("artifact"),
+        "notice": compat_bundle.get("notice"),
+        "deliveryNotice": compat_bundle.get("deliveryNotice"),
+        "frontstage": compat_bundle.get("frontstage"),
+        "frontstageDelivery": compat_bundle.get("frontstageDelivery"),
+        "artifactNotice": compat_bundle.get("artifactNotice"),
+        "notify": notify,
+        "delivery": {
+            **delivery,
+            "mode": "frontstage",
+            "status": "skipped" if recorded.get("skipped") else str(delivery.get("status") or "sent"),
+            "notify": notify,
+        },
+    }
+
+
+def emit_event(source: str, event_key: str, session_key: str, message: str, state_path: Path, broker_data_dir: Path) -> dict[str, Any]:
+    try:
+        return emit_via_infos_handle(source, event_key, session_key, message, state_path, broker_data_dir)
+    except RuntimeError:
+        return emit_compatibility_event(source, event_key, session_key, message, state_path, broker_data_dir)
 
 
 def main() -> int:

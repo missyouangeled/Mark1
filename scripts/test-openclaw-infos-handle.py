@@ -2,21 +2,26 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
-EXPECTED_QUERY_CONTRACT_VERSION = 13
+EXPECTED_QUERY_CONTRACT_VERSION = 17
+EXPECTED_REQUEST_CONTRACT_VERSION = 6
 
 
-def run(*args: str) -> subprocess.CompletedProcess[str]:
+def run(*args: str, env: dict[str, str] | None = None, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    current_env = os.environ.copy()
+    if env:
+        current_env.update(env)
     return subprocess.run([
         "python3",
         str(SCRIPT),
         *args,
-    ], cwd=WORKSPACE, capture_output=True, text=True, check=False)
+    ], cwd=WORKSPACE, capture_output=True, text=True, check=False, env=current_env, input=input_text)
 
 
 def main() -> int:
@@ -209,6 +214,43 @@ def main() -> int:
             encoding="utf-8",
         )
 
+        output_root = tmp_path / "infos-handle-output"
+        broker_state_dir = tmp_path / "frontstage-state"
+        broker_data_dir = tmp_path / "broker-data"
+        audio_renderer = tmp_path / "fake-audio-renderer.sh"
+        audio_renderer.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "TEXT=\"${1:-}\"\n"
+            "PRESET=\"${2:-default}\"\n"
+            "OUTDIR=\"$(dirname \"$0\")/fake-audio\"\n"
+            "mkdir -p \"$OUTDIR\"\n"
+            "OUT=\"$OUTDIR/$(printf '%s' \"$PRESET\" | tr -cs '[:alnum:]' '-')-reply.mp3\"\n"
+            "printf 'FAKE AUDIO | %s | %s\n' \"$PRESET\" \"$TEXT\" > \"$OUT\"\n"
+            "printf '%s\n' \"$OUT\"\n",
+            encoding="utf-8",
+        )
+        audio_renderer.chmod(0o755)
+
+        fake_frontstage_helper = tmp_path / "fake-frontstage-helper.py"
+        fake_frontstage_helper.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, sys\n"
+            "args = sys.argv[1:]\n"
+            "session_key = args[args.index('--session-key') + 1]\n"
+            "message = args[args.index('--message') + 1]\n"
+            "print(json.dumps({\n"
+            "  'ok': True,\n"
+            "  'targetSessionKey': f'{session_key}:frontstage',\n"
+            "  'response': {'messageId': f'msg::{message}'}\n"
+            "}, ensure_ascii=False))\n",
+            encoding="utf-8",
+        )
+        fake_frontstage_helper.chmod(0o755)
+        fake_frontstage_env = {
+            "OPENCLAW_INFOS_HANDLE_FRONTSTAGE_HELPER": str(fake_frontstage_helper),
+        }
+
         result = run("query", "--kind", "snapshot.summary", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         assert "前台状态总体正常" in result.stdout
@@ -228,6 +270,7 @@ def main() -> int:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["kind"] == "events.recent"
+        assert payload["format"] == "json"
         assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
         assert len(payload["events"]) == 3
         assert len(payload["result"]["events"]) == 3
@@ -267,6 +310,32 @@ def main() -> int:
                 "isDelivery": True,
             },
         }
+        assert payload["result"]["latestBySourceItems"] == [
+            {
+                "source": "supervisor",
+                "eventCount": 1,
+                "deliveryCount": 1,
+                "latestEventAt": "2026-05-15T12:00:03+08:00",
+                "latestRecordType": "frontstage.delivery.sent",
+                "latestEventSummary": "[监工] 后台任务已完成。",
+                "latestEventKey": "done-1",
+                "sourceEventType": "supervisor.status.changed",
+                "sourceView": "tasks",
+                "isDelivery": True,
+            },
+            {
+                "source": "local-health",
+                "eventCount": 2,
+                "deliveryCount": 1,
+                "latestEventAt": "2026-05-15T12:00:01+08:00",
+                "latestRecordType": "frontstage.delivery.sent",
+                "latestEventSummary": "[本地健康] 当前已恢复正常。",
+                "latestEventKey": "health-delivery-1",
+                "sourceEventType": "local_health.status.changed",
+                "sourceView": "health",
+                "isDelivery": True,
+            },
+        ]
         assert len(payload["result"]["eventItems"]) == 3
         assert payload["result"]["eventItems"][0]["recordType"] == "frontstage.delivery.sent"
         assert payload["result"]["eventItems"][0]["source"] == "supervisor"
@@ -420,7 +489,9 @@ def main() -> int:
         result = run("query", "--kind", "contract.catalog", "--format", "json", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
+        assert payload["format"] == "json"
         assert payload["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
+        assert payload["result"]["requestContractVersion"] == EXPECTED_REQUEST_CONTRACT_VERSION
         assert payload["result"]["brokerContractVersion"] == 2
         assert payload["result"]["snapshotContract"]["primaryView"] == "snapshot"
         assert payload["result"]["contracts"]["sources"]["supervisor"]["sourceView"] == "tasks"
@@ -429,7 +500,83 @@ def main() -> int:
         assert payload["result"]["contracts"]["eventFieldCatalog"]["sourceEventType"]["knownValues"] == ["local_health.status.changed", "supervisor.status.changed"]
         assert payload["result"]["contracts"]["eventFieldCatalog"]["sentAt"]["type"] == "str|null"
         assert payload["result"]["queryCatalog"]["defaultLimit"] == 6
+        assert payload["result"]["queryCatalog"]["readyOutputFormats"] == ["text", "json"]
+        assert payload["result"]["queryCatalog"]["previewOutputFormats"] == ["image", "audio"]
+        assert payload["result"]["queryCatalog"]["reservedOutputFormats"] == []
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["text"]["status"] == "ready"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["json"]["delivery"] == "stdout"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["image"]["status"] == "preview"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["image"]["delivery"] == "artifact_file"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["image"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["image"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["audio"]["delivery"] == "artifact_file"
+        assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["audio"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["artifactMediaType"] == "image/svg+xml"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
+        assert payload["result"]["queryCatalog"]["responseEnvelope"]["format"] == "str"
+        assert payload["result"]["queryCatalog"]["responseEnvelope"]["output"] == "object|null"
+        assert payload["result"]["queryCatalog"]["responseEnvelope"]["requestContractVersion"] == "int|null"
+        assert payload["result"]["requestCatalog"]["requestContractVersion"] == EXPECTED_REQUEST_CONTRACT_VERSION
+        assert payload["result"]["requestCatalog"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["requestCatalog"]["deliveryNoticeContractVersion"] == 1
+        assert payload["result"]["requestCatalog"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["supportedFormats"] == ["text", "json", "image", "audio"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestInputModes"] == ["flags", "request_json", "request_file"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["preferredRequestInputMode"] == "request_file"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["preferredRequestFileValue"] == "-"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["responseOutputModes"] == ["stdout", "response_file"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["preferredResponseOutputMode"] == "stdout"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperModule"] == "openclaw_infos_handle_contract.py"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperFunctions"] == [
+            "build_handle_request_payload",
+            "invoke_handle_request",
+            "invoke_handle_query",
+            "extract_handle_response_snapshot",
+            "extract_frontstage_notify_payload",
+            "extract_delivery_snapshot",
+            "build_compat_delivery_bundle",
+        ]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["artifactNoticeFormats"] == ["image", "audio"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["formatDeliveryMatrix"]["image"] == ["none", "frontstage"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["formatDeliveryMatrix"]["audio"] == ["none", "frontstage"]
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestShape"]["requestId"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestShape"]["message"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestShape"]["audioRenderer"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestShape"]["brokerStateDir"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["requestShape"]["brokerDataDir"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["cliTransportShape"]["responseFile"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["artifactShape"]["ref"] == "str"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["outputShape"]["artifact"] == "artifact|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["deliveryShape"]["artifactRef"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["deliveryShape"]["notice"] == "deliveryNotice|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["deliveryNoticeShape"]["frontstage"] == "frontstageDelivery"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["frontstageDeliveryShape"]["messageId"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["frontstageDeliveryShape"]["artifactRef"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["frontstageDeliveryShape"]["displayText"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["artifactNoticeShape"]["artifactRef"] == "str"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["artifactNoticeShape"]["delivery"] == "frontstageDelivery"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["responseShape"]["requestId"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["responseShape"]["requestInputMode"] == "str"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["responseShape"]["responseOutputMode"] == "str"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["kind"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["format"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["notice"] == "deliveryNotice|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["deliveryNotice"] == "deliveryNotice|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["frontstage"] == "frontstageDelivery|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["frontstageDelivery"] == "frontstageDelivery|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["artifactNotice"] == "artifactNotice|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["notify"] == "object|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["artifact"] == "artifact|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["targetSessionKey"] == "str|null"
+        assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["messageId"] == "str|null"
+        assert payload["result"]["handlerCatalog"]["json.stdout.v1"]["delivery"] == "stdout"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["count"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["availableSources"] == "array[str]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceItems"] == "array[sourceLatestItem]"
@@ -462,6 +609,7 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["deliveryCount"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["recordTypeCounts"] == "object[str,int]"
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["latestBySource"] == "object[str,sourceRecentSummary]"
+        assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["latestBySourceItems"] == "array[sourceRecentSummary]"
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["eventCount"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["latestEventSummary"] == "str|null"
         assert payload["result"]["queryCatalog"]["queries"]["events.recent"]["resultShape"]["sourceRecentSummary"]["isDelivery"] == "bool"
@@ -486,6 +634,364 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["queries"]["panels.catalog"]["resultShape"]["panelCatalogItem"]["available"] == "bool"
         assert payload["result"]["queryCatalog"]["queries"]["panels.catalog"]["resultShape"]["panelCatalogItem"]["checkedAt"] == "str|null"
         assert payload["result"]["paths"]["snapshotPath"] == str(snapshot_path)
+
+        result = run(
+            "notify-frontstage",
+            "--kind", "snapshot.summary",
+            "--session-key", "agent:main:test",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["action"] == "notify-frontstage"
+        assert payload["requestId"] is None
+        assert payload["targetSessionKey"] == "agent:main:test:frontstage"
+        assert payload["response"]["messageId"].startswith("msg::[ok] 前台状态总体正常")
+        assert payload["delivery"]["kind"] == "message"
+        assert payload["notice"]["kind"] == "message"
+        assert payload["deliveryNotice"]["kind"] == "message"
+        assert payload["frontstage"]["noticeKind"] == "message"
+        assert payload["frontstageDelivery"]["noticeKind"] == "message"
+        assert payload["frontstageDelivery"]["displayText"].startswith("[ok] 前台状态总体正常")
+        assert payload["artifact"] is None
+        assert payload["artifactNotice"] is None
+        assert payload["delivery"]["artifactRef"] is None
+        assert payload["delivery"]["artifact"] is None
+        assert payload["delivery"]["artifactNotice"] is None
+        assert payload["delivery"]["notice"]["artifactRef"] is None
+        assert payload["delivery"]["frontstage"]["artifactRef"] is None
+        assert payload["delivery"]["metadata"]["messageId"] == payload["response"]["messageId"]
+        assert payload["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "json",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is True
+        assert payload["action"] == "handle"
+        assert payload["requestContractVersion"] == EXPECTED_REQUEST_CONTRACT_VERSION
+        assert payload["request"]["format"] == "json"
+        assert payload["response"]["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
+        assert payload["response"]["output"]["handler"] == "json.stdout.v1"
+        assert payload["response"]["output"]["mediaType"] == "application/json"
+        assert payload["response"]["delivery"]["mode"] == "none"
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "image",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        image_output = payload["response"]["output"]
+        assert payload["ok"] is True
+        assert payload["request"]["format"] == "image"
+        assert image_output["format"] == "image"
+        assert image_output["handler"] == "image.summary-card.v1"
+        assert image_output["mediaType"] == "image/svg+xml"
+        assert image_output["artifact"]["ref"] == image_output["artifactRef"]
+        assert image_output["artifact"]["fileName"] == image_output["fileName"]
+        assert Path(image_output["path"]).exists()
+        assert image_output["path"].endswith(".svg")
+        assert "snapshot.summary" in Path(image_output["path"]).name
+        assert "前台状态总体正常" in Path(image_output["path"]).read_text(encoding="utf-8")
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "image",
+            "--delivery-mode", "frontstage",
+            "--session-key", "agent:main:test",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        image_delivery = payload["response"]["delivery"]
+        assert payload["ok"] is True
+        assert image_delivery["contractVersion"] == 1
+        assert image_delivery["mode"] == "frontstage"
+        assert image_delivery["kind"] == "artifact_notice"
+        assert image_delivery["artifactRef"] == image_delivery["artifact"]["ref"]
+        assert image_delivery["artifact"]["format"] == "image"
+        assert image_delivery["artifact"]["ref"].startswith("infos-handle:image:")
+        assert image_delivery["artifact"]["fileName"].endswith(".svg")
+        assert image_delivery["notice"]["contractVersion"] == 1
+        assert image_delivery["notice"]["kind"] == "artifact_notice"
+        assert image_delivery["notice"]["artifactRef"] == image_delivery["artifact"]["ref"]
+        assert image_delivery["notice"]["displayText"] == image_delivery["message"]
+        assert image_delivery["frontstage"] == image_delivery["notice"]["frontstage"]
+        assert image_delivery["frontstage"]["noticeKind"] == "artifact_notice"
+        assert image_delivery["frontstage"]["artifactRef"] == image_delivery["artifact"]["ref"]
+        assert image_delivery["frontstage"]["displayText"] == image_delivery["message"]
+        assert image_delivery["artifactNotice"]["contractVersion"] == 1
+        assert image_delivery["artifactNotice"]["artifactRef"] == image_delivery["artifact"]["ref"]
+        assert image_delivery["artifactNotice"]["displayText"] == image_delivery["message"]
+        assert image_delivery["artifactNotice"]["fallbackText"] == "[infos-handle] 图片 artifact 已生成。"
+        assert image_delivery["artifactNotice"]["delivery"]["artifactRef"] == image_delivery["artifact"]["ref"]
+        assert image_delivery["artifactNotice"]["delivery"]["messageId"].startswith("msg::[infos-handle] 已生成图片 artifact：")
+        assert image_delivery["metadata"]["handler"] == "image.summary-card.v1"
+        assert image_delivery["metadata"]["requestedSessionKey"] == "agent:main:test"
+        assert image_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
+        assert image_delivery["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
+        assert image_delivery["notify"]["response"]["messageId"].startswith("msg::[infos-handle] 已生成图片 artifact：")
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "audio",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            "--audio-renderer", str(audio_renderer),
+            "--audio-preset", "demo-voice",
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        audio_output = payload["response"]["output"]
+        assert payload["ok"] is True
+        assert payload["request"]["format"] == "audio"
+        assert audio_output["format"] == "audio"
+        assert audio_output["handler"] == "audio.local-tts.v1"
+        assert audio_output["preset"] == "demo-voice"
+        assert audio_output["mediaType"] == "audio/mpeg"
+        assert audio_output["artifact"]["ref"] == audio_output["artifactRef"]
+        assert audio_output["artifact"]["fileName"] == audio_output["fileName"]
+        assert Path(audio_output["path"]).exists()
+        audio_text = Path(audio_output["path"]).read_text(encoding="utf-8")
+        assert audio_text.startswith("FAKE AUDIO | demo-voice | [ok] 前台状态总体正常")
+        assert "broker / 监工 / 恢复观察 / 本地健康当前都没看到明显异常。" in audio_text
+        assert audio_output["spokenText"].startswith("[ok] 前台状态总体正常")
+        assert audio_output["sourcePath"].endswith("reply.mp3")
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "audio",
+            "--delivery-mode", "frontstage",
+            "--session-key", "agent:main:test",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            "--audio-renderer", str(audio_renderer),
+            "--audio-preset", "demo-voice",
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        audio_delivery = payload["response"]["delivery"]
+        assert payload["ok"] is True
+        assert audio_delivery["contractVersion"] == 1
+        assert audio_delivery["mode"] == "frontstage"
+        assert audio_delivery["kind"] == "artifact_notice"
+        assert audio_delivery["artifactRef"] == audio_delivery["artifact"]["ref"]
+        assert audio_delivery["artifact"]["format"] == "audio"
+        assert audio_delivery["artifact"]["ref"].startswith("infos-handle:audio:")
+        assert audio_delivery["artifact"]["fileName"].endswith(".mp3")
+        assert audio_delivery["notice"]["contractVersion"] == 1
+        assert audio_delivery["notice"]["kind"] == "artifact_notice"
+        assert audio_delivery["notice"]["artifactRef"] == audio_delivery["artifact"]["ref"]
+        assert audio_delivery["notice"]["displayText"] == audio_delivery["message"]
+        assert audio_delivery["frontstage"] == audio_delivery["notice"]["frontstage"]
+        assert audio_delivery["frontstage"]["noticeKind"] == "artifact_notice"
+        assert audio_delivery["frontstage"]["artifactRef"] == audio_delivery["artifact"]["ref"]
+        assert audio_delivery["frontstage"]["displayText"] == audio_delivery["message"]
+        assert audio_delivery["artifactNotice"]["contractVersion"] == 1
+        assert audio_delivery["artifactNotice"]["artifactRef"] == audio_delivery["artifact"]["ref"]
+        assert audio_delivery["artifactNotice"]["displayText"] == audio_delivery["message"]
+        assert audio_delivery["artifactNotice"]["fallbackText"] == "[infos-handle] 音频 artifact 已生成。"
+        assert audio_delivery["artifactNotice"]["delivery"]["artifactRef"] == audio_delivery["artifact"]["ref"]
+        assert audio_delivery["artifactNotice"]["delivery"]["messageId"].startswith("msg::[infos-handle] 已生成音频 artifact：")
+        assert audio_delivery["metadata"]["handler"] == "audio.local-tts.v1"
+        assert audio_delivery["metadata"]["requestedSessionKey"] == "agent:main:test"
+        assert audio_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
+        assert audio_delivery["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
+        assert audio_delivery["notify"]["response"]["messageId"].startswith("msg::[infos-handle] 已生成音频 artifact：")
+
+        result = run(
+            "handle",
+            "--message", "把 artifact notice 也收进 broker 数据层。",
+            "--format", "image",
+            "--delivery-mode", "frontstage",
+            "--session-key", "agent:main:test",
+            "--source", "local-health",
+            "--event-key", "artifact-image-1",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            "--broker-state-dir", str(broker_state_dir),
+            "--broker-data-dir", str(broker_data_dir),
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        broker_delivery = payload["response"]["delivery"]
+        broker_notify = broker_delivery["notify"]["broker"]
+        broker_events_path = Path(broker_notify["delivery"]["paths"]["events"])
+        broker_events = [json.loads(line) for line in broker_events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        assert payload["request"]["brokerStateDir"] == str(broker_state_dir.resolve())
+        assert payload["request"]["brokerDataDir"] == str(broker_data_dir.resolve())
+        assert broker_delivery["artifactNotice"]["artifactRef"] == broker_delivery["artifact"]["ref"]
+        assert broker_notify["ingest"]["paths"]["events"] == str(broker_events_path)
+        assert broker_notify["delivery"]["paths"]["events"] == str(broker_events_path)
+        assert len(broker_events) == 2
+        assert broker_events[0]["recordType"] == "broker.source.event"
+        assert broker_events[0]["data"]["artifactNotice"]["artifactRef"] == broker_delivery["artifact"]["ref"]
+        assert broker_events[0]["data"]["artifactNotice"]["displayText"] == broker_delivery["message"]
+        assert broker_events[0]["data"]["deliveryNotice"]["artifactRef"] == broker_delivery["artifact"]["ref"]
+        assert broker_events[0]["data"]["deliveryNotice"]["frontstage"]["requestedSessionKey"] == "agent:main:test"
+        assert broker_events[0]["data"]["frontstageDelivery"]["frontstageEventKey"] == "artifact-image-1"
+        assert broker_events[1]["recordType"] == "frontstage.delivery.sent"
+        assert broker_events[1]["eventKey"] == "artifact-image-1"
+        assert broker_events[1]["message"] == broker_delivery["message"]
+
+        result = run(
+            "handle",
+            "--request-json", json.dumps({
+                "kind": "events.recent",
+                "format": "image",
+                "limit": 2,
+                "snapshotPath": str(snapshot_path),
+                "eventsPath": str(events_path),
+                "outputRoot": str(output_root),
+            }, ensure_ascii=False),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is True
+        assert payload["request"]["limit"] == 2
+        assert payload["response"]["kind"] == "events.recent"
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v1"
+        assert Path(payload["response"]["output"]["path"]).exists()
+
+        request_file = tmp_path / "handle-request.json"
+        request_file.write_text(json.dumps({
+            "requestId": "test-handle-request-file",
+            "message": "文件入口也能直发前台。",
+            "format": "text",
+            "deliveryMode": "frontstage",
+            "sessionKey": "agent:main:test",
+        }, ensure_ascii=False), encoding="utf-8")
+        result = run(
+            "handle",
+            "--request-file", str(request_file),
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        text_delivery = payload["response"]["delivery"]
+        assert payload["ok"] is True
+        assert payload["requestId"] == "test-handle-request-file"
+        assert payload["requestInputMode"] == "request_file"
+        assert payload["responseOutputMode"] == "stdout"
+        assert payload["request"]["requestId"] == "test-handle-request-file"
+        assert payload["request"]["message"] == "文件入口也能直发前台。"
+        assert text_delivery["contractVersion"] == 1
+        assert text_delivery["kind"] == "message"
+        assert text_delivery["message"] == "文件入口也能直发前台。"
+        assert text_delivery["artifactRef"] is None
+        assert text_delivery["artifact"] is None
+        assert text_delivery["artifactNotice"] is None
+        assert text_delivery["notice"]["kind"] == "message"
+        assert text_delivery["notice"]["displayText"] == "文件入口也能直发前台。"
+        assert text_delivery["notice"]["artifactRef"] is None
+        assert text_delivery["frontstage"] == text_delivery["notice"]["frontstage"]
+        assert text_delivery["frontstage"]["noticeKind"] == "message"
+        assert text_delivery["frontstage"]["artifactRef"] is None
+        assert text_delivery["frontstage"]["displayText"] == "文件入口也能直发前台。"
+        assert text_delivery["metadata"]["messageId"] == text_delivery["notify"]["response"]["messageId"]
+        assert text_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
+
+        result = run(
+            "handle",
+            "--request-file", "-",
+            env=fake_frontstage_env,
+            input_text=json.dumps({
+                "requestId": "test-handle-request-stdin",
+                "message": "stdin 入口也能复用统一请求。",
+                "format": "text",
+                "deliveryMode": "frontstage",
+                "sessionKey": "agent:main:test",
+            }, ensure_ascii=False),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["requestId"] == "test-handle-request-stdin"
+        assert payload["requestInputMode"] == "request_file"
+        assert payload["responseOutputMode"] == "stdout"
+        assert payload["request"]["requestId"] == "test-handle-request-stdin"
+        assert payload["request"]["message"] == "stdin 入口也能复用统一请求。"
+        assert payload["response"]["delivery"]["frontstage"]["displayText"] == "stdin 入口也能复用统一请求。"
+
+        response_file = tmp_path / "handle-response.json"
+        result = run(
+            "handle",
+            "--request-id", "test-handle-response-file",
+            "--kind", "contract.catalog",
+            "--format", "json",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--response-file", str(response_file),
+        )
+        assert result.returncode == 0, result.stderr
+        assert (result.stdout or "").strip() == ""
+        payload = json.loads(response_file.read_text(encoding="utf-8"))
+        assert payload["ok"] is True
+        assert payload["requestId"] == "test-handle-response-file"
+        assert payload["requestInputMode"] == "flags"
+        assert payload["responseOutputMode"] == "response_file"
+        assert payload["request"]["requestId"] == "test-handle-response-file"
+        assert payload["response"]["kind"] == "contract.catalog"
+        assert payload["response"]["queryContractVersion"] == EXPECTED_QUERY_CONTRACT_VERSION
+
+        result = run(
+            "handle",
+            "--message", "直接走统一入口的前台摘要。",
+            "--format", "image",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is True
+        assert payload["request"]["kind"] is None
+        assert payload["request"]["message"] == "直接走统一入口的前台摘要。"
+        assert payload["response"]["kind"] == "direct.message"
+        assert payload["response"]["result"] == {
+            "message": "直接走统一入口的前台摘要。",
+            "messageSource": "direct",
+        }
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v1"
+        assert Path(payload["response"]["output"]["path"]).exists()
+
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "audio",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            "--audio-renderer", str(tmp_path / "missing-audio-renderer.sh"),
+        )
+        assert result.returncode != 0
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is False
+        assert "audio renderer not found" in payload["error"]
+        assert payload["request"]["format"] == "audio"
 
         result = run("query", "--kind", "source.inspect", "--source-name", "local-health", "--snapshot-path", str(snapshot_path), "--events-path", str(events_path))
         assert result.returncode == 0, result.stderr

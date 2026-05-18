@@ -12,13 +12,21 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+
+from openclaw_infos_handle_contract import build_handle_request_payload, invoke_handle_query, invoke_handle_request
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 BROKER_TEST = WORKSPACE / "scripts" / "test-frontstage-broker.py"
 INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
 INFOS_HANDLE_TEST = WORKSPACE / "scripts" / "test-openclaw-infos-handle.py"
+FRONTSTAGE_RECOVERY_TEST = WORKSPACE / "scripts" / "test-frontstage-recovery-watch.py"
+INFOS_HANDLE_CALLER_TEST = WORKSPACE / "scripts" / "test-infos-handle-frontstage-callers.py"
+SUPERVISOR_STATUS_SCRIPT = WORKSPACE / "scripts" / "openclaw-supervisor-status.py"
+FRONTSTAGE_RECOVERY_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-recovery-watch.py"
+LOCAL_HEALTH_SCRIPT = WORKSPACE / "scripts" / "openclaw-local-health-diagnose.py"
 BROKER_REBUILD_SERVICE = WORKSPACE / "tools" / "openclaw-frontstage-broker" / "openclaw-frontstage-broker-rebuild.service"
 BROKER_REBUILD_TIMER = WORKSPACE / "tools" / "openclaw-frontstage-broker" / "openclaw-frontstage-broker-rebuild.timer"
 BRANDING_SCRIPT = WORKSPACE / "scripts" / "apply-openclaw-control-ui-branding.py"
@@ -165,6 +173,188 @@ def inspect_live_frontstage_publication() -> dict[str, object]:
     return payload
 
 
+def verify_infos_handle_contract_consumer() -> dict[str, object]:
+    request_id = "apply-frontstage-broker-data:contract-catalog-query"
+    snapshot = invoke_handle_query(
+        INFOS_HANDLE_SCRIPT,
+        kind="contract.catalog",
+        output_format="json",
+        request_id=request_id,
+        python_executable=sys.executable,
+        run=subprocess.run,
+    )
+    if not snapshot.get("ok"):
+        raise RuntimeError(str(snapshot.get("error") or "infos-handle query consumer response not ok"))
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    request_catalog = result.get("requestCatalog") if isinstance(result.get("requestCatalog"), dict) else {}
+    actions = request_catalog.get("actions") if isinstance(request_catalog.get("actions"), dict) else {}
+    handle_catalog = actions.get("handle") if isinstance(actions.get("handle"), dict) else {}
+    helper_shape = handle_catalog.get("clientHelperResponseShape") if isinstance(handle_catalog.get("clientHelperResponseShape"), dict) else {}
+    if snapshot.get("requestId") != request_id:
+        raise RuntimeError(f"infos-handle query consumer requestId mismatch: {snapshot.get('requestId')!r}")
+    if snapshot.get("requestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle query consumer requestInputMode mismatch: {snapshot.get('requestInputMode')!r}")
+    if snapshot.get("responseOutputMode") != "stdout":
+        raise RuntimeError(f"infos-handle query consumer responseOutputMode mismatch: {snapshot.get('responseOutputMode')!r}")
+    if snapshot.get("kind") != "contract.catalog":
+        raise RuntimeError(f"infos-handle query consumer kind mismatch: {snapshot.get('kind')!r}")
+    if handle_catalog.get("preferredRequestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle query consumer preferred input mismatch: {handle_catalog.get('preferredRequestInputMode')!r}")
+    if handle_catalog.get("clientHelperModule") != "openclaw_infos_handle_contract.py":
+        raise RuntimeError(f"infos-handle query consumer helper module mismatch: {handle_catalog.get('clientHelperModule')!r}")
+    if helper_shape.get("notice") != "deliveryNotice|null" or helper_shape.get("frontstage") != "frontstageDelivery|null":
+        raise RuntimeError(f"infos-handle query consumer helper alias shape mismatch: {helper_shape!r}")
+    if helper_shape.get("artifactNotice") != "artifactNotice|null":
+        raise RuntimeError(f"infos-handle query consumer artifact notice shape mismatch: {helper_shape!r}")
+    if helper_shape.get("notify") != "object|null":
+        raise RuntimeError(f"infos-handle query consumer notify shape mismatch: {helper_shape!r}")
+    return {
+        "ok": True,
+        "requestId": request_id,
+        "requestInputMode": snapshot.get("requestInputMode"),
+        "responseOutputMode": snapshot.get("responseOutputMode"),
+        "kind": snapshot.get("kind"),
+        "queryContractVersion": snapshot.get("queryContractVersion"),
+        "requestContractVersion": request_catalog.get("requestContractVersion"),
+        "helperModule": handle_catalog.get("clientHelperModule"),
+        "helperNoticeAlias": helper_shape.get("notice"),
+        "helperFrontstageAlias": helper_shape.get("frontstage"),
+        "helperArtifactNotice": helper_shape.get("artifactNotice"),
+        "helperNotify": helper_shape.get("notify"),
+    }
+
+
+def verify_infos_handle_snapshot_summary_consumer() -> dict[str, object]:
+    request_id = "apply-frontstage-broker-data:snapshot-summary-query"
+    snapshot = invoke_handle_query(
+        INFOS_HANDLE_SCRIPT,
+        kind="snapshot.summary",
+        output_format="json",
+        request_id=request_id,
+        python_executable=sys.executable,
+        run=subprocess.run,
+    )
+    if not snapshot.get("ok"):
+        raise RuntimeError(str(snapshot.get("error") or "infos-handle snapshot summary consumer response not ok"))
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    summary = result.get("summary") if isinstance(result.get("summary"), str) else None
+    if snapshot.get("requestId") != request_id:
+        raise RuntimeError(f"infos-handle snapshot summary consumer requestId mismatch: {snapshot.get('requestId')!r}")
+    if snapshot.get("requestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle snapshot summary consumer requestInputMode mismatch: {snapshot.get('requestInputMode')!r}")
+    if snapshot.get("responseOutputMode") != "stdout":
+        raise RuntimeError(f"infos-handle snapshot summary consumer responseOutputMode mismatch: {snapshot.get('responseOutputMode')!r}")
+    if snapshot.get("kind") != "snapshot.summary":
+        raise RuntimeError(f"infos-handle snapshot summary consumer kind mismatch: {snapshot.get('kind')!r}")
+    if snapshot.get("format") != "json":
+        raise RuntimeError(f"infos-handle snapshot summary consumer format mismatch: {snapshot.get('format')!r}")
+    if not summary or not summary.strip():
+        raise RuntimeError(f"infos-handle snapshot summary consumer summary missing: {result!r}")
+    return {
+        "ok": True,
+        "requestId": request_id,
+        "requestInputMode": snapshot.get("requestInputMode"),
+        "responseOutputMode": snapshot.get("responseOutputMode"),
+        "kind": snapshot.get("kind"),
+        "format": snapshot.get("format"),
+        "severity": result.get("severity"),
+        "summary": summary,
+    }
+
+
+
+def verify_infos_handle_events_recent_consumer() -> dict[str, object]:
+    request_id = "apply-frontstage-broker-data:events-recent-query"
+    snapshot = invoke_handle_query(
+        INFOS_HANDLE_SCRIPT,
+        kind="events.recent",
+        output_format="json",
+        request_id=request_id,
+        limit=1,
+        python_executable=sys.executable,
+        run=subprocess.run,
+    )
+    if not snapshot.get("ok"):
+        raise RuntimeError(str(snapshot.get("error") or "infos-handle events recent consumer response not ok"))
+    result = snapshot.get("result") if isinstance(snapshot.get("result"), dict) else {}
+    event_items = result.get("eventItems") if isinstance(result.get("eventItems"), list) else None
+    latest_by_source_items = result.get("latestBySourceItems") if isinstance(result.get("latestBySourceItems"), list) else None
+    record_type_counts = result.get("recordTypeCounts") if isinstance(result.get("recordTypeCounts"), dict) else None
+    if snapshot.get("requestId") != request_id:
+        raise RuntimeError(f"infos-handle events recent consumer requestId mismatch: {snapshot.get('requestId')!r}")
+    if snapshot.get("requestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle events recent consumer requestInputMode mismatch: {snapshot.get('requestInputMode')!r}")
+    if snapshot.get("responseOutputMode") != "stdout":
+        raise RuntimeError(f"infos-handle events recent consumer responseOutputMode mismatch: {snapshot.get('responseOutputMode')!r}")
+    if snapshot.get("kind") != "events.recent":
+        raise RuntimeError(f"infos-handle events recent consumer kind mismatch: {snapshot.get('kind')!r}")
+    if snapshot.get("format") != "json":
+        raise RuntimeError(f"infos-handle events recent consumer format mismatch: {snapshot.get('format')!r}")
+    if not isinstance(result.get("count"), int):
+        raise RuntimeError(f"infos-handle events recent consumer count missing: {result!r}")
+    if event_items is None or latest_by_source_items is None or record_type_counts is None:
+        raise RuntimeError(f"infos-handle events recent consumer result shape mismatch: {result!r}")
+    return {
+        "ok": True,
+        "requestId": request_id,
+        "requestInputMode": snapshot.get("requestInputMode"),
+        "responseOutputMode": snapshot.get("responseOutputMode"),
+        "kind": snapshot.get("kind"),
+        "format": snapshot.get("format"),
+        "count": result.get("count"),
+        "latestEventAt": result.get("latestEventAt"),
+        "sourceEventCount": result.get("sourceEventCount"),
+        "deliveryCount": result.get("deliveryCount"),
+    }
+
+
+
+def verify_infos_handle_request_entry() -> dict[str, object]:
+    with tempfile.TemporaryDirectory(prefix="infos-handle-request-entry-") as tmp:
+        tmp_path = Path(tmp)
+        request_path = tmp_path / "request.json"
+        response_path = tmp_path / "response.json"
+        request_id = "apply-frontstage-broker-data:contract-catalog"
+        payload = invoke_handle_request(
+            INFOS_HANDLE_SCRIPT,
+            build_handle_request_payload(
+                request_id=request_id,
+                kind="contract.catalog",
+                output_format="json",
+            ),
+            python_executable=sys.executable,
+            run=subprocess.run,
+            request_file=request_path,
+            response_file=response_path,
+        )
+        if not request_path.exists():
+            raise RuntimeError("infos-handle request-entry smoke did not materialize request file")
+        if not isinstance(payload, dict) or not payload.get("ok"):
+            raise RuntimeError(str((payload or {}).get("error") or "infos-handle request-entry response not ok"))
+        response = payload.get("response") if isinstance(payload.get("response"), dict) else {}
+        request = payload.get("request") if isinstance(payload.get("request"), dict) else {}
+        if payload.get("requestId") != request_id:
+            raise RuntimeError(f"infos-handle request-entry requestId mismatch: {payload.get('requestId')!r}")
+        if payload.get("requestInputMode") != "request_file":
+            raise RuntimeError(f"infos-handle request-entry requestInputMode mismatch: {payload.get('requestInputMode')!r}")
+        if payload.get("responseOutputMode") != "response_file":
+            raise RuntimeError(f"infos-handle request-entry responseOutputMode mismatch: {payload.get('responseOutputMode')!r}")
+        if response.get("kind") != "contract.catalog":
+            raise RuntimeError(f"infos-handle request-entry response kind mismatch: {response.get('kind')!r}")
+        return {
+            "ok": True,
+            "requestId": request_id,
+            "requestFile": str(request_path),
+            "responseFile": str(response_path),
+            "requestInputMode": payload.get("requestInputMode"),
+            "responseOutputMode": payload.get("responseOutputMode"),
+            "format": request.get("format"),
+            "kind": response.get("kind"),
+            "queryContractVersion": response.get("queryContractVersion"),
+            "requestContractVersion": payload.get("requestContractVersion"),
+        }
+
+
 def install_user_systemd() -> dict[str, str]:
     if sys.platform.startswith("win"):
         raise RuntimeError("user systemd install is not supported on Windows")
@@ -196,9 +386,25 @@ def main() -> int:
     args = parser.parse_args()
 
     steps = [
-        [sys.executable, "-m", "py_compile", str(BROKER_SCRIPT), str(BROKER_TEST), str(INFOS_HANDLE_SCRIPT), str(INFOS_HANDLE_TEST), str(BRANDING_SCRIPT)],
+        [
+            sys.executable,
+            "-m",
+            "py_compile",
+            str(BROKER_SCRIPT),
+            str(BROKER_TEST),
+            str(INFOS_HANDLE_SCRIPT),
+            str(INFOS_HANDLE_TEST),
+            str(SUPERVISOR_STATUS_SCRIPT),
+            str(FRONTSTAGE_RECOVERY_SCRIPT),
+            str(LOCAL_HEALTH_SCRIPT),
+            str(FRONTSTAGE_RECOVERY_TEST),
+            str(INFOS_HANDLE_CALLER_TEST),
+            str(BRANDING_SCRIPT),
+        ],
         [sys.executable, str(BROKER_TEST)],
         [sys.executable, str(INFOS_HANDLE_TEST)],
+        [sys.executable, str(FRONTSTAGE_RECOVERY_TEST)],
+        [sys.executable, str(INFOS_HANDLE_CALLER_TEST)],
     ]
     if args.apply_control_ui_branding:
         steps.append([sys.executable, str(BRANDING_SCRIPT)])
@@ -212,6 +418,10 @@ def main() -> int:
     )
 
     rebuild_payload = None
+    infos_handle_contract_consumer_check = None
+    infos_handle_snapshot_summary_consumer_check = None
+    infos_handle_events_recent_consumer_check = None
+    infos_handle_request_entry_check = None
     installed_units = None
     dock_snapshot_check = None
     frontstage_publication_check = None
@@ -229,6 +439,30 @@ def main() -> int:
                     pass
             else:
                 print(output)
+
+    try:
+        infos_handle_contract_consumer_check = verify_infos_handle_contract_consumer()
+    except RuntimeError as exc:
+        sys.stderr.write(f"verify-infos-handle-contract-consumer failed: {exc}\n")
+        return 1
+
+    try:
+        infos_handle_snapshot_summary_consumer_check = verify_infos_handle_snapshot_summary_consumer()
+    except RuntimeError as exc:
+        sys.stderr.write(f"verify-infos-handle-snapshot-summary-consumer failed: {exc}\n")
+        return 1
+
+    try:
+        infos_handle_events_recent_consumer_check = verify_infos_handle_events_recent_consumer()
+    except RuntimeError as exc:
+        sys.stderr.write(f"verify-infos-handle-events-recent-consumer failed: {exc}\n")
+        return 1
+
+    try:
+        infos_handle_request_entry_check = verify_infos_handle_request_entry()
+    except RuntimeError as exc:
+        sys.stderr.write(f"verify-infos-handle-request-entry failed: {exc}\n")
+        return 1
 
     if args.install_user_systemd:
         try:
@@ -259,6 +493,14 @@ def main() -> int:
     print("Applied frontstage broker data layer.")
     if isinstance(rebuild_payload, dict):
         print(json.dumps(rebuild_payload, ensure_ascii=False, indent=2))
+    if infos_handle_contract_consumer_check is not None:
+        print(json.dumps({"infosHandleContractConsumer": infos_handle_contract_consumer_check}, ensure_ascii=False, indent=2))
+    if infos_handle_snapshot_summary_consumer_check is not None:
+        print(json.dumps({"infosHandleSnapshotSummaryConsumer": infos_handle_snapshot_summary_consumer_check}, ensure_ascii=False, indent=2))
+    if infos_handle_events_recent_consumer_check is not None:
+        print(json.dumps({"infosHandleEventsRecentConsumer": infos_handle_events_recent_consumer_check}, ensure_ascii=False, indent=2))
+    if infos_handle_request_entry_check is not None:
+        print(json.dumps({"infosHandleRequestEntry": infos_handle_request_entry_check}, ensure_ascii=False, indent=2))
     if dock_snapshot_check is not None:
         print(json.dumps({"controlUiSnapshotDock": dock_snapshot_check}, ensure_ascii=False, indent=2))
     if frontstage_publication_check is not None:

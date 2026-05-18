@@ -18,6 +18,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from openclaw_infos_handle_contract import build_handle_request_payload, invoke_handle_request
+
 WORKSPACE = Path.home() / ".openclaw" / "workspace"
 CONFIG_PATH = Path.home() / ".openclaw" / "openclaw.json"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "local-health"
@@ -1348,22 +1350,25 @@ def maybe_send_frontstage(previous: dict[str, Any], current: dict[str, Any], ena
         message = f"{prefix}{summary}"
 
     helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
-    cmd = [
-        sys.executable,
-        str(helper_path),
-        "notify-frontstage",
-        "--source",
-        "local-health",
-        "--event-key",
-        event_key,
-        "--session-key",
-        "agent:main:main",
-        "--message",
-        message,
-        "--data-json",
-        json.dumps({"severity": severity, "summary": summary, "checkedAt": current.get("checkedAt")}, ensure_ascii=False),
-    ]
-    subprocess.run(cmd, capture_output=True, text=True, check=False)
+    request_payload = build_handle_request_payload(
+        request_id=f"local-health:{event_key}",
+        message=message,
+        output_format="text",
+        delivery_mode="frontstage",
+        frontstage_source="local-health",
+        frontstage_event_key=event_key,
+        session_key="agent:main:main",
+        data={"severity": severity, "summary": summary, "checkedAt": current.get("checkedAt")},
+    )
+    try:
+        invoke_handle_request(
+            helper_path,
+            request_payload,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError:
+        return
 
 
 

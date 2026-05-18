@@ -12,7 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from openclaw_infos_handle_contract import build_handle_request_payload, extract_frontstage_notify_payload, invoke_handle_request
+
 DEFAULT_TASKS_DB_PATH = Path.home() / ".openclaw" / "tasks" / "runs.sqlite"
+DEFAULT_AGENTS_ROOT = Path.home() / ".openclaw" / "agents"
 DEFAULT_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "supervisor"
 STATUS_PATH_NAME = "supervisor-status.json"
 CONTROL_PATH_NAME = "service-control.json"
@@ -20,11 +23,14 @@ EVENT_LOG_PATH_NAME = "supervisor-events.log"
 NOTIFY_STATE_PATH_NAME = "notify-state.json"
 DEFAULT_STALLED_AFTER_SECONDS = 180
 DEFAULT_TERMINAL_DISPLAY_SECONDS = 180
+DEFAULT_FOLLOWUP_WAIT_SECONDS = 600
+DEFAULT_SESSION_TAIL_LINES = 16
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled", "canceled", "timed_out", "lost"}
 FAILURE_STATUSES = {"failed", "cancelled", "canceled", "timed_out", "lost"}
-NOTIFYABLE_STATUSES = {"stalled", "failed", "done"}
+NOTIFYABLE_STATUSES = {"stalled", "failed", "done", "waiting"}
 ALLOWED_DESIRED_STATES = {"disabled", "armed"}
 ALLOWED_POLICY_MODES = {"auto", "force_on", "force_off"}
+UNSET = object()
 
 
 def now_iso() -> str:
@@ -87,6 +93,56 @@ def compute_desired_state(policy_mode: str, task_active: bool) -> str:
     return "armed" if task_active else "disabled"
 
 
+def normalize_followup_window(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    expires_at_ms = value.get("expiresAtMs")
+    if not isinstance(expires_at_ms, int) or expires_at_ms <= 0:
+        return None
+    started_at_ms = value.get("startedAtMs")
+    if not isinstance(started_at_ms, int) or started_at_ms <= 0:
+        started_at_ms = max(0, expires_at_ms - DEFAULT_FOLLOWUP_WAIT_SECONDS * 1000)
+    return {
+        "startedAtMs": started_at_ms,
+        "startedAt": value.get("startedAt") or iso_from_ms(started_at_ms),
+        "expiresAtMs": expires_at_ms,
+        "expiresAt": value.get("expiresAt") or iso_from_ms(expires_at_ms),
+        "taskId": value.get("taskId"),
+        "taskLabel": value.get("taskLabel"),
+        "ownerKey": value.get("ownerKey"),
+        "completedAt": value.get("completedAt"),
+        "waitSeconds": value.get("waitSeconds") if isinstance(value.get("waitSeconds"), int) else max(0, int((expires_at_ms - started_at_ms) / 1000)),
+    }
+
+
+def is_followup_window_active(window: dict[str, Any] | None, now_ms: int) -> bool:
+    if not isinstance(window, dict):
+        return False
+    expires_at_ms = window.get("expiresAtMs")
+    return isinstance(expires_at_ms, int) and expires_at_ms > now_ms
+
+
+def build_followup_window(task: dict[str, Any], now_ms: int, wait_seconds: int) -> dict[str, Any]:
+    expires_at_ms = now_ms + max(0, wait_seconds) * 1000
+    return {
+        "startedAtMs": now_ms,
+        "startedAt": iso_from_ms(now_ms),
+        "expiresAtMs": expires_at_ms,
+        "expiresAt": iso_from_ms(expires_at_ms),
+        "taskId": task.get("taskId"),
+        "taskLabel": task.get("label"),
+        "ownerKey": task.get("ownerKey"),
+        "completedAt": task.get("terminalAt") or task.get("endedAt") or task.get("lastEventAt"),
+        "waitSeconds": max(0, wait_seconds),
+    }
+
+
+def followup_window_matches_task(window: dict[str, Any] | None, task: dict[str, Any] | None) -> bool:
+    if not isinstance(window, dict) or not isinstance(task, dict):
+        return False
+    return window.get("taskId") == task.get("taskId") and window.get("completedAt") == (task.get("terminalAt") or task.get("endedAt") or task.get("lastEventAt"))
+
+
 def load_service_control(path: Path) -> dict[str, Any]:
     raw = load_json(path)
     legacy_desired_state = normalize_desired_state(raw.get("desiredState"))
@@ -104,6 +160,7 @@ def load_service_control(path: Path) -> dict[str, Any]:
         "updatedBy": raw.get("updatedBy"),
         "host": raw.get("host"),
         "reason": raw.get("reason"),
+        "followupWindow": normalize_followup_window(raw.get("followupWindow")),
     }
 
 
@@ -114,10 +171,12 @@ def save_service_control(
     task_active: bool | None = None,
     updated_by: str,
     reason: str | None,
+    followup_window: Any = UNSET,
 ) -> dict[str, Any]:
     current = load_service_control(path)
     next_policy_mode = normalize_policy_mode(policy_mode if policy_mode is not None else current.get("policyMode"))
     next_task_active = bool(task_active if task_active is not None else current.get("taskActive"))
+    next_followup_window = current.get("followupWindow") if followup_window is UNSET else normalize_followup_window(followup_window)
     payload = {
         "policyMode": next_policy_mode,
         "taskActive": next_task_active,
@@ -126,6 +185,7 @@ def save_service_control(
         "updatedBy": updated_by,
         "host": socket.gethostname(),
         "reason": reason or None,
+        "followupWindow": next_followup_window,
     }
     save_json(path, payload)
     return payload
@@ -139,6 +199,136 @@ def open_db(tasks_db_path: Path) -> sqlite3.Connection | None:
     return conn
 
 
+def parse_iso_ms(value: Any) -> int | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)
+    except ValueError:
+        return None
+
+
+def session_key_agent_id(session_key: Any, fallback: str | None = None) -> str:
+    if isinstance(session_key, str):
+        parts = session_key.split(":")
+        if len(parts) >= 2 and parts[0] == "agent" and parts[1]:
+            return parts[1]
+    return fallback or "main"
+
+
+def sessions_index_path(agent_id: str | None) -> Path:
+    return DEFAULT_AGENTS_ROOT / session_key_agent_id(None, agent_id) / "sessions" / "sessions.json"
+
+
+def load_sessions_index(agent_id: str | None) -> dict[str, Any]:
+    raw = load_json(sessions_index_path(agent_id))
+    return raw if isinstance(raw, dict) else {}
+
+
+def read_jsonl_tail(path: Path, max_lines: int = DEFAULT_SESSION_TAIL_LINES) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-max_lines:]
+    except OSError:
+        return []
+    entries: list[dict[str, Any]] = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            entries.append(payload)
+    return entries
+
+
+def message_has_visible_text(message: dict[str, Any]) -> bool:
+    content = message.get("content")
+    if not isinstance(content, list):
+        return False
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "text" and isinstance(item.get("text"), str) and item.get("text").strip():
+            return True
+    return False
+
+
+def entry_timestamp_ms(entry: dict[str, Any]) -> int | None:
+    message = entry.get("message")
+    if isinstance(message, dict):
+        timestamp = message.get("timestamp")
+        if isinstance(timestamp, int):
+            return timestamp
+    timestamp = entry.get("timestamp")
+    if isinstance(timestamp, int):
+        return timestamp
+    return parse_iso_ms(timestamp)
+
+
+def detect_orphaned_running_task(row: Any) -> tuple[bool, str | None]:
+    if not isinstance(row, (dict, sqlite3.Row)):
+        return False, None
+    status = row["status"] if isinstance(row, sqlite3.Row) else row.get("status")
+    if status in TERMINAL_STATUSES:
+        return False, None
+    child_session_key = row["child_session_key"] if isinstance(row, sqlite3.Row) else row.get("child_session_key")
+    if not isinstance(child_session_key, str) or not child_session_key:
+        return False, None
+    agent_id = row["agent_id"] if isinstance(row, sqlite3.Row) else row.get("agent_id")
+    session_index = load_sessions_index(session_key_agent_id(child_session_key, agent_id))
+    session_meta = session_index.get(child_session_key)
+    if not isinstance(session_meta, dict):
+        return False, None
+    session_file = session_meta.get("sessionFile")
+    if not isinstance(session_file, str) or not session_file:
+        return False, None
+    entries = read_jsonl_tail(Path(session_file).expanduser())
+    if not entries:
+        return False, None
+
+    task_started_ms = 0
+    for candidate in (
+        row["started_at"] if isinstance(row, sqlite3.Row) else row.get("started_at"),
+        row["created_at"] if isinstance(row, sqlite3.Row) else row.get("created_at"),
+    ):
+        if isinstance(candidate, int) and candidate > task_started_ms:
+            task_started_ms = candidate
+
+    relevant_entries = [entry for entry in entries if (entry_timestamp_ms(entry) or task_started_ms) >= task_started_ms]
+    if not relevant_entries:
+        return False, None
+
+    for entry in reversed(relevant_entries):
+        entry_type = entry.get("type")
+        if entry_type == "message":
+            message = entry.get("message")
+            if not isinstance(message, dict):
+                continue
+            role = message.get("role")
+            if role == "assistant":
+                error_message = entry.get("errorMessage") or message.get("errorMessage")
+                stop_reason = entry.get("stopReason") or message.get("stopReason")
+                if (isinstance(error_message, str) and error_message.strip()) or stop_reason == "error":
+                    if not message_has_visible_text(message):
+                        return True, (error_message or stop_reason or "assistant_error")
+                return False, None
+            if role in {"toolResult", "user"}:
+                return False, None
+        if entry_type == "custom" and entry.get("customType") == "openclaw:prompt-error":
+            data = entry.get("data")
+            if isinstance(data, dict):
+                error_message = data.get("error")
+                if isinstance(error_message, str) and error_message.strip():
+                    return True, error_message
+            return True, "prompt_error"
+    return False, None
+
+
 def fetch_active_tasks(conn: sqlite3.Connection | None, now_ms: int, stalled_after_seconds: int) -> tuple[list[dict[str, Any]], str | None]:
     if conn is None:
         return [], "tasks_db_missing"
@@ -146,7 +336,7 @@ def fetch_active_tasks(conn: sqlite3.Connection | None, now_ms: int, stalled_aft
         rows = conn.execute(
             """
             SELECT task_id, label, status, runtime, owner_key, child_session_key,
-                   created_at, started_at, ended_at, last_event_at,
+                   agent_id, created_at, started_at, ended_at, last_event_at,
                    error, progress_summary, terminal_summary, terminal_outcome
             FROM task_runs
             WHERE status NOT IN ('succeeded', 'failed', 'cancelled', 'canceled', 'timed_out', 'lost')
@@ -158,6 +348,9 @@ def fetch_active_tasks(conn: sqlite3.Connection | None, now_ms: int, stalled_aft
 
     tasks: list[dict[str, Any]] = []
     for row in rows:
+        orphaned, _orphan_reason = detect_orphaned_running_task(row)
+        if orphaned:
+            continue
         created_at = row["created_at"]
         started_at = row["started_at"]
         last_event_at = row["last_event_at"]
@@ -264,11 +457,18 @@ def derive_service_state(desired_state: str, active_tasks: list[dict[str, Any]])
     return "active" if active_tasks else "armed"
 
 
-def derive_monitor_status(active_tasks: list[dict[str, Any]], recent_terminal_task: dict[str, Any] | None) -> str:
+def derive_monitor_status(
+    active_tasks: list[dict[str, Any]],
+    recent_terminal_task: dict[str, Any] | None,
+    followup_window: dict[str, Any] | None,
+    now_ms: int,
+) -> str:
     if active_tasks:
         if any(task.get("derivedStatus") == "stalled" for task in active_tasks):
             return "stalled"
         return "running"
+    if is_followup_window_active(followup_window, now_ms):
+        return "waiting"
     if recent_terminal_task:
         return "failed" if recent_terminal_task.get("status") in FAILURE_STATUSES else "done"
     return "idle"
@@ -281,6 +481,7 @@ def build_summary(
     active_tasks: list[dict[str, Any]],
     focus_task: dict[str, Any] | None,
     recent_terminal_task: dict[str, Any] | None,
+    followup_window: dict[str, Any] | None,
 ) -> tuple[str, str]:
     policy_mode = str(control.get("policyMode") or "auto")
     task_active = bool(control.get("taskActive"))
@@ -290,10 +491,11 @@ def build_summary(
             return "监工服务已关闭", "当前处于手动关闭状态。"
         return "监工服务自动待机", "当前处于自动模式；这轮未标记为复杂任务，所以暂不启用监工。"
     if service_state == "armed" and monitor_status == "idle":
+        likely_idle_reason = "当前没有 active run 可监工；这通常表示工作仍在前台进行，或上一轮后台任务刚结束。"
         if policy_mode == "force_on":
-            return "监工服务常开待命中", "当前处于手动开启状态，但还没有后台任务。"
+            return "监工服务常开待命中", f"{likely_idle_reason} 若这轮准备按“后台推进 + 监工盯着”执行，应立即真卸到后台任务。"
         if policy_mode == "auto" and task_active:
-            return "监工服务待命中", "当前处于自动模式；这轮已标记为复杂任务，监工已进入待命。"
+            return "监工服务待命中", f"{likely_idle_reason} 当前已标记为复杂任务；若还要继续后台推进，应立即补一个真实后台任务。"
         return "监工服务待命中", "监工服务已开启，但当前没有后台任务。"
     if service_state == "stopping":
         count = len(active_tasks)
@@ -306,6 +508,10 @@ def build_summary(
         if label:
             return f"后台任务运行中（{count}）", f"最近关注任务：{label}。"
         return f"后台任务运行中（{count}）", "至少有一个后台任务仍在运行。"
+    if monitor_status == "waiting" and followup_window:
+        label = followup_window.get("taskLabel") or followup_window.get("taskId") or "上一轮后台任务"
+        remaining_seconds = max(0, int((int(followup_window.get("expiresAtMs") or 0) - epoch_ms() + 999) / 1000))
+        return "后台任务已完成，等待接续中", f"{label} 刚完成。监工会在接下来 {remaining_seconds} 秒内等待新的后台任务；若没有新的后台任务或继续信号，将自动关闭。"
     if monitor_status == "stalled":
         count = len(active_tasks)
         silent_seconds = focus_task.get("silentSeconds") if focus_task else None
@@ -366,6 +572,70 @@ def maybe_log_transition(previous: dict[str, Any], current: dict[str, Any], even
     )
 
 
+def should_open_followup_window(report: dict[str, Any]) -> bool:
+    service = report.get("service") or {}
+    task = report.get("recentTerminalTask") or {}
+    if report.get("status") != "done":
+        return False
+    if service.get("desiredState") != "armed":
+        return False
+    if not (service.get("taskActive") or service.get("policyMode") == "force_on"):
+        return False
+    if not isinstance(task, dict) or not is_frontstage_owner_key(task.get("ownerKey")):
+        return False
+    return True
+
+
+def reconcile_followup_window(report: dict[str, Any], control_path: Path, wait_seconds: int) -> bool:
+    control = load_service_control(control_path)
+    followup_window = control.get("followupWindow")
+    now_ms = epoch_ms()
+
+    if report.get("hasActiveTask"):
+        if followup_window is not None:
+            save_service_control(
+                control_path,
+                updated_by="supervisor-auto",
+                reason="followup-window-cleared-active-task",
+                followup_window=None,
+            )
+            return True
+        return False
+
+    if followup_window and not is_followup_window_active(followup_window, now_ms):
+        save_service_control(
+            control_path,
+            policy_mode="auto",
+            task_active=False,
+            updated_by="supervisor-auto",
+            reason="followup-window-expired",
+            followup_window=None,
+        )
+        return True
+
+    if should_open_followup_window(report):
+        task = report.get("recentTerminalTask") or {}
+        if not followup_window_matches_task(followup_window, task):
+            save_service_control(
+                control_path,
+                updated_by="supervisor-auto",
+                reason="await-next-task",
+                followup_window=build_followup_window(task, now_ms, wait_seconds),
+            )
+            return True
+        return False
+
+    if followup_window is not None:
+        save_service_control(
+            control_path,
+            updated_by="supervisor-auto",
+            reason="followup-window-cleared",
+            followup_window=None,
+        )
+        return True
+    return False
+
+
 def build_report(tasks_db_path: Path, state_dir: Path, stalled_after_seconds: int, terminal_display_seconds: int) -> dict[str, Any]:
     now_ms = epoch_ms()
     control_path = state_dir / CONTROL_PATH_NAME
@@ -385,10 +655,11 @@ def build_report(tasks_db_path: Path, state_dir: Path, stalled_after_seconds: in
         if conn is not None:
             conn.close()
 
+    followup_window = desired.get("followupWindow")
     focus_task = pick_focus_task(active_tasks)
     service_state = derive_service_state(desired["desiredState"], active_tasks)
-    monitor_status = derive_monitor_status(active_tasks, recent_terminal_task)
-    summary, detail = build_summary(desired, service_state, monitor_status, active_tasks, focus_task, recent_terminal_task)
+    monitor_status = derive_monitor_status(active_tasks, recent_terminal_task, followup_window, now_ms)
+    summary, detail = build_summary(desired, service_state, monitor_status, active_tasks, focus_task, recent_terminal_task, followup_window)
     host = socket.gethostname()
 
     report = {
@@ -411,6 +682,7 @@ def build_report(tasks_db_path: Path, state_dir: Path, stalled_after_seconds: in
             "host": desired.get("host"),
             "reason": desired.get("reason"),
         },
+        "followupWindow": followup_window,
         "focusTask": focus_task,
         "activeTasks": active_tasks,
         "recentTerminalTask": recent_terminal_task,
@@ -435,28 +707,38 @@ def build_notification_candidate(report: dict[str, Any]) -> dict[str, Any] | Non
     if service.get("state") == "disabled":
         return None
 
+    status = str(report.get("status") or "")
     task: dict[str, Any] | None
     marker: str | None
-    if report.get("status") == "stalled":
+    owner_key: str | None
+    if status == "stalled":
         task = report.get("focusTask") or None
         marker = (task or {}).get("lastActivityAt") or (task or {}).get("taskId")
+        owner_key = (task or {}).get("ownerKey")
+    elif status == "waiting":
+        task = report.get("recentTerminalTask") or None
+        followup_window = report.get("followupWindow") or {}
+        marker = followup_window.get("expiresAt") or (task or {}).get("terminalAt") or (task or {}).get("taskId")
+        owner_key = followup_window.get("ownerKey") or (task or {}).get("ownerKey")
     else:
         task = report.get("recentTerminalTask") or None
         marker = (task or {}).get("terminalAt") or (task or {}).get("endedAt") or (task or {}).get("taskId")
+        owner_key = (task or {}).get("ownerKey")
 
     if not isinstance(task, dict):
         return None
-    owner_key = task.get("ownerKey")
     if not is_frontstage_owner_key(owner_key):
         return None
 
     label = task.get("label") or task.get("taskId") or "后台任务"
-    status = str(report.get("status") or "")
     if status == "stalled":
         silent_seconds = task.get("silentSeconds")
         tail = f"{label} 已有 {silent_seconds} 秒无新进展。" if silent_seconds is not None else f"{label} 可能卡住了。"
     elif status == "failed":
         tail = f"{label} 异常结束，我正在接手检查。"
+    elif status == "waiting":
+        wait_seconds = ((report.get("followupWindow") or {}).get("waitSeconds") or DEFAULT_FOLLOWUP_WAIT_SECONDS)
+        tail = f"{label} 已完成。我会再等 {wait_seconds} 秒看是否接续新任务；若没有新的后台任务或继续信号，就自动关闭监工。"
     else:
         tail = f"{label} 已完成。"
 
@@ -469,7 +751,6 @@ def build_notification_candidate(report: dict[str, Any]) -> dict[str, Any] | Non
         "taskId": task.get("taskId"),
     }
 
-
 def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, event_log_path: Path) -> None:
     candidate = build_notification_candidate(report)
     if not candidate:
@@ -481,48 +762,41 @@ def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, 
         return
 
     helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
-    cmd = [
-        sys.executable,
-        str(helper_path),
-        "notify-frontstage",
-        "--source",
-        "supervisor",
-        "--event-key",
-        str(candidate["eventKey"]),
-        "--session-key",
-        str(candidate["sessionKey"]),
-        "--message",
-        str(candidate["message"]),
-        "--data-json",
-        json.dumps({
+    request_payload = build_handle_request_payload(
+        request_id=f"supervisor:{candidate['eventKey']}",
+        message=str(candidate["message"]),
+        output_format="text",
+        delivery_mode="frontstage",
+        frontstage_source="supervisor",
+        frontstage_event_key=str(candidate["eventKey"]),
+        session_key=str(candidate["sessionKey"]),
+        data={
             "status": candidate.get("status"),
             "taskId": candidate.get("taskId"),
             "checkedAt": report.get("checkedAt"),
-        }, ensure_ascii=False),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        append_log(event_log_path, f"[{report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error={(result.stderr or result.stdout).strip()}")
-        return
+        },
+    )
     try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        append_log(event_log_path, f"[{report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error=invalid_json")
+        payload = invoke_handle_request(
+            helper_path,
+            request_payload,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError as exc:
+        append_log(event_log_path, f"[{report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error={exc}")
         return
 
-    response = payload.get("response") if isinstance(payload, dict) else None
-    message_id = None
-    if isinstance(response, dict):
-        message_id = response.get("messageId")
-    if message_id is None and isinstance(payload, dict):
-        message_id = payload.get("messageId")
+    notify_payload = extract_frontstage_notify_payload(payload)
+    response = notify_payload.get("response") if isinstance(notify_payload.get("response"), dict) else {}
+    message_id = response.get("messageId") or notify_payload.get("messageId")
     notify_state = {
         "sentAt": report.get("checkedAt"),
         "eventKey": candidate["eventKey"],
         "status": candidate["status"],
         "taskId": candidate["taskId"],
         "sessionKey": candidate["sessionKey"],
-        "targetSessionKey": payload.get("targetSessionKey") if isinstance(payload, dict) else None,
+        "targetSessionKey": notify_payload.get("targetSessionKey"),
         "messageId": message_id,
         "message": candidate["message"],
     }
@@ -536,6 +810,7 @@ def main() -> int:
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR), help="Directory for supervisor state files")
     parser.add_argument("--stalled-after-seconds", type=int, default=DEFAULT_STALLED_AFTER_SECONDS, help="Silent threshold for stalled tasks")
     parser.add_argument("--terminal-display-seconds", type=int, default=DEFAULT_TERMINAL_DISPLAY_SECONDS, help="Keep done/failed visible for this long")
+    parser.add_argument("--followup-wait-seconds", type=int, default=DEFAULT_FOLLOWUP_WAIT_SECONDS, help="After a task finishes, wait this long for the next background task before auto-closing supervisor")
     parser.add_argument("--set-service-state", choices=sorted(ALLOWED_DESIRED_STATES), help="Legacy shortcut: armed=auto+taskActive=true, disabled=auto+taskActive=false")
     parser.add_argument("--set-policy-mode", choices=sorted(ALLOWED_POLICY_MODES), help="Persist supervisor policy mode")
     parser.add_argument("--activate-task", action="store_true", help="Mark current work as complex/active under auto mode")
@@ -563,6 +838,7 @@ def main() -> int:
             task_active=args.set_service_state == "armed",
             updated_by="legacy-manual",
             reason=args.reason,
+            followup_window=None,
         )
 
     if args.set_policy_mode or args.activate_task or args.deactivate_task:
@@ -572,10 +848,13 @@ def main() -> int:
             task_active=True if args.activate_task else False if args.deactivate_task else None,
             updated_by="manual",
             reason=args.reason,
+            followup_window=None,
         )
 
     previous = load_json(status_path)
     report = build_report(tasks_db_path, state_dir, args.stalled_after_seconds, args.terminal_display_seconds)
+    if reconcile_followup_window(report, control_path, args.followup_wait_seconds):
+        report = build_report(tasks_db_path, state_dir, args.stalled_after_seconds, args.terminal_display_seconds)
     save_json(status_path, report)
     maybe_log_transition(previous, report, event_log_path)
     if args.notify_transitions:

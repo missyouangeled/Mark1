@@ -6,9 +6,9 @@
 
 ## 当前临时高优先级接手任务（broker / infos-handle 收尾与下周续做入口）
 
-- 任务目标：把 `broker sidecar 数据层 1.0` + `infos-handle 查询契约层` 在当前阶段收成一个稳定停点，保证下周一回来可以直接沿着 machine-readable contract 继续推，而不是重新扫仓库找口径。
+- 任务目标：继续把 `broker sidecar 数据层 1.0` 往 `infos-handle 统一信息处理层` 推进；当前重点已从“只把 query contract 收紧”扩展到“补统一请求入口、补 image/audio 最小正式 handler、继续把 caller 从 broker emit 往 infos-handle 收”。
 - 当前机器：`missyouangeled-VMware-Virtual-Platform` / `公司（Linux）`
-- 截至 2026-05-15 17:50 的收口判断：**当前阶段主体已完成，按开发主体看约 90%；现在更适合停在 handoff / 文档 / GitHub 备份前一步，而不是继续开第四刀。**
+- 截至 2026-05-18 下午的收口判断：**按本轮目标（A-E）已可视为当前主线可称“最终版”的收口状态**：`infos-handle handle` + `--request-file` + `openclaw_infos_handle_contract.py` helper 已成为正式主入口；`query` / `notify-frontstage` / broker `emit` 只再保 compat 壳；剩余未做项属于下一阶段增强，不再阻塞这轮收口。
 
 ### 当前已确认结论
 
@@ -19,8 +19,8 @@
      - `supervisor -> broker -> 当前前台`：通过
    - 当前 broker manifest 已在位，`schemaVersion: 1`、`contractVersion: 2`
 
-2. **infos-handle 当前主干已经成型，且查询契约连续收紧到可直接消费的程度**
-   - 当前已支持：
+2. **infos-handle 当前主干已经从“查询契约层”推进到“统一信息处理层最小版”**
+   - 当前已支持的 query kind 仍包括：
      - `snapshot.summary`
      - `health.summary`
      - `tasks.summary`
@@ -32,63 +32,103 @@
      - `source.inspect`
      - `events.recent`
      - `contract.catalog`
-   - 2026-05-15 下午到 17:50 前，这条线连续完成了：
+   - 到当前工作树为止，这条线已经连续完成：
      - `sources.catalog` / `source.inspect` 稳定顶层字段收口
      - `sources.latest` 的 `count / availableSources / sourceItems[]` 收口
      - `panel.inspect` / `panels.catalog` 已纳入正式 query catalog
      - broker 事件契约正式化，`contract.catalog` 可直接带出 `contracts.recordTypes / contracts.eventFieldCatalog`
-     - `events.recent` 稳定 item shape 收口，并新增 `latestBySource`
-   - 当前 `QUERY_CONTRACT_VERSION = 13`
+     - `events.recent` 稳定 item shape 收口，并同时提供 `latestBySource` + `latestBySourceItems[]`
+     - `contract.catalog` 现在会同时带 `outputFormatCatalog / requestCatalog / handlerCatalog`
+     - 新增统一 `handle` 请求入口；CLI 之上现在有一层正式 request envelope，可统一处理 `text/json/image/audio`
+     - `image` 已落低风险 `summary-card SVG` handler，`audio` 已落本地 TTS preview handler（默认接现有 `tools/voice-reply/voice-reply.sh`，可被 smoke/stub 覆盖）
+     - `handle --delivery-mode frontstage` 现在也能覆盖 `image/audio`：先产出 artifact，再发一条 text artifact notice 到前台，并带回稳定 artifact 元数据
+     - preview 输出现在在 `response.output.artifact` / `response.delivery.artifact` 两侧复用同一套 artifact shape；`response.delivery` 也新增了稳定 `artifactRef`
+     - `image/audio` 的 frontstage artifact-notice 已继续收口成 consumer 可直接读的稳定返回：优先看 `response.delivery.notice / response.delivery.frontstage`，其中 `frontstage` 当前还会稳定带 `noticeKind / artifactRef / displayText`；旧 `artifactNotice / metadata` 仍保留兼容别名
+     - `handle` 还新增了可选 `brokerStateDir / brokerDataDir` 覆盖，便于在不碰默认本地状态目录时做正式请求入口 smoke / 回归
+     - `handle` 还支持 `--request-file <path|->` 这条最小正式请求入口，便于文件 / stdin 单次请求复用同一套 request envelope；本轮又补了 `--request-id` / `--response-file <path>`，让一次性 CLI 请求也能拿到更正式的 request/response envelope
+     - 这条最小请求入口又继续正式化了一小步：`contract.catalog.requestCatalog.actions.handle` 现在额外公开 `preferredRequestInputMode=request_file`、`preferredRequestFileValue=-`、`preferredResponseOutputMode=stdout` 与 `clientHelperModule=openclaw_infos_handle_contract.py`；helper 公开面也已把 `build_handle_request_payload / invoke_handle_request / invoke_handle_query / extract_handle_response_snapshot / extract_frontstage_notify_payload / extract_delivery_snapshot / build_compat_delivery_bundle` 一并列入正式 contract，runtime caller / compat consumer 直接复用同一份 helper
+   - 当前 `QUERY_CONTRACT_VERSION = 17`
+   - 当前 `REQUEST_CONTRACT_VERSION = 6`
    - 当前 `brokerContractVersion = 2`
 
-3. **这轮最后一个本地代码停点已经存在，可直接从这里续做**
-   - 当前代码停点提交：`7396ede` `Tighten broker and infos-handle event contracts`
-   - 其前一串关键提交：
-     - `eb8aa4f` `Tighten infos-handle source query handoff contract`
-     - `3aa091e` `Tighten infos-handle sources.latest contract`
-     - `7fe7efd` `Tighten infos-handle source event summaries`
-     - `ff07c2f` `Tighten infos-handle source inspect summaries`
-     - `2575456` `Tighten infos-handle source catalog contract`
-     - `4de50fb` `Add panels catalog query to infos handle`
-     - `a862517` `feat: add panel inspect query to infos-handle`
-     - `2f57998` `feat: add infos-handle source catalog contract`
+3. **这轮最后一个已提交停点已可直接作为续做起点**
+   - 当前最近本地 commit 见 `git log --oneline -1`
+   - 这一停点已收住：
+     - `events.recent.latestBySourceItems[]`
+     - broker renderer 公开副本发布 `best_effort` 化（失败不应阻塞核心 `views/*.json` / `manifest.json`）
+     - `infos-handle handle` 统一入口
+     - `image/audio` preview handler、artifact notice delivery 与最小 smoke test
+     - broker `emit` 已进一步压成更明显的 legacy compatibility wrapper（前台发送优先经 `infos-handle handle`，broker 自己只保 delivery 兼容记录）；本轮又继续往前收一步：改成经 `--request-file -` 把 request envelope 喂给 infos-handle，并优先消费 `delivery.notice / delivery.frontstage / delivery.artifactRef`；compat 请求当前也会稳定带 `requestId`，同时也会把 `frontstageSource / frontstageEventKey / brokerStateDir / brokerDataDir` 一并透传给 `handle` 主请求面，优先复用 infos-handle 内部 broker ingest / record-delivery
+     - `supervisor / frontstage-recovery / local-health` 三条 caller 已从 `infos-handle notify-frontstage` 迁到 `handle --delivery-mode frontstage`，现在三条都统一走 `--request-file -` 这条正式请求入口，且同样会稳定带 `requestId`
+     - `scripts/apply-openclaw-frontstage-broker-data.py` 也已补成真实 consumer / 验证入口：现在直接复用 `openclaw_infos_handle_contract.py` 的 helper，除了原有 `handle --request-file ... --response-file ...` 一跳式 request/response envelope smoke，还会先跑一跳真实 `invoke_handle_query()` `contract.catalog` consumer 检查
+     - broker compat emit、`supervisor`、`frontstage-recovery`、`local-health` 现在开始共用 `openclaw_infos_handle_contract.py` 里的最小 request client helper，统一经 `handle --request-file -` 打请求；这样 formal request entry 已不只是 contract 文档，而是真实 runtime caller 在复用
+     - 本轮又再迁了一个真实 non-delivery consumer：`scripts/openclaw-post-upgrade-self-check.py` 现在也会复用同一 helper，经 `handle --request-file -` 查询 `contract.catalog`，把 infos-handle 正式请求面纳入升级后自检，而不是只靠 README / 单测；这轮又把 `apply-openclaw-frontstage-broker-data.py` 也补成同类 query consumer。最新继续收口后，`post-upgrade-self-check` 不再只看 `contract.catalog`，而是又新增一跳真实 `snapshot.summary` consumer；本轮再继续往前推一小步，把原先口径偏旧的 `sources.catalog` 升级后自检改成 `sources.latest` 真 consumer，直接按推荐轻量 inventory 入口做 live 验证。与此同时，`apply-openclaw-frontstage-broker-data.py` 也已经有一跳真实 `events.recent` consumer，连 `limit` 参数都开始经同一 helper / request-file 主路径跑 live 验证
+     - delivery adapter 这层也又继续收口了一步：`extract_delivery_snapshot()` 现在会优先读 `delivery.notice / delivery.frontstage / delivery.artifact`，同时把旧 `artifactNotice / metadata` 兼容别名也一并归一；本轮又补了 `extract_handle_response_snapshot()` 这层通用 helper snapshot，把 `result / output / deliveryNotice / frontstageDelivery / artifact` 一并收口给 query consumer；这轮再往前补了 `notice / frontstage / artifactNotice / notify / targetSessionKey / messageId` 顶层 alias，随后又把 `extract_frontstage_notify_payload()` / `build_compat_delivery_bundle()` 也一并定成正式 helper：broker compat emit 与 supervisor / recovery notify adapter 现在都直接复用同一份 contract helper，而不是各自再留一套前台返回解析；这次继续补齐后，`notify-frontstage` compat payload 与 broker `emit` compat shell 也都会把 `notice / deliveryNotice / frontstage / frontstageDelivery / artifact / artifactNotice / notify` 显式收口为 `...|null`，把 legacy edge shape 的空对象缺省再压掉一层
+     - `notify-frontstage` 旧 compat 入口本轮也已再弱化一层：内部改成走 `handle` 主请求面，再回吐兼容 payload，便于旧入口继续可用但不再额外长出平行实现
 
 4. **当前验证结果保持全绿**
    - `python3 scripts/test-openclaw-infos-handle.py` → `ALL PASS`
    - `python3 scripts/test-frontstage-broker.py` → `ALL PASS`
-   - `python3 -m py_compile scripts/openclaw-infos-handle.py scripts/test-openclaw-infos-handle.py scripts/openclaw-frontstage-broker.py scripts/test-frontstage-broker.py` → 通过
-   - live 查询也已确认：
-     - `python3 scripts/openclaw-infos-handle.py query --kind events.recent --format json` → 返回 `result.latestBySource`
-     - `python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json` → 当前返回 `queryContractVersion=13 / brokerContractVersion=2`
+   - `python3 scripts/test-frontstage-recovery-watch.py` → `ALL PASS`
+   - `python3 scripts/test-infos-handle-frontstage-callers.py` → `ALL PASS`
+   - `python3 -m py_compile scripts/apply-openclaw-frontstage-broker-data.py scripts/openclaw-infos-handle.py scripts/openclaw-frontstage-broker.py scripts/test-infos-handle-frontstage-callers.py scripts/test-openclaw-infos-handle.py scripts/test-frontstage-broker.py` → 通过
+   - 当前新增 smoke / caller 回归也已进验证：
+     - `handle --format json`
+     - `handle --format image`（生成 SVG）
+     - `handle --format audio`（通过 stub renderer 验证 artifact contract）
+     - `handle --format image|audio --delivery-mode frontstage`（通过 fake helper 验证 artifact notice delivery contract）
+     - `handle --format image --delivery-mode frontstage --source ... --event-key ... --broker-state-dir ... --broker-data-dir ...`（验证 artifact-notice 元数据能被 broker ingest / delivery 一并收下）
+     - `handle --request-file <path>` 与 `handle --request-file -`（验证最小正式请求入口）
+     - `handle --response-file <path>`（验证最小正式响应出口）
+     - 三条 watcher/caller 与 broker compat emit 的 request-envelope 命令构造与返回解析
+     - `python3 scripts/apply-openclaw-frontstage-broker-data.py`
+     - 当前 live 输出会额外打印 `infosHandleEventsRecentConsumer`，确认第 3 个真实 query consumer 已经经 `handle --request-file -` 主路径跑通
+     - `python3 -m py_compile scripts/openclaw_infos_handle_contract.py scripts/openclaw-infos-handle.py scripts/openclaw-frontstage-broker.py scripts/openclaw-supervisor-status.py scripts/openclaw-frontstage-recovery-watch.py scripts/openclaw-post-upgrade-self-check.py scripts/apply-openclaw-frontstage-broker-data.py scripts/test-infos-handle-frontstage-callers.py scripts/test-openclaw-infos-handle.py scripts/test-frontstage-broker.py`
+   - live 查询至少已确认：
+     - `python3 scripts/openclaw-infos-handle.py query --kind events.recent --format json` → 返回 `result.latestBySource / result.latestBySourceItems`
+     - `python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json` → 当前返回 `queryContractVersion=17 / requestContractVersion=6 / brokerContractVersion=2`
 
-### 还没做、但下周一最自然的下一步
+### 已到当前“最终版”，若继续则属于下一阶段
 
 按优先级建议：
 
-1. **先做收尾文档同步，而不是继续开新 query**
-   - 补齐 `events.recent.latestBySource` 在 README / 说明里的最终口径
-   - 检查 `PLANS.md` / `tools/openclaw-frontstage-broker/README.md` / `HANDOFF.md` 三处描述是否完全对齐
+1. **继续扩 infos-handle 的 richer delivery / renderer，但不回退正式主入口**
+   - `image/audio` 当前已是 preview 级正式 handler；下一步若继续，应补 richer renderer / artifact transport，而不是再开平行入口
+   - `handle --request-file` 与 contract helper 保持为唯一推荐主路径
 
-2. **如果文档已齐，再决定要不要补有序 shape**
-   - 可评估是否给 `events.recent` 增加 `latestBySourceItems[]`
-   - 目的只是提供稳定顺序；不要替代现有 keyed object
+2. **继续把新增 consumer 保持在 infos-handle 主请求面上**
+   - 当前 broker `emit` / `query` / `notify-frontstage` 都已只剩 compat 壳
+   - 后续若再接新 caller / consumer，默认直接复用 `openclaw_infos_handle_contract.py`，不要再往 broker 或旧 convenience route 塞新逻辑
 
 3. **继续坚持小步 contract-first 路线**
-   - 只收 machine-readable 输出面
    - 不碰主对话链
    - 不做 broker / renderer 大拆
+   - 每一步都带最小验证
+
+### 固定续做口令（本轮正式拍板）
+
+如果用户下周一回来要继续这条线，**固定口令就定为：`继续 broker / infos-handle`**。
+
+看到这句话时，默认按下面语义执行，不需要再二次猜测：
+
+1. 恢复 `broker sidecar 数据层 1.0 + infos-handle 正式请求层` 这条主线
+2. 以当前本地代码停点与本节收尾记录为准继续
+3. 先看当前 contract / README / HANDOFF 是否仍与代码一致，不默认新开大功能
+4. 若继续扩，优先沿 `handle --request-file` + helper 主路径往 richer consumer / delivery 推进，而不是把新副作用塞回 broker
+5. 继续坚持小步、contract-first、不中断主对话链的路线
 
 ### 明天/下周一继续时的最短恢复路径
 
 1. `git log --oneline -5`
 2. `git status --short`
-3. 读：`PLANS.md`
-4. 读：`tools/openclaw-frontstage-broker/README.md`
-5. 读：`memory/daily/2026-05-15.md`
-6. 跑：
+3. 读：`HANDOFF.md`
+4. 读：`PLANS.md`
+5. 读：`tools/openclaw-frontstage-broker/README.md`
+6. 读：`memory/daily/2026-05-15.md`
+7. 跑：
    - `python3 scripts/test-openclaw-infos-handle.py`
    - `python3 scripts/test-frontstage-broker.py`
-7. 再决定是先补 README 对齐，还是补 `latestBySourceItems[]`
+8. 再决定是继续迁 caller 到 infos-handle，还是继续扩 infos-handle 的下一层 text/json 契约
 
 ### 当前边界与注意事项
 

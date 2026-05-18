@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 MODULE_PATH = Path(__file__).with_name("openclaw-frontstage-broker.py")
 
@@ -37,10 +38,67 @@ def main() -> int:
         state_path = tmp_path / "frontstage" / "broker-state.json"
         broker_data_dir = tmp_path / "broker"
 
-        mod.emit_frontstage = lambda session_key, message: {
-            "targetSessionKey": "agent:main:dashboard:test",
-            "response": {"messageId": f"msg-{message}"},
-        }
+        handle_calls: list[list[str]] = []
+
+        def fake_run(cmd, capture_output, text, check, input=None):
+            handle_calls.append(cmd)
+            assert cmd[1].endswith("openclaw-infos-handle.py"), cmd
+            assert cmd[2] == "handle", cmd
+            assert "--request-file" in cmd, cmd
+            assert cmd[cmd.index("--request-file") + 1] == "-", cmd
+            request_payload = json.loads(input)
+            assert request_payload == {
+                "requestId": (
+                    "broker.emit:local-health:health-1"
+                    if len(handle_calls) < 3
+                    else "broker.emit:frontstage-recovery:recovery-1"
+                ),
+                "message": "健康恢复" if len(handle_calls) < 3 else "前台恢复观察",
+                "format": "text",
+                "sessionKey": "agent:main:main",
+                "deliveryMode": "frontstage",
+                "frontstageSource": "local-health" if len(handle_calls) < 3 else "frontstage-recovery",
+                "frontstageEventKey": "health-1" if len(handle_calls) < 3 else "recovery-1",
+                "brokerStateDir": str(state_path.parent.resolve()),
+                "brokerDataDir": str(broker_data_dir.resolve()),
+            }, request_payload
+            message = request_payload["message"]
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "ok": True,
+                        "action": "handle",
+                        "requestId": request_payload["requestId"],
+                        "requestInputMode": "request_file",
+                        "responseOutputMode": "stdout",
+                        "response": {
+                            "delivery": {
+                                "mode": "frontstage",
+                                "kind": "message",
+                                "status": "sent",
+                                "message": message,
+                                "notice": {
+                                    "kind": "message",
+                                    "displayText": message,
+                                    "frontstage": {
+                                        "targetSessionKey": "agent:main:dashboard:test",
+                                        "messageId": f"msg-{message}",
+                                    },
+                                },
+                                "frontstage": {
+                                    "targetSessionKey": "agent:main:dashboard:test",
+                                    "messageId": f"msg-{message}",
+                                },
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+
+        mod.subprocess.run = fake_run
 
         ingested = mod.ingest_event(
             "local-health",
@@ -63,6 +121,24 @@ def main() -> int:
             broker_data_dir,
         )
         assert first["ok"] is True and first["skipped"] is False
+        assert first["compatibilityMode"] == "legacy_emit"
+        assert first["transport"] == "infos_handle_handle"
+        assert first["delivery"]["mode"] == "frontstage"
+        assert first["notice"]["kind"] == "message"
+        assert first["deliveryNotice"]["kind"] == "message"
+        assert first["frontstage"]["targetSessionKey"] == "agent:main:dashboard:test"
+        assert first["frontstageDelivery"]["targetSessionKey"] == "agent:main:dashboard:test"
+        assert first["artifact"] is None
+        assert first["artifactNotice"] is None
+        assert first["delivery"]["artifactRef"] is None
+        assert first["delivery"]["artifact"] is None
+        assert first["delivery"]["artifactNotice"] is None
+        assert first["delivery"]["notice"]["artifactRef"] is None
+        assert first["delivery"]["frontstage"]["artifactRef"] is None
+        assert first["delivery"]["metadata"]["messageId"] == "msg-健康恢复"
+        assert first["notify"]["targetSessionKey"] == "agent:main:dashboard:test"
+        assert first["delivery"]["notify"]["targetSessionKey"] == "agent:main:dashboard:test"
+        assert first["delivery"]["notify"]["response"]["messageId"] == "msg-健康恢复"
 
         second = mod.emit_event(
             "local-health",
@@ -73,6 +149,41 @@ def main() -> int:
             broker_data_dir,
         )
         assert second["ok"] is True and second["skipped"] is True
+        assert second["compatibilityMode"] == "legacy_emit"
+        assert second["transport"] == "infos_handle_handle"
+        assert second["frontstageDelivery"]["messageId"] == "msg-健康恢复"
+        assert second["notify"]["response"]["messageId"] == "msg-健康恢复"
+        assert second["artifact"] is None
+        assert second["artifactNotice"] is None
+        assert second["delivery"]["status"] == "skipped"
+
+        legacy_state_path = tmp_path / "legacy-frontstage" / "broker-state.json"
+        legacy_broker_data_dir = tmp_path / "legacy-broker"
+        mod.emit_frontstage = lambda session_key, outgoing_message: {
+            "ok": True,
+            "targetSessionKey": f"{session_key}:legacy-frontstage",
+            "response": {"messageId": f"legacy-msg::{outgoing_message}"},
+        }
+        legacy_emit = mod.emit_compatibility_event(
+            "legacy-source",
+            "legacy-health-1",
+            "agent:main:main",
+            "兼容壳前台消息",
+            legacy_state_path,
+            legacy_broker_data_dir,
+        )
+        assert legacy_emit["transport"] == "legacy_broker_emit"
+        assert legacy_emit["frontstageDelivery"]["targetSessionKey"] == "agent:main:main:legacy-frontstage"
+        assert legacy_emit["notify"]["response"]["messageId"] == "legacy-msg::兼容壳前台消息"
+        assert legacy_emit["deliveryNotice"] is None
+        assert legacy_emit["artifact"] is None
+        assert legacy_emit["artifactNotice"] is None
+        assert legacy_emit["delivery"]["artifactRef"] is None
+        assert legacy_emit["delivery"]["artifact"] is None
+        assert legacy_emit["delivery"]["artifactNotice"] is None
+        assert legacy_emit["delivery"]["notify"]["response"]["messageId"] == "legacy-msg::兼容壳前台消息"
+        assert legacy_emit["delivery"]["metadata"]["messageId"] == "legacy-msg::兼容壳前台消息"
+        assert legacy_emit["delivery"]["frontstage"]["messageId"] == "legacy-msg::兼容壳前台消息"
 
         third = mod.emit_event(
             "frontstage-recovery",
@@ -83,6 +194,8 @@ def main() -> int:
             broker_data_dir,
         )
         assert third["ok"] is True and third["skipped"] is False
+        assert third["transport"] == "infos_handle_handle"
+        assert len(handle_calls) == 3
 
         paths = mod.broker_paths(state_path, broker_data_dir)
         with paths["events"].open("a", encoding="utf-8") as fh:
@@ -175,6 +288,8 @@ def main() -> int:
         assert manifest["views"]["overview"].endswith("overview.json")
         assert manifest["updatedAt"] == manifest["freshness"]["rebuiltAt"]
         assert manifest["freshness"]["sources"]["recoveryNotify"]["reportTimestamp"] == "2026-05-14T16:33:00+08:00"
+        assert manifest["publicationMode"] == "best_effort"
+        assert manifest["publicationWarnings"] == []
         assert manifest["published"]["frontstageStatusHtml"].endswith("jarvis-frontstage-status.html")
         assert manifest["published"]["frontstageSnapshotJson"].endswith("jarvis-frontstage-snapshot.json")
 
@@ -241,6 +356,42 @@ def main() -> int:
         assert "frontstage_recovery.status.changed" in public_html
         assert "恢复观察" in public_html
         assert "/jarvis-frontstage-snapshot.json" in public_html
+
+        original_save_text = mod.save_text
+
+        def flaky_save_text(path: Path, content: str) -> None:
+            path_text = str(path)
+            if path.name in {
+                "index.html",
+                "status.json",
+                "snapshot.json",
+                "jarvis-frontstage-status.html",
+                "jarvis-frontstage-status.json",
+                "jarvis-frontstage-snapshot.json",
+            } and ("frontstage-status" in path_text or "jarvis-frontstage" in path.name):
+                raise PermissionError("simulated publication failure")
+            return original_save_text(path, content)
+
+        mod.save_text = flaky_save_text
+        degraded_paths = mod.build_views(state_path, broker_data_dir)
+        mod.save_text = original_save_text
+
+        degraded_manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+        assert degraded_manifest["publicationMode"] == "best_effort"
+        assert len(degraded_manifest["publicationWarnings"]) == 6
+        assert {item["artifact"] for item in degraded_manifest["publicationWarnings"]} == {
+            "frontstageStatusCanvasHtml",
+            "frontstageStatusCanvasJson",
+            "frontstageSnapshotCanvasJson",
+            "frontstageStatusHtml",
+            "frontstageStatusJson",
+            "frontstageSnapshotJson",
+        }
+        assert all("PermissionError: simulated publication failure" == item["error"] for item in degraded_manifest["publicationWarnings"])
+        assert degraded_manifest["published"] == {}
+        assert "frontstageStatusHtml" not in degraded_paths
+        assert Path(degraded_paths["snapshotView"]).exists()
+        assert Path(degraded_paths["manifest"]).exists()
 
         print("ALL PASS")
         print(paths["events"])

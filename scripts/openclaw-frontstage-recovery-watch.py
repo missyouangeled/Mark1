@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from openclaw_infos_handle_contract import build_handle_request_payload, extract_frontstage_notify_payload, invoke_handle_request
+
 DEFAULT_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "frontstage-recovery"
 REPORT_PATH_NAME = "last-report.json"
 NOTIFY_STATE_PATH_NAME = "notify-state.json"
@@ -508,7 +510,6 @@ def build_notification_candidate(previous_report: dict[str, Any], previous_notif
 
     return None
 
-
 def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[str, Any], state_dir: Path, event_log_path: Path, enabled: bool) -> None:
     if not enabled:
         return
@@ -522,43 +523,41 @@ def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[
         return
 
     helper_path = Path(__file__).with_name("openclaw-infos-handle.py")
-    cmd = [
-        sys.executable,
-        str(helper_path),
-        "notify-frontstage",
-        "--source",
-        "frontstage-recovery",
-        "--event-key",
-        str(candidate["eventKey"]),
-        "--session-key",
-        str(candidate["sessionKey"]),
-        "--message",
-        str(candidate["message"]),
-        "--data-json",
-        json.dumps({
+    request_payload = build_handle_request_payload(
+        request_id=f"frontstage-recovery:{candidate['eventKey']}",
+        message=str(candidate["message"]),
+        output_format="text",
+        delivery_mode="frontstage",
+        frontstage_source="frontstage-recovery",
+        frontstage_event_key=str(candidate["eventKey"]),
+        session_key=str(candidate["sessionKey"]),
+        data={
             "status": candidate.get("status"),
             "anomalyCode": candidate.get("anomalyCode"),
             "checkedAt": current_report.get("checkedAt"),
-        }, ensure_ascii=False),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        append_log(event_log_path, f"[{current_report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error={(result.stderr or result.stdout).strip()}")
-        return
+        },
+    )
     try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        append_log(event_log_path, f"[{current_report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error=invalid_json")
+        payload = invoke_handle_request(
+            helper_path,
+            request_payload,
+            python_executable=sys.executable,
+            run=subprocess.run,
+        )
+    except RuntimeError as exc:
+        append_log(event_log_path, f"[{current_report.get('checkedAt')}] notify_failed session={candidate['sessionKey']} error={exc}")
         return
 
+    notify_payload = extract_frontstage_notify_payload(payload)
+    response = notify_payload.get("response") if isinstance(notify_payload.get("response"), dict) else {}
     notify_state = {
         "sentAt": current_report.get("checkedAt"),
         "eventKey": candidate["eventKey"],
         "status": candidate["status"],
         "anomalyCode": candidate.get("anomalyCode"),
         "sessionKey": candidate["sessionKey"],
-        "targetSessionKey": payload.get("targetSessionKey") if isinstance(payload, dict) else None,
-        "messageId": payload.get("messageId") if isinstance(payload, dict) else None,
+        "targetSessionKey": notify_payload.get("targetSessionKey"),
+        "messageId": response.get("messageId") or notify_payload.get("messageId"),
         "message": candidate["message"],
     }
     save_json(notify_state_path, notify_state)
