@@ -1182,6 +1182,8 @@ def main() -> int:
         )
         try:
             wait_for_sidecar(f"http://127.0.0.1:{sidecar_port}/healthz")
+            healthz_payload = fetch_json(f"http://127.0.0.1:{sidecar_port}/healthz")
+            assert healthz_payload["artifactRoutePrefix"] == "/v1/artifacts"
             snapshot_summary = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json")
             assert snapshot_summary["kind"] == "snapshot.summary"
             assert snapshot_summary["result"]["summary"] == "前台状态总体正常"
@@ -1199,6 +1201,53 @@ def main() -> int:
             assert handle_payload["ok"] is True
             assert handle_payload["response"]["kind"] == "snapshot.summary"
             assert handle_payload["response"]["output"]["handler"] == "json.stdout.v1"
+
+            image_request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/handle",
+                data=json.dumps({"kind": "snapshot.summary", "format": "image"}, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(image_request, timeout=5) as response:
+                image_payload = json.loads(response.read().decode("utf-8"))
+            image_output = image_payload["response"]["output"]
+            image_href = image_output["artifactHref"]
+            assert image_href.startswith("/v1/artifacts/")
+            assert image_output["artifact"]["href"] == image_href
+            with urllib.request.urlopen(f"http://127.0.0.1:{sidecar_port}{image_href}", timeout=5) as response:
+                image_body = response.read().decode("utf-8")
+                image_content_type = response.headers.get_content_type()
+            assert image_content_type == "image/svg+xml"
+            assert "<svg" in image_body
+
+            audio_request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/handle",
+                data=json.dumps(
+                    {
+                        "kind": "snapshot.summary",
+                        "format": "audio",
+                        "audioRenderer": str(audio_renderer),
+                        "audioPreset": "demo-voice",
+                    },
+                    ensure_ascii=False,
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(audio_request, timeout=10) as response:
+                audio_payload = json.loads(response.read().decode("utf-8"))
+            audio_output = audio_payload["response"]["output"]
+            audio_href = audio_output["artifactHref"]
+            assert audio_href.startswith("/v1/artifacts/")
+            assert audio_output["artifact"]["href"] == audio_href
+            with urllib.request.urlopen(f"http://127.0.0.1:{sidecar_port}{audio_href}?download=1", timeout=5) as response:
+                audio_body = response.read().decode("utf-8")
+                audio_content_type = response.headers.get_content_type()
+                audio_disposition = response.headers.get("Content-Disposition")
+            assert audio_content_type == "audio/mpeg"
+            assert audio_disposition is not None and audio_disposition.startswith("attachment;")
+            assert audio_body.startswith("FAKE AUDIO | demo-voice | 前台状态总体正常。")
+
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{sidecar_port}/v1/events/stream?kind=snapshot.summary&intervalMs=1000",
                 timeout=5,

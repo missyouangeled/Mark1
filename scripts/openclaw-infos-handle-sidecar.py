@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import socketserver
 import sys
 import time
@@ -14,7 +15,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from openclaw_infos_handle_contract import invoke_handle_query, invoke_handle_request
 
@@ -28,6 +29,85 @@ DEFAULT_OUTPUT_ROOT = WORKSPACE / "tmp" / "infos-handle" / "outputs"
 DEFAULT_BROKER_ROOT = Path.home() / ".local" / "state" / "openclaw" / "broker"
 DEFAULT_SNAPSHOT_PATH = DEFAULT_BROKER_ROOT / "views" / "snapshot.json"
 DEFAULT_EVENTS_PATH = DEFAULT_BROKER_ROOT / "events.jsonl"
+ARTIFACT_ROUTE_PREFIX = "/v1/artifacts"
+ARTIFACT_TRUE_VALUES = {"1", "true", "yes", "on"}
+ARTIFACT_SUFFIX_PREFERENCE = {
+    "image": [".svg", ".png", ".webp", ".jpg", ".jpeg", ".gif"],
+    "audio": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
+}
+
+
+def build_artifact_href(artifact_ref: str) -> str:
+    return f"{ARTIFACT_ROUTE_PREFIX}/{quote(artifact_ref, safe='')}"
+
+
+
+def enrich_artifact_hrefs(payload: Any) -> None:
+    if isinstance(payload, dict):
+        artifact = payload.get("artifact") if isinstance(payload.get("artifact"), dict) else None
+        artifact_ref = None
+        if artifact:
+            ref_value = artifact.get("ref")
+            if isinstance(ref_value, str) and ref_value.strip():
+                artifact_ref = ref_value.strip()
+        if artifact_ref is None:
+            ref_value = payload.get("artifactRef")
+            if isinstance(ref_value, str) and ref_value.strip():
+                artifact_ref = ref_value.strip()
+        if artifact_ref:
+            href = build_artifact_href(artifact_ref)
+            payload.setdefault("artifactHref", href)
+            if artifact:
+                artifact.setdefault("href", href)
+        for value in payload.values():
+            enrich_artifact_hrefs(value)
+    elif isinstance(payload, list):
+        for item in payload:
+            enrich_artifact_hrefs(item)
+
+
+
+def resolve_artifact_path(output_root: Path, artifact_ref: str) -> tuple[Path, str]:
+    normalized_ref = str(artifact_ref or "").strip()
+    parts = normalized_ref.split(":", 2)
+    if len(parts) != 3 or parts[0] != "infos-handle":
+        raise ValueError(f"unsupported artifact ref: {artifact_ref}")
+    format_name = parts[1].strip()
+    stem = parts[2].strip()
+    if format_name not in ARTIFACT_SUFFIX_PREFERENCE:
+        raise FileNotFoundError(f"unsupported artifact format: {format_name}")
+    if not stem or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-_." for char in stem.lower()):
+        raise ValueError(f"invalid artifact stem: {stem}")
+    artifact_dir = (output_root / format_name).resolve()
+    if not artifact_dir.exists():
+        raise FileNotFoundError(f"artifact directory missing: {artifact_dir}")
+
+    preferred_suffixes = ARTIFACT_SUFFIX_PREFERENCE.get(format_name) or []
+    suffix_rank = {suffix: index for index, suffix in enumerate(preferred_suffixes)}
+    candidates: list[Path] = []
+    for candidate in artifact_dir.glob(f"{stem}.*"):
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(artifact_dir)
+        except ValueError:
+            continue
+        if resolved.is_file():
+            candidates.append(resolved)
+    if not candidates:
+        raise FileNotFoundError(f"artifact not found: {artifact_ref}")
+    candidates.sort(key=lambda item: (suffix_rank.get(item.suffix.lower(), 999), item.name))
+    return candidates[0], format_name
+
+
+
+def guess_artifact_media_type(path: Path, format_name: str) -> str:
+    guessed, _ = mimetypes.guess_type(path.name)
+    if guessed:
+        return guessed
+    return {
+        "image": "image/svg+xml",
+        "audio": "audio/mpeg",
+    }.get(format_name, "application/octet-stream")
 
 
 class SidecarServer(ThreadingHTTPServer):
@@ -73,11 +153,15 @@ class SidecarHandler(BaseHTTPRequestHandler):
                     "snapshotPath": str(self.server.snapshot_path),
                     "eventsPath": str(self.server.events_path),
                     "outputRoot": str(self.server.output_root),
+                    "artifactRoutePrefix": ARTIFACT_ROUTE_PREFIX,
                 }
             )
             return
         if parsed.path.startswith("/v1/query/"):
             self._handle_query(parsed)
+            return
+        if parsed.path == ARTIFACT_ROUTE_PREFIX or parsed.path.startswith(f"{ARTIFACT_ROUTE_PREFIX}/"):
+            self._handle_artifact(parsed)
             return
         if parsed.path == "/v1/events/stream":
             self._handle_sse(parsed)
@@ -114,6 +198,7 @@ class SidecarHandler(BaseHTTPRequestHandler):
         except RuntimeError as exc:
             self._write_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
             return
+        enrich_artifact_hrefs(response)
         status = HTTPStatus.OK if response.get("ok") else HTTPStatus.BAD_GATEWAY
         self._write_json(response, status=status)
 
@@ -147,6 +232,37 @@ class SidecarHandler(BaseHTTPRequestHandler):
             self._write_text(str(snapshot.get("text") or ""), content_type="text/plain; charset=utf-8")
             return
         self._write_json(snapshot)
+
+    def _handle_artifact(self, parsed) -> None:
+        params = parse_qs(parsed.query, keep_blank_values=False)
+        ref_from_path = parsed.path.removeprefix(ARTIFACT_ROUTE_PREFIX).strip("/")
+        artifact_ref = unquote(ref_from_path) if ref_from_path else self._first_text(params.get("ref"))
+        if not artifact_ref:
+            self._write_json({"ok": False, "error": "missing artifact ref"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        try:
+            artifact_path, format_name = resolve_artifact_path(self.server.output_root, artifact_ref)
+        except ValueError as exc:
+            self._write_json({"ok": False, "error": str(exc), "artifactRef": artifact_ref}, status=HTTPStatus.BAD_REQUEST)
+            return
+        except FileNotFoundError as exc:
+            self._write_json({"ok": False, "error": str(exc), "artifactRef": artifact_ref}, status=HTTPStatus.NOT_FOUND)
+            return
+        try:
+            content = artifact_path.read_bytes()
+        except OSError as exc:
+            self._write_json({"ok": False, "error": f"unable to read artifact: {exc}", "artifactRef": artifact_ref}, status=HTTPStatus.BAD_GATEWAY)
+            return
+
+        download_flag = (self._first_text(params.get("download"), params.get("attachment")) or "").strip().lower() in ARTIFACT_TRUE_VALUES
+        disposition = "attachment" if download_flag else "inline"
+        self.send_response(HTTPStatus.OK)
+        self._send_common_headers(content_type=guess_artifact_media_type(artifact_path, format_name), content_length=len(content))
+        self.send_header("Content-Disposition", f'{disposition}; filename="{artifact_path.name}"')
+        self.send_header("X-Infos-Handle-Artifact-Ref", artifact_ref)
+        self.send_header("X-Infos-Handle-Artifact-Format", format_name)
+        self.end_headers()
+        self.wfile.write(content)
 
     def _handle_sse(self, parsed) -> None:
         params = parse_qs(parsed.query, keep_blank_values=False)
@@ -256,6 +372,7 @@ def main() -> int:
         "snapshotPath": str(server.snapshot_path),
         "eventsPath": str(server.events_path),
         "outputRoot": str(server.output_root),
+        "artifactRoutePrefix": ARTIFACT_ROUTE_PREFIX,
     }, ensure_ascii=False))
     try:
         server.serve_forever()

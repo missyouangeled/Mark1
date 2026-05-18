@@ -43,6 +43,7 @@ GET /healthz
 - `snapshotPath`
 - `eventsPath`
 - `outputRoot`
+- `artifactRoutePrefix`
 
 ### 2. 查询接口
 
@@ -103,7 +104,33 @@ sidecar 会自动补：
 
 然后复用 `invoke_handle_request()` 调用正式主入口。
 
-### 4. SSE 推送
+当 `format=image|audio` 时，sidecar 现在还会在返回体里额外补一层可直接给网页消费的 artifact 链接：
+
+- `response.output.artifactHref`
+- `response.output.artifact.href`
+- `response.delivery.artifactHref`
+- 以及 `notice / artifactNotice / frontstage` 这些嵌套对象里的 `artifactHref`
+
+这样消费方不必自己从本地路径拼 URL，只需要拿 `artifactRef` 或返回里的 `artifactHref` 即可继续取文件。
+
+### 4. Artifact 文件读取
+
+```http
+GET /v1/artifacts/<artifactRef>
+GET /v1/artifacts?ref=<artifactRef>
+```
+
+可选参数：
+
+- `download=1` / `attachment=1`：返回 `Content-Disposition: attachment`
+
+当前行为：
+
+- 只允许读取当前 `outputRoot` 下的 `image/` 与 `audio/` artifact
+- 会按 `artifactRef` 解析成实际文件并返回正确 `Content-Type`
+- 主要给自建网页 / Control UI 扩展 consumer 直接挂 `<img>` / `<audio>` 使用
+
+### 5. SSE 推送
 
 ```http
 GET /v1/events/stream?kind=snapshot.summary
@@ -156,6 +183,8 @@ journalctl --user -u openclaw-infos-handle-sidecar.service -n 100 --no-pager
 curl -s http://127.0.0.1:18790/healthz
 curl -s 'http://127.0.0.1:18790/v1/query/snapshot.summary?format=json'
 curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'
+curl -s -X POST 'http://127.0.0.1:18790/v1/handle' -H 'Content-Type: application/json' -d '{"kind":"snapshot.summary","format":"image"}'
+curl -s 'http://127.0.0.1:18790/v1/artifacts/infos-handle%3Aimage%3Aexample-ref' || true
 curl -N 'http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary'
 ```
 
@@ -185,6 +214,12 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-bran
 1. 优先请求 `infosHandleSummaryHref`
 2. 若失败，再回退到 `jarvis-frontstage-snapshot.json`
 3. 若浏览器支持 `EventSource`，再尝试连 `infosHandleSseHref`
+
+而对自建网页这类 richer consumer，现在更推荐的最小接法是：
+
+1. `GET /v1/query/...` / `POST /v1/handle` 先拿结构化结果
+2. 若返回里带 `artifactHref`，直接继续请求 `GET <artifactHref>`
+3. 需要轻量刷新时，再订阅 `GET /v1/events/stream`
 
 因此 sidecar 当前的价值是：
 
