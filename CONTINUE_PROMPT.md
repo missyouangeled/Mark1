@@ -4,41 +4,60 @@
 
 ---
 
-继续纳达尔星项目。
+继续 `broker / infos-handle` 这条主线。
 
-先不要直接开始写代码，先按下面顺序恢复上下文：
+先不要重写结构，也不要直接开大改。先按下面顺序恢复上下文：
 
-1. 读 `HANDOFF.md`
-2. 读 `PROJECT_VERSIONS.md`
-3. 读 `memory/2026-04-02.md`（以及今天/昨天对应的 memory 文件）
-4. 查看当前 Git 状态与最近提交
-5. 以当前工作区和 Git 最新状态为准继续开发
+1. 读 `HANDOFF.md`，重点看：
+   - `给下一个模型的增强阶段直读摘要`
+   - `可直接贴给下一个模型的接手提示词`
+   - `明天/下周一继续时的最短恢复路径`
+2. `git log --oneline -5`
+3. `git status --short`
+4. 跑最小验证：
+   - `python3 scripts/test-openclaw-infos-handle.py`
+   - `python3 scripts/test-frontstage-broker.py`
+   - `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar`
+5. 看 sidecar 状态：
+   - `systemctl --user --no-pager --full status openclaw-infos-handle-sidecar.service`
+6. 以当前 Git 最新状态和 `HANDOFF.md` 为准继续开发
 
-当前默认主锚点版本是：**星云初始03**。
+当前必须先记住的事实：
 
-如果我没有额外说明：
-- 默认继续 `pulsenest-php/` 这个论坛系统
-- 默认沿着“可实际上线运营的论坛系统”方向推进
-- 默认优先保持当前页面风格与版本锚点一致
-- 做系统性修改后，记得及时 `git commit` 并推送 GitHub 备份
+- 这条线的当前正确定位是：
+  - `broker = sidecar 数据层 + compat 壳`
+  - `infos-handle = 正式请求/处理层`
+  - `Control UI = 优先消费 infos-handle sidecar，失败再回退 snapshot`
+- 正式主入口继续保持：
+  - `handle --request-file`
+  - `openclaw_infos_handle_contract.py`
+- 不要把新逻辑塞回 `broker emit/query/notify-frontstage` 这些 compat 壳
+- 不要把当前工作重新定义成“大拆分层重构”
 
-如果我说“恢复星云初始03”，就以 `PROJECT_VERSIONS.md` 里当前定义的星云初始03为准。
+当前最新本地停点：
 
-如果你接手后不确定从哪继续，就先总结：
+- `ec946b6` `Compact infos-handle summary audio plans`
+
+这一步已做完：
+
+- 把 `*.summary` 类音频 spoken-text plan 收紧为：**最多 3 段、最多 1 条建议**
+- 补了 `health.summary` 音频回归测试
+- 昨晚/今天早上发生过一次临时关机，但恢复后已验证主链、broker 视图、sidecar 与最小 consumer 都仍正常
+
+如果继续做，默认只在下面两个方向里二选一：
+
+1. 继续增强 `image/audio delivery`，但**不改主入口**
+2. 继续把新增 caller / consumer 收口到 `infos-handle handle --request-file` 主路径
+
+如果你接手后不确定从哪开始，就先输出：
+
 - 当前已完成哪些能力
-- 当前版本锚点是什么
-- 下一步最自然的 3 个开发方向
-
-然后再开始动代码。
-
-当前预览参考地址：
-- 首页：`http://192.168.233.130:8093/`
-- 后台：`http://192.168.233.130:8093/admin.php`
+- 当前最新停点 commit 是什么
+- 当前验证是否仍全绿
+- 下一步只选哪一个增强方向，为什么
 
 ---
 
 ## 极简版（一句话）
 
-如果你只想发一句最短的，也可以直接发这个：
-
-继续纳达尔星项目，先读 HANDOFF.md、PROJECT_VERSIONS.md 和最新 memory 文件；当前主锚点是星云初始03，按当前 Git 最新状态继续开发。
+继续 `broker / infos-handle`；先读 `HANDOFF.md`，再看最近提交和工作区状态，先跑 `test-openclaw-infos-handle.py`、`test-frontstage-broker.py`、`apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar`，确认仍是绿的后，再沿 `handle --request-file + openclaw_infos_handle_contract.py` 主路径小步继续。

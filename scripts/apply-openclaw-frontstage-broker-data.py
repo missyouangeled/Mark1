@@ -404,13 +404,82 @@ def fetch_sse_preview(url: str, *, timeout_seconds: float = 5.0, lines: int = 4)
 
 
 
-def derive_infos_handle_sidecar_healthz_href(summary_href: str | None) -> str | None:
+def derive_infos_handle_sidecar_base_url(summary_href: str | None) -> str | None:
     if not isinstance(summary_href, str) or not summary_href.strip():
         return None
     parsed = urllib.parse.urlsplit(summary_href)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return None
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+
+
+
+def derive_infos_handle_sidecar_healthz_href(summary_href: str | None) -> str | None:
+    base_url = derive_infos_handle_sidecar_base_url(summary_href)
+    if not base_url:
+        return None
+    parsed = urllib.parse.urlsplit(base_url)
     return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "/healthz", "", ""))
+
+
+
+def fetch_url_text(url: str, *, timeout_seconds: float = 5.0) -> tuple[str, str]:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+            body = response.read().decode("utf-8", errors="replace")
+            content_type = response.headers.get_content_type()
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"url fetch failed: {url} ({exc})") from exc
+    return body, content_type
+
+
+
+def invoke_infos_handle_sidecar_handle(base_url: str, request_payload: dict[str, object], *, timeout_seconds: float = 10.0) -> dict[str, Any]:
+    handle_href = urllib.parse.urljoin(base_url.rstrip("/") + "/", "v1/handle")
+    request = urllib.request.Request(
+        handle_href,
+        data=json.dumps(request_payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"sidecar handle failed: {handle_href} ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"sidecar handle json decode failed: {handle_href} ({exc})") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"sidecar handle did not return a JSON object: {handle_href}")
+    return payload
+
+
+
+def probe_infos_handle_sidecar_image_artifact(summary_href: str) -> dict[str, object]:
+    base_url = derive_infos_handle_sidecar_base_url(summary_href)
+    if not base_url:
+        raise RuntimeError(f"cannot derive sidecar base url from summary href: {summary_href!r}")
+    handle_payload = invoke_infos_handle_sidecar_handle(base_url, {"kind": "snapshot.summary", "format": "image"})
+    response = handle_payload.get("response") if isinstance(handle_payload.get("response"), dict) else {}
+    output = response.get("output") if isinstance(response.get("output"), dict) else {}
+    artifact = output.get("artifact") if isinstance(output.get("artifact"), dict) else {}
+    artifact_href = output.get("artifactHref") if isinstance(output.get("artifactHref"), str) and output.get("artifactHref") else artifact.get("href")
+    artifact_ref = output.get("artifactRef") if isinstance(output.get("artifactRef"), str) and output.get("artifactRef") else artifact.get("ref")
+    if handle_payload.get("ok") is not True:
+        raise RuntimeError(f"sidecar image handle not ok: {handle_payload!r}")
+    if not isinstance(artifact_href, str) or not artifact_href.startswith("/v1/artifacts/"):
+        raise RuntimeError(f"sidecar image artifact href missing: {handle_payload!r}")
+    artifact_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", artifact_href.lstrip("/"))
+    artifact_body, artifact_content_type = fetch_url_text(artifact_url)
+    if artifact_content_type != "image/svg+xml":
+        raise RuntimeError(f"sidecar image artifact content type mismatch: {artifact_content_type!r}")
+    if "<svg" not in artifact_body:
+        raise RuntimeError("sidecar image artifact body missing <svg")
+    return {
+        "artifactHref": artifact_href,
+        "artifactRef": artifact_ref,
+        "artifactMediaType": artifact_content_type,
+    }
 
 
 
@@ -480,6 +549,8 @@ def verify_control_ui_infos_handle_sidecar(dock_snapshot: dict[str, object]) -> 
     if handle_catalog.get("clientHelperModule") != "openclaw_infos_handle_contract.py":
         raise RuntimeError(f"infos-handle contract helper module mismatch: {handle_catalog.get('clientHelperModule')!r}")
 
+    image_artifact_check = probe_infos_handle_sidecar_image_artifact(summary_href)
+
     sse_preview = None
     sse_ready = False
     if sse_href and bool(dock_snapshot.get("usesInfosHandleSse")):
@@ -503,6 +574,9 @@ def verify_control_ui_infos_handle_sidecar(dock_snapshot: dict[str, object]) -> 
         "queryContractVersion": contract_payload.get("queryContractVersion"),
         "requestContractVersion": contract_payload.get("requestContractVersion"),
         "helperModule": handle_catalog.get("clientHelperModule"),
+        "imageArtifactHref": image_artifact_check.get("artifactHref"),
+        "imageArtifactRef": image_artifact_check.get("artifactRef"),
+        "imageArtifactMediaType": image_artifact_check.get("artifactMediaType"),
         "sseConfigured": bool(sse_href and bool(dock_snapshot.get("usesInfosHandleSse"))),
         "sseReady": sse_ready,
         "ssePreview": (sse_preview[:400] + "…") if isinstance(sse_preview, str) and len(sse_preview) > 400 else sse_preview,

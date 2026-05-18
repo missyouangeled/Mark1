@@ -195,6 +195,8 @@ python3 scripts/test-openclaw-infos-handle.py
 python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar
 ```
 
+其中 `--verify-control-ui-infos-handle-sidecar` 当前不只检查 `healthz / summary / contract / SSE`，也会额外走一跳真实 `POST /v1/handle {"kind":"snapshot.summary","format":"image"}`，并继续验证返回的 `artifactHref` 确实可经 `/v1/artifacts/...` 取回 SVG。
+
 若当前还要连同 live branding 注入与 snapshot-first 回退链路一起验，则用：
 
 ```bash

@@ -614,6 +614,78 @@ def main() -> int:
     else:
         print("PASS apply_frontstage_infos_handle_events_recent_consumer")
 
+    apply_frontstage.fetch_json_url = lambda url, **kwargs: {
+        "http://127.0.0.1:18790/healthz": {
+            "ok": True,
+            "service": "infos-handle-sidecar",
+        },
+        "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json": {
+            "ok": True,
+            "kind": "snapshot.summary",
+            "requestInputMode": "request_file",
+            "responseOutputMode": "stdout",
+            "result": {
+                "summary": "前台状态总体正常",
+                "severity": "ok",
+            },
+        },
+        "http://127.0.0.1:18790/v1/query/contract.catalog?format=json": {
+            "ok": True,
+            "kind": "contract.catalog",
+            "requestInputMode": "request_file",
+            "responseOutputMode": "stdout",
+            "requestContractVersion": 6,
+            "result": {
+                "requestCatalog": {
+                    "requestContractVersion": 6,
+                    "actions": {
+                        "handle": {
+                            "clientHelperModule": "openclaw_infos_handle_contract.py",
+                        }
+                    },
+                }
+            },
+        },
+    }[url]
+    apply_frontstage.fetch_sse_preview = lambda url, **kwargs: 'event: snapshot\ndata: {"kind":"snapshot.summary","result":{"summary":"前台状态总体正常"}}\n'
+    apply_frontstage.probe_infos_handle_sidecar_image_artifact = lambda summary_href: {
+        "artifactHref": "/v1/artifacts/infos-handle%3Aimage%3Asmoke",
+        "artifactRef": "infos-handle:image:smoke",
+        "artifactMediaType": "image/svg+xml",
+    }
+    apply_sidecar_check = apply_frontstage.verify_control_ui_infos_handle_sidecar(
+        {
+            "infosHandleDirectReady": True,
+            "usesInfosHandleSse": True,
+            "infosHandleSummaryHref": "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json",
+            "infosHandleContractHref": "http://127.0.0.1:18790/v1/query/contract.catalog?format=json",
+            "infosHandleSseHref": "http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary",
+        }
+    )
+    if apply_sidecar_check != {
+        "ok": True,
+        "healthzHref": "http://127.0.0.1:18790/healthz",
+        "summaryHref": "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json",
+        "contractHref": "http://127.0.0.1:18790/v1/query/contract.catalog?format=json",
+        "sseHref": "http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary",
+        "service": "infos-handle-sidecar",
+        "summaryKind": "snapshot.summary",
+        "summarySeverity": "ok",
+        "summaryText": "前台状态总体正常",
+        "queryContractVersion": None,
+        "requestContractVersion": 6,
+        "helperModule": "openclaw_infos_handle_contract.py",
+        "imageArtifactHref": "/v1/artifacts/infos-handle%3Aimage%3Asmoke",
+        "imageArtifactRef": "infos-handle:image:smoke",
+        "imageArtifactMediaType": "image/svg+xml",
+        "sseConfigured": True,
+        "sseReady": True,
+        "ssePreview": 'event: snapshot\ndata: {"kind":"snapshot.summary","result":{"summary":"前台状态总体正常"}}\n',
+    }:
+        failures.append(f"apply frontstage broker data infos-handle sidecar verify mismatch: {apply_sidecar_check}")
+    else:
+        print("PASS apply_frontstage_control_ui_infos_handle_sidecar")
+
     alias_snapshot = contract.extract_delivery_snapshot({
         "ok": True,
         "action": "handle",
