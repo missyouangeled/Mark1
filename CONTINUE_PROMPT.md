@@ -36,12 +36,13 @@
 
 当前最新本地停点：
 
-- `ec946b6` `Compact infos-handle summary audio plans`
+- `9d6f358` `Verify infos-handle sidecar artifact transport`
 
-这一步已做完：
+最近两步已做完：
 
-- 把 `*.summary` 类音频 spoken-text plan 收紧为：**最多 3 段、最多 1 条建议**
-- 补了 `health.summary` 音频回归测试
+- 最新：把 `apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar` 扩到会真实验证 image artifact transport：实际调用 `handle(format=image)`，并确认返回的 `artifactHref` 确实可经 `/v1/artifacts/...` 取回 SVG
+- 上一步：把 `*.summary` 类音频 spoken-text plan 收紧为：**最多 3 段、最多 1 条建议**
+- 另已补：`health.summary` 音频回归测试，以及 sidecar artifact transport 的 caller/contract 回归测试
 - 昨晚/今天早上发生过一次临时关机，但恢复后已验证主链、broker 视图、sidecar 与最小 consumer 都仍正常
 
 如果继续做，默认只在下面两个方向里二选一：

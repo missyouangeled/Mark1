@@ -61,7 +61,7 @@
    - 当前 sidecar 仍是增强入口，不是 gateway 主链，也不是 broker compat 壳的新主逻辑
 
 4. **这轮最后一个已提交停点已可直接作为续做起点**
-   - 当前最近本地 commit：`ec946b6` `Compact infos-handle summary audio plans`
+   - 当前最近本地 commit：`9d6f358` `Verify infos-handle sidecar artifact transport`
    - 这一停点已收住：
      - `events.recent.latestBySourceItems[]`
      - broker renderer 公开副本发布 `best_effort` 化（失败不应阻塞核心 `views/*.json` / `manifest.json`）
@@ -74,7 +74,9 @@
      - 本轮又再迁了一个真实 non-delivery consumer：`scripts/openclaw-post-upgrade-self-check.py` 现在也会复用同一 helper，经 `handle --request-file -` 查询 `contract.catalog`，把 infos-handle 正式请求面纳入升级后自检，而不是只靠 README / 单测；这轮又把 `apply-openclaw-frontstage-broker-data.py` 也补成同类 query consumer。最新继续收口后，`post-upgrade-self-check` 不再只看 `contract.catalog`，而是又新增一跳真实 `snapshot.summary` consumer；本轮再继续往前推一小步，把原先口径偏旧的 `sources.catalog` 升级后自检改成 `sources.latest` 真 consumer，直接按推荐轻量 inventory 入口做 live 验证。与此同时，`apply-openclaw-frontstage-broker-data.py` 也已经有一跳真实 `events.recent` consumer，连 `limit` 参数都开始经同一 helper / request-file 主路径跑 live 验证
      - delivery adapter 这层也又继续收口了一步：`extract_delivery_snapshot()` 现在会优先读 `delivery.notice / delivery.frontstage / delivery.artifact`，同时把旧 `artifactNotice / metadata` 兼容别名也一并归一；本轮又补了 `extract_handle_response_snapshot()` 这层通用 helper snapshot，把 `result / output / deliveryNotice / frontstageDelivery / artifact` 一并收口给 query consumer；这轮再往前补了 `notice / frontstage / artifactNotice / notify / targetSessionKey / messageId` 顶层 alias，随后又把 `extract_frontstage_notify_payload()` / `build_compat_delivery_bundle()` 也一并定成正式 helper：broker compat emit 与 supervisor / recovery notify adapter 现在都直接复用同一份 contract helper，而不是各自再留一套前台返回解析；这次继续补齐后，`notify-frontstage` compat payload 与 broker `emit` compat shell 也都会把 `notice / deliveryNotice / frontstage / frontstageDelivery / artifact / artifactNotice / notify` 显式收口为 `...|null`，把 legacy edge shape 的空对象缺省再压掉一层
      - `notify-frontstage` 旧 compat 入口本轮也已再弱化一层：内部改成走 `handle` 主请求面，再回吐兼容 payload，便于旧入口继续可用但不再额外长出平行实现
-     - 2026-05-19 最新一小步已补齐：`*.summary` 类音频输出现在默认收紧为更短的 spoken-text plan（最多 3 段、最多 1 条建议），避免摘要音频继续膨胀；对应回归测试已补到 `scripts/test-openclaw-infos-handle.py`，其中 `health.summary` 已覆盖“只保留首条建议”的验证
+     - 2026-05-19 最新两小步已补齐：
+       - `*.summary` 类音频输出现在默认收紧为更短的 spoken-text plan（最多 3 段、最多 1 条建议），避免摘要音频继续膨胀；对应回归测试已补到 `scripts/test-openclaw-infos-handle.py`，其中 `health.summary` 已覆盖“只保留首条建议”的验证
+       - `apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar` 现在又继续纳入一跳真实 sidecar image artifact transport 验证：不只看 `healthz / summary / contract / SSE`，也会实际调用 `handle(format=image)`，并验证返回的 `artifactHref` 确实能经 `/v1/artifacts/...` 取回 SVG；对应 contract/caller 回归已补到 `scripts/test-infos-handle-frontstage-callers.py`
 
 5. **当前验证结果保持全绿**
    - `python3 scripts/test-openclaw-infos-handle.py` → `ALL PASS`
@@ -156,10 +158,10 @@
 
 **当前本地停点可优先参考的提交：**
 
+- `9d6f358` `Verify infos-handle sidecar artifact transport`
 - `ec946b6` `Compact infos-handle summary audio plans`
 - `1f11fd4` `Add infos-handle sidecar artifact fetch route`
 - `b6e5acf` `Verify control-ui infos-handle sidecar live chain`
-- `a7cb86e` `Clarify next-phase broker infos-handle handoff`
 
 ### 可直接贴给下一个模型的接手提示词
 
@@ -167,7 +169,7 @@
 先读 HANDOFF.md 里“给下一个模型的增强阶段直读摘要”，再继续 broker / infos-handle。
 当前主线已完成到可用停点，不要重做主线，也不要把目标理解成“大拆分层重构”。
 broker 现在只应视为 sidecar 数据层 + compat 壳；infos-handle 才是正式请求/处理层。
-最新本地停点是 `ec946b6 Compact infos-handle summary audio plans`：这一步把 `*.summary` 音频 spoken-text plan 收紧为最多 3 段、最多 1 条建议，并补了 `health.summary` 音频回归测试。
+最新本地停点是 `9d6f358 Verify infos-handle sidecar artifact transport`：这一步把 sidecar live 验证继续从“能查 summary / contract / SSE”推进到“也能真实取回 image artifact”，即实际调用 `handle(format=image)` 并验证 `artifactHref -> /v1/artifacts/...` 的 SVG 取回链路；上一条 `ec946b6` 则把 `*.summary` 音频 spoken-text plan 收紧为最多 3 段、最多 1 条建议，并补了 `health.summary` 音频回归测试。
 昨晚/今天早上发生过一次临时关机，但恢复后已验证 `openclaw status`、`test-openclaw-infos-handle.py`、`test-frontstage-broker.py`、`apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar` 与 `openclaw-infos-handle-sidecar.service`，当前主链仍正常。
 后续增强优先沿 handle --request-file + openclaw_infos_handle_contract.py 主路径推进，默认不要把新逻辑塞回 broker compat 入口。
 先跑最小验证，再只选一个增强方向继续（优先 image/audio delivery 或 Control UI consumer），每一步都补最小测试与文档。
