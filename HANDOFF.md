@@ -103,6 +103,54 @@
 - Control UI 直连 infos-handle：已做到 sidecar 优先、静态 snapshot 回退；还没有继续硬拆前端状态层
 - HTTP/SSE：已做到独立最小本地 sidecar；还没有升级成 gateway 主链接口
 
+### 给下一个模型的“增强阶段”直读摘要
+
+如果是换模型后第一次接手，这一段可以直接当作最短理解入口：
+
+- **当前主线已经收口**：不要再把目标理解成“把 broker / infos-handle 从半成品做完”；这轮主线已经可用、可测、可继续。
+- **当前正确定位**：
+  - broker = `sidecar 数据层 + compat 壳`
+  - infos-handle = `正式请求/处理层`
+  - Control UI = `优先消费 infos-handle sidecar，失败再回退 snapshot`
+- **下一阶段增强的核心不是重写结构，而是继续做厚 infos-handle 这一层**。
+
+建议按下面 4 个方向理解后续增强：
+
+1. **增强 richer image/audio delivery，但不改主入口**
+   - 继续提升 `image/audio` 的 renderer、artifact transport、fallback、notice、metadata 与清理策略
+   - 不要再开新的平行多模态入口
+   - 正式主入口继续保持：`handle --request-file` + `openclaw_infos_handle_contract.py`
+
+2. **继续把新 caller / consumer 收口到 infos-handle 主请求面**
+   - 后续新增调用方，默认都应复用 contract helper，经 `handle --request-file` 发请求
+   - 不要再把新逻辑塞回 broker `emit` / `query` / `notify-frontstage` 这些 compat 壳
+
+3. **把 Control UI 的辅助状态层继续往 consumer 方向推，但先不碰聊天主链**
+   - 可以继续让更多辅助状态区优先读 infos-handle sidecar
+   - 但不要把当前对话主链、Gateway live chat、前台消息投递一起大拆
+
+4. **把 sidecar 做稳，但暂时不要升成 gateway 主链接口**
+   - 可继续增强 `GET /v1/query/<kind>`、`POST /v1/handle`、`GET /v1/events/stream`
+   - 但当前阶段不要把它升级成新的 gateway 级 HTTP/SSE/WebSocket 总入口
+
+**明确不要做的事：**
+
+- 不要回退到“broker 里继续长主逻辑”
+- 不要新开一套绕过 `handle --request-file` 的平行入口
+- 不要为了增强辅助状态层而重写 Control UI 聊天主链
+- 不要把这轮工作重新定义成“大拆分层工程”
+
+**推荐续做顺序：**
+
+1. 先跑当前最小验证，确认停点仍是绿的
+2. 只选一个增强方向继续推进（优先 `image/audio delivery` 或 `Control UI consumer`）
+3. 每做一步都补最小测试 / smoke
+4. 同步更新 `HANDOFF.md` / `PLANS.md` / 对应 README
+
+**当前本地停点可优先参考的提交：**
+
+- `500d6a5` `Add infos-handle sidecar and richer control-ui hooks`
+- `c9c055f` `Document infos-handle sidecar on company linux`
 
 按优先级建议：
 
