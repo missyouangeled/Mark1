@@ -1959,13 +1959,18 @@ def build_audio_render_plan(query_payload: dict[str, Any]) -> dict[str, Any]:
     text = str(query_payload.get("text") or "").strip()
     result = query_payload.get("result") if isinstance(query_payload.get("result"), dict) else {}
     raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    is_summary_kind = kind.endswith(".summary")
+    max_segments = 3 if is_summary_kind else 6
+    self_help_actions = [item for item in result.get("selfHelpActions", []) if isinstance(item, str) and item.strip()]
+    if is_summary_kind:
+        self_help_actions = self_help_actions[:1]
     structured_lines = normalize_render_lines(
         [
             result.get("summary"),
             result.get("issueOverview"),
             result.get("detail"),
             result.get("message"),
-            *(f"建议：{item}" for item in result.get("selfHelpActions", []) if isinstance(item, str) and item.strip()),
+            *(f"建议：{item}" for item in self_help_actions),
         ],
         max_items=8,
         split_pipes=False,
@@ -2001,9 +2006,9 @@ def build_audio_render_plan(query_payload: dict[str, Any]) -> dict[str, Any]:
                 continue
             seen.add(normalized)
             segments.append(normalized)
-            if len(segments) >= 6:
+            if len(segments) >= max_segments:
                 break
-        if len(segments) >= 6:
+        if len(segments) >= max_segments:
             break
 
     if not segments:

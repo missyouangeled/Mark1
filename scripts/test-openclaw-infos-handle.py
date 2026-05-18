@@ -73,6 +73,7 @@ def main() -> int:
                 "health": {
                     "summary": "健康正常",
                     "detail": "当前网络和 Gateway 可达。",
+                    "selfHelpActions": ["继续观察网络与 Gateway。", "若出现异常，再检查 broker 视图。"],
                     "checkedAt": "2026-05-15T12:00:00+08:00",
                 },
                 "supervisor": {
@@ -834,6 +835,31 @@ def main() -> int:
         assert audio_output["result"]["estimatedDurationSeconds"] > 1
         assert audio_output["result"]["sourceKind"] == "snapshot.summary"
         assert audio_output["sourcePath"].endswith("reply.mp3")
+
+        result = run(
+            "handle",
+            "--kind", "health.summary",
+            "--format", "audio",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            "--audio-renderer", str(audio_renderer),
+            "--audio-preset", "demo-voice",
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        audio_output = payload["response"]["output"]
+        assert payload["ok"] is True
+        assert payload["request"]["kind"] == "health.summary"
+        assert payload["request"]["format"] == "audio"
+        assert audio_output["spokenText"] == "健康正常。 当前网络和 Gateway 可达。 建议：继续观察网络与 Gateway。"
+        assert audio_output["summary"] == "健康正常"
+        assert audio_output["result"]["segmentCount"] == 3
+        assert audio_output["result"]["segments"] == ["健康正常。", "当前网络和 Gateway 可达。", "建议：继续观察网络与 Gateway。"]
+        assert audio_output["result"]["sourceKind"] == "health.summary"
+        health_audio_text = Path(audio_output["path"]).read_text(encoding="utf-8")
+        assert "建议：继续观察网络与 Gateway。" in health_audio_text
+        assert "若出现异常，再检查 broker 视图。" not in health_audio_text
 
         result = run(
             "handle",
