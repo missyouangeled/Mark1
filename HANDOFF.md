@@ -151,6 +151,17 @@
 
 - `500d6a5` `Add infos-handle sidecar and richer control-ui hooks`
 - `c9c055f` `Document infos-handle sidecar on company linux`
+- `a7cb86e` `Clarify next-phase broker infos-handle handoff`
+
+### 可直接贴给下一个模型的接手提示词
+
+```text
+先读 HANDOFF.md 里“给下一个模型的增强阶段直读摘要”，再继续 broker / infos-handle。
+当前主线已完成到可用停点，不要重做主线，也不要把目标理解成“大拆分层重构”。
+broker 现在只应视为 sidecar 数据层 + compat 壳；infos-handle 才是正式请求/处理层。
+后续增强优先沿 handle --request-file + openclaw_infos_handle_contract.py 主路径推进，默认不要把新逻辑塞回 broker compat 入口。
+先跑最小验证，再只选一个增强方向继续（优先 image/audio delivery 或 Control UI consumer），每一步都补最小测试与文档。
+```
 
 按优先级建议：
 
