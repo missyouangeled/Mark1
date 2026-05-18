@@ -274,7 +274,42 @@ systemctl --user show openclaw-frontstage-broker-rebuild.service -p Result -p Ex
 systemctl --user show openclaw-frontstage-broker-rebuild.timer -p UnitFileState -p ActiveState -p SubState
 ```
 
-### 5. systemd 用户单元
+### 5. infos-handle sidecar（Control UI 直连入口）
+
+用途：
+
+- 给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小本地 HTTP / SSE 直连入口
+- 当前 live branding patch 会优先读这条 sidecar；若 sidecar 不可用，再回退 `jarvis-frontstage-snapshot.json`
+
+相关文件：
+
+- sidecar 脚本：`scripts/openclaw-infos-handle-sidecar.py`
+- README：`tools/openclaw-infos-handle-sidecar/README.md`
+- service 模板：`tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+- 当前用户态 systemd：`~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
+
+当前监听：
+
+- `127.0.0.1:18790`
+
+当前最小接口：
+
+- `GET /healthz`
+- `GET /v1/query/<kind>`
+- `POST /v1/handle`
+- `GET /v1/events/stream`
+
+当前最小验收：
+
+```bash
+systemctl --user show openclaw-infos-handle-sidecar.service -p ActiveState -p SubState -p UnitFileState
+curl -s http://127.0.0.1:18790/healthz
+curl -s 'http://127.0.0.1:18790/v1/query/snapshot.summary?format=json'
+curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'
+curl -N 'http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary&intervalMs=1000'
+```
+
+### 6. systemd 用户单元
 
 相关文件：
 
