@@ -61,7 +61,7 @@
    - 当前 sidecar 仍是增强入口，不是 gateway 主链，也不是 broker compat 壳的新主逻辑
 
 4. **这轮最后一个已提交停点已可直接作为续做起点**
-   - 当前最近本地 commit：`9d6f358` `Verify infos-handle sidecar artifact transport`
+   - 当前代码停点 commit：`9d6f358` `Verify infos-handle sidecar artifact transport`
    - 这一停点已收住：
      - `events.recent.latestBySourceItems[]`
      - broker renderer 公开副本发布 `best_effort` 化（失败不应阻塞核心 `views/*.json` / `manifest.json`）

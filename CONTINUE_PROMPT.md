@@ -34,7 +34,7 @@
 - 不要把新逻辑塞回 `broker emit/query/notify-frontstage` 这些 compat 壳
 - 不要把当前工作重新定义成“大拆分层重构”
 
-当前最新本地停点：
+当前代码停点：
 
 - `9d6f358` `Verify infos-handle sidecar artifact transport`
 
