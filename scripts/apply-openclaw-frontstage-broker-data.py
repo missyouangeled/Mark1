@@ -13,6 +13,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from openclaw_infos_handle_contract import build_handle_request_payload, invoke_handle_query, invoke_handle_request
@@ -21,6 +24,7 @@ WORKSPACE = Path(__file__).resolve().parents[1]
 BROKER_SCRIPT = WORKSPACE / "scripts" / "openclaw-frontstage-broker.py"
 BROKER_TEST = WORKSPACE / "scripts" / "test-frontstage-broker.py"
 INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
+INFOS_HANDLE_SIDECAR_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle-sidecar.py"
 INFOS_HANDLE_TEST = WORKSPACE / "scripts" / "test-openclaw-infos-handle.py"
 FRONTSTAGE_RECOVERY_TEST = WORKSPACE / "scripts" / "test-frontstage-recovery-watch.py"
 INFOS_HANDLE_CALLER_TEST = WORKSPACE / "scripts" / "test-infos-handle-frontstage-callers.py"
@@ -76,11 +80,16 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
         "snapshotJsonHref": None,
         "legacyStatusJsonHref": None,
         "statusJsonHref": None,
+        "infosHandleSummaryHref": None,
+        "infosHandleContractHref": None,
+        "infosHandleSseHref": None,
         "effectiveJsonHref": None,
         "statusPageHref": None,
         "snapshotFirst": False,
+        "infosHandleDirectReady": False,
         "legacyStatusAliasMarked": False,
         "usesNormalizeFrontstageSnapshot": False,
+        "usesInfosHandleSse": False,
     }
     if not dist_root:
         return payload
@@ -94,22 +103,33 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     snapshot_json_match = re.search(r'"snapshotJsonHref":\s*"([^"]+)"', script_text)
     legacy_status_json_match = re.search(r'"legacyStatusJsonHref":\s*"([^"]+)"', script_text)
     status_json_match = re.search(r'"statusJsonHref":\s*"([^"]+)"', script_text)
+    infos_handle_summary_match = re.search(r'"infosHandleSummaryHref":\s*"([^"]+)"', script_text)
+    infos_handle_contract_match = re.search(r'"infosHandleContractHref":\s*"([^"]+)"', script_text)
+    infos_handle_sse_match = re.search(r'"infosHandleSseHref":\s*"([^"]+)"', script_text)
     status_page_match = re.search(r'"href":\s*"([^"]+/jarvis-frontstage-status\.html|/jarvis-frontstage-status\.html)"', script_text)
     snapshot_json_href = snapshot_json_match.group(1) if snapshot_json_match else None
     legacy_status_json_href = legacy_status_json_match.group(1) if legacy_status_json_match else None
     status_json_href = status_json_match.group(1) if status_json_match else None
+    infos_handle_summary_href = infos_handle_summary_match.group(1) if infos_handle_summary_match else None
+    infos_handle_contract_href = infos_handle_contract_match.group(1) if infos_handle_contract_match else None
+    infos_handle_sse_href = infos_handle_sse_match.group(1) if infos_handle_sse_match else None
     status_page_href = status_page_match.group(1) if status_page_match else None
     effective_json_href = snapshot_json_href or status_json_href
     payload["snapshotJsonHref"] = snapshot_json_href
     payload["legacyStatusJsonHref"] = legacy_status_json_href
     payload["statusJsonHref"] = status_json_href
+    payload["infosHandleSummaryHref"] = infos_handle_summary_href
+    payload["infosHandleContractHref"] = infos_handle_contract_href
+    payload["infosHandleSseHref"] = infos_handle_sse_href
     payload["effectiveJsonHref"] = effective_json_href
     payload["statusPageHref"] = status_page_href
     payload["snapshotFirst"] = effective_json_href == "/jarvis-frontstage-snapshot.json"
+    payload["infosHandleDirectReady"] = bool(infos_handle_summary_href and infos_handle_contract_href)
     payload["legacyStatusAliasMarked"] = legacy_status_json_href == "/jarvis-frontstage-status.json" or (
         bool(snapshot_json_href) and status_json_href == "/jarvis-frontstage-status.json"
     )
     payload["usesNormalizeFrontstageSnapshot"] = "function normalizeFrontstageSnapshot" in script_text
+    payload["usesInfosHandleSse"] = "function connectHealthDockSse" in script_text and "new EventSource(href)" in script_text
     return payload
 
 
@@ -355,6 +375,141 @@ def verify_infos_handle_request_entry() -> dict[str, object]:
         }
 
 
+def fetch_json_url(url: str, *, timeout_seconds: float = 5.0) -> dict[str, Any]:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"url fetch failed: {url} ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"url json decode failed: {url} ({exc})") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"url did not return a JSON object: {url}")
+    return payload
+
+
+
+def fetch_sse_preview(url: str, *, timeout_seconds: float = 5.0, lines: int = 4) -> str:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+            chunks: list[str] = []
+            for _ in range(max(1, lines)):
+                raw = response.readline()
+                if not raw:
+                    break
+                chunks.append(raw.decode("utf-8", errors="replace"))
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"sse fetch failed: {url} ({exc})") from exc
+    return "".join(chunks)
+
+
+
+def derive_infos_handle_sidecar_healthz_href(summary_href: str | None) -> str | None:
+    if not isinstance(summary_href, str) or not summary_href.strip():
+        return None
+    parsed = urllib.parse.urlsplit(summary_href)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "/healthz", "", ""))
+
+
+
+def build_infos_handle_sidecar_failure_payload(dock_snapshot: dict[str, object] | None, error: str) -> dict[str, object]:
+    dock_payload = dock_snapshot if isinstance(dock_snapshot, dict) else {}
+    return {
+        "ok": False,
+        "error": error,
+        "infosHandleDirectReady": bool(dock_payload.get("infosHandleDirectReady")),
+        "usesInfosHandleSse": bool(dock_payload.get("usesInfosHandleSse")),
+        "healthzHref": derive_infos_handle_sidecar_healthz_href(dock_payload.get("infosHandleSummaryHref") if isinstance(dock_payload.get("infosHandleSummaryHref"), str) else None),
+        "summaryHref": dock_payload.get("infosHandleSummaryHref"),
+        "contractHref": dock_payload.get("infosHandleContractHref"),
+        "sseHref": dock_payload.get("infosHandleSseHref"),
+    }
+
+
+
+def verify_control_ui_infos_handle_sidecar(dock_snapshot: dict[str, object]) -> dict[str, object]:
+    summary_href = dock_snapshot.get("infosHandleSummaryHref") if isinstance(dock_snapshot.get("infosHandleSummaryHref"), str) else None
+    contract_href = dock_snapshot.get("infosHandleContractHref") if isinstance(dock_snapshot.get("infosHandleContractHref"), str) else None
+    sse_href = dock_snapshot.get("infosHandleSseHref") if isinstance(dock_snapshot.get("infosHandleSseHref"), str) else None
+    if not bool(dock_snapshot.get("infosHandleDirectReady")):
+        raise RuntimeError("control-ui branding has not exposed a ready infos-handle direct path")
+    if not summary_href or not contract_href:
+        raise RuntimeError("control-ui infos-handle summary/contract href missing")
+
+    healthz_href = derive_infos_handle_sidecar_healthz_href(summary_href)
+    healthz_payload = fetch_json_url(healthz_href) if healthz_href else {}
+    if healthz_href:
+        if healthz_payload.get("ok") is not True:
+            raise RuntimeError(f"infos-handle sidecar healthz not ok: {healthz_payload!r}")
+        if healthz_payload.get("service") != "infos-handle-sidecar":
+            raise RuntimeError(f"infos-handle sidecar service mismatch: {healthz_payload.get('service')!r}")
+
+    summary_payload = fetch_json_url(summary_href)
+    summary_result = summary_payload.get("result") if isinstance(summary_payload.get("result"), dict) else {}
+    if summary_payload.get("ok") is not True:
+        raise RuntimeError(f"infos-handle summary query not ok: {summary_payload!r}")
+    if summary_payload.get("kind") != "snapshot.summary":
+        raise RuntimeError(f"infos-handle summary kind mismatch: {summary_payload.get('kind')!r}")
+    if summary_payload.get("requestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle summary requestInputMode mismatch: {summary_payload.get('requestInputMode')!r}")
+    if summary_payload.get("responseOutputMode") != "stdout":
+        raise RuntimeError(f"infos-handle summary responseOutputMode mismatch: {summary_payload.get('responseOutputMode')!r}")
+    if not isinstance(summary_result.get("summary"), str) or not summary_result.get("summary").strip():
+        raise RuntimeError(f"infos-handle summary result missing summary: {summary_result!r}")
+
+    contract_payload = fetch_json_url(contract_href)
+    contract_result = contract_payload.get("result") if isinstance(contract_payload.get("result"), dict) else {}
+    request_catalog = contract_result.get("requestCatalog") if isinstance(contract_result.get("requestCatalog"), dict) else {}
+    actions = request_catalog.get("actions") if isinstance(request_catalog.get("actions"), dict) else {}
+    handle_catalog = actions.get("handle") if isinstance(actions.get("handle"), dict) else {}
+    if contract_payload.get("ok") is not True:
+        raise RuntimeError(f"infos-handle contract query not ok: {contract_payload!r}")
+    if contract_payload.get("kind") != "contract.catalog":
+        raise RuntimeError(f"infos-handle contract kind mismatch: {contract_payload.get('kind')!r}")
+    if contract_payload.get("requestInputMode") != "request_file":
+        raise RuntimeError(f"infos-handle contract requestInputMode mismatch: {contract_payload.get('requestInputMode')!r}")
+    if contract_payload.get("responseOutputMode") != "stdout":
+        raise RuntimeError(f"infos-handle contract responseOutputMode mismatch: {contract_payload.get('responseOutputMode')!r}")
+    if request_catalog.get("requestContractVersion") != contract_payload.get("requestContractVersion"):
+        raise RuntimeError(
+            "infos-handle contract requestContractVersion mismatch: "
+            f"{request_catalog.get('requestContractVersion')!r} vs {contract_payload.get('requestContractVersion')!r}"
+        )
+    if handle_catalog.get("clientHelperModule") != "openclaw_infos_handle_contract.py":
+        raise RuntimeError(f"infos-handle contract helper module mismatch: {handle_catalog.get('clientHelperModule')!r}")
+
+    sse_preview = None
+    sse_ready = False
+    if sse_href and bool(dock_snapshot.get("usesInfosHandleSse")):
+        sse_preview = fetch_sse_preview(sse_href)
+        if "event: snapshot" not in sse_preview:
+            raise RuntimeError(f"infos-handle sidecar sse preview missing snapshot event: {sse_preview!r}")
+        if '"kind": "snapshot.summary"' not in sse_preview and '"kind":"snapshot.summary"' not in sse_preview:
+            raise RuntimeError(f"infos-handle sidecar sse preview missing snapshot.summary payload: {sse_preview!r}")
+        sse_ready = True
+
+    return {
+        "ok": True,
+        "healthzHref": healthz_href,
+        "summaryHref": summary_href,
+        "contractHref": contract_href,
+        "sseHref": sse_href,
+        "service": healthz_payload.get("service") if isinstance(healthz_payload, dict) else None,
+        "summaryKind": summary_payload.get("kind"),
+        "summarySeverity": summary_result.get("severity"),
+        "summaryText": summary_result.get("summary"),
+        "queryContractVersion": contract_payload.get("queryContractVersion"),
+        "requestContractVersion": contract_payload.get("requestContractVersion"),
+        "helperModule": handle_catalog.get("clientHelperModule"),
+        "sseConfigured": bool(sse_href and bool(dock_snapshot.get("usesInfosHandleSse"))),
+        "sseReady": sse_ready,
+        "ssePreview": (sse_preview[:400] + "…") if isinstance(sse_preview, str) and len(sse_preview) > 400 else sse_preview,
+    }
+
+
+
 def install_user_systemd() -> dict[str, str]:
     if sys.platform.startswith("win"):
         raise RuntimeError("user systemd install is not supported on Windows")
@@ -383,6 +538,8 @@ def main() -> int:
     parser.add_argument("--apply-control-ui-branding", action="store_true", help="Also re-apply the current Control UI branding patch before snapshot-first verification")
     parser.add_argument("--verify-control-ui-snapshot-dock", action="store_true", help="Inspect the live Control UI override script plus live public JSON, and report whether snapshot is first while status.json is only a legacy alias")
     parser.add_argument("--require-control-ui-snapshot-dock", action="store_true", help="Fail if the live Control UI snapshot-first chain is not ready")
+    parser.add_argument("--verify-control-ui-infos-handle-sidecar", action="store_true", help="Probe the live infos-handle sidecar URLs referenced by the current Control UI branding override")
+    parser.add_argument("--require-control-ui-infos-handle-sidecar", action="store_true", help="Fail if the live Control UI infos-handle sidecar direct path is not ready")
     args = parser.parse_args()
 
     steps = [
@@ -393,6 +550,7 @@ def main() -> int:
             str(BROKER_SCRIPT),
             str(BROKER_TEST),
             str(INFOS_HANDLE_SCRIPT),
+            str(INFOS_HANDLE_SIDECAR_SCRIPT),
             str(INFOS_HANDLE_TEST),
             str(SUPERVISOR_STATUS_SCRIPT),
             str(FRONTSTAGE_RECOVERY_SCRIPT),
@@ -425,6 +583,7 @@ def main() -> int:
     installed_units = None
     dock_snapshot_check = None
     frontstage_publication_check = None
+    control_ui_infos_handle_sidecar_check = None
     for cmd in steps:
         result = run(cmd)
         if result.returncode != 0:
@@ -471,7 +630,13 @@ def main() -> int:
             sys.stderr.write(f"install-user-systemd failed: {exc}\n")
             return 1
 
-    if args.verify_control_ui_snapshot_dock or args.require_control_ui_snapshot_dock or args.apply_control_ui_branding:
+    if (
+        args.verify_control_ui_snapshot_dock
+        or args.require_control_ui_snapshot_dock
+        or args.verify_control_ui_infos_handle_sidecar
+        or args.require_control_ui_infos_handle_sidecar
+        or args.apply_control_ui_branding
+    ):
         dock_snapshot_check = inspect_control_ui_snapshot_dock()
         frontstage_publication_check = inspect_live_frontstage_publication()
         if args.require_control_ui_snapshot_dock and not (
@@ -490,6 +655,27 @@ def main() -> int:
             )
             return 1
 
+    if args.verify_control_ui_infos_handle_sidecar or args.require_control_ui_infos_handle_sidecar:
+        if dock_snapshot_check is None:
+            dock_snapshot_check = inspect_control_ui_snapshot_dock()
+        try:
+            control_ui_infos_handle_sidecar_check = verify_control_ui_infos_handle_sidecar(dock_snapshot_check)
+        except RuntimeError as exc:
+            control_ui_infos_handle_sidecar_check = build_infos_handle_sidecar_failure_payload(dock_snapshot_check, str(exc))
+            if args.require_control_ui_infos_handle_sidecar:
+                sys.stderr.write(
+                    json.dumps(
+                        {
+                            "controlUiSnapshotDock": dock_snapshot_check,
+                            "controlUiInfosHandleSidecar": control_ui_infos_handle_sidecar_check,
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n"
+                )
+                return 1
+
     print("Applied frontstage broker data layer.")
     if isinstance(rebuild_payload, dict):
         print(json.dumps(rebuild_payload, ensure_ascii=False, indent=2))
@@ -505,6 +691,8 @@ def main() -> int:
         print(json.dumps({"controlUiSnapshotDock": dock_snapshot_check}, ensure_ascii=False, indent=2))
     if frontstage_publication_check is not None:
         print(json.dumps({"frontstagePublication": frontstage_publication_check}, ensure_ascii=False, indent=2))
+    if control_ui_infos_handle_sidecar_check is not None:
+        print(json.dumps({"controlUiInfosHandleSidecar": control_ui_infos_handle_sidecar_check}, ensure_ascii=False, indent=2))
     if installed_units:
         print(json.dumps({"installedUserSystemd": installed_units}, ensure_ascii=False, indent=2))
     return 0

@@ -213,7 +213,7 @@ python3 scripts/openclaw-infos-handle.py handle --request-file /tmp/infos-reques
 python3 scripts/openclaw-infos-handle.py handle --request-id smoke-1 --request-file /tmp/infos-request.json --response-file /tmp/infos-response.json
 python3 scripts/openclaw-infos-handle-sidecar.py --host 127.0.0.1 --port 18790
 python3 scripts/apply-openclaw-frontstage-broker-data.py
-python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock
+python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar
 python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
 # 若只想手工装 timer，也可：
 cp tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service ~/.config/systemd/user/
@@ -242,6 +242,12 @@ systemctl --user enable --now openclaw-frontstage-broker-rebuild.timer
   - live `jarvis-branding-override.js` 的 `snapshotJsonHref = /jarvis-frontstage-snapshot.json`
   - live `jarvis-branding-override.js` 的 `legacyStatusJsonHref = /jarvis-frontstage-status.json`
   - `frontstagePublication.snapshotFirstReady = true`，证明 live 公开链路里 snapshot 是首选入口、status.json 只是兼容别名
+- 若再跑了 `--verify-control-ui-infos-handle-sidecar`，则应额外看到：
+  - `controlUiInfosHandleSidecar.ok = true`
+  - `healthzHref / summaryHref / contractHref` 都指向当前 branding 注入的 live sidecar URL
+  - `summaryKind = snapshot.summary`
+  - `requestContractVersion = 6`
+  - 若当前 dock 已启用 SSE，`sseReady = true`
 - `scripts/apply-openclaw-frontstage-broker-data.py` 应能完成 py_compile + 测试 + rebuild-views 这一整套最小重装流程
 - 若使用 `--install-user-systemd`，应额外输出已安装的 user systemd service/timer 路径
 - `openclaw-frontstage-broker-rebuild.timer` 应处于 `enabled + active(waiting)`

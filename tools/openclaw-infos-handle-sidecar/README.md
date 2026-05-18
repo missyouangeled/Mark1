@@ -163,6 +163,13 @@ curl -N 'http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary'
 
 ```bash
 python3 scripts/test-openclaw-infos-handle.py
+python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar
+```
+
+若当前还要连同 live branding 注入与 snapshot-first 回退链路一起验，则用：
+
+```bash
+python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar
 ```
 
 ## 与 Control UI 的关系
