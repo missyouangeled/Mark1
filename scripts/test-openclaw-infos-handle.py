@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import tempfile
+import time
+import urllib.request
 from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
+SIDECAR_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle-sidecar.py"
 EXPECTED_QUERY_CONTRACT_VERSION = 17
 EXPECTED_REQUEST_CONTRACT_VERSION = 6
 
@@ -22,6 +26,36 @@ def run(*args: str, env: dict[str, str] | None = None, input_text: str | None = 
         str(SCRIPT),
         *args,
     ], cwd=WORKSPACE, capture_output=True, text=True, check=False, env=current_env, input=input_text)
+
+
+def pick_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+
+def fetch_json(url: str) -> dict[str, object]:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+
+def wait_for_sidecar(url: str, *, timeout_seconds: float = 5.0) -> None:
+    deadline = time.time() + timeout_seconds
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        try:
+            payload = fetch_json(url)
+            if payload.get("ok") is True:
+                return
+        except Exception as exc:  # pragma: no cover - retry helper
+            last_error = exc
+        time.sleep(0.1)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("sidecar did not become ready")
+
 
 
 def main() -> int:
@@ -513,8 +547,12 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["audio"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["artifactMediaType"] == "image/svg+xml"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["layout"] == "str"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["panels"] == "array[imageCardPanel]"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segmentCount"] == "int"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["estimatedDurationSeconds"] == "number"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["format"] == "str"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["output"] == "object|null"
@@ -575,8 +613,10 @@ def main() -> int:
         assert payload["result"]["handlerCatalog"]["json.stdout.v1"]["delivery"] == "stdout"
         assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["badge"] == "str|null"
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segments"] == "array[str]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["count"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["availableSources"] == "array[str]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceItems"] == "array[sourceLatestItem]"
@@ -705,7 +745,17 @@ def main() -> int:
         assert Path(image_output["path"]).exists()
         assert image_output["path"].endswith(".svg")
         assert "snapshot.summary" in Path(image_output["path"]).name
-        assert "前台状态总体正常" in Path(image_output["path"]).read_text(encoding="utf-8")
+        assert image_output["result"]["cardVersion"] == 2
+        assert image_output["result"]["layout"] == "activity-grid"
+        assert image_output["result"]["badge"] == "正常"
+        assert len(image_output["result"]["panels"]) == 3
+        assert image_output["result"]["panels"][0]["label"] == "概览"
+        assert image_output["result"]["panels"][1]["label"] == "重点"
+        assert image_output["result"]["panels"][2]["label"] == "上下文"
+        image_svg = Path(image_output["path"]).read_text(encoding="utf-8")
+        assert "前台状态总体正常" in image_svg
+        assert "概览" in image_svg
+        assert "重点" in image_svg
 
         result = run(
             "handle",
@@ -772,9 +822,17 @@ def main() -> int:
         assert audio_output["artifact"]["fileName"] == audio_output["fileName"]
         assert Path(audio_output["path"]).exists()
         audio_text = Path(audio_output["path"]).read_text(encoding="utf-8")
-        assert audio_text.startswith("FAKE AUDIO | demo-voice | [ok] 前台状态总体正常")
-        assert "broker / 监工 / 恢复观察 / 本地健康当前都没看到明显异常。" in audio_text
-        assert audio_output["spokenText"].startswith("[ok] 前台状态总体正常")
+        assert audio_text.startswith("FAKE AUDIO | demo-voice | 前台状态总体正常。")
+        assert "broker、监工、恢复观察、本地健康当前都没看到明显异常。" in audio_text
+        assert "建议：一切正常，继续工作。" in audio_text
+        assert audio_output["spokenText"] == "前台状态总体正常。 broker、监工、恢复观察、本地健康当前都没看到明显异常。 建议：一切正常，继续工作。"
+        assert audio_output["summary"] == "前台状态总体正常"
+        assert audio_output["result"]["textPlanVersion"] == 2
+        assert audio_output["result"]["strategy"] == "stable_lines"
+        assert audio_output["result"]["segmentCount"] == 3
+        assert audio_output["result"]["segments"] == ["前台状态总体正常。", "broker、监工、恢复观察、本地健康当前都没看到明显异常。", "建议：一切正常，继续工作。"]
+        assert audio_output["result"]["estimatedDurationSeconds"] > 1
+        assert audio_output["result"]["sourceKind"] == "snapshot.summary"
         assert audio_output["sourcePath"].endswith("reply.mp3")
 
         result = run(
@@ -1100,6 +1158,61 @@ def main() -> int:
         assert "panel=missing-panel" in result.stdout
         assert "exists=false" in result.stdout
         assert "availablePanels: health, recovery, supervisor" in result.stdout
+
+        sidecar_port = pick_free_port()
+        sidecar_process = subprocess.Popen(
+            [
+                "python3",
+                str(SIDECAR_SCRIPT),
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(sidecar_port),
+                "--snapshot-path",
+                str(snapshot_path),
+                "--events-path",
+                str(events_path),
+                "--output-root",
+                str(output_root),
+            ],
+            cwd=WORKSPACE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            wait_for_sidecar(f"http://127.0.0.1:{sidecar_port}/healthz")
+            snapshot_summary = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json")
+            assert snapshot_summary["kind"] == "snapshot.summary"
+            assert snapshot_summary["result"]["summary"] == "前台状态总体正常"
+            contract_catalog = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/contract.catalog?format=json")
+            assert contract_catalog["kind"] == "contract.catalog"
+            assert contract_catalog["result"]["requestCatalog"]["requestContractVersion"] == EXPECTED_REQUEST_CONTRACT_VERSION
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/handle",
+                data=json.dumps({"kind": "snapshot.summary", "format": "json"}, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=5) as response:
+                handle_payload = json.loads(response.read().decode("utf-8"))
+            assert handle_payload["ok"] is True
+            assert handle_payload["response"]["kind"] == "snapshot.summary"
+            assert handle_payload["response"]["output"]["handler"] == "json.stdout.v1"
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{sidecar_port}/v1/events/stream?kind=snapshot.summary&intervalMs=1000",
+                timeout=5,
+            ) as response:
+                stream_chunk = "".join(response.readline().decode("utf-8") for _ in range(4))
+            assert "event: snapshot" in stream_chunk
+            assert "前台状态总体正常" in stream_chunk
+        finally:
+            sidecar_process.terminate()
+            try:
+                sidecar_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                sidecar_process.kill()
+                sidecar_process.wait(timeout=5)
 
         print("ALL PASS")
     return 0

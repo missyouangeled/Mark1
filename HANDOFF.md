@@ -19,7 +19,7 @@
      - `supervisor -> broker -> 当前前台`：通过
    - 当前 broker manifest 已在位，`schemaVersion: 1`、`contractVersion: 2`
 
-2. **infos-handle 当前主干已经从“查询契约层”推进到“统一信息处理层最小版”**
+2. **infos-handle 当前主干已经从“查询契约层”推进到“统一信息处理层最小版”，且下一阶段增强已有第一批最小落点**
    - 当前已支持的 query kind 仍包括：
      - `snapshot.summary`
      - `health.summary`
@@ -40,7 +40,7 @@
      - `events.recent` 稳定 item shape 收口，并同时提供 `latestBySource` + `latestBySourceItems[]`
      - `contract.catalog` 现在会同时带 `outputFormatCatalog / requestCatalog / handlerCatalog`
      - 新增统一 `handle` 请求入口；CLI 之上现在有一层正式 request envelope，可统一处理 `text/json/image/audio`
-     - `image` 已落低风险 `summary-card SVG` handler，`audio` 已落本地 TTS preview handler（默认接现有 `tools/voice-reply/voice-reply.sh`，可被 smoke/stub 覆盖）
+     - `image` 已从单条 `summary-card SVG` 提升到 low-risk richer multi-panel SVG preview，稳定回传 `layout / panels / badge / footerLines` 这组结果元数据；`audio` 也已补成先生成稳定 spoken-text plan（`textPlanVersion / strategy / segmentCount / segments / estimatedDurationSeconds`）再走本地 TTS preview handler（默认接现有 `tools/voice-reply/voice-reply.sh`，可被 smoke/stub 覆盖）
      - `handle --delivery-mode frontstage` 现在也能覆盖 `image/audio`：先产出 artifact，再发一条 text artifact notice 到前台，并带回稳定 artifact 元数据
      - preview 输出现在在 `response.output.artifact` / `response.delivery.artifact` 两侧复用同一套 artifact shape；`response.delivery` 也新增了稳定 `artifactRef`
      - `image/audio` 的 frontstage artifact-notice 已继续收口成 consumer 可直接读的稳定返回：优先看 `response.delivery.notice / response.delivery.frontstage`，其中 `frontstage` 当前还会稳定带 `noticeKind / artifactRef / displayText`；旧 `artifactNotice / metadata` 仍保留兼容别名
@@ -51,7 +51,14 @@
    - 当前 `REQUEST_CONTRACT_VERSION = 6`
    - 当前 `brokerContractVersion = 2`
 
-3. **这轮最后一个已提交停点已可直接作为续做起点**
+3. **Control UI / sidecar 这条增强线也已有最小可交付落点**
+   - `scripts/apply-openclaw-control-ui-branding.py` / `config/control-ui-branding.json` 现已支持给 live Control UI 注入 `infosHandleSummaryHref / infosHandleContractHref / infosHandleSseHref`
+   - Control UI health dock 现在会先尝试直连本地 infos-handle sidecar（默认 `http://127.0.0.1:18790`），失败时再回退到 `jarvis-frontstage-snapshot.json`
+   - 新增 `scripts/openclaw-infos-handle-sidecar.py`：独立本地 sidecar，最小提供 `GET /v1/query/<kind>`、`POST /v1/handle` 与只读 `GET /v1/events/stream`
+   - 仓库内也已补齐最小正式落点：`tools/openclaw-infos-handle-sidecar/README.md` 与 `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+   - 当前 sidecar 仍是增强入口，不是 gateway 主链，也不是 broker compat 壳的新主逻辑
+
+4. **这轮最后一个已提交停点已可直接作为续做起点**
    - 当前最近本地 commit 见 `git log --oneline -1`
    - 这一停点已收住：
      - `events.recent.latestBySourceItems[]`
@@ -66,7 +73,7 @@
      - delivery adapter 这层也又继续收口了一步：`extract_delivery_snapshot()` 现在会优先读 `delivery.notice / delivery.frontstage / delivery.artifact`，同时把旧 `artifactNotice / metadata` 兼容别名也一并归一；本轮又补了 `extract_handle_response_snapshot()` 这层通用 helper snapshot，把 `result / output / deliveryNotice / frontstageDelivery / artifact` 一并收口给 query consumer；这轮再往前补了 `notice / frontstage / artifactNotice / notify / targetSessionKey / messageId` 顶层 alias，随后又把 `extract_frontstage_notify_payload()` / `build_compat_delivery_bundle()` 也一并定成正式 helper：broker compat emit 与 supervisor / recovery notify adapter 现在都直接复用同一份 contract helper，而不是各自再留一套前台返回解析；这次继续补齐后，`notify-frontstage` compat payload 与 broker `emit` compat shell 也都会把 `notice / deliveryNotice / frontstage / frontstageDelivery / artifact / artifactNotice / notify` 显式收口为 `...|null`，把 legacy edge shape 的空对象缺省再压掉一层
      - `notify-frontstage` 旧 compat 入口本轮也已再弱化一层：内部改成走 `handle` 主请求面，再回吐兼容 payload，便于旧入口继续可用但不再额外长出平行实现
 
-4. **当前验证结果保持全绿**
+5. **当前验证结果保持全绿**
    - `python3 scripts/test-openclaw-infos-handle.py` → `ALL PASS`
    - `python3 scripts/test-frontstage-broker.py` → `ALL PASS`
    - `python3 scripts/test-frontstage-recovery-watch.py` → `ALL PASS`
@@ -89,6 +96,13 @@
      - `python3 scripts/openclaw-infos-handle.py query --kind contract.catalog --format json` → 当前返回 `queryContractVersion=17 / requestContractVersion=6 / brokerContractVersion=2`
 
 ### 已到当前“最终版”，若继续则属于下一阶段
+
+当前这批 phase-2 最小增强已经落到：
+
+- richer image/audio：已从 preview 1.0 提升到 richer preview 1.1，但仍维持 `handle --request-file` 正式主入口不变
+- Control UI 直连 infos-handle：已做到 sidecar 优先、静态 snapshot 回退；还没有继续硬拆前端状态层
+- HTTP/SSE：已做到独立最小本地 sidecar；还没有升级成 gateway 主链接口
+
 
 按优先级建议：
 

@@ -1,0 +1,17 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：为 infos-handle 提供本地 HTTP / SSE sidecar，供 Control UI 等 consumer 直连。
+
+[Unit]
+Description=OpenClaw infos-handle sidecar
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openclaw/workspace
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-infos-handle-sidecar.py --host 127.0.0.1 --port 18790
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

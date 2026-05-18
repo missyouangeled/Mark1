@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -201,6 +203,27 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
 
 
 
+def file_to_data_url(path: Path) -> str:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if not mime_type or not mime_type.startswith("image/"):
+        die(f"无法识别为图片文件，不能生成 data URL：{path}")
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+
+def resolve_runtime_href(base_url: str | None, path_or_url: str | None, fallback: str) -> str:
+    value = str(path_or_url or fallback).strip() or fallback
+    if re.match(r"^https?://", value):
+        return value
+    base = str(base_url or "").strip().rstrip("/")
+    if not base:
+        return value
+    normalized_value = value if value.startswith("/") else f"/{value}"
+    return base + normalized_value
+
+
+
 def write_override_script(
     path: Path,
     *,
@@ -210,6 +233,10 @@ def write_override_script(
     logo_file: str,
     favicon_file: str,
     apple_touch_file: str,
+    user_avatar_data_url: str | None,
+    infos_handle_summary_href: str,
+    infos_handle_contract_href: str,
+    infos_handle_sse_href: str,
     version: str,
 ) -> None:
     payload = {
@@ -220,6 +247,7 @@ def write_override_script(
         "faviconHref": f"./{favicon_file}?v={version}",
         "appleTouchHref": f"./{apple_touch_file}?v={version}",
         "logoAlt": brand_title,
+        "userAvatarDataUrl": user_avatar_data_url or "",
         "healthEntry": {
             "label": "前台状态",
             "title": "前台状态总览",
@@ -228,6 +256,9 @@ def write_override_script(
             "snapshotJsonHref": "/jarvis-frontstage-snapshot.json",
             "legacyStatusJsonHref": "/jarvis-frontstage-status.json",
             "statusJsonHref": "/jarvis-frontstage-status.json",
+            "infosHandleSummaryHref": infos_handle_summary_href,
+            "infosHandleContractHref": infos_handle_contract_href,
+            "infosHandleSseHref": infos_handle_sse_href,
             "refreshMs": 60000,
             "openLabel": "打开状态页",
         },
@@ -262,7 +293,10 @@ def write_override_script(
   const TOOL_NOISE_STYLE_ID = 'jarvis-tool-noise-filter';
   const HEALTH_DOCK_ID = 'jarvis-health-dock';
   const HEALTH_DOCK_STYLE_ID = 'jarvis-health-dock-style';
+  const USER_IDENTITY_STORAGE_KEY = 'openclaw.control.user.v1';
   let healthRefreshTimerId = null;
+  let healthEventSource = null;
+  let healthEventSourceHref = '';
   let healthDockExpanded = false;
 
   function setAttr(node, name, value) {{
@@ -346,6 +380,34 @@ def write_override_script(
   function applyTargetedTextOverrides() {{
     for (const [selector, value] of BRAND.targetedTextSelectors) {{
       document.querySelectorAll(selector).forEach((node) => setText(node, value));
+    }}
+  }}
+
+  function applyUserAvatar() {{
+    if (!BRAND.userAvatarDataUrl) return;
+    try {{
+      const currentRaw = window.localStorage.getItem(USER_IDENTITY_STORAGE_KEY);
+      let current = {{}};
+      if (currentRaw) {{
+        try {{
+          const parsed = JSON.parse(currentRaw);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) current = parsed;
+        }} catch {{}}
+      }}
+      if (current.avatar !== BRAND.userAvatarDataUrl) {{
+        current.avatar = BRAND.userAvatarDataUrl;
+        window.localStorage.setItem(USER_IDENTITY_STORAGE_KEY, JSON.stringify(current));
+      }}
+    }} catch (err) {{
+      console.warn('[jarvis-branding] user avatar storage update failed:', err);
+    }}
+    try {{
+      const app = document.querySelector('openclaw-app');
+      if (app && typeof app.applyLocalUserIdentity === 'function') {{
+        app.applyLocalUserIdentity({{ avatar: BRAND.userAvatarDataUrl }});
+      }}
+    }} catch (err) {{
+      console.warn('[jarvis-branding] user avatar runtime apply failed:', err);
     }}
   }}
 
@@ -641,6 +703,20 @@ def write_override_script(
 
   function normalizeFrontstageSnapshot(payload) {{
     const snapshot = payload && typeof payload === 'object' ? payload : {{}};
+    const infosHandleResult = snapshot && typeof snapshot.result === 'object' ? snapshot.result : null;
+    const infosHandleResponse = snapshot && snapshot.response && typeof snapshot.response === 'object' ? snapshot.response : null;
+    const infosHandleNestedResult = infosHandleResponse && typeof infosHandleResponse.result === 'object' ? infosHandleResponse.result : null;
+    const summaryPayload = infosHandleResult || infosHandleNestedResult;
+    if (summaryPayload) {{
+      return {{
+        severity: summaryPayload.severity || 'unknown',
+        summary: summaryPayload.summary || BRAND.healthEntry.title,
+        issueOverview: summaryPayload.issueOverview || summaryPayload.detail || BRAND.healthEntry.description,
+        checkedAt: summaryPayload.checkedAt || null,
+        host: snapshot.host || '',
+        selfHelpActions: Array.isArray(summaryPayload.selfHelpActions) ? summaryPayload.selfHelpActions : [],
+      }};
+    }}
     const panels = snapshot && typeof snapshot.panels === 'object' ? snapshot.panels : null;
     const healthPanel = panels && panels.health && typeof panels.health === 'object'
       ? panels.health
@@ -653,6 +729,12 @@ def write_override_script(
       host: snapshot && snapshot.host ? snapshot.host : '',
       selfHelpActions: Array.isArray(snapshot && snapshot.selfHelpActions) ? snapshot.selfHelpActions : [],
     }};
+  }}
+
+  async function fetchJsonNoStore(href) {{
+    const resp = await fetch(href, {{ cache: 'no-store' }});
+    if (!resp.ok) throw new Error(`http_${{resp.status}}`);
+    return await resp.json();
   }}
 
   function updateHealthDock(payload) {{
@@ -685,19 +767,57 @@ def write_override_script(
   async function refreshHealthDock() {{
     const dock = ensureHealthDock();
     if (!dock) return;
+    const infosHandleSummaryHref = BRAND.healthEntry.infosHandleSummaryHref || '';
+    const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
     try {{
-      const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
-      const resp = await fetch(snapshotJsonHref, {{ cache: 'no-store' }});
-      if (!resp.ok) throw new Error(`http_${{resp.status}}`);
-      const payload = await resp.json();
+      if (infosHandleSummaryHref) {{
+        try {{
+          const payload = await fetchJsonNoStore(infosHandleSummaryHref);
+          updateHealthDock(payload);
+          return;
+        }} catch (err) {{
+          console.warn('[jarvis-branding] infos-handle summary fetch failed, falling back to snapshot JSON:', err);
+        }}
+      }}
+      const payload = await fetchJsonNoStore(snapshotJsonHref);
       updateHealthDock(payload);
     }} catch (err) {{
       console.warn('[jarvis-branding] health dock fetch failed:', err);
       updateHealthDock({{
         severity: 'warn',
         summary: '前台状态暂时不可读',
-        issueOverview: '静态状态文件读取失败；请刷新页面或检查本机 gateway 是否仍在提供最新状态文件',
+        issueOverview: 'infos-handle 直连与静态状态文件都暂时不可读；请刷新页面，必要时再检查本机 gateway / infos-handle sidecar。',
       }});
+    }}
+  }}
+
+  function connectHealthDockSse() {{
+    const href = BRAND.healthEntry.infosHandleSseHref || '';
+    if (!href || typeof window.EventSource !== 'function') return;
+    if (healthEventSource && healthEventSourceHref === href) return;
+    if (healthEventSource) {{
+      healthEventSource.close();
+      healthEventSource = null;
+    }}
+    healthEventSourceHref = href;
+    try {{
+      const source = new EventSource(href);
+      source.onmessage = (event) => {{
+        try {{
+          const payload = JSON.parse(event.data || '{{}}');
+          updateHealthDock(payload);
+        }} catch (err) {{
+          console.warn('[jarvis-branding] infos-handle sse payload parse failed:', err);
+        }}
+      }};
+      source.onerror = () => {{
+        if (source.readyState === EventSource.CLOSED) {{
+          healthEventSource = null;
+        }}
+      }};
+      healthEventSource = source;
+    }} catch (err) {{
+      console.warn('[jarvis-branding] infos-handle sse connect failed:', err);
     }}
   }}
 
@@ -744,6 +864,7 @@ def write_override_script(
       setAttr(logo, 'src', BRAND.logoHref);
       setAttr(logo, 'alt', BRAND.logoAlt);
 
+      applyUserAvatar();
       ensureToolNoiseStyle();
       ensureHealthDockStyle();
       ensureHealthDock();
@@ -768,6 +889,7 @@ def write_override_script(
   function boot() {{
     applyBranding(document.body || document.documentElement);
     refreshHealthDock();
+    connectHealthDockSse();
     if (!healthRefreshTimerId) {{
       healthRefreshTimerId = window.setInterval(refreshHealthDock, Number(BRAND.healthEntry.refreshMs) || 60000);
     }}
@@ -781,12 +903,15 @@ def write_override_script(
       }}
     }});
     observer.observe(document.documentElement, {{ childList: true, subtree: true, characterData: true }});
-    window.addEventListener('pageshow', () => {{ applyBranding(document.body || document.documentElement); refreshHealthDock(); positionHealthDock(); }});
+    window.addEventListener('pageshow', () => {{ applyBranding(document.body || document.documentElement); refreshHealthDock(); connectHealthDockSse(); positionHealthDock(); }});
     window.addEventListener('resize', positionHealthDock);
     document.addEventListener('visibilitychange', () => {{
       applyBranding(document.body || document.documentElement);
       positionHealthDock();
-      if (document.visibilityState === 'visible') refreshHealthDock();
+      if (document.visibilityState === 'visible') {{
+        refreshHealthDock();
+        connectHealthDockSse();
+      }}
     }});
   }}
 
@@ -807,6 +932,7 @@ def main() -> int:
 
     branding = cfg.get("branding") or {}
     assets = cfg.get("assets") or {}
+    control_ui = cfg.get("controlUi") or {}
 
     brand_title = str(branding.get("brandTitle") or "贾维斯")
     brand_eyebrow = str(branding.get("brandEyebrow") or "CONTROL")
@@ -816,9 +942,27 @@ def main() -> int:
     notification_title = str(branding.get("notificationTitle") or brand_title)
 
     logo_source = resolve_source(str(assets.get("logoSource") or "avatars/jarvis-neon-20260507.png"))
+    user_avatar_source_value = assets.get("chatUserAvatarSource")
+    user_avatar_source = resolve_source(str(user_avatar_source_value)) if user_avatar_source_value else None
     runtime_logo_file = str(assets.get("runtimeLogoFile") or f"jarvis-brand{logo_source.suffix.lower() or '.png'}")
     favicon_file = str(assets.get("favicon32File") or "favicon-32.png")
     apple_touch_file = str(assets.get("appleTouchIconFile") or "apple-touch-icon.png")
+    infos_handle_base_url = str(control_ui.get("infosHandleBaseUrl") or "http://127.0.0.1:18790")
+    infos_handle_summary_href = resolve_runtime_href(
+        infos_handle_base_url,
+        control_ui.get("infosHandleSnapshotSummaryPath"),
+        "/v1/query/snapshot.summary?format=json",
+    )
+    infos_handle_contract_href = resolve_runtime_href(
+        infos_handle_base_url,
+        control_ui.get("infosHandleContractPath"),
+        "/v1/query/contract.catalog?format=json",
+    )
+    infos_handle_sse_href = resolve_runtime_href(
+        infos_handle_base_url,
+        control_ui.get("infosHandleSsePath"),
+        "/v1/events/stream?kind=snapshot.summary",
+    )
 
     package_root = resolve_package_root()
     dist_root = package_root / "dist" / "control-ui"
@@ -847,6 +991,10 @@ def main() -> int:
         logo_file=runtime_logo_file,
         favicon_file=favicon_file,
         apple_touch_file=apple_touch_file,
+        user_avatar_data_url=file_to_data_url(user_avatar_source) if user_avatar_source else None,
+        infos_handle_summary_href=infos_handle_summary_href,
+        infos_handle_contract_href=infos_handle_contract_href,
+        infos_handle_sse_href=infos_handle_sse_href,
         version=version,
     )
     patched_assets = patch_chat_running_indicator(dist_root)
@@ -881,6 +1029,9 @@ def main() -> int:
     print(f"- runtimeLogo: {runtime_logo_path}")
     print(f"- windowTitle: {window_title}")
     print(f"- brandTitle: {brand_title}")
+    print(f"- infosHandleSummaryHref: {infos_handle_summary_href}")
+    print(f"- infosHandleContractHref: {infos_handle_contract_href}")
+    print(f"- infosHandleSseHref: {infos_handle_sse_href}")
     print("- chatRunningPatched:")
     for path in patched_assets:
         print(f"  - {path}")
