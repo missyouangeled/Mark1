@@ -309,7 +309,40 @@ curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'
 curl -N 'http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary&intervalMs=1000'
 ```
 
-### 6. systemd 用户单元
+### 6. infos-handle 统一入口代理（Caddy）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-05-19
+- 用途：给 Gateway 与 infos-handle sidecar 提供单端口统一入口；默认 `:18788`，其余保持 Gateway `:18789` 与 sidecar `:18790` 分离。
+
+相关文件：
+
+- Caddyfile：`tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+- README：`tools/openclaw-infos-handle-gateway-proxy/README.md`
+- apply/verify 脚本：`scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+- service 模板：`tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+- 当前用户态 systemd：`~/.config/systemd/user/openclaw-unified-proxy.service`
+
+当前路由：
+
+- `/v1/query/*` `/v1/handle*` `/v1/artifacts/*` `/v1/events/*` `/healthz*` → `127.0.0.1:18790`
+- 其余 → `127.0.0.1:18789`
+
+当前关键点：
+
+- 会透传原始客户端 IP（`X-Forwarded-For` + `X-Real-IP`）
+- sidecar 会据此判断远程请求，不再把经代理进入的 LAN 请求误判为 localhost 免鉴权
+- 当前支持 HTTP / HTTPS（域名）两种模式；切到 HTTPS 推荐直接走 apply 脚本
+
+推荐命令：
+
+```bash
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --install-user-systemd --enable --restart --verify --print-json
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --mode https --domain your-domain.com --email you@example.com --reload --verify --print-json
+```
+
+### 7. systemd 用户单元
 
 相关文件：
 
@@ -320,7 +353,7 @@ curl -N 'http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary&intervalM
 
 - 在 Linux 用户态下调度 resume-watch 逻辑
 
-### 6. Control UI 品牌覆盖（贾维斯）
+### 8. Control UI 品牌覆盖（贾维斯）
 
 - 适用机器：公司（Linux）
 - 系统 / OS：Linux

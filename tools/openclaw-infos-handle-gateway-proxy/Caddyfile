@@ -1,20 +1,14 @@
 # Caddyfile — OpenClaw unified Gateway + infos-handle reverse proxy
 # 适用机器：公司（Linux）
 # 系统 / OS：Linux
-# 用途：单端口统一入口，把 Gateway (18789) 和 infos-handle sidecar (18790) 合并到一个端口
+# 用途：单端口统一入口，把 Gateway (18789) 和 infos-handle sidecar (18790) 合并到一个入口
 
-# 默认：仅本地 / LAN 访问（无域名时为 HTTP）
-# 若填域名，Caddy 自动申请 Let's Encrypt 证书，即公网就绪
-
-# ---------- 全局配置 ----------
+# 当前模式：http
+# - http: 仅本地 / LAN 使用
+# - https: 绑定域名，自动申请 Let's Encrypt 证书
 {
-	# 如需 HTTPS + 域名，取消下面注释并填邮箱：
 	# email your-email@example.com
 }
-
-# ---------- 站点配置 ----------
-# 替换 <your-domain> 为你的域名（留空则仅 HTTP / LAN 可用）
-# :18788 表示仅监听 18788 端口，无域名时为纯 HTTP
 
 http://:18788 {
 	# CORS 头（给跨域 consumer 用）
@@ -36,7 +30,7 @@ http://:18788 {
 		Access-Control-Allow-Headers "Authorization, Content-Type"
 	}
 
-	# ---------- infos-handle API → sidecar (18790) ----------
+	# infos-handle API → sidecar
 	handle /v1/query/* {
 		reverse_proxy 127.0.0.1:18790 {
 			header_up X-Real-IP {remote_host}
@@ -63,16 +57,13 @@ http://:18788 {
 		}
 	}
 
-	# ---------- 其余请求 → Gateway (18789) ----------
+	# 其余 → Gateway
 	handle {
 		reverse_proxy 127.0.0.1:18789
 	}
 }
 
-# ========== 公网 TLS 配置（填域名后取消注释，删掉上面的 http:// 块） ==========
-# 替换 your-domain.com 为实际域名，并取消 email 注释
-# 然后 reload: caddy reload --config <this-file>
-#
+# ========== 公网 TLS 配置（填域名后可切到 HTTPS） ==========
 # your-domain.com {
 # 	# CORS 头
 # 	@cors_preflight method OPTIONS
@@ -93,29 +84,29 @@ http://:18788 {
 #
 # 	# infos-handle API → sidecar
 # 	handle /v1/query/* {
-# 		reverse_proxy 127.0.0.1:18790 {
-# 			header_up X-Real-IP {remote_host}
-# 		}
+# 	reverse_proxy 127.0.0.1:18790 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
 # 	}
 # 	handle /v1/handle* {
-# 		reverse_proxy 127.0.0.1:18790 {
-# 			header_up X-Real-IP {remote_host}
-# 		}
+# 	reverse_proxy 127.0.0.1:18790 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
 # 	}
 # 	handle /v1/artifacts/* {
-# 		reverse_proxy 127.0.0.1:18790 {
-# 			header_up X-Real-IP {remote_host}
-# 		}
+# 	reverse_proxy 127.0.0.1:18790 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
 # 	}
 # 	handle /v1/events/* {
-# 		reverse_proxy 127.0.0.1:18790 {
-# 			header_up X-Real-IP {remote_host}
-# 		}
+# 	reverse_proxy 127.0.0.1:18790 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
 # 	}
 # 	handle /healthz* {
-# 		reverse_proxy 127.0.0.1:18790 {
-# 			header_up X-Real-IP {remote_host}
-# 		}
+# 	reverse_proxy 127.0.0.1:18790 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
 # 	}
 #
 # 	# 其余 → Gateway

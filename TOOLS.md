@@ -98,11 +98,14 @@ Things like:
   - 脚本默认监听：`127.0.0.1:18790`
   - 当前 service 实际监听：`0.0.0.0:18790`
   - 鉴权：本地 localhost 直连免鉴权；远程/LAN 访问需 `Authorization: Bearer <gateway-token>`；经统一入口代理时按 `X-Forwarded-For` / `X-Real-IP` 识别原始客户端
+  - 远程限流：默认只对非 localhost 客户端生效，`120 req / 60s`（环境变量：`INFOS_HANDLE_SIDECAR_REMOTE_RATE_MAX` / `INFOS_HANDLE_SIDECAR_REMOTE_RATE_WINDOW_S`）
   - 用途：给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE 直连入口
   - 当前最小接口：`GET /healthz` / `GET /v1/query/<kind>` / `POST /v1/handle` / `GET /v1/events/stream`
   - 当前状态：已在公司（Linux）机安装并启用；Control UI branding 补丁默认会优先读这条 sidecar，失败时再回退 broker snapshot 静态文件
 - infos-handle 统一入口代理：`tools/openclaw-infos-handle-gateway-proxy/`
   - Caddyfile：`tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+  - README：`tools/openclaw-infos-handle-gateway-proxy/README.md`
+  - apply/verify：`scripts/apply-openclaw-infos-handle-gateway-proxy.py`
   - service 模板：`tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
   - 当前用户态 systemd：`~/.config/systemd/user/openclaw-unified-proxy.service`
   - 当前监听：`0.0.0.0:18788`

@@ -209,9 +209,9 @@
 
 #### 现在还没做成
 
-- 公网正式域名/TLS（Caddyfile 模板已就位,填域名+邮箱即自动 HTTPS）
-- rate limit / 多租户隔离
-- WebSocket 透传（Caddy 当前 HTTP-only;WS 需额外配置）
+- 公网正式域名/TLS（当前已可通过 `scripts/apply-openclaw-infos-handle-gateway-proxy.py --mode https --domain ... --email ...` 切到 HTTPS，但还未绑定实际域名）
+- 更强的入口层 rate limit / 多租户隔离（当前 sidecar 已有远程客户端 rate limit，统一入口自身仍未加独立限流）
+- WebSocket 透传增强与专门回归（当前主焦点仍是 infos-handle HTTP 面）
 
 当前架构:
 

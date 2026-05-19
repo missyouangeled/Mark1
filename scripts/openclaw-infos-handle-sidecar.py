@@ -45,6 +45,8 @@ HANDLE_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_HANDLE_TIMEOUT
 SSE_QUERY_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_SSE_QUERY_TIMEOUT_S", "20"))
 MAX_ACTIVE_REQUESTS = int(os.environ.get("INFOS_HANDLE_SIDECAR_MAX_ACTIVE", "32"))
 REQUEST_BODY_LIMIT_BYTES = 256 * 1024
+REMOTE_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_REMOTE_RATE_WINDOW_S", "60"))
+REMOTE_RATE_LIMIT_MAX_REQUESTS = int(os.environ.get("INFOS_HANDLE_SIDECAR_REMOTE_RATE_MAX", "120"))
 GATEWAY_CONFIG_PATH = Path.home() / ".openclaw" / "openclaw.json"
 
 
@@ -242,6 +244,7 @@ class SidecarServer(ThreadingHTTPServer):
         self._started_at: float = time.time()
         self._total_requests: int = 0
         self._total_errors: int = 0
+        self._remote_rate_windows: dict[str, dict[str, float | int]] = {}
 
     def validate_startup(self) -> None:
         if not INFOS_HANDLE_SCRIPT.exists():
@@ -250,7 +253,8 @@ class SidecarServer(ThreadingHTTPServer):
         sys.stderr.write(
             f"[infos-handle-sidecar] startup ok snapshot={self.snapshot_path} events={self.events_path} "
             f"output_root={self.output_root} handle_timeout={HANDLE_TIMEOUT_SECONDS}s "
-            f"sse_query_timeout={SSE_QUERY_TIMEOUT_SECONDS}s max_active={MAX_ACTIVE_REQUESTS}\n"
+            f"sse_query_timeout={SSE_QUERY_TIMEOUT_SECONDS}s max_active={MAX_ACTIVE_REQUESTS} "
+            f"remote_rate={REMOTE_RATE_LIMIT_MAX_REQUESTS}/{REMOTE_RATE_LIMIT_WINDOW_SECONDS}s\n"
         )
 
     @contextmanager
@@ -282,7 +286,39 @@ class SidecarServer(ThreadingHTTPServer):
                 "totalRequests": self._total_requests,
                 "totalErrors": self._total_errors,
                 "maxActiveRequests": MAX_ACTIVE_REQUESTS,
+                "remoteRateLimit": {
+                    "windowSeconds": REMOTE_RATE_LIMIT_WINDOW_SECONDS,
+                    "maxRequests": REMOTE_RATE_LIMIT_MAX_REQUESTS,
+                },
             }
+
+    def check_remote_rate_limit(self, client_host: str) -> tuple[bool, int | None]:
+        normalized_host = _normalize_host(client_host)
+        if not normalized_host or _is_loopback_host(normalized_host):
+            return True, None
+        if REMOTE_RATE_LIMIT_MAX_REQUESTS <= 0 or REMOTE_RATE_LIMIT_WINDOW_SECONDS <= 0:
+            return True, None
+        now = time.time()
+        retry_after: int | None = None
+        with self._lock:
+            stale_hosts = [
+                host
+                for host, window in self._remote_rate_windows.items()
+                if now - float(window.get("startedAt", 0.0)) >= (REMOTE_RATE_LIMIT_WINDOW_SECONDS * 3)
+            ]
+            for host in stale_hosts:
+                self._remote_rate_windows.pop(host, None)
+            window = self._remote_rate_windows.get(normalized_host)
+            if not isinstance(window, dict) or now - float(window.get("startedAt", 0.0)) >= REMOTE_RATE_LIMIT_WINDOW_SECONDS:
+                window = {"startedAt": now, "count": 0}
+                self._remote_rate_windows[normalized_host] = window
+            count = int(window.get("count", 0))
+            started_at = float(window.get("startedAt", now))
+            if count >= REMOTE_RATE_LIMIT_MAX_REQUESTS:
+                retry_after = max(1, int(REMOTE_RATE_LIMIT_WINDOW_SECONDS - (now - started_at)))
+                return False, retry_after
+            window["count"] = count + 1
+        return True, None
 
 
 class SidecarHandler(BaseHTTPRequestHandler):
@@ -299,6 +335,18 @@ class SidecarHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        allowed, retry_after = self.server.check_remote_rate_limit(_extract_forwarded_client_host(self))
+        if not allowed:
+            self._write_json(
+                {
+                    "ok": False,
+                    "error": "rate limit exceeded",
+                    "retryAfterSeconds": retry_after,
+                },
+                status=HTTPStatus.TOO_MANY_REQUESTS,
+                extra_headers={"Retry-After": str(retry_after or REMOTE_RATE_LIMIT_WINDOW_SECONDS)},
+            )
+            return
         if not _check_auth(self, parsed.path):
             self._write_json({"ok": False, "error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
             return
@@ -312,6 +360,10 @@ class SidecarHandler(BaseHTTPRequestHandler):
                     "outputRoot": str(self.server.output_root),
                     "artifactRoutePrefix": ARTIFACT_ROUTE_PREFIX,
                     "sseConnections": self.server._sse_connections,
+                    "remoteRateLimit": {
+                        "windowSeconds": REMOTE_RATE_LIMIT_WINDOW_SECONDS,
+                        "maxRequests": REMOTE_RATE_LIMIT_MAX_REQUESTS,
+                    },
                 }
             )
             return
@@ -328,6 +380,18 @@ class SidecarHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        allowed, retry_after = self.server.check_remote_rate_limit(_extract_forwarded_client_host(self))
+        if not allowed:
+            self._write_json(
+                {
+                    "ok": False,
+                    "error": "rate limit exceeded",
+                    "retryAfterSeconds": retry_after,
+                },
+                status=HTTPStatus.TOO_MANY_REQUESTS,
+                extra_headers={"Retry-After": str(retry_after or REMOTE_RATE_LIMIT_WINDOW_SECONDS)},
+            )
+            return
         if not _check_auth(self, parsed.path):
             self._write_json({"ok": False, "error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
             return
@@ -544,28 +608,54 @@ class SidecarHandler(BaseHTTPRequestHandler):
             python_executable=self.server.python_executable,
         )
 
-    def _write_json(self, payload: dict[str, Any], *, status: HTTPStatus = HTTPStatus.OK) -> None:
+    def _write_json(
+        self,
+        payload: dict[str, Any],
+        *,
+        status: HTTPStatus = HTTPStatus.OK,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
-        self._send_common_headers(content_type="application/json; charset=utf-8", content_length=len(content))
+        self._send_common_headers(
+            content_type="application/json; charset=utf-8",
+            content_length=len(content),
+            extra_headers=extra_headers,
+        )
         self.end_headers()
         self.wfile.write(content)
 
-    def _write_text(self, payload: str, *, status: HTTPStatus = HTTPStatus.OK, content_type: str = "text/plain; charset=utf-8") -> None:
+    def _write_text(
+        self,
+        payload: str,
+        *,
+        status: HTTPStatus = HTTPStatus.OK,
+        content_type: str = "text/plain; charset=utf-8",
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         content = payload.encode("utf-8")
         self.send_response(status)
-        self._send_common_headers(content_type=content_type, content_length=len(content))
+        self._send_common_headers(content_type=content_type, content_length=len(content), extra_headers=extra_headers)
         self.end_headers()
         self.wfile.write(content)
 
-    def _send_common_headers(self, *, content_type: str, content_length: int | None = None) -> None:
+    def _send_common_headers(
+        self,
+        *,
+        content_type: str,
+        content_length: int | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         self.send_header("Content-Type", content_type)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.send_header("Cache-Control", "no-store")
         if content_length is not None:
             self.send_header("Content-Length", str(content_length))
+        if extra_headers:
+            for header_name, header_value in extra_headers.items():
+                self.send_header(header_name, header_value)
 
     @staticmethod
     def _first_text(*value_lists: list[str] | None) -> str | None:

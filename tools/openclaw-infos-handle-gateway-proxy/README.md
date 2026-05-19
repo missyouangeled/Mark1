@@ -18,6 +18,7 @@
 - 透传原始客户端 IP：
   - `X-Forwarded-For` 走 Caddy 默认反代行为
   - `X-Real-IP: {remote_host}` 显式补上
+- 当前配套 apply/verify 脚本：`scripts/apply-openclaw-infos-handle-gateway-proxy.py`
 
 ## 为什么显式上送原始客户端 IP
 
@@ -31,6 +32,14 @@ sidecar 当前的鉴权语义是：
 因此当前 Caddyfile 已明确把 `X-Forwarded-For` / `X-Real-IP` 传给 sidecar；sidecar 也只信任来自 loopback 代理的这两个头。
 
 ## 安装
+
+推荐直接走脚本：
+
+```bash
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --install-user-systemd --enable --restart --verify --print-json
+```
+
+手工安装也可：
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -65,17 +74,21 @@ curl -H 'Authorization: Bearer <gateway-token>' \
 
 ## 公网/TLS
 
-`Caddyfile` 已带一段注释掉的域名配置模板：
+推荐直接用 apply 脚本切到 HTTPS 模式：
 
-- 填入域名
-- 取消全局 `email` 注释
-- 删掉或停用当前 `http://:18788` 块
-- reload Caddy
+```bash
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py \
+  --mode https \
+  --domain your-domain.com \
+  --email you@example.com \
+  --reload --verify --print-json
+```
 
-即可使用自动 Let's Encrypt TLS。
+它会把 `Caddyfile` 改写成域名/TLS 版本；当前若不提供域名，则继续保持 HTTP/LAN 模式。
 
 ## 当前边界
 
 - 当前主要是 **统一入口 / 统一路由**，不是新的业务层
-- 当前还**不负责** rate limit / 多租户隔离
+- 当前更细的 rate limit 放在 sidecar：**仅限制远程客户端，本地 localhost 不受影响**
+- 当前还**不负责** 多租户隔离
 - 当前对 Gateway 的 WebSocket 主链不做额外增强，只做现有反代

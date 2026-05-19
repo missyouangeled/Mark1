@@ -1300,6 +1300,8 @@ def main() -> int:
         sidecar_port = pick_free_port()
         sidecar_env = os.environ.copy()
         sidecar_env["HOME"] = str(fake_home)
+        sidecar_env["INFOS_HANDLE_SIDECAR_REMOTE_RATE_MAX"] = "4"
+        sidecar_env["INFOS_HANDLE_SIDECAR_REMOTE_RATE_WINDOW_S"] = "60"
         sidecar_process = subprocess.Popen(
             [
                 "python3",
@@ -1425,6 +1427,23 @@ def main() -> int:
             ) as response:
                 proxied_image_content_type = response.headers.get_content_type()
             assert proxied_image_content_type == "image/svg+xml"
+
+            proxied_rate_limited_request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json",
+                headers={
+                    "X-Forwarded-For": "198.51.100.22",
+                    "Authorization": f"Bearer {sidecar_token}",
+                },
+            )
+            try:
+                urllib.request.urlopen(proxied_rate_limited_request, timeout=5)
+                raise AssertionError("proxied remote query beyond rate limit should have returned 429")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 429, f"expected 429, got {exc.code}"
+                assert exc.headers.get("Retry-After") is not None
+                rate_limit_body = json.loads(exc.read().decode("utf-8"))
+                assert rate_limit_body["error"] == "rate limit exceeded"
+                assert int(rate_limit_body["retryAfterSeconds"]) >= 1
 
             # v3 image via sidecar
             v3_image_request = urllib.request.Request(

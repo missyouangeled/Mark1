@@ -9,6 +9,7 @@
 > - audio handler 升级到 `audio.local-tts.v2`：自然口语 preamble + conversational connectors 连接 segment
 > - sidecar 已接入 Gateway Bearer token 鉴权：**本地直连 localhost 免鉴权；远程/LAN 访问需 `Authorization: Bearer <gateway-token>`**
 > - 若经 Caddy 统一入口转发，sidecar 会按 `X-Forwarded-For` / `X-Real-IP` 识别原始客户端，不会再把远程代理请求误当 localhost 放过
+> - sidecar 新增远程 rate limit：**仅限制非 localhost 客户端**，默认 `120 req / 60s`
 > - 新增 artifact cleanup：`--cleanup-artifacts-older-than-hours N` 可清理过期 artifact
 > - 所有测试保持绿色
 
@@ -19,6 +20,7 @@
 - 脚本默认监听：`127.0.0.1:18790`
 - service 模板默认监听：`0.0.0.0:18790`
 - 鉴权语义：本地直连 localhost 免鉴权；远程/LAN 请求需 Bearer token；若经统一入口代理，按原始客户端 IP 判定
+- 远程限流：默认仅对非 localhost 客户端生效，`120 req / 60s`（可用环境变量覆盖）
 - 当前 Control UI 品牌补丁默认读取：
   - `GET /v1/query/snapshot.summary?format=json`
   - `GET /v1/query/contract.catalog?format=json`
@@ -54,6 +56,7 @@ GET /healthz
 - `eventsPath`
 - `outputRoot`
 - `artifactRoutePrefix`
+- `remoteRateLimit`
 
 ### 2. 查询接口
 
