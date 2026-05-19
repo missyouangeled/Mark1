@@ -256,6 +256,7 @@ def write_override_script(
             "snapshotJsonHref": "/jarvis-frontstage-snapshot.json",
             "legacyStatusJsonHref": "/jarvis-frontstage-status.json",
             "statusJsonHref": "/jarvis-frontstage-status.json",
+            "infosHandleBaseUrl": "http://127.0.0.1:18790",
             "infosHandleSummaryHref": infos_handle_summary_href,
             "infosHandleContractHref": infos_handle_contract_href,
             "infosHandleSseHref": infos_handle_sse_href,
@@ -598,6 +599,51 @@ def write_override_script(
       #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab:hover {{
         filter: brightness(1.05);
       }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-cards {{
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 2px;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card {{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(148, 163, 184, 0.10);
+        font-size: 12px;
+        line-height: 1.35;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card-badge {{
+        flex-shrink: 0;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        background: rgba(148, 163, 184, 0.14);
+        color: #d9e6f5;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card-badge[data-severity="ok"] {{
+        background: rgba(34, 197, 94, 0.15);
+        color: #97f0b3;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card-badge[data-severity="warn"] {{
+        background: rgba(245, 158, 11, 0.16);
+        color: #ffd796;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card-badge[data-severity="critical"] {{
+        background: rgba(239, 68, 68, 0.16);
+        color: #ffb1b1;
+      }}
+      #${{HEALTH_DOCK_ID}} .jarvis-health-dock__sub-card-text {{
+        color: #cbdff5;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }}
       @media (max-width: 900px) {{
         #${{HEALTH_DOCK_ID}} {{
           right: 12px;
@@ -674,6 +720,16 @@ def write_override_script(
         <div class="jarvis-health-dock__desc">${{BRAND.healthEntry.description}}</div>
         <div class="jarvis-health-dock__meta">等待前台状态快照…</div>
         <ul class="jarvis-health-dock__tips"><li>等待前台状态快照…</li></ul>
+        <div class="jarvis-health-dock__sub-cards">
+          <div class="jarvis-health-dock__sub-card" data-jarvis-dock="task">
+            <span class="jarvis-health-dock__sub-card-badge">—</span>
+            <span class="jarvis-health-dock__sub-card-text">后台任务：读取中…</span>
+          </div>
+          <div class="jarvis-health-dock__sub-card" data-jarvis-dock="recovery">
+            <span class="jarvis-health-dock__sub-card-badge">—</span>
+            <span class="jarvis-health-dock__sub-card-text">恢复观察：读取中…</span>
+          </div>
+        </div>
         <div class="jarvis-health-dock__actions">
           <a class="jarvis-health-dock__open" href="${{BRAND.healthEntry.href}}" target="_blank" rel="noopener noreferrer">${{BRAND.healthEntry.openLabel || '打开状态页'}}</a>
         </div>
@@ -821,6 +877,127 @@ def write_override_script(
     }}
   }}
 
+  function normalizeTasksSummary(payload) {{
+    const result = payload && typeof payload.result === 'object' ? payload.result : null;
+    const response = payload && payload.response && typeof payload.response === 'object' ? payload.response : null;
+    const nested = response && typeof response.result === 'object' ? response.result : null;
+    const data = result || nested;
+    if (data) {{
+      const sv = data.supervisor && typeof data.supervisor === 'object' ? data.supervisor : null;
+      return {{
+        severity: sv ? (sv.severity || 'ok') : 'ok',
+        summary: sv ? (sv.summary || '无活跃后台任务') : '无活跃后台任务',
+        checkedAt: sv ? (sv.checkedAt || null) : null,
+      }};
+    }}
+    const panels = payload && typeof payload.panels === 'object' ? payload.panels : null;
+    const taskPanel = panels && panels.supervisor && typeof panels.supervisor === 'object' ? panels.supervisor : null;
+    return {{
+      severity: taskPanel ? (taskPanel.severity || 'ok') : 'ok',
+      summary: taskPanel ? (taskPanel.summary || '无活跃后台任务') : '无活跃后台任务',
+      checkedAt: taskPanel ? (taskPanel.checkedAt || null) : null,
+    }};
+  }}
+
+  function updateTaskCard(data) {{
+    const panel = document.getElementById(HEALTH_DOCK_ID);
+    if (!panel) return;
+    const card = panel.querySelector('[data-jarvis-dock="task"]');
+    if (!card) return;
+    const badge = card.querySelector('.jarvis-health-dock__sub-card-badge');
+    const text = card.querySelector('.jarvis-health-dock__sub-card-text');
+    if (badge) {{
+      badge.dataset.severity = data.severity || 'ok';
+      badge.textContent = healthBadgeText(data.severity);
+    }}
+    if (text) {{
+      text.textContent = '后台任务：' + (data.summary || '无活跃后台任务');
+    }}
+  }}
+
+  async function refreshTaskCard() {{
+    const infosHandleBase = BRAND.healthEntry.infosHandleBaseUrl || '';
+    const tasksHref = infosHandleBase ? (infosHandleBase + '/v1/query/tasks.summary?format=json') : '';
+    const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
+    try {{
+      if (tasksHref) {{
+        try {{
+          const payload = await fetchJsonNoStore(tasksHref);
+          updateTaskCard(normalizeTasksSummary(payload));
+          return;
+        }} catch (err) {{
+          console.warn('[jarvis-branding] infos-handle tasks fetch failed, falling back to snapshot:', err);
+        }}
+      }}
+      if (snapshotJsonHref) {{
+        const payload = await fetchJsonNoStore(snapshotJsonHref);
+        updateTaskCard(normalizeTasksSummary(payload));
+      }}
+    }} catch (err) {{
+      updateTaskCard({{ severity: 'warn', summary: '暂时不可读' }});
+    }}
+  }}
+
+  function normalizeRecoverySummary(payload) {{
+    const result = payload && typeof payload.result === 'object' ? payload.result : null;
+    const response = payload && payload.response && typeof payload.response === 'object' ? payload.response : null;
+    const nested = response && typeof response.result === 'object' ? response.result : null;
+    const data = result || nested;
+    if (data) {{
+      return {{
+        severity: data.severity || 'ok',
+        summary: data.summary || '未发现明显异常',
+        checkedAt: data.checkedAt || null,
+      }};
+    }}
+    const panels = payload && typeof payload.panels === 'object' ? payload.panels : null;
+    const recoveryPanel = panels && panels.recovery && typeof panels.recovery === 'object' ? panels.recovery : null;
+    return {{
+      severity: recoveryPanel ? (recoveryPanel.severity || 'ok') : 'ok',
+      summary: recoveryPanel ? (recoveryPanel.summary || '未发现明显异常') : '未发现明显异常',
+      checkedAt: recoveryPanel ? (recoveryPanel.checkedAt || null) : null,
+    }};
+  }}
+
+  function updateRecoveryCard(data) {{
+    const panel = document.getElementById(HEALTH_DOCK_ID);
+    if (!panel) return;
+    const card = panel.querySelector('[data-jarvis-dock="recovery"]');
+    if (!card) return;
+    const badge = card.querySelector('.jarvis-health-dock__sub-card-badge');
+    const text = card.querySelector('.jarvis-health-dock__sub-card-text');
+    if (badge) {{
+      badge.dataset.severity = data.severity || 'ok';
+      badge.textContent = healthBadgeText(data.severity);
+    }}
+    if (text) {{
+      text.textContent = '恢复观察：' + (data.summary || '未发现明显异常');
+    }}
+  }}
+
+  async function refreshRecoveryCard() {{
+    const infosHandleBase = BRAND.healthEntry.infosHandleBaseUrl || '';
+    const recoveryHref = infosHandleBase ? (infosHandleBase + '/v1/query/recovery.summary?format=json') : '';
+    const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
+    try {{
+      if (recoveryHref) {{
+        try {{
+          const payload = await fetchJsonNoStore(recoveryHref);
+          updateRecoveryCard(normalizeRecoverySummary(payload));
+          return;
+        }} catch (err) {{
+          console.warn('[jarvis-branding] infos-handle recovery fetch failed, falling back to snapshot:', err);
+        }}
+      }}
+      if (snapshotJsonHref) {{
+        const payload = await fetchJsonNoStore(snapshotJsonHref);
+        updateRecoveryCard(normalizeRecoverySummary(payload));
+      }}
+    }} catch (err) {{
+      updateRecoveryCard({{ severity: 'warn', summary: '暂时不可读' }});
+    }}
+  }}
+
   function isVisible(node) {{
     if (!(node instanceof Element)) return false;
     const style = window.getComputedStyle(node);
@@ -889,9 +1066,11 @@ def write_override_script(
   function boot() {{
     applyBranding(document.body || document.documentElement);
     refreshHealthDock();
+    refreshTaskCard();
+    refreshRecoveryCard();
     connectHealthDockSse();
     if (!healthRefreshTimerId) {{
-      healthRefreshTimerId = window.setInterval(refreshHealthDock, Number(BRAND.healthEntry.refreshMs) || 60000);
+      healthRefreshTimerId = window.setInterval(() => {{ refreshHealthDock(); refreshTaskCard(); refreshRecoveryCard(); }}, Number(BRAND.healthEntry.refreshMs) || 60000);
     }}
     const observer = new MutationObserver((mutations) => {{
       for (const mutation of mutations) {{
@@ -903,13 +1082,15 @@ def write_override_script(
       }}
     }});
     observer.observe(document.documentElement, {{ childList: true, subtree: true, characterData: true }});
-    window.addEventListener('pageshow', () => {{ applyBranding(document.body || document.documentElement); refreshHealthDock(); connectHealthDockSse(); positionHealthDock(); }});
+    window.addEventListener('pageshow', () => {{ applyBranding(document.body || document.documentElement); refreshHealthDock(); refreshTaskCard(); refreshRecoveryCard(); connectHealthDockSse(); positionHealthDock(); }});
     window.addEventListener('resize', positionHealthDock);
     document.addEventListener('visibilitychange', () => {{
       applyBranding(document.body || document.documentElement);
       positionHealthDock();
       if (document.visibilityState === 'visible') {{
         refreshHealthDock();
+        refreshTaskCard();
+        refreshRecoveryCard();
         connectHealthDockSse();
       }}
     }});

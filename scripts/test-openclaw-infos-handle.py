@@ -1227,6 +1227,24 @@ def main() -> int:
             wait_for_sidecar(f"http://127.0.0.1:{sidecar_port}/healthz")
             healthz_payload = fetch_json(f"http://127.0.0.1:{sidecar_port}/healthz")
             assert healthz_payload["artifactRoutePrefix"] == "/v1/artifacts"
+            assert isinstance(healthz_payload.get("sseConnections"), int)
+            assert healthz_payload["sseConnections"] >= 0
+
+            # verify REQUEST_ENTITY_TOO_LARGE for oversized body
+            oversize_req = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/handle",
+                data=b"{\"x\":\"" + b"y" * (512 * 1024) + b"\"}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                urllib.request.urlopen(oversize_req, timeout=5)
+                raise AssertionError("oversized body should have returned 413")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 413, f"expected 413, got {exc.code}"
+                oversize_body = json.loads(exc.read().decode("utf-8"))
+                assert oversize_body.get("error") is not None
+
             snapshot_summary = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json")
             assert snapshot_summary["kind"] == "snapshot.summary"
             assert snapshot_summary["result"]["summary"] == "前台状态总体正常"

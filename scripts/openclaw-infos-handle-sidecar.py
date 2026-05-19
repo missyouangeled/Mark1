@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-# 适用机器：通用（当前按公司 Linux 的 Control UI 直连需求做最小验证）
+# 适用机器：通用（当前按公司 Linux 的 Control UI 直连需求做验证）
 # 系统 / OS：通用
-# 用途：为 infos-handle 提供最小本地 HTTP/SSE sidecar，给 Control UI 等消费方优先直连统一请求层。
+# 用途：为 infos-handle 提供稳固的本地 HTTP/SSE sidecar，给 Control UI 等消费方优先直连统一请求层。
 
 from __future__ import annotations
 
 import argparse
 import json
 import mimetypes
+import os
+import signal
 import socketserver
+import subprocess
 import sys
+import threading
 import time
+from contextlib import contextmanager
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,6 +40,10 @@ ARTIFACT_SUFFIX_PREFERENCE = {
     "image": [".svg", ".png", ".webp", ".jpg", ".jpeg", ".gif"],
     "audio": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
 }
+HANDLE_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_HANDLE_TIMEOUT_S", "45"))
+SSE_QUERY_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_SSE_QUERY_TIMEOUT_S", "20"))
+MAX_ACTIVE_REQUESTS = int(os.environ.get("INFOS_HANDLE_SIDECAR_MAX_ACTIVE", "32"))
+REQUEST_BODY_LIMIT_BYTES = 256 * 1024
 
 
 def build_artifact_href(artifact_ref: str) -> str:
@@ -130,14 +139,57 @@ class SidecarServer(ThreadingHTTPServer):
         self.output_root = output_root
         self.python_executable = python_executable
         self._sse_connections: int = 0
-        self._sse_lock = __import__('threading').Lock()
+        self._active_requests: int = 0
+        self._lock: threading.Lock = threading.Lock()
+        self._started_at: float = time.time()
+        self._total_requests: int = 0
+        self._total_errors: int = 0
+
+    def validate_startup(self) -> None:
+        if not INFOS_HANDLE_SCRIPT.exists():
+            raise FileNotFoundError(f"infos-handle script not found: {INFOS_HANDLE_SCRIPT}")
+        self.output_root.mkdir(parents=True, exist_ok=True)
+        sys.stderr.write(
+            f"[infos-handle-sidecar] startup ok snapshot={self.snapshot_path} events={self.events_path} "
+            f"output_root={self.output_root} handle_timeout={HANDLE_TIMEOUT_SECONDS}s "
+            f"sse_query_timeout={SSE_QUERY_TIMEOUT_SECONDS}s max_active={MAX_ACTIVE_REQUESTS}\n"
+        )
+
+    @contextmanager
+    def acquire_request_slot(self):
+        with self._lock:
+            if self._active_requests >= MAX_ACTIVE_REQUESTS:
+                raise RuntimeError(
+                    f"too many active requests ({self._active_requests}/{MAX_ACTIVE_REQUESTS}); try again shortly"
+                )
+            self._active_requests += 1
+            self._total_requests += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._active_requests = max(0, self._active_requests - 1)
+
+    def record_error(self) -> None:
+        with self._lock:
+            self._total_errors += 1
+
+    def server_stats(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self._started_at)),
+                "uptimeSeconds": round(time.time() - self._started_at, 1),
+                "sseConnections": self._sse_connections,
+                "activeRequests": self._active_requests,
+                "totalRequests": self._total_requests,
+                "totalErrors": self._total_errors,
+                "maxActiveRequests": MAX_ACTIVE_REQUESTS,
+            }
 
 
 class SidecarHandler(BaseHTTPRequestHandler):
     server: SidecarServer
     protocol_version = "HTTP/1.1"
-    MAX_BODY_BYTES = 256 * 1024
-    HANDLE_TIMEOUT_SECONDS = 30
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
         sys.stderr.write(f"[infos-handle-sidecar] {self.address_string()} - {format % args}\n")
@@ -158,6 +210,7 @@ class SidecarHandler(BaseHTTPRequestHandler):
                     "eventsPath": str(self.server.events_path),
                     "outputRoot": str(self.server.output_root),
                     "artifactRoutePrefix": ARTIFACT_ROUTE_PREFIX,
+                    "sseConnections": self.server._sse_connections,
                 }
             )
             return
@@ -178,11 +231,22 @@ class SidecarHandler(BaseHTTPRequestHandler):
             self._write_json({"ok": False, "error": f"unknown path: {parsed.path}"}, status=HTTPStatus.NOT_FOUND)
             return
         try:
+            with self.server.acquire_request_slot():
+                self._do_handle(parsed)
+        except RuntimeError as exc:
+            self.server.record_error()
+            self._write_json({"ok": False, "error": str(exc)}, status=HTTPStatus.SERVICE_UNAVAILABLE)
+
+    def _do_handle(self, parsed) -> None:
+        try:
             content_length = int(self.headers.get("Content-Length") or "0")
         except ValueError:
             content_length = 0
-        if content_length > self.MAX_BODY_BYTES:
-            self._write_json({"ok": False, "error": "request body too large", "maxBytes": self.MAX_BODY_BYTES}, status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        if content_length > REQUEST_BODY_LIMIT_BYTES:
+            self._write_json(
+                {"ok": False, "error": "request body too large", "maxBytes": REQUEST_BODY_LIMIT_BYTES},
+                status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
             return
         raw_body = self.rfile.read(content_length) if content_length > 0 else b""
         try:
@@ -196,18 +260,45 @@ class SidecarHandler(BaseHTTPRequestHandler):
         payload.setdefault("snapshotPath", str(self.server.snapshot_path))
         payload.setdefault("eventsPath", str(self.server.events_path))
         payload.setdefault("outputRoot", str(self.server.output_root))
+        request_id = payload.get("requestId", "-")
         try:
-            response = invoke_handle_request(
-                INFOS_HANDLE_SCRIPT,
-                payload,
-                python_executable=self.server.python_executable,
+            response = self._invoke_handle_with_timeout(payload)
+        except subprocess.TimeoutExpired as exc:
+            self.server.record_error()
+            sys.stderr.write(
+                f"[infos-handle-sidecar] handle timeout requestId={request_id} timeout={exc.timeout}s\n"
             )
+            self._write_json(
+                {
+                    "ok": False,
+                    "error": f"handle request timed out after {HANDLE_TIMEOUT_SECONDS}s",
+                    "requestId": request_id,
+                },
+                status=HTTPStatus.GATEWAY_TIMEOUT,
+            )
+            return
         except RuntimeError as exc:
-            self._write_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+            self.server.record_error()
+            self._write_json({"ok": False, "error": str(exc), "requestId": request_id}, status=HTTPStatus.BAD_GATEWAY)
             return
         enrich_artifact_hrefs(response)
         status = HTTPStatus.OK if response.get("ok") else HTTPStatus.BAD_GATEWAY
         self._write_json(response, status=status)
+
+    def _invoke_handle_with_timeout(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return invoke_handle_request(
+            INFOS_HANDLE_SCRIPT,
+            payload,
+            python_executable=self.server.python_executable,
+            run=lambda cmd, **kwargs: subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=HANDLE_TIMEOUT_SECONDS,
+                **{k: v for k, v in kwargs.items() if k == "input"},
+            ),
+        )
 
     def _handle_query(self, parsed) -> None:
         kind = parsed.path.removeprefix("/v1/query/").strip("/")
@@ -216,6 +307,9 @@ class SidecarHandler(BaseHTTPRequestHandler):
             return
         params = parse_qs(parsed.query, keep_blank_values=False)
         output_format = self._first_text(params.get("format")) or "json"
+        if output_format in {"image", "audio"}:
+            self._handle_query_via_post(kind, output_format, params)
+            return
         if output_format not in {"text", "json"}:
             self._write_json({"ok": False, "error": "query endpoint currently only supports format=text|json"}, status=HTTPStatus.BAD_REQUEST)
             return
@@ -232,13 +326,43 @@ class SidecarHandler(BaseHTTPRequestHandler):
                 events_path=str(self.server.events_path),
                 python_executable=self.server.python_executable,
             )
-        except RuntimeError as exc:
+        except Exception as exc:
             self._write_json({"ok": False, "error": str(exc), "kind": kind}, status=HTTPStatus.BAD_GATEWAY)
             return
         if output_format == "text":
             self._write_text(str(snapshot.get("text") or ""), content_type="text/plain; charset=utf-8")
             return
         self._write_json(snapshot)
+
+    def _handle_query_via_post(self, kind: str, output_format: str, params: dict[str, list[str]]) -> None:
+        limit = self._parse_int(self._first_text(params.get("limit")))
+        payload: dict[str, Any] = {
+            "kind": kind,
+            "format": output_format,
+            "snapshotPath": str(self.server.snapshot_path),
+            "eventsPath": str(self.server.events_path),
+            "outputRoot": str(self.server.output_root),
+        }
+        if limit is not None:
+            payload["limit"] = limit
+        source_name = self._first_text(params.get("sourceName"), params.get("source_name"))
+        if source_name:
+            payload["sourceName"] = source_name
+        panel_name = self._first_text(params.get("panelName"), params.get("panel_name"))
+        if panel_name:
+            payload["panelName"] = panel_name
+        try:
+            response = invoke_handle_request(
+                INFOS_HANDLE_SCRIPT,
+                payload,
+                python_executable=self.server.python_executable,
+            )
+        except Exception as exc:
+            self._write_json({"ok": False, "error": str(exc), "kind": kind, "format": output_format}, status=HTTPStatus.BAD_GATEWAY)
+            return
+        enrich_artifact_hrefs(response)
+        status = HTTPStatus.OK if response.get("ok") else HTTPStatus.BAD_GATEWAY
+        self._write_json(response, status=status)
 
     def _handle_artifact(self, parsed) -> None:
         params = parse_qs(parsed.query, keep_blank_values=False)
@@ -282,6 +406,8 @@ class SidecarHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = False
         event_id = 0
+        with self.server._lock:
+            self.server._sse_connections += 1
         try:
             while True:
                 event_id += 1
@@ -300,6 +426,9 @@ class SidecarHandler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             except Exception:
                 return
+        finally:
+            with self.server._lock:
+                self.server._sse_connections = max(0, self.server._sse_connections - 1)
 
     def _build_sse_payload(self, kind: str) -> dict[str, Any]:
         return invoke_handle_query(
