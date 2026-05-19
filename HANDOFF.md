@@ -2,6 +2,238 @@
 
 如果以后更换 AI 大模型、代理、运行时，先读这个文件，再继续工作。
 
+## broker / infos-handle 当前版本总纲（跨模型续接版，2026-05-19 09:26）
+
+> 这段是给“任何 AI 模型 / 任何代理运行时”直接接手用的统一摘要。默认把它当成当前版本的最高层口径，不需要依赖某个特定模型的上下文记忆。
+
+### 1. 当前项目定位
+
+这条线当前已经不是“半成品探索”，而是进入了**可用、可测、可继续扩**的阶段。
+
+统一定位如下：
+
+- **broker** = `sidecar 数据层 + compat 壳`
+- **infos-handle** = `正式请求/处理层`
+- **Control UI / 轻量 consumer** = `优先消费 infos-handle sidecar，失败再回退 snapshot`
+
+不要再把 broker 当成后续主要业务堆叠层；后续增强默认都应优先沿 infos-handle 主请求面继续推进。
+
+### 2. 当前版本已经完成到哪
+
+按 2026-05-19 这一轮收口判断，当前主线已达到：
+
+- **broker sidecar 数据层 1.0 已交付**
+- **infos-handle 正式请求层最小版已交付**
+- **Control UI sidecar-first 消费链路已打通**
+- **本地 HTTP / SSE sidecar 已打通并完成最小加固**
+- **image / audio preview 级正式 handler 已接入正式主入口**
+
+换句话说：
+
+> 当前版本已经可以稳定作为“本机状态数据 / 结构化信息 / 图片卡片 / 音频 artifact 的统一本地读取层”继续演进。
+
+### 3. 已完成的核心能力
+
+#### broker 数据层
+
+已稳定产出：
+
+- `events.jsonl`
+- `manifest.json`
+- `views/frontstage.json`
+- `views/health.json`
+- `views/tasks.json`
+- `views/recovery.json`
+- `views/snapshot.json`
+
+当前正式事件契约已收口到：
+
+- `broker.source.event`
+- `frontstage.delivery.sent`
+- `frontstage.delivery.latest`
+- `broker.source.latest`
+
+#### infos-handle 正式请求层
+
+当前正式 query kind：
+
+- `snapshot.summary`
+- `health.summary`
+- `tasks.summary`
+- `recovery.summary`
+- `panel.inspect`
+- `panels.catalog`
+- `sources.latest`
+- `sources.catalog`
+- `source.inspect`
+- `events.recent`
+- `contract.catalog`
+
+当前正式请求面：
+
+- `handle`
+- `--request-file <path|->`
+- `--request-id`
+- `--response-file <path>`
+- helper：`openclaw_infos_handle_contract.py`
+
+当前版本号：
+
+- `QUERY_CONTRACT_VERSION = 17`
+- `REQUEST_CONTRACT_VERSION = 6`
+- `brokerContractVersion = 2`
+
+#### richer image / audio
+
+- `image.summary-card.v2`：`cardVersion=3`
+  - per-panel severity
+  - tone accent bar
+  - status badge
+  - dashboard 布局
+- `audio.local-tts.v2`：`textPlanVersion=3`
+  - 自然口语 preamble
+  - conversational connectors
+- `--cleanup-artifacts-older-than-hours N`
+
+#### sidecar 本地 HTTP / SSE
+
+当前 sidecar：`scripts/openclaw-infos-handle-sidecar.py`
+
+已提供：
+
+- `GET /healthz`
+- `GET /v1/query/<kind>`
+- `POST /v1/handle`
+- `GET /v1/artifacts/<artifactRef>`
+- `GET /v1/events/stream`
+
+当前已完成的 sidecar 加固：
+
+- `MAX_BODY_BYTES = 256KB`，超限 413
+- `healthz.sseConnections`
+- handle timeout
+- max active requests
+- CORS / OPTIONS 最小支持
+
+### 4. 当前真实可用范围（很重要）
+
+#### 现在已经可用
+
+- **本机 Control UI**
+- **本机网页 / 本机桌面 App / 本机脚本**
+- **浏览器内直接取本机 localhost sidecar**
+- **JSON / text / image artifact / audio artifact / SSE**
+
+#### 现在还没做成
+
+- 公网正式 API
+- 跨设备 / 远程服务器直接访问的正式开放接口
+- Gateway 主链级 HTTP / SSE / WebSocket 总入口
+- 完整鉴权 / rate limit / 多租户隔离
+
+当前 sidecar 默认只监听：
+
+- `127.0.0.1:18790`
+
+因此：
+
+> **本机 consumer 已经可以正常取数；外部网站 / 外部 App / 其他设备现在还不能把它当成现成公网接口直接用。**
+
+### 5. 当前正式主入口与兼容入口的关系
+
+后续任何模型接手时，都默认按下面语义工作：
+
+- **正式主入口**：`infos-handle handle` + `--request-file` + contract helper
+- **broker query / emit / notify-frontstage**：只视为 compat 壳
+- **Control UI**：sidecar first，snapshot fallback
+- **snapshot**：正式顶层口径
+- **overview / status.json**：兼容别名，不再视为正式主入口
+
+### 6. 当前验证结果
+
+截至 2026-05-19 09:26，当前主线已验证通过：
+
+- `python3 scripts/test-openclaw-infos-handle.py`
+- `python3 scripts/test-frontstage-broker.py`
+- `python3 scripts/test-frontstage-recovery-watch.py`
+- `python3 scripts/test-infos-handle-frontstage-callers.py`
+- `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar`
+- `systemctl --user status openclaw-infos-handle-sidecar.service`
+
+live 现状也已确认：
+
+- sidecar 服务在线
+- `GET /healthz` 正常
+- `GET /v1/query/snapshot.summary?format=json` 正常
+- `GET /v1/query/contract.catalog?format=json` 正常
+- `POST /v1/handle` 可返回 image artifactHref
+- `GET /v1/events/stream?kind=snapshot.summary` 可返回 `event: snapshot`
+
+### 7. 后续默认怎么继续（跨模型统一规则）
+
+无论换成哪个 AI 模型，后续都默认遵守下面几条：
+
+1. **不要重做主线判断**
+   - 当前版本已经收口为可用停点
+   - 不要再把目标理解成“把 broker / infos-handle 从半成品做完”
+
+2. **不要回退正式入口**
+   - 新能力默认优先接到 `handle --request-file` + helper 主路径
+   - 不要把新逻辑重新塞回 broker compat 入口
+
+3. **不要大拆**
+   - 不重写聊天主链
+   - 不把 sidecar 直接升级成 gateway 主链
+   - 不把这轮工作重新定义成“大拆分层工程”
+
+4. **继续方式以小步 contract-first 为准**
+   - 先跑最小验证
+   - 一次只做一个增强点
+   - 每步都补 smoke / test / 文档
+
+### 8. 后续最推荐的增强方向
+
+优先级建议：
+
+1. **继续增强 image / audio delivery**
+   - 丰富 renderer
+   - 丰富 artifact transport / metadata / fallback
+   - 但不改主入口
+
+2. **继续把新 caller / consumer 收口到 infos-handle**
+   - 新调用方默认复用 helper
+   - 不继续扩 broker compat 壳
+
+3. **继续扩 Control UI / 自建前端 consumer**
+   - 更多辅助状态区优先读 sidecar
+   - 但不碰聊天主链
+
+4. **继续增强 sidecar 稳定性**
+   - 继续做本地 HTTP / SSE bridge
+   - 但暂不升成 gateway 正式外放接口
+
+### 9. 任何模型恢复工作时的最短路径
+
+1. `git log --oneline -5`
+2. `git status --short`
+3. 读本文件这一节：`broker / infos-handle 当前版本总纲（跨模型续接版）`
+4. 再读：`PLANS.md` 里 `2026-05-19：infos-handle 增强轮 4 方向收口`
+5. 再读：`tools/openclaw-infos-handle-sidecar/README.md`
+6. 跑最小验证：
+   - `python3 scripts/test-openclaw-infos-handle.py`
+   - `python3 scripts/test-frontstage-broker.py`
+   - `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar`
+7. 若验证全绿，再只选一个增强方向继续
+
+### 10. 当前最新停点
+
+- **代码停点（功能）**：`e88aff8` `Sidecar hardening: SSE counter, timeout, body limit, health-dock sub-cards`
+- **文档停点（总结）**：`632fe5d` `Record sidecar hardening fix and new stop point`
+
+如果下一个模型只记一件事，就记这句：
+
+> **当前 broker / infos-handle 主线已经完成到“本机可用的统一信息处理层 + 本地 HTTP/SSE bridge”阶段；后续只需要沿 infos-handle 正式主入口继续小步增强，不要回退 broker compat 壳，也不要重做大拆分层。**
+
 ## 当前增强轮收口 (2026-05-19 上午)
 
 - **任务**：按 4 方向（image/audio 增强、consumer 收口、Control UI consumer 推、sidecar 加固）继续推进 broker/infos-handle 主线
