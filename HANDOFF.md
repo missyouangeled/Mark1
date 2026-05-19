@@ -2,6 +2,89 @@
 
 如果以后更换 AI 大模型、代理、运行时,先读这个文件,再继续工作。
 
+## broker / infos-handle 一页读取摘要（2026-05-19 12:02）
+
+> 这段是当前最适合给**其他模型 / 其他工程**先读的一页摘要；若只想快速知道“现在做到哪、算不算完成、升级后会不会坏”，优先看这里。
+
+### 一句话结论
+
+**broker / infos-handle 当前已经是“完整的内部版统一信息系统（本机 / LAN）”。**
+
+- 已经不算半成品
+- 已经可以正式收口为 **v1 内部版**
+- **不包含** 公网正式服务版 / 多租户产品化范围
+
+### 当前系统由什么组成
+
+- **broker**：sidecar 数据层 + compat 壳
+- **infos-handle**：正式请求 / 信息处理层
+- **sidecar**：infos-handle 的轻量 HTTP / SSE 运输层
+- **unified proxy**：Gateway + infos-handle 的统一入口层
+
+### 当前已完成范围（v1）
+
+1. broker 数据层已成型（events / manifest / views / snapshot）
+2. infos-handle 正式主入口已成型（`handle --request-file` + helper）
+3. 输出形态已成型：`text` / `json` / `image.summary-card.v3`(默认) / `image.summary-card.v2`(兼容) / `audio.local-tts.v2`
+4. sidecar 已成型：`/healthz` `/v1/query/*` `/v1/handle` `/v1/artifacts/*` `/v1/events/stream`
+5. 统一入口已成型：
+   - `:18788` → unified proxy
+   - `:18789` → Gateway
+   - `:18790` → infos-handle sidecar
+6. 鉴权闭环已完成：
+   - localhost 直连可免鉴权
+   - 远程/LAN 访问需 Bearer token
+   - 经 unified proxy 转发时不会再出现 localhost 绕过
+7. sidecar 远程限流已完成：默认仅对非 localhost 生效，`120 req / 60s`
+8. install / verify 入口已成型：
+   - `scripts/apply-openclaw-frontstage-broker-data.py`
+   - `scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+9. 升级后自检链已成型：branding / broker / infos-handle / sidecar / unified proxy / recovery watcher 都在检查范围内
+
+### 当前不包含的范围（不是 v1 已完成范围）
+
+- 公网正式域名 / HTTPS 实装（当前只有切换入口，没有真实域名）
+- 多租户 / 多用户产品边界
+- 更强的公网入口层防护
+- 把 infos-handle / sidecar 升成 OpenClaw 主聊天链硬依赖
+- 把这条线扩成“另一个 Gateway”
+
+### 以后默认怎么理解
+
+以后如果再提这条线，默认按下面这句理解：
+
+> **当前 broker / infos-handle 已经是完整的内部版统一信息系统；若 OpenClaw 升级后结构变化不大，它会通过启动时自检继续保持可用；若升级影响过大，则按自检结果进入补丁修复。**
+
+### 现在最关键的入口
+
+- 正式主入口：`scripts/openclaw-infos-handle.py`
+- 统一入口 apply/verify：`scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+- broker apply/verify：`scripts/apply-openclaw-frontstage-broker-data.py`
+- 升级后自检：`scripts/openclaw-post-upgrade-self-check.py`
+- 最终收口说明：`PLANS.md` → `2026-05-19：broker / infos-handle v1 收口说明`
+
+### 升级后怎么判断是不是还正常
+
+优先跑：
+
+```bash
+python3 scripts/openclaw-post-upgrade-self-check.py --force --print-human
+```
+
+当前这条自检已经覆盖：
+
+- branding / live Control UI 标记
+- broker snapshot-first
+- infos-handle contract / snapshot / sources entry
+- infos-handle sidecar live 链
+- unified proxy verify
+- sidecar / unified proxy service 状态
+- broker / infos-handle / caller / recovery 回归
+
+如果这里只记一句操作建议，那就是：
+
+> **先跑升级后自检；全绿就视为当前版本继续可用。**
+
 ## broker / infos-handle 收口补丁（2026-05-19 11:xx）
 
 本轮针对“离完善还差最后一圈”的 4 个收口项做了直接修补：
