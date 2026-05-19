@@ -39,6 +39,8 @@ Things like:
 - 系统 / OS：通用 / Windows / Linux（按各条目说明执行）
 
 - 口袋速记：纯日常聊天 / 简单工作 = 监工服务默认 `auto + taskInactive`；复杂工程 / 长耗时 / 易阻塞前台 = 默认切到 `auto + taskActive`；用户可随时显式切成 `force_on` / `force_off`；媒体仍必须按主会话真实可用验收。
+- 补充硬规则：如果已经切到 `force_on` 或 `auto + taskActive=true`，并且已经对用户说“开始处理/继续推进”，就要立刻核对是否真的出现 `activeTaskCount>0`；若没有，就不要假装监工已经在盯，要么马上真卸后台任务，要么明确说明这轮仍在前台做，所以监工会先显示 `idle/待命`。
+- 新增行为（2026-05-18）：当上一轮后台任务完成后，监工会进入约 10 分钟的“等待接续任务”窗口，并向前台发一句简短提示；若这段时间内出现新的 active run，就继续盯下一轮；若 10 分钟内没有新的后台任务或继续信号，则自动退回 `auto + taskActive=false`，不再无限期空挂在 `force_on/armed`。
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - 升级后自检入口：`docs/通用-OpenClaw-升级后自检清单.md`
 - 升级后自检脚本：`scripts/openclaw-post-upgrade-self-check.py`
@@ -89,6 +91,14 @@ Things like:
   - 当前动作：`emit` / `rebuild-views`
   - 路线：broker -> `openclaw-supervisor-subagent.py send-frontstage` -> `chat.inject`
   - 规则：按 `source + eventKey` 去重；默认不接管正常主回复，只处理辅助消息；升级后可先跑 apply/rebuild 入口恢复视图；当前再由 rebuild timer 周期刷新视图，降低“长时间无新辅助消息时视图变旧”的风险
+- infos-handle sidecar：`scripts/openclaw-infos-handle-sidecar.py`
+  - README：`tools/openclaw-infos-handle-sidecar/README.md`
+  - service 模板：`tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+  - 当前用户态 systemd：`~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
+  - 默认监听：`127.0.0.1:18790`
+  - 用途：给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小本地 HTTP / SSE 直连入口
+  - 当前最小接口：`GET /healthz` / `GET /v1/query/<kind>` / `POST /v1/handle` / `GET /v1/events/stream`
+  - 当前状态：已在公司（Linux）机安装并启用；Control UI branding 补丁默认会优先读这条 sidecar，失败时再回退 broker snapshot 静态文件
 - 前台恢复观察 watcher：`scripts/openclaw-frontstage-recovery-watch.py`
   - 状态目录：`~/.local/state/openclaw/frontstage-recovery/`
   - 关键文件：`last-report.json` / `notify-state.json` / `frontstage-recovery-events.log`

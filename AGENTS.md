@@ -323,6 +323,7 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
 - 简单工作 / 单轮问答 / 明确命令执行 / 很小的小修改：默认保持 `auto + taskActive=false`。
 - 复杂工程 / 长耗时 / 易阻塞前台 / 需要后台下载构建测试 / 需要分身协作：默认切到 `auto + taskActive=true`。
 - 用户明确说“开监工服务 / 关监工服务”时，优先切到 `force_on / force_off`，不要再按自动判定覆盖掉。
+- 若已切到 `force_on` 或 `auto + taskActive=true`，并且你已经对用户表述成“开始处理 / 正在推进 / 我去做了”，必须立刻核对一次当前是否真的有后台任务在跑；若 `activeTaskCount=0` 且剩余工作不是几秒内就能完成的小事，就马上真卸成后台任务；若决定继续前台做，也要直说此时监工会显示 `idle/待命`，不算真正后台推进。
 - 先给前台短反馈，再决定是否把重活卸到后台；不要先闷头跑。
 - 只有当当前轮确实需要聊天插播、额外协作、或主会话可能被卡住时，才按需拉起 `main-supervisor-lite` 监工分身。
 - 3 分钟无可见产出时，必须由监工链路主动补一次状态；默认优先靠脚本监工 / 状态面板，监工分身只做补充出口。

@@ -128,7 +128,7 @@
   - conversational connectors
 - `--cleanup-artifacts-older-than-hours N`
 
-#### sidecar 本地 HTTP / SSE
+#### sidecar 本地 HTTP / SSE ▶ LAN + 公网就绪
 
 当前 sidecar:`scripts/openclaw-infos-handle-sidecar.py`
 
@@ -147,8 +147,23 @@
 - handle timeout
 - max active requests
 - CORS / OPTIONS 最小支持
+- **Bearer token 鉴权**（读 Gateway auth config,本地 localhost 免鉴权,远程需 `Authorization: Bearer <token>`）
+- **LAN 绑定**（默认 `0.0.0.0:18790`,跨设备可直连）
 
-### 4. 当前真实可用范围(很重要)
+#### Caddy 统一入口反向代理
+
+当前 Caddy 反向代理:`tools/openclaw-infos-handle-gateway-proxy/`
+
+- **Caddyfile** — 统一入口模板(LAN HTTP + TLS 公网就绪)
+- **openclaw-unified-proxy.service** — systemd user 服务模板
+- 端口:`18788`（统一入口,可改）
+- 路由规则:
+  - `/v1/query/*` `/v1/handle*` `/v1/artifacts/*` `/v1/events/*` `/healthz*` → sidecar `127.0.0.1:18790`
+  - 其余 → Gateway `127.0.0.1:18789`
+- CORS 自动头注入
+- **填域名即自动 Let's Encrypt TLS**——公网就绪
+
+### 4. 当前真实可用范围
 
 #### 现在已经可用
 
@@ -156,21 +171,26 @@
 - **本机网页 / 本机桌面 App / 本机脚本**
 - **浏览器内直接取本机 localhost sidecar**
 - **JSON / text / image artifact / audio artifact / SSE**
+- **LAN 跨设备直连**（`http://<lan-ip>:18788/` 或 `http://<lan-ip>:18790/`,远程需 Bearer token）
+- **Gateway 主链级统一入口**（`:18788`,同端口同时服务 Gateway + infos-handle）
+- **Bearer token 鉴权**（与 Gateway 共享 auth config）
 
 #### 现在还没做成
 
-- 公网正式 API
-- 跨设备 / 远程服务器直接访问的正式开放接口
-- Gateway 主链级 HTTP / SSE / WebSocket 总入口
-- 完整鉴权 / rate limit / 多租户隔离
+- 公网正式域名/TLS（Caddyfile 模板已就位,填域名+邮箱即自动 HTTPS）
+- rate limit / 多租户隔离
+- WebSocket 透传（Caddy 当前 HTTP-only;WS 需额外配置）
 
-当前 sidecar 默认只监听:
+当前架构:
 
-- `127.0.0.1:18790`
-
-因此:
-
-> **本机 consumer 已经可以正常取数;外部网站 / 外部 App / 其他设备现在还不能把它当成现成公网接口直接用。**
+```
+LAN / 公网
+    │
+    ├─ :18788 ── Caddy 反向代理 ──┬─ :18789 Gateway (dashboard, chat, WS)
+    │                              └─ :18790 sidecar (infos-handle API)
+    │
+    └─ :18790 ── sidecar 直连 (localhost 免鉴权, 远程需 Bearer)
+```
 
 ### 5. 当前正式主入口与兼容入口的关系
 

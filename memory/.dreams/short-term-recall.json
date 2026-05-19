@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-08T09:06:43.977Z",
+  "updatedAt": "2026-05-14T09:41:15.314Z",
   "entries": {
     "memory:memory/2026-04-03.md:26:28": {
       "key": "memory:memory/2026-04-03.md:26:28",
@@ -531,6 +531,37 @@
         "随后",
         "用户",
         "kokoro"
+      ]
+    },
+    "memory:memory/daily/2026-05-14.md:124:127": {
+      "key": "memory:memory/daily/2026-05-14.md:124:127",
+      "path": "memory/daily/2026-05-14.md",
+      "startLine": 124,
+      "endLine": 127,
+      "source": "memory",
+      "snippet": "@@ -124,4 @@ (123 before, 53 after) - `scripts/openclaw-frontstage-broker.py` 的 `rebuild-views` 现已不再强依赖伪造的 `--source/--event-key/--message` 参数；`emit` 才要求这些参数 - 新增 broker 周期重建 user systemd 模板：`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service` / `.timer` - 当前用户态单元已安装到 `~/.config/systemd/user/`，并已启用 ti...",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.97,
+      "maxScore": 0.97,
+      "firstRecalledAt": "2026-05-14T09:41:15.314Z",
+      "lastRecalledAt": "2026-05-14T09:41:15.314Z",
+      "queryHashes": [
+        "d4a0e1fd6162"
+      ],
+      "recallDays": [
+        "2026-05-14"
+      ],
+      "conceptTags": [
+        "rebuild-views",
+        "event-key",
+        "config/systemd/user",
+        "124,4",
+        "scripts",
+        "openclaw",
+        "frontstage",
+        "broker.py"
       ]
     }
   }

@@ -25,7 +25,7 @@
   - `taskActive = true | false`
 - `supervisor-status.json` 负责表达当前推导后的监工状态：
   - `service.state = disabled | armed | active | stopping`
-  - `status = idle | running | stalled | done | failed`
+  - `status = idle | waiting | running | stalled | done | failed`
 - `notify-state.json` 记录最近一次已投递的监工事件，用来给 timer 轮询去重，避免重复刷屏
 
 ## 当前默认语义
@@ -35,6 +35,10 @@
 - 复杂工程：切到 `auto + taskActive=true`
 - 用户显式说“开监工服务”：切到 `force_on`
 - 用户显式说“关监工服务”：切到 `force_off`
+- 当上一轮后台任务完成后，若当前仍处于工作型监工语义（`force_on` 或 `taskActive=true`），监工会进入一个默认约 10 分钟的“等待接续任务”窗口：
+  - 会先向前台发一句“已完成，等待下一轮后台任务”的提示
+  - 若窗口内出现新的 active run，则继续盯下一轮
+  - 若窗口超时仍没有新的后台任务或继续信号，则自动退回 `auto + taskActive=false`
 
 ## 手工运行
 

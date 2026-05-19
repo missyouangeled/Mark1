@@ -1,0 +1,22 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：Caddy 反向代理，统一 Gateway (18789) + infos-handle sidecar (18790) 到一个端口 (18788)
+
+[Unit]
+Description=OpenClaw Gateway + infos-handle unified proxy (Caddy)
+After=network-online.target openclaw-gateway.service openclaw-infos-handle-sidecar.service
+Wants=network-online.target openclaw-gateway.service openclaw-infos-handle-sidecar.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/caddy run --config %h/.openclaw/workspace/tools/openclaw-infos-handle-gateway-proxy/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config %h/.openclaw/workspace/tools/openclaw-infos-handle-gateway-proxy/Caddyfile
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=1048576
+LimitNPROC=512
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+WorkingDirectory=%h/.openclaw/workspace
+
+[Install]
+WantedBy=default.target

@@ -44,6 +44,63 @@ HANDLE_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_HANDLE_TIMEOUT
 SSE_QUERY_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_SSE_QUERY_TIMEOUT_S", "20"))
 MAX_ACTIVE_REQUESTS = int(os.environ.get("INFOS_HANDLE_SIDECAR_MAX_ACTIVE", "32"))
 REQUEST_BODY_LIMIT_BYTES = 256 * 1024
+GATEWAY_CONFIG_PATH = Path.home() / ".openclaw" / "openclaw.json"
+NO_AUTH_PATHS = {"/healthz"}
+
+
+def _load_gateway_auth_config() -> dict[str, Any]:
+    """Read Gateway auth config from openclaw.json. Returns empty dict on failure."""
+    try:
+        if not GATEWAY_CONFIG_PATH.exists():
+            return {}
+        with open(GATEWAY_CONFIG_PATH, "r", encoding="utf-8") as fh:
+            # Use json5-style relaxed parsing; fall back to plain json
+            raw = fh.read()
+            try:
+                import json5
+                config = json5.loads(raw)
+            except ImportError:
+                config = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(config, dict):
+        return {}
+    auth = config.get("gateway", {}).get("auth") if isinstance(config.get("gateway"), dict) else None
+    return auth if isinstance(auth, dict) else {}
+
+
+def _check_auth(handler: BaseHTTPRequestHandler, parsed_path: str) -> bool:
+    """Validate Bearer token against Gateway auth config. Returns True if authorized."""
+    # No auth for healthz and artifact routes (artifacts use opaque refs)
+    if parsed_path in NO_AUTH_PATHS or parsed_path.startswith(f"{ARTIFACT_ROUTE_PREFIX}/"):
+        return True
+    # Localhost is always allowed (backward compat for local consumers like Control UI)
+    client_host = handler.client_address[0] if handler.client_address else ""
+    if client_host in ("127.0.0.1", "::1", "localhost"):
+        return True
+    auth_config = _load_gateway_auth_config()
+    mode = str(auth_config.get("mode") or "")
+    if mode == "none":
+        return True
+    if mode not in ("token", "password"):
+        return False
+    expected = str(auth_config.get("token") or auth_config.get("password") or "")
+    if not expected:
+        return False
+    auth_header = handler.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    provided = auth_header[7:].strip()
+    return _constant_time_compare(provided, expected)
+
+
+def _constant_time_compare(a: str, b: str) -> bool:
+    if len(a) != len(b):
+        return False
+    result = 0
+    for x, y in zip(a, b):
+        result |= ord(x) ^ ord(y)
+    return result == 0
 
 
 def build_artifact_href(artifact_ref: str) -> str:
@@ -201,6 +258,9 @@ class SidecarHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if not _check_auth(self, parsed.path):
+            self._write_json({"ok": False, "error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+            return
         if parsed.path == "/healthz":
             self._write_json(
                 {
@@ -227,6 +287,9 @@ class SidecarHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if not _check_auth(self, parsed.path):
+            self._write_json({"ok": False, "error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+            return
         if parsed.path != "/v1/handle":
             self._write_json({"ok": False, "error": f"unknown path: {parsed.path}"}, status=HTTPStatus.NOT_FOUND)
             return

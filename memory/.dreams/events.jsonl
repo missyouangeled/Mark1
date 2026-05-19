@@ -1,2 +1,3 @@
 {"type":"memory.recall.recorded","timestamp":"2026-04-27T05:58:36.329Z","query":"voice TTS 音色","resultCount":1,"results":[{"path":"memory/2026-04-21.md","startLine":19,"endLine":22,"score":0.93}]}
 {"type":"memory.recall.recorded","timestamp":"2026-05-08T09:06:43.977Z","query":"chattts","resultCount":1,"results":[{"path":"memory/daily/2026-05-08.md","startLine":21,"endLine":24,"score":0.81}]}
+{"type":"memory.recall.recorded","timestamp":"2026-05-14T09:41:15.314Z","query":"broker 数据层 sidecar 当前状态 manifest rebuild timer 2026-05-14","resultCount":1,"results":[{"path":"memory/daily/2026-05-14.md","startLine":124,"endLine":127,"score":0.97}]}

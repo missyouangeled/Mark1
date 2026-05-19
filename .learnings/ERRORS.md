@@ -10240,3 +10240,153 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260515-001] user-reported-error
+
+**Logged**: 2026-05-15T03:40:57.092Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Fri 2026-05-15 11:40 GMT+8] 我想在 broker 和 Control UI 中间 加一层 ，我的理解 broker就是一个数据中心，谁要数据，都从这拿，现在是直接跟ControlUI 前端主要会话 直接交互，所以我想把拿数据，处理对话，这部分单独放到这一层，暂时起个名字infos-handle ，就是如果以后我把Openclaw放到服务器，或者任何机器上，我都可以通过发送信息给infos-handle来直接要数据，然后直接以图片，声音，或者文字的方式返回给我，或者在本地解析。这都可以。然后broker部分，我想达到的效果，…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:0e238e2b-0e3c-4e63-9c1d-790e3f2794cf
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260518-001] user-reported-error
+
+**Logged**: 2026-05-18T07:42:43.999Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Mon 2026-05-18 15:42 GMT+8] 监工提示 后台任务异常结束， 查查看怎么了。 然后继续完成项目。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:5e34fc18-838b-4966-90b7-8c3858326cf7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260519-001] user-reported-error
+
+**Logged**: 2026-05-18T23:49:38.239Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Tue 2026-05-19 07:49 GMT+8] 为什么异常结束，查查看原因。并且修复后继续。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:f1bce791-4591-451c-a873-c6d498ba44d4
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260519-002] user-reported-error
+
+**Logged**: 2026-05-19T00:02:05.504Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Tue 2026-05-19 08:02 GMT+8] 又异常结束了 为什么 ？ 是这个Ai 模型 不行吗？
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:f1bce791-4591-451c-a873-c6d498ba44d4
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260519-003] user-reported-error
+
+**Logged**: 2026-05-19T01:09:51.791Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Tue 2026-05-19 09:09 GMT+8] 刚才后台任务异常结束，看看为什么，然后修复，继续做。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:1cc3b9e9-544c-425a-955b-9e2e94dc1d5f
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
