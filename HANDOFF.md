@@ -2,6 +2,42 @@
 
 如果以后更换 AI 大模型、代理、运行时，先读这个文件，再继续工作。
 
+## 当前增强轮收口 (2026-05-19 上午)
+
+- **任务**：按 4 方向（image/audio 增强、consumer 收口、Control UI consumer 推、sidecar 加固）继续推进 broker/infos-handle 主线
+- **机器**：`公司（Linux）`
+- **结果**：全部 4 方向已完成，全量测试通过
+
+### 方向 1：增强 richer image/audio delivery
+- image handler: `image.summary-card.v2` (cardVersion=3)。新增 per-panel 严重性着色、tone 顶部强调条、面板状态 badge、dashboard 布局（有真实 snapshot panels 时自动启用）；`_build_snapshot_dashboard_panels` 使用 `frontstage/health/supervisor/recovery` 真实 panel key
+- audio handler: `audio.local-tts.v2` (textPlanVersion=3)。新增自然口语 preamble + conversational connectors
+- artifact cleanup: 新增 `--cleanup-artifacts-older-than-hours N`（按 mtime 删除旧 artifact）
+
+### 方向 2：consumer 收口
+- 检查确认所有数据生产 caller 已迁到 infos-handle contract helper
+- `openclaw-supervisor-subagent.py` 的 `send-frontstage` 走 chat.inject 直投，属管理层 CLI 而非数据 producer，无需迁移
+
+### 方向 3：Control UI consumer 推
+- Control UI branding 配置仍正确：`infosHandleBaseUrl=http://127.0.0.1:18790`
+- apply/verify 全链通过：healthz / summary / contract / SSE / image artifact transport
+
+### 方向 4：sidecar 加固
+- 请求体大小限制：MAX_BODY_BYTES=256KB，超限返回 413
+- SSE 连接计数：healthz 返回 `sseConnections`，线程安全
+- 测试已补：oversized body 413 验证、sseConnections 字段验证
+
+### 验证结果
+- `test-openclaw-infos-handle.py` → ALL PASS
+- `test-frontstage-broker.py` → ALL PASS
+- `apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar` → ALL PASS
+
+### 代码变更
+- `scripts/openclaw-infos-handle.py`: v2 handlers、cleanup 函数、panel key 修正
+- `scripts/openclaw-infos-handle-sidecar.py`: body size limit、SSE counter、healthz 扩展
+- `scripts/test-openclaw-infos-handle.py`: 更新断言 (cardVersion=3, preamble, connectors, 413, sseConnections)
+- `tools/openclaw-infos-handle-sidecar/README.md`: 增强记录
+- `tools/openclaw-frontstage-broker/README.md`: v2 handler 记录
+
 ## 当前默认接手方式
 
 ## 当前临时高优先级接手任务（broker / infos-handle 收尾与下周续做入口）
