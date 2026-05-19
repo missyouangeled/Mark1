@@ -38,6 +38,7 @@ def build_handle_request_payload(
     output_root: str | None = None,
     audio_renderer: str | None = None,
     audio_preset: str | None = None,
+    image_preset: str | None = None,
     broker_state_dir: str | None = None,
     broker_data_dir: str | None = None,
 ) -> dict[str, Any]:
@@ -76,6 +77,8 @@ def build_handle_request_payload(
         payload["audioRenderer"] = audio_renderer
     if audio_preset is not None:
         payload["audioPreset"] = audio_preset
+    if image_preset is not None:
+        payload["imagePreset"] = image_preset
     if broker_state_dir is not None:
         payload["brokerStateDir"] = broker_state_dir
     if broker_data_dir is not None:

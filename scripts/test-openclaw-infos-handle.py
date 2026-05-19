@@ -13,7 +13,7 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parents[1]
 SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
 SIDECAR_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle-sidecar.py"
-EXPECTED_QUERY_CONTRACT_VERSION = 17
+EXPECTED_QUERY_CONTRACT_VERSION = 18
 EXPECTED_REQUEST_CONTRACT_VERSION = 6
 
 
@@ -550,6 +550,11 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["layout"] == "str"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["panels"] == "array[imageCardPanel]"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v3"]["artifactMediaType"] == "image/svg+xml"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v3"]["imagePreset"] == "summary-card-v3"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v3"]["renderResultShape"]["cardVersion"] == "int"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v3"]["renderResultShape"]["gradientShell"] == "bool"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v3"]["renderResultShape"]["statusSparkLine"] == "bool"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["renderResultShape"]["segmentCount"] == "int"
@@ -615,6 +620,9 @@ def main() -> int:
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["badge"] == "str|null"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v3"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v3"]["imagePreset"] == "summary-card-v3"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v3"]["renderResultShape"]["panelGradients"] == "bool"
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["renderResultShape"]["segments"] == "array[str]"
@@ -761,6 +769,77 @@ def main() -> int:
         assert "前台状态总体正常" in image_svg
         assert "健康" in image_svg
         assert "任务" in image_svg
+
+        # --- v3 image card tests ---
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "image",
+            "--image-preset", "summary-card-v3",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        v3_output = payload["response"]["output"]
+        assert payload["ok"] is True
+        assert v3_output["handler"] == "image.summary-card.v3"
+        assert v3_output["mediaType"] == "image/svg+xml"
+        assert v3_output["preset"] == "summary-card-v3"
+        assert v3_output["artifact"]["ref"] == v3_output["artifactRef"]
+        assert Path(v3_output["path"]).exists()
+        assert v3_output["result"]["cardVersion"] == 4
+        assert v3_output["result"]["layout"] == "dashboard"
+        assert v3_output["result"]["badge"] == "正常"
+        assert v3_output["result"]["gradientShell"] is True
+        assert v3_output["result"]["panelGradients"] is True
+        assert v3_output["result"]["statusSparkLine"] is True
+        assert len(v3_output["result"]["panels"]) == 3
+        assert "checkedAt" in v3_output["result"]["panels"][0]
+        assert len(v3_output["result"]["sparklineData"]) == 3
+        v3_svg = Path(v3_output["path"]).read_text(encoding="utf-8")
+        assert "v3 richer dashboard" in v3_svg
+        assert "<defs>" in v3_svg
+        assert "linearGradient" in v3_svg
+        assert "url(#shellGrad)" in v3_svg
+        assert "url(#accentGrad)" in v3_svg
+        assert "url(#panelGrad0)" in v3_svg
+
+        # v3 with frontstage delivery
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "image",
+            "--image-preset", "summary-card-v3",
+            "--delivery-mode", "frontstage",
+            "--session-key", "agent:main:test",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+            env=fake_frontstage_env,
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        v3_delivery = payload["response"]["delivery"]
+        assert v3_delivery["metadata"]["handler"] == "image.summary-card.v3"
+        assert v3_delivery["artifactRef"] == v3_delivery["artifact"]["ref"]
+        assert v3_delivery["kind"] == "artifact_notice"
+
+        # backward compat: v2 still works when preset is default or not set
+        result = run(
+            "handle",
+            "--kind", "snapshot.summary",
+            "--format", "image",
+            "--image-preset", "summary-card",
+            "--snapshot-path", str(snapshot_path),
+            "--events-path", str(events_path),
+            "--output-root", str(output_root),
+        )
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v2"
+        assert payload["response"]["output"]["result"]["cardVersion"] == 3
 
         result = run(
             "handle",
@@ -1280,6 +1359,26 @@ def main() -> int:
                 image_content_type = response.headers.get_content_type()
             assert image_content_type == "image/svg+xml"
             assert "<svg" in image_body
+
+            # v3 image via sidecar
+            v3_image_request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/handle",
+                data=json.dumps({"kind": "snapshot.summary", "format": "image", "imagePreset": "summary-card-v3"}, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(v3_image_request, timeout=5) as response:
+                v3_payload = json.loads(response.read().decode("utf-8"))
+            v3_output = v3_payload["response"]["output"]
+            assert v3_output["handler"] == "image.summary-card.v3"
+            assert v3_output["result"]["cardVersion"] == 4
+            v3_href = v3_output["artifactHref"]
+            with urllib.request.urlopen(f"http://127.0.0.1:{sidecar_port}{v3_href}", timeout=5) as response:
+                v3_body = response.read().decode("utf-8")
+                v3_content_type = response.headers.get_content_type()
+            assert v3_content_type == "image/svg+xml"
+            assert "v3 richer dashboard" in v3_body
+            assert "linearGradient" in v3_body
 
             audio_request = urllib.request.Request(
                 f"http://127.0.0.1:{sidecar_port}/v1/handle",

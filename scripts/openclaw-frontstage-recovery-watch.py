@@ -401,8 +401,16 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
         anomaly_code = "history_oversized_placeholder"
         detail = "chat.history 返回了 oversized placeholder，当前前台可能看不到完整稳定文本。"
     elif transcript_latest and history_latest and transcript_latest.get("text") != history_latest.get("text"):
-        anomaly_code = "assistant_text_mismatch"
-        detail = "transcript 与 chat.history 的最新可见 assistant 文本不一致，可能存在投影/渲染层差异。"
+        # Grace period: if transcript is newer than history and within catchup window,
+        # treat as pending projection delay rather than a real anomaly.
+        mismatch_history_behind = transcript_latest_ms is not None and (history_latest_ms is None or history_latest_ms < transcript_latest_ms)
+        if mismatch_history_behind and recent_catchup_window:
+            pending_projection = True
+            pending_reason = "text-mismatch-catchup"
+            detail = "transcript 已写出最新 assistant 文本，chat.history 的投影仍在追赶中（文本暂不一致）；这轮先按追赶窗口处理，暂不视为异常。"
+        else:
+            anomaly_code = "assistant_text_mismatch"
+            detail = "transcript 与 chat.history 的最新可见 assistant 文本不一致，可能存在投影/渲染层差异。"
     elif (transcript_latest_yielded or history_latest_yielded) and not transcript_latest and not history_latest and not session_has_active_run and session_status != "running":
         anomaly_code = "yielded_tool_result_missing_visible_reply"
         detail = "主会话已经收到带 message 的 yielded 结果，但它没有投影成可见 assistant 回复；前台会表现成“三个点消失了，但没回字”。"
