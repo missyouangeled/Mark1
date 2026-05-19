@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import mimetypes
 import os
@@ -45,7 +46,6 @@ SSE_QUERY_TIMEOUT_SECONDS = int(os.environ.get("INFOS_HANDLE_SIDECAR_SSE_QUERY_T
 MAX_ACTIVE_REQUESTS = int(os.environ.get("INFOS_HANDLE_SIDECAR_MAX_ACTIVE", "32"))
 REQUEST_BODY_LIMIT_BYTES = 256 * 1024
 GATEWAY_CONFIG_PATH = Path.home() / ".openclaw" / "openclaw.json"
-NO_AUTH_PATHS = {"/healthz"}
 
 
 def _load_gateway_auth_config() -> dict[str, Any]:
@@ -54,7 +54,6 @@ def _load_gateway_auth_config() -> dict[str, Any]:
         if not GATEWAY_CONFIG_PATH.exists():
             return {}
         with open(GATEWAY_CONFIG_PATH, "r", encoding="utf-8") as fh:
-            # Use json5-style relaxed parsing; fall back to plain json
             raw = fh.read()
             try:
                 import json5
@@ -69,18 +68,60 @@ def _load_gateway_auth_config() -> dict[str, Any]:
     return auth if isinstance(auth, dict) else {}
 
 
+def _normalize_host(raw: str | None) -> str:
+    host = str(raw or "").strip().strip('"').strip("'")
+    if host.startswith("[") and "]" in host:
+        host = host[1:host.index("]")]
+    elif host.count(":") == 1:
+        maybe_host, maybe_port = host.rsplit(":", 1)
+        if maybe_port.isdigit():
+            host = maybe_host
+    lowered = host.lower()
+    if lowered.startswith("::ffff:"):
+        host = host.split(":", 3)[-1]
+    return host.strip()
+
+
+def _is_loopback_host(raw: str | None) -> bool:
+    host = _normalize_host(raw)
+    if not host:
+        return False
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _extract_forwarded_client_host(handler: BaseHTTPRequestHandler) -> str:
+    peer_host = _normalize_host(handler.client_address[0] if handler.client_address else "")
+    if not _is_loopback_host(peer_host):
+        return peer_host
+    forwarded_for = handler.headers.get("X-Forwarded-For", "")
+    if isinstance(forwarded_for, str) and forwarded_for.strip():
+        first_hop = _normalize_host(forwarded_for.split(",", 1)[0])
+        if first_hop:
+            return first_hop
+    real_ip = _normalize_host(handler.headers.get("X-Real-IP", ""))
+    if real_ip:
+        return real_ip
+    return peer_host
+
+
 def _check_auth(handler: BaseHTTPRequestHandler, parsed_path: str) -> bool:
-    """Validate Bearer token against Gateway auth config. Returns True if authorized."""
-    # No auth for healthz and artifact routes (artifacts use opaque refs)
-    if parsed_path in NO_AUTH_PATHS or parsed_path.startswith(f"{ARTIFACT_ROUTE_PREFIX}/"):
-        return True
-    # Localhost is always allowed (backward compat for local consumers like Control UI)
-    client_host = handler.client_address[0] if handler.client_address else ""
-    if client_host in ("127.0.0.1", "::1", "localhost"):
-        return True
+    """Validate access against Gateway auth config.
+
+    - direct localhost callers remain trusted for backward compatibility
+    - proxy headers are trusted only when the immediate peer is loopback
+    - proxied remote callers must present the Gateway Bearer token
+    """
+    effective_client_host = _extract_forwarded_client_host(handler)
     auth_config = _load_gateway_auth_config()
     mode = str(auth_config.get("mode") or "")
     if mode == "none":
+        return True
+    if _is_loopback_host(effective_client_host):
         return True
     if mode not in ("token", "password"):
         return False

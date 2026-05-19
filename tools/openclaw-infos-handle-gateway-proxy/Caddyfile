@@ -38,19 +38,29 @@ http://:18788 {
 
 	# ---------- infos-handle API → sidecar (18790) ----------
 	handle /v1/query/* {
-		reverse_proxy 127.0.0.1:18790
+		reverse_proxy 127.0.0.1:18790 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle /v1/handle* {
-		reverse_proxy 127.0.0.1:18790
+		reverse_proxy 127.0.0.1:18790 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle /v1/artifacts/* {
-		reverse_proxy 127.0.0.1:18790
+		reverse_proxy 127.0.0.1:18790 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle /v1/events/* {
-		reverse_proxy 127.0.0.1:18790
+		reverse_proxy 127.0.0.1:18790 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle /healthz* {
-		reverse_proxy 127.0.0.1:18790
+		reverse_proxy 127.0.0.1:18790 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 
 	# ---------- 其余请求 → Gateway (18789) ----------
@@ -82,11 +92,31 @@ http://:18788 {
 # 	}
 #
 # 	# infos-handle API → sidecar
-# 	handle /v1/query/* { reverse_proxy 127.0.0.1:18790 }
-# 	handle /v1/handle* { reverse_proxy 127.0.0.1:18790 }
-# 	handle /v1/artifacts/* { reverse_proxy 127.0.0.1:18790 }
-# 	handle /v1/events/* { reverse_proxy 127.0.0.1:18790 }
-# 	handle /healthz* { reverse_proxy 127.0.0.1:18790 }
+# 	handle /v1/query/* {
+# 		reverse_proxy 127.0.0.1:18790 {
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
+# 	handle /v1/handle* {
+# 		reverse_proxy 127.0.0.1:18790 {
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
+# 	handle /v1/artifacts/* {
+# 		reverse_proxy 127.0.0.1:18790 {
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
+# 	handle /v1/events/* {
+# 		reverse_proxy 127.0.0.1:18790 {
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
+# 	handle /healthz* {
+# 		reverse_proxy 127.0.0.1:18790 {
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
 #
 # 	# 其余 → Gateway
 # 	handle { reverse_proxy 127.0.0.1:18789 }

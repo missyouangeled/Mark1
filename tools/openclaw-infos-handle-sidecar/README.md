@@ -5,8 +5,10 @@
 - 用途：为 `scripts/openclaw-infos-handle.py` 提供最小本地 HTTP / SSE sidecar，让 Control UI / 其他轻量 consumer 优先直连 infos-handle 正式请求层，而不是只读 broker 静态快照。
 
 > **最新增强 (2026-05-19):**
-> - image handler 升级到 `image.summary-card.v2`：per-panel 严重性着色、tone 顶部强调条、面板状态 badge、全新 dashboard 布局（使用真实 snapshot panels）
+> - 默认 image preset 已切到 `summary-card-v3`（`image.summary-card.v3`），v2 仍可通过显式 `--image-preset summary-card` / `imagePreset=summary-card` 使用
 > - audio handler 升级到 `audio.local-tts.v2`：自然口语 preamble + conversational connectors 连接 segment
+> - sidecar 已接入 Gateway Bearer token 鉴权：**本地直连 localhost 免鉴权；远程/LAN 访问需 `Authorization: Bearer <gateway-token>`**
+> - 若经 Caddy 统一入口转发，sidecar 会按 `X-Forwarded-For` / `X-Real-IP` 识别原始客户端，不会再把远程代理请求误当 localhost 放过
 > - 新增 artifact cleanup：`--cleanup-artifacts-older-than-hours N` 可清理过期 artifact
 > - 所有测试保持绿色
 
@@ -14,7 +16,9 @@
 
 - sidecar 脚本：`scripts/openclaw-infos-handle-sidecar.py`
 - service 模板：`tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
-- 默认监听：`127.0.0.1:18790`
+- 脚本默认监听：`127.0.0.1:18790`
+- service 模板默认监听：`0.0.0.0:18790`
+- 鉴权语义：本地直连 localhost 免鉴权；远程/LAN 请求需 Bearer token；若经统一入口代理，按原始客户端 IP 判定
 - 当前 Control UI 品牌补丁默认读取：
   - `GET /v1/query/snapshot.summary?format=json`
   - `GET /v1/query/contract.catalog?format=json`
@@ -32,7 +36,7 @@
 
 因此这层 sidecar 只做一件事：
 
-> 把 infos-handle 的正式请求层，最小地桥成 loopback HTTP / SSE 入口。
+> 把 infos-handle 的正式请求层，最小地桥成 HTTP / SSE 入口（本地直连优先，也可在受控 LAN / 统一入口下复用）。
 
 它不是新的业务主链，也不是要替代 broker；只是让前端优先直连 infos-handle 当前主入口。
 
@@ -62,6 +66,7 @@ GET /v1/query/<kind>?format=text
 
 - `snapshot.summary`
 - `health.summary`
+- `health.detail`
 - `tasks.summary`
 - `recovery.summary`
 - `panel.inspect`
@@ -70,6 +75,7 @@ GET /v1/query/<kind>?format=text
 - `sources.catalog`
 - `source.inspect`
 - `events.recent`
+- `events.timeline`
 - `contract.catalog`
 
 常用 query string：
@@ -165,6 +171,8 @@ python3 scripts/openclaw-infos-handle-sidecar.py
 
 ```bash
 python3 scripts/openclaw-infos-handle-sidecar.py --host 127.0.0.1 --port 18790
+# 若要给 LAN / 其他设备直连：
+python3 scripts/openclaw-infos-handle-sidecar.py --host 0.0.0.0 --port 18790
 ```
 
 ## user systemd 安装（公司 Linux）
@@ -236,7 +244,8 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-bran
 
 ## 当前边界
 
-- 只监听 `127.0.0.1`
+- 脚本默认仍是 loopback；若使用 service 模板或显式 `--host 0.0.0.0`，则变为 LAN 可达
+- 远程/LAN 请求默认需要 Bearer token；本地 localhost 直连保留免鉴权兼容
 - 只做最小 HTTP / SSE bridge，不做新的数据库/缓存层
 - 不把 OpenClaw 主聊天链改成依赖 sidecar
 - richer image/audio 仍以 `handle` 主请求面为核心，sidecar 只是 transport
@@ -245,4 +254,4 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-bran
 
 一句话：
 
-> 这层 sidecar 是 infos-handle 正式主入口的 loopback 运输层，不是新的平行主线。
+> 这层 sidecar 是 infos-handle 正式主入口的轻量运输层，不是新的平行主线。

@@ -95,10 +95,19 @@ Things like:
   - README：`tools/openclaw-infos-handle-sidecar/README.md`
   - service 模板：`tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
   - 当前用户态 systemd：`~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
-  - 默认监听：`127.0.0.1:18790`
-  - 用途：给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小本地 HTTP / SSE 直连入口
+  - 脚本默认监听：`127.0.0.1:18790`
+  - 当前 service 实际监听：`0.0.0.0:18790`
+  - 鉴权：本地 localhost 直连免鉴权；远程/LAN 访问需 `Authorization: Bearer <gateway-token>`；经统一入口代理时按 `X-Forwarded-For` / `X-Real-IP` 识别原始客户端
+  - 用途：给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE 直连入口
   - 当前最小接口：`GET /healthz` / `GET /v1/query/<kind>` / `POST /v1/handle` / `GET /v1/events/stream`
   - 当前状态：已在公司（Linux）机安装并启用；Control UI branding 补丁默认会优先读这条 sidecar，失败时再回退 broker snapshot 静态文件
+- infos-handle 统一入口代理：`tools/openclaw-infos-handle-gateway-proxy/`
+  - Caddyfile：`tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+  - service 模板：`tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+  - 当前用户态 systemd：`~/.config/systemd/user/openclaw-unified-proxy.service`
+  - 当前监听：`0.0.0.0:18788`
+  - 路由：infos-handle API → `127.0.0.1:18790`；其余 → Gateway `127.0.0.1:18789`
+  - 当前会透传原始客户端 IP（`X-Forwarded-For` 走 Caddy 默认反代行为，`X-Real-IP` 显式补上），避免 sidecar 把远程代理请求误判为 localhost 免鉴权
 - 前台恢复观察 watcher：`scripts/openclaw-frontstage-recovery-watch.py`
   - 状态目录：`~/.local/state/openclaw/frontstage-recovery/`
   - 关键文件：`last-report.json` / `notify-state.json` / `frontstage-recovery-events.log`

@@ -2,6 +2,33 @@
 
 如果以后更换 AI 大模型、代理、运行时,先读这个文件,再继续工作。
 
+## broker / infos-handle 收口补丁（2026-05-19 11:xx）
+
+本轮针对“离完善还差最后一圈”的 4 个收口项做了直接修补：
+
+1. **统一入口鉴权闭环**
+   - sidecar 不再只看 TCP 对端是否 localhost
+   - 当请求是经本机反向代理进入时，会优先读取 `X-Forwarded-For` / `X-Real-IP` 判定原始客户端
+   - 因此：**远程经 Caddy 统一入口 (`:18788`) 访问 infos-handle 时，也必须带 Gateway Bearer token**，不再出现“代理后被误判成 localhost 免鉴权”的绕过
+
+2. **默认 image preset 与文档口径统一**
+   - `scripts/openclaw-infos-handle.py` 当前真实默认值已对齐为 `DEFAULT_IMAGE_PRESET = "summary-card-v3"`
+   - 默认 `handle --format image` 现返回 `image.summary-card.v3`
+   - `summary-card` / `image.summary-card.v2` 仍保留作显式兼容 preset
+
+3. **模板/安装一致性修复**
+   - 仓库里的 `tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service` 已对齐当前真正能跑通的 user service 模板
+   - 移除了会导致 user systemd 安装歧义的能力项配置残留
+   - `Caddyfile` 现在也显式上送 `X-Forwarded-For` / `X-Real-IP`
+
+4. **文档同步**
+   - sidecar README / TOOLS 已同步为：脚本默认 loopback、service 模板默认 `0.0.0.0:18790`
+   - 当前鉴权语义已明确写成：本地 localhost 免鉴权；远程/LAN 访问需 Bearer；统一入口代理按原始客户端判定
+
+这轮之后的口径应更新为：
+
+> **broker / infos-handle 已经是“可用、可测、可继续扩”的正式统一信息层；统一入口鉴权闭环已补上，但公网正式域名/TLS 与更强的 rate-limit / 多租户隔离仍属于下一阶段。**
+
 ## broker / infos-handle 增强轮 5 收口（2026-05-19 10:25）
 
 ### 本轮 4 方向全部完成
@@ -118,7 +145,12 @@
 
 #### richer image / audio
 
-- `image.summary-card.v2`:`cardVersion=3`
+- 默认 image preset：`image.summary-card.v3` / `summary-card-v3`（`cardVersion=4`）
+  - gradient shell
+  - per-panel 渐变色条
+  - status sparkline
+  - checkedAt 时间戳
+- 兼容 image preset：`image.summary-card.v2` / `summary-card`（`cardVersion=3`）
   - per-panel severity
   - tone accent bar
   - status badge
@@ -147,7 +179,7 @@
 - handle timeout
 - max active requests
 - CORS / OPTIONS 最小支持
-- **Bearer token 鉴权**（读 Gateway auth config,本地 localhost 免鉴权,远程需 `Authorization: Bearer <token>`）
+- **Bearer token 鉴权**（读 Gateway auth config；本地 localhost 直连免鉴权；远程需 `Authorization: Bearer <token>`；经统一入口代理时按 `X-Forwarded-For` / `X-Real-IP` 判定原始客户端，不再误判成 localhost）
 - **LAN 绑定**（默认 `0.0.0.0:18790`,跨设备可直连）
 
 #### Caddy 统一入口反向代理
@@ -190,6 +222,12 @@ LAN / 公网
     │                              └─ :18790 sidecar (infos-handle API)
     │
     └─ :18790 ── sidecar 直连 (localhost 免鉴权, 远程需 Bearer)
+
+统一入口 (`:18788`) 当前也遵循同一条鉴权语义：
+
+- localhost 访问可继续免鉴权
+- 远程/LAN 访问 infos-handle 路由时必须带 Bearer token
+- sidecar 只信任来自 loopback 反向代理的 `X-Forwarded-For` / `X-Real-IP`
 ```
 
 ### 5. 当前正式主入口与兼容入口的关系
@@ -280,12 +318,12 @@ live 现状也已确认:
 
 ### 10. 当前最新停点
 
-- **代码停点(功能)**:`e88aff8` `Sidecar hardening: SSE counter, timeout, body limit, health-dock sub-cards`
-- **文档停点(总结)**:`632fe5d` `Record sidecar hardening fix and new stop point`
+- **当前代码停点**：以 `git log --oneline -1` 为准（本轮已补上统一入口鉴权闭环、默认 image v3、模板一致性与文档同步）
+- **当前文档停点**：以本文件顶部 `broker / infos-handle 收口补丁（2026-05-19 11:xx）` 为准
 
 如果下一个模型只记一件事,就记这句:
 
-> **当前 broker / infos-handle 主线已经完成到"本机可用的统一信息处理层 + 本地 HTTP/SSE bridge"阶段;后续只需要沿 infos-handle 正式主入口继续小步增强,不要回退 broker compat 壳,也不要重做大拆分层。**
+> **当前 broker / infos-handle 主线已经完成到"本机/LAN 可用的统一信息处理层 + sidecar HTTP/SSE bridge + 统一入口鉴权闭环"阶段;后续只需要沿 infos-handle 正式主入口继续小步增强,不要回退 broker compat 壳,也不要重做大拆分层。**
 
 ## 当前增强轮收口 (2026-05-19 上午)
 

@@ -13,9 +13,6 @@ ExecStart=/usr/local/bin/caddy run --config %h/.openclaw/workspace/tools/opencla
 ExecReload=/usr/local/bin/caddy reload --config %h/.openclaw/workspace/tools/openclaw-infos-handle-gateway-proxy/Caddyfile
 Restart=on-failure
 RestartSec=5
-LimitNOFILE=1048576
-LimitNPROC=512
-AmbientCapabilities=CAP_NET_BIND_SERVICE
 WorkingDirectory=%h/.openclaw/workspace
 
 [Install]

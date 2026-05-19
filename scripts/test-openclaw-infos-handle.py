@@ -7,6 +7,7 @@ import socket
 import subprocess
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -35,8 +36,9 @@ def pick_free_port() -> int:
 
 
 
-def fetch_json(url: str) -> dict[str, object]:
-    with urllib.request.urlopen(url, timeout=5) as response:
+def fetch_json(url: str, *, headers: dict[str, str] | None = None) -> dict[str, object]:
+    request = urllib.request.Request(url, headers=headers or {})
+    with urllib.request.urlopen(request, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -747,14 +749,15 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["format"] == "image"
         assert image_output["format"] == "image"
-        assert image_output["handler"] == "image.summary-card.v2"
+        assert image_output["handler"] == "image.summary-card.v3"
+        assert image_output["preset"] == "summary-card-v3"
         assert image_output["mediaType"] == "image/svg+xml"
         assert image_output["artifact"]["ref"] == image_output["artifactRef"]
         assert image_output["artifact"]["fileName"] == image_output["fileName"]
         assert Path(image_output["path"]).exists()
         assert image_output["path"].endswith(".svg")
         assert "snapshot.summary" in Path(image_output["path"]).name
-        assert image_output["result"]["cardVersion"] == 3
+        assert image_output["result"]["cardVersion"] == 4
         assert image_output["result"]["layout"] == "dashboard"
         assert image_output["result"]["badge"] == "正常"
         assert len(image_output["result"]["panels"]) == 3
@@ -765,10 +768,14 @@ def main() -> int:
         assert image_output["result"]["panels"][1]["tone"] == "supervisor"
         assert image_output["result"]["panels"][2]["tone"] == "recovery"
         assert image_output["result"]["panels"][0]["severity"] == "ok"
+        assert image_output["result"]["gradientShell"] is True
+        assert image_output["result"]["panelGradients"] is True
+        assert image_output["result"]["statusSparkLine"] is True
         image_svg = Path(image_output["path"]).read_text(encoding="utf-8")
         assert "前台状态总体正常" in image_svg
         assert "健康" in image_svg
         assert "任务" in image_svg
+        assert "linearGradient" in image_svg
 
         # --- v3 image card tests ---
         result = run(
@@ -826,7 +833,7 @@ def main() -> int:
         assert v3_delivery["artifactRef"] == v3_delivery["artifact"]["ref"]
         assert v3_delivery["kind"] == "artifact_notice"
 
-        # backward compat: v2 still works when preset is default or not set
+        # backward compat: v2 still works when preset is explicitly summary-card
         result = run(
             "handle",
             "--kind", "snapshot.summary",
@@ -877,7 +884,7 @@ def main() -> int:
         assert image_delivery["artifactNotice"]["fallbackText"] == "[infos-handle] 图片 artifact 已生成。"
         assert image_delivery["artifactNotice"]["delivery"]["artifactRef"] == image_delivery["artifact"]["ref"]
         assert image_delivery["artifactNotice"]["delivery"]["messageId"].startswith("msg::[infos-handle] 已生成图片 artifact：")
-        assert image_delivery["metadata"]["handler"] == "image.summary-card.v2"
+        assert image_delivery["metadata"]["handler"] == "image.summary-card.v3"
         assert image_delivery["metadata"]["requestedSessionKey"] == "agent:main:test"
         assert image_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
         assert image_delivery["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
@@ -1054,7 +1061,7 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["limit"] == 2
         assert payload["response"]["kind"] == "events.recent"
-        assert payload["response"]["output"]["handler"] == "image.summary-card.v2"
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v3"
         assert Path(payload["response"]["output"]["path"]).exists()
 
         request_file = tmp_path / "handle-request.json"
@@ -1155,7 +1162,7 @@ def main() -> int:
             "message": "直接走统一入口的前台摘要。",
             "messageSource": "direct",
         }
-        assert payload["response"]["output"]["handler"] == "image.summary-card.v2"
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v3"
         assert Path(payload["response"]["output"]["path"]).exists()
 
         result = run(
@@ -1281,7 +1288,18 @@ def main() -> int:
         assert "exists=false" in result.stdout
         assert "availablePanels: health, recovery, supervisor" in result.stdout
 
+        fake_home = tmp_path / "test-home"
+        fake_gateway_dir = fake_home / ".openclaw"
+        fake_gateway_dir.mkdir(parents=True, exist_ok=True)
+        sidecar_token = "test-sidecar-token"
+        (fake_gateway_dir / "openclaw.json").write_text(
+            json.dumps({"gateway": {"auth": {"mode": "token", "token": sidecar_token}}}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
         sidecar_port = pick_free_port()
+        sidecar_env = os.environ.copy()
+        sidecar_env["HOME"] = str(fake_home)
         sidecar_process = subprocess.Popen(
             [
                 "python3",
@@ -1301,6 +1319,7 @@ def main() -> int:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            env=sidecar_env,
         )
         try:
             wait_for_sidecar(f"http://127.0.0.1:{sidecar_port}/healthz")
@@ -1327,6 +1346,27 @@ def main() -> int:
             snapshot_summary = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json")
             assert snapshot_summary["kind"] == "snapshot.summary"
             assert snapshot_summary["result"]["summary"] == "前台状态总体正常"
+
+            proxied_remote_request = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json",
+                headers={"X-Forwarded-For": "198.51.100.22"},
+            )
+            try:
+                urllib.request.urlopen(proxied_remote_request, timeout=5)
+                raise AssertionError("proxied remote query without token should have returned 401")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 401, f"expected 401, got {exc.code}"
+                unauthorized_body = json.loads(exc.read().decode("utf-8"))
+                assert unauthorized_body["error"] == "unauthorized"
+
+            proxied_remote_summary = fetch_json(
+                f"http://127.0.0.1:{sidecar_port}/v1/query/snapshot.summary?format=json",
+                headers={
+                    "X-Forwarded-For": "198.51.100.22",
+                    "Authorization": f"Bearer {sidecar_token}",
+                },
+            )
+            assert proxied_remote_summary["result"]["summary"] == "前台状态总体正常"
             contract_catalog = fetch_json(f"http://127.0.0.1:{sidecar_port}/v1/query/contract.catalog?format=json")
             assert contract_catalog["kind"] == "contract.catalog"
             assert contract_catalog["result"]["requestCatalog"]["requestContractVersion"] == EXPECTED_REQUEST_CONTRACT_VERSION
@@ -1351,6 +1391,9 @@ def main() -> int:
             with urllib.request.urlopen(image_request, timeout=5) as response:
                 image_payload = json.loads(response.read().decode("utf-8"))
             image_output = image_payload["response"]["output"]
+            assert image_output["handler"] == "image.summary-card.v3"
+            assert image_output["preset"] == "summary-card-v3"
+            assert image_output["result"]["cardVersion"] == 4
             image_href = image_output["artifactHref"]
             assert image_href.startswith("/v1/artifacts/")
             assert image_output["artifact"]["href"] == image_href
@@ -1359,6 +1402,29 @@ def main() -> int:
                 image_content_type = response.headers.get_content_type()
             assert image_content_type == "image/svg+xml"
             assert "<svg" in image_body
+
+            proxied_remote_artifact = urllib.request.Request(
+                f"http://127.0.0.1:{sidecar_port}{image_href}",
+                headers={"X-Forwarded-For": "198.51.100.22"},
+            )
+            try:
+                urllib.request.urlopen(proxied_remote_artifact, timeout=5)
+                raise AssertionError("proxied remote artifact without token should have returned 401")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 401, f"expected 401, got {exc.code}"
+
+            with urllib.request.urlopen(
+                urllib.request.Request(
+                    f"http://127.0.0.1:{sidecar_port}{image_href}",
+                    headers={
+                        "X-Forwarded-For": "198.51.100.22",
+                        "Authorization": f"Bearer {sidecar_token}",
+                    },
+                ),
+                timeout=5,
+            ) as response:
+                proxied_image_content_type = response.headers.get_content_type()
+            assert proxied_image_content_type == "image/svg+xml"
 
             # v3 image via sidecar
             v3_image_request = urllib.request.Request(
