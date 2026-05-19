@@ -30,13 +30,20 @@
 - `test-openclaw-infos-handle.py` → ALL PASS
 - `test-frontstage-broker.py` → ALL PASS
 - `apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar` → ALL PASS
+- `test-frontstage-recovery-watch.py` → ALL PASS
+- `test-infos-handle-frontstage-callers.py` → ALL PASS
 
 ### 代码变更
 - `scripts/openclaw-infos-handle.py`: v2 handlers、cleanup 函数、panel key 修正
-- `scripts/openclaw-infos-handle-sidecar.py`: body size limit、SSE counter、healthz 扩展
+- `scripts/openclaw-infos-handle-sidecar.py`: body size limit、SSE counter、handle timeout、max active requests、healthz 扩展
 - `scripts/test-openclaw-infos-handle.py`: 更新断言 (cardVersion=3, preamble, connectors, 413, sseConnections)
+- `scripts/apply-openclaw-control-ui-branding.py`: health-dock sub-card CSS 样式
 - `tools/openclaw-infos-handle-sidecar/README.md`: 增强记录
 - `tools/openclaw-frontstage-broker/README.md`: v2 handler 记录
+
+### 最新停点
+- `e88aff8` Sidecar hardening: SSE counter, timeout, body limit, health-dock sub-cards
+- 上一个后台子分身 `c6bde960` 因 `_sse_lock`→`_lock` 重命名遗漏导致 SSE 测试失败而超时，已于当轮修复并提交
 
 ## 当前默认接手方式
 
