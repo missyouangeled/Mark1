@@ -546,10 +546,10 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["image"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["audio"]["delivery"] == "artifact_file"
         assert payload["result"]["queryCatalog"]["outputFormatCatalog"]["audio"]["artifactNoticeContractVersion"] == 1
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["artifactMediaType"] == "image/svg+xml"
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["layout"] == "str"
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["panels"] == "array[imageCardPanel]"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["artifactMediaType"] == "image/svg+xml"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["layout"] == "str"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["panels"] == "array[imageCardPanel]"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segmentCount"] == "int"
@@ -612,9 +612,9 @@ def main() -> int:
         assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["targetSessionKey"] == "str|null"
         assert payload["result"]["requestCatalog"]["actions"]["handle"]["clientHelperResponseShape"]["messageId"] == "str|null"
         assert payload["result"]["handlerCatalog"]["json.stdout.v1"]["delivery"] == "stdout"
-        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["deliveryModes"] == ["none", "frontstage"]
-        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["frontstageDeliveryKind"] == "artifact_notice"
-        assert payload["result"]["handlerCatalog"]["image.summary-card.v1"]["renderResultShape"]["badge"] == "str|null"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
+        assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["badge"] == "str|null"
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
         assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segments"] == "array[str]"
@@ -739,24 +739,28 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["format"] == "image"
         assert image_output["format"] == "image"
-        assert image_output["handler"] == "image.summary-card.v1"
+        assert image_output["handler"] == "image.summary-card.v2"
         assert image_output["mediaType"] == "image/svg+xml"
         assert image_output["artifact"]["ref"] == image_output["artifactRef"]
         assert image_output["artifact"]["fileName"] == image_output["fileName"]
         assert Path(image_output["path"]).exists()
         assert image_output["path"].endswith(".svg")
         assert "snapshot.summary" in Path(image_output["path"]).name
-        assert image_output["result"]["cardVersion"] == 2
-        assert image_output["result"]["layout"] == "activity-grid"
+        assert image_output["result"]["cardVersion"] == 3
+        assert image_output["result"]["layout"] == "dashboard"
         assert image_output["result"]["badge"] == "正常"
         assert len(image_output["result"]["panels"]) == 3
-        assert image_output["result"]["panels"][0]["label"] == "概览"
-        assert image_output["result"]["panels"][1]["label"] == "重点"
-        assert image_output["result"]["panels"][2]["label"] == "上下文"
+        assert "健康" in image_output["result"]["panels"][0]["label"]
+        assert "任务" in image_output["result"]["panels"][1]["label"]
+        assert "恢复" in image_output["result"]["panels"][2]["label"]
+        assert image_output["result"]["panels"][0]["tone"] == "health"
+        assert image_output["result"]["panels"][1]["tone"] == "supervisor"
+        assert image_output["result"]["panels"][2]["tone"] == "recovery"
+        assert image_output["result"]["panels"][0]["severity"] == "ok"
         image_svg = Path(image_output["path"]).read_text(encoding="utf-8")
         assert "前台状态总体正常" in image_svg
-        assert "概览" in image_svg
-        assert "重点" in image_svg
+        assert "健康" in image_svg
+        assert "任务" in image_svg
 
         result = run(
             "handle",
@@ -794,7 +798,7 @@ def main() -> int:
         assert image_delivery["artifactNotice"]["fallbackText"] == "[infos-handle] 图片 artifact 已生成。"
         assert image_delivery["artifactNotice"]["delivery"]["artifactRef"] == image_delivery["artifact"]["ref"]
         assert image_delivery["artifactNotice"]["delivery"]["messageId"].startswith("msg::[infos-handle] 已生成图片 artifact：")
-        assert image_delivery["metadata"]["handler"] == "image.summary-card.v1"
+        assert image_delivery["metadata"]["handler"] == "image.summary-card.v2"
         assert image_delivery["metadata"]["requestedSessionKey"] == "agent:main:test"
         assert image_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
         assert image_delivery["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
@@ -958,7 +962,7 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["limit"] == 2
         assert payload["response"]["kind"] == "events.recent"
-        assert payload["response"]["output"]["handler"] == "image.summary-card.v1"
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v2"
         assert Path(payload["response"]["output"]["path"]).exists()
 
         request_file = tmp_path / "handle-request.json"
@@ -1059,7 +1063,7 @@ def main() -> int:
             "message": "直接走统一入口的前台摘要。",
             "messageSource": "direct",
         }
-        assert payload["response"]["output"]["handler"] == "image.summary-card.v1"
+        assert payload["response"]["output"]["handler"] == "image.summary-card.v2"
         assert Path(payload["response"]["output"]["path"]).exists()
 
         result = run(

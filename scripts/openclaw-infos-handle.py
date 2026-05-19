@@ -107,7 +107,7 @@ def build_output_handler_catalog() -> dict[str, dict[str, Any]]:
             "entryActions": ["query", "handle"],
             "description": "JSON response envelope printed to stdout.",
         },
-        "image.summary-card.v1": {
+        "image.summary-card.v2": {
             "formats": ["image"],
             "status": "preview",
             "delivery": "artifact_file",
@@ -126,10 +126,11 @@ def build_output_handler_catalog() -> dict[str, dict[str, Any]]:
                     "label": "str",
                     "title": "str",
                     "tone": "str",
+                    "severity": "str",
                     "lines": "array[str]",
                 },
             },
-            "description": "Low-risk richer SVG summary card rendered from one infos-handle query response; the card now chooses among headline / column / activity-grid layouts while frontstage delivery still uses a text artifact notice plus stable artifact-ref / delivery metadata.",
+            "description": "Richer SVG summary card v2 with per-panel severity coloring, tone-accented top bars, per-panel status badges, and a new dashboard layout for real snapshot panel data; supports headline / focus-columns / activity-grid / dashboard layouts.",
         },
         "audio.local-tts.v1": {
             "formats": ["audio"],
@@ -1707,6 +1708,59 @@ def normalize_render_lines(values: list[Any], *, max_items: int = 8, split_pipes
     return lines
 
 
+TONE_SEVERITY_MAP: dict[str, str] = {
+    "summary": "ok",
+    "focus": "warn",
+    "meta": "ok",
+    "health": "ok",
+    "supervisor": "warn",
+    "recovery": "critical",
+}
+
+TONE_ICON_MAP: dict[str, str] = {
+    "summary": "📋",
+    "focus": "🔍",
+    "meta": "ℹ️",
+    "health": "💚",
+    "supervisor": "⚙️",
+    "recovery": "🔄",
+}
+
+TONE_BADGE_MAP: dict[str, str] = {
+    "ok": "正常",
+    "warn": "注意",
+    "critical": "异常",
+}
+
+
+def _build_snapshot_dashboard_panels(snapshot: dict[str, Any], result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build richer per-source panels from the real snapshot when available."""
+    snapshot_panels = snapshot.get("panels") if isinstance(snapshot.get("panels"), dict) else {}
+    if not snapshot_panels:
+        return []
+    panels: list[dict[str, Any]] = []
+    for panel_key in ("health", "supervisor", "recovery"):
+        panel = snapshot_panels.get(panel_key) if isinstance(snapshot_panels.get(panel_key), dict) else None
+        if not panel:
+            continue
+        panel_summary = str(panel.get("summary") or "-")
+        panel_severity = str(panel.get("severity") or TONE_SEVERITY_MAP.get(panel_key, "ok"))
+        panel_detail = str(panel.get("detail") or "").strip()
+        panel_checked = str(panel.get("checkedAt") or "-")
+        lines = normalize_render_lines(
+            [panel_summary, panel_detail, f"时间：{panel_checked}"],
+            max_items=3,
+        )
+        panels.append({
+            "label": TONE_ICON_MAP.get(panel_key, "📌") + " " + {"health": "健康", "supervisor": "任务", "recovery": "恢复"}.get(panel_key, panel_key),
+            "title": trim_line(panel_summary, 28),
+            "tone": panel_key,
+            "severity": panel_severity,
+            "lines": lines,
+        })
+    return panels
+
+
 def build_image_render_model(query_payload: dict[str, Any]) -> dict[str, Any]:
     kind = str(query_payload.get("kind") or "direct.message")
     text = str(query_payload.get("text") or "").strip()
@@ -1755,33 +1809,43 @@ def build_image_render_model(query_payload: dict[str, Any]) -> dict[str, Any]:
         max_items=4,
         split_pipes=False,
     )
-    panels = [
-        {
-            "label": "概览",
-            "title": trim_line(summary, 28),
-            "tone": "summary",
-            "lines": overview_lines[:3] or [summary],
-        }
-    ]
-    if focus_lines:
-        panels.append({
-            "label": "重点",
-            "title": trim_line(focus_lines[0], 28),
-            "tone": "focus",
-            "lines": focus_lines[:4],
-        })
-    if context_lines:
-        panels.append({
-            "label": "上下文",
-            "title": trim_line(context_lines[0], 28),
-            "tone": "meta",
-            "lines": context_lines[:4],
-        })
+    dashboard_panels = _build_snapshot_dashboard_panels(snapshot, result)
+    panels: list[dict[str, Any]] = []
+    if dashboard_panels:
+        panels = dashboard_panels
+    else:
+        panels = [
+            {
+                "label": "📋 概览",
+                "title": trim_line(summary, 28),
+                "tone": "summary",
+                "severity": severity,
+                "lines": overview_lines[:3] or [summary],
+            }
+        ]
+        if focus_lines:
+            panels.append({
+                "label": "🔍 重点",
+                "title": trim_line(focus_lines[0], 28),
+                "tone": "focus",
+                "severity": "warn",
+                "lines": focus_lines[:4],
+            })
+        if context_lines:
+            panels.append({
+                "label": "ℹ️ 上下文",
+                "title": trim_line(context_lines[0], 28),
+                "tone": "meta",
+                "severity": "ok",
+                "lines": context_lines[:4],
+            })
     layout = "headline"
     if len(panels) >= 3:
         layout = "activity-grid"
     elif len(panels) == 2:
         layout = "focus-columns"
+    if dashboard_panels and len(panels) >= 2:
+        layout = "dashboard"
     footer_lines = [
         f"kind={kind}",
         f"checkedAt={checked_at}",
@@ -1793,7 +1857,7 @@ def build_image_render_model(query_payload: dict[str, Any]) -> dict[str, Any]:
         "critical": "严重",
     }.get(str(severity or ""), "预览")
     return {
-        "cardVersion": 2,
+        "cardVersion": 3,
         "layout": layout,
         "title": trim_line(kind, 48),
         "summary": summary,
@@ -1811,6 +1875,17 @@ def build_image_panel_positions(layout: str, panel_count: int) -> list[tuple[int
             (36, 246, 584, 286),
             (660, 246, 584, 286),
         ]
+    if layout == "dashboard" and panel_count >= 2:
+        if panel_count == 2:
+            return [
+                (36, 246, 584, 286),
+                (660, 246, 584, 286),
+            ]
+        return [
+            (36, 246, 376, 286),
+            (452, 246, 376, 286),
+            (868, 246, 376, 286),
+        ]
     if layout == "headline" or panel_count <= 1:
         return [(36, 246, 1208, 286)]
     return [
@@ -1826,6 +1901,19 @@ def build_image_card_svg(model: dict[str, Any]) -> str:
         "warn": "#f59e0b",
         "critical": "#ef4444",
     }.get(str(model.get("severity") or ""), "#60a5fa")
+    panel_accent_map = {
+        "ok": "#4ade80",
+        "warn": "#f59e0b",
+        "critical": "#ef4444",
+    }
+    tone_accent_map = {
+        "summary": "#60a5fa",
+        "focus": "#f59e0b",
+        "meta": "#94a3b8",
+        "health": "#4ade80",
+        "supervisor": "#f59e0b",
+        "recovery": "#ef4444",
+    }
     bg = "#081018"
     shell = "#0f172a"
     panel_fill = "#132236"
@@ -1839,21 +1927,38 @@ def build_image_card_svg(model: dict[str, Any]) -> str:
     panel_positions = build_image_panel_positions(str(model.get("layout") or "headline"), len(panels))
     panel_svg: list[str] = []
     for panel, (x, y, width, height) in zip(panels, panel_positions, strict=False):
-        label = trim_line(str(panel.get("label") or ""), 12)
+        label = trim_line(str(panel.get("label") or ""), 16)
         title = trim_line(str(panel.get("title") or ""), 28)
         lines = panel.get("lines") if isinstance(panel.get("lines"), list) else []
+        panel_tone = str(panel.get("tone") or "summary")
+        panel_severity = str(panel.get("severity") or "")
+        panel_accent = panel_accent_map.get(panel_severity) or tone_accent_map.get(panel_tone, "#60a5fa")
+        panel_badge_text = TONE_BADGE_MAP.get(panel_severity, "") or {
+            "ok": "正常",
+            "warn": "注意",
+            "critical": "异常",
+        }.get(TONE_SEVERITY_MAP.get(panel_tone, "ok"), "")
         line_svg: list[str] = []
-        line_y = y + 112
+        line_y = y + 120
         for item in lines[:6]:
             text = trim_line(item, 34 if width < 500 else 58)
             if not text:
                 continue
             line_svg.append(f"<text x='{x + 20}' y='{line_y}' font-size='20' fill='{text_sub}'>{escape(text)}</text>")
             line_y += 28
+        badge_svg = ""
+        if panel_badge_text:
+            badge_x = x + width - 72
+            badge_svg = (
+                f"<rect x='{badge_x}' y='{y + 16}' width='56' height='28' rx='14' fill='{panel_accent}' opacity='0.18' />"
+                f"<text x='{badge_x + 28}' y='{y + 35}' font-size='14' text-anchor='middle' fill='{panel_accent}'>{escape(trim_line(panel_badge_text, 6))}</text>"
+            )
         panel_svg.append(
             f"<rect x='{x}' y='{y}' width='{width}' height='{height}' rx='24' fill='{panel_fill}' stroke='{panel_stroke}' />"
-            f"<text x='{x + 20}' y='{y + 40}' font-size='16' fill='{text_muted}'>{escape(label)}</text>"
-            f"<text x='{x + 20}' y='{y + 78}' font-size='28' font-weight='700' fill='{text_main}'>{escape(title)}</text>"
+            f"<rect x='{x + 4}' y='{y + 4}' width='{width - 8}' height='6' rx='3' fill='{panel_accent}' opacity='0.5' />"
+            f"{badge_svg}"
+            f"<text x='{x + 20}' y='{y + 46}' font-size='16' fill='{text_muted}'>{escape(label)}</text>"
+            f"<text x='{x + 20}' y='{y + 84}' font-size='26' font-weight='700' fill='{text_main}'>{escape(title)}</text>"
             f"{''.join(line_svg)}"
         )
 
@@ -1871,7 +1976,7 @@ def build_image_card_svg(model: dict[str, Any]) -> str:
   <rect width='1280' height='720' fill='{bg}' />
   <rect x='24' y='24' width='1232' height='672' rx='28' fill='{shell}' stroke='rgba(150,180,220,.18)' />
   <rect x='36' y='36' width='1208' height='10' rx='5' fill='{accent}' />
-  <text x='36' y='88' font-size='22' fill='{text_muted}'>infos-handle richer image output</text>
+  <text x='36' y='88' font-size='22' fill='{text_muted}'>infos-handle v2 richer image output</text>
   <rect x='1084' y='62' width='132' height='40' rx='20' fill='{badge_bg}' stroke='rgba(255,255,255,.08)' />
   <text x='1150' y='88' font-size='18' text-anchor='middle' fill='{text_sub}'>{escape(trim_line(str(model.get('badge') or '预览'), 10))}</text>
   <text x='36' y='146' font-size='38' font-weight='700' fill='{text_main}'>{escape(trim_line(str(model.get('title') or 'infos-handle'), 46))}</text>
@@ -1895,7 +2000,7 @@ def render_image_output(query_payload: dict[str, Any], output_root: Path) -> dic
     return {
         "format": "image",
         "status": "rendered",
-        "handler": "image.summary-card.v1",
+        "handler": "image.summary-card.v2",
         "delivery": "artifact_file",
         "mediaType": "image/svg+xml",
         "preset": DEFAULT_IMAGE_PRESET,
@@ -1952,6 +2057,46 @@ def ensure_spoken_sentence(text: str) -> str:
 def estimate_spoken_duration_seconds(spoken_text: str) -> float:
     visible_chars = len(re.sub(r"\s+", "", spoken_text))
     return round(max(1.0, visible_chars / 4.6), 1)
+
+
+KIND_NATURAL_PREAMBLE: dict[str, str] = {
+    "snapshot.summary": "系统状态汇报：",
+    "health.summary": "健康检查结果：",
+    "tasks.summary": "后台任务情况：",
+    "recovery.summary": "前台恢复状态：",
+    "direct.message": "来自系统的消息：",
+}
+
+
+SPOKEN_CONNECTORS = ["——", "另外，", "当前来看，", "需要留意的是，", "同时，", "接下来，"]
+
+
+def build_spoken_preamble(kind: str, summary: str) -> str:
+    """Build a natural spoken preamble that identifies the context before delivering details."""
+    base = KIND_NATURAL_PREAMBLE.get(kind)
+    if base:
+        return base
+    if kind.endswith(".summary"):
+        return "状态汇报："
+    if kind == "direct.message":
+        return "来自系统的消息："
+    return ""
+
+
+def apply_spoken_connectors(segments: list[str]) -> list[str]:
+    """Insert natural spoken connectors between segments to avoid robotic list recitation."""
+    if len(segments) <= 1:
+        return segments
+    result: list[str] = [segments[0]]
+    for i, segment in enumerate(segments[1:], 1):
+        if i <= len(SPOKEN_CONNECTORS):
+            connector = SPOKEN_CONNECTORS[i - 1]
+        else:
+            connector = "还有，"
+        if segment.startswith("建议") or segment.startswith("需要"):
+            connector = "——"
+        result.append(f"{connector}{segment}")
+    return result
 
 
 def build_audio_render_plan(query_payload: dict[str, Any]) -> dict[str, Any]:
