@@ -44,7 +44,7 @@ Things like:
 - Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
 - 升级后自检入口：`docs/通用-OpenClaw-升级后自检清单.md`
 - 升级后自检脚本：`scripts/openclaw-post-upgrade-self-check.py`
-  - 用途：检测 OpenClaw 版本是否变化；若已升级，则按自检清单主动核对关键补丁 / broker / recovery watcher
+  - 用途：检测 OpenClaw 版本是否变化；若已升级，则按自检清单主动核对关键补丁 / broker / infos-handle / sidecar / unified proxy / recovery watcher
   - 常用命令：`python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
   - 启动行为：当前 `BOOT.md` 已改成启动时先跑这支脚本；若版本未变，只发普通上线消息；若版本变化，则先做升级后自检，再带结果上线
   - 状态目录：`~/.local/state/openclaw/post-upgrade-self-check/`

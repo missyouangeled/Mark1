@@ -26,6 +26,12 @@ BRANDING_CONF = Path.home() / ".config" / "systemd" / "user" / "openclaw-gateway
 CONTROL_UI_DIST = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "dist" / "control-ui"
 CONTROL_UI_OVERRIDE = CONTROL_UI_DIST / "jarvis-branding-override.js"
 INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
+INFOS_HANDLE_TEST = WORKSPACE / "scripts" / "test-openclaw-infos-handle.py"
+INFOS_HANDLE_CALLERS_TEST = WORKSPACE / "scripts" / "test-infos-handle-frontstage-callers.py"
+FRONTSTAGE_APPLY_SCRIPT = WORKSPACE / "scripts" / "apply-openclaw-frontstage-broker-data.py"
+UNIFIED_PROXY_APPLY_SCRIPT = WORKSPACE / "scripts" / "apply-openclaw-infos-handle-gateway-proxy.py"
+SIDECAR_USER_SERVICE = "openclaw-infos-handle-sidecar.service"
+UNIFIED_PROXY_USER_SERVICE = "openclaw-unified-proxy.service"
 DEFAULT_ONLINE_MESSAGE = "贾维斯已上线，我在。要开始干活的话，直接喊我。"
 
 
@@ -257,24 +263,103 @@ def check_infos_handle_sources_latest_entry() -> dict[str, Any]:
 
 
 
-def check_timer(unit: str) -> dict[str, Any]:
+def systemd_unit_state(unit: str) -> tuple[bool, dict[str, str]]:
     if sys.platform.startswith("win"):
-        return make_check(unit, True, "Windows 环境跳过 systemd 检查", required=False)
-    result = run(["systemctl", "--user", "show", unit, "-p", "UnitFileState", "-p", "ActiveState", "-p", "SubState"])
+        return False, {}
+    result = run(["systemctl", "--user", "show", unit, "-p", "LoadState", "-p", "UnitFileState", "-p", "ActiveState", "-p", "SubState"])
     output = (result.stdout or "") + (result.stderr or "")
     lines = [line.strip() for line in output.splitlines() if line.strip()]
-    data = {}
+    data: dict[str, str] = {}
     for line in lines:
         if "=" in line:
             k, v = line.split("=", 1)
             data[k] = v
+    exists = result.returncode == 0 and data.get("LoadState") not in {None, "not-found", "masked"}
+    return exists, data
+
+
+def check_timer(unit: str) -> dict[str, Any]:
+    if sys.platform.startswith("win"):
+        return make_check(unit, True, "Windows 环境跳过 systemd 检查", required=False)
+    exists, data = systemd_unit_state(unit)
     ok = (
-        result.returncode == 0
+        exists
         and data.get("UnitFileState") == "enabled"
         and data.get("ActiveState") == "active"
         and data.get("SubState") in {"waiting", "running", "elapsed"}
     )
     return make_check(unit, ok, json.dumps(data, ensure_ascii=False))
+
+
+def check_user_service(unit: str, *, required_if_present: bool = True) -> dict[str, Any]:
+    if sys.platform.startswith("win"):
+        return make_check(unit, True, "Windows 环境跳过 systemd 检查", required=False)
+    exists, data = systemd_unit_state(unit)
+    if not exists:
+        return make_check(unit, True, f"未安装：{unit}", required=False)
+    ok = data.get("ActiveState") == "active" and data.get("SubState") in {"running", "listening", "waiting", "elapsed"}
+    return make_check(unit, ok, json.dumps(data, ensure_ascii=False), required=required_if_present)
+
+
+def check_infos_handle_sidecar_live() -> dict[str, Any]:
+    cmd = [
+        sys.executable,
+        str(FRONTSTAGE_APPLY_SCRIPT),
+        "--verify-control-ui-infos-handle-sidecar",
+    ]
+    result = run(cmd)
+    output = ((result.stdout or "") + (result.stderr or "")).strip()
+    if result.returncode != 0:
+        detail = output.splitlines()[-1] if output else f"exit={result.returncode}"
+        return make_check("infos_handle_sidecar_live", False, detail)
+    ok = False
+    detail = "missing controlUiInfosHandleSidecar payload"
+    for block in output.split("\n{\n"):
+        text = block if block.startswith("{") else "{\n" + block
+        try:
+            payload = json.loads(text)
+        except Exception:
+            continue
+        sidecar = payload.get("controlUiInfosHandleSidecar") if isinstance(payload.get("controlUiInfosHandleSidecar"), dict) else None
+        if not sidecar:
+            continue
+        ok = sidecar.get("ok") is True
+        detail = (
+            f"summaryKind={sidecar.get('summaryKind') or '-'} "
+            f"severity={sidecar.get('summarySeverity') or '-'} "
+            f"sseReady={sidecar.get('sseReady')}"
+        )
+        break
+    return make_check("infos_handle_sidecar_live", ok, detail)
+
+
+def check_infos_handle_unified_proxy_verify() -> dict[str, Any]:
+    if not UNIFIED_PROXY_APPLY_SCRIPT.exists():
+        return make_check("infos_handle_unified_proxy_verify", True, "缺少 apply 脚本，跳过", required=False)
+    result = run([sys.executable, str(UNIFIED_PROXY_APPLY_SCRIPT), "--verify", "--print-json"])
+    output = ((result.stdout or "") + (result.stderr or "")).strip()
+    if result.returncode != 0:
+        detail = output.splitlines()[-1] if output else f"exit={result.returncode}"
+        return make_check("infos_handle_unified_proxy_verify", False, detail)
+    try:
+        payload = json.loads(result.stdout)
+    except Exception:
+        detail = output.splitlines()[-1] if output else "invalid json"
+        return make_check("infos_handle_unified_proxy_verify", False, detail)
+    verify = payload.get("verify") if isinstance(payload.get("verify"), dict) else {}
+    ok = bool(verify.get("ok")) and verify.get("localHealthzOk") is True and verify.get("localSummaryCode") == 200
+    remote_no_auth = verify.get("remoteNoAuthCode")
+    remote_with_auth = verify.get("remoteWithAuthCode")
+    if verify.get("lanIp"):
+        ok = ok and remote_no_auth == 401 and remote_with_auth == 200
+    detail = (
+        f"mode={verify.get('mode') or payload.get('mode') or '-'} "
+        f"port={verify.get('port') or '-'} "
+        f"local={verify.get('localSummaryCode') or '-'} "
+        f"remoteNoAuth={remote_no_auth if remote_no_auth is not None else '-'} "
+        f"remoteWithAuth={remote_with_auth if remote_with_auth is not None else '-'}"
+    )
+    return make_check("infos_handle_unified_proxy_verify", ok, detail)
 
 
 
@@ -292,15 +377,29 @@ def build_report(force: bool = False) -> dict[str, Any]:
         checks.append(check_live_control_ui_markers())
         checks.append(run_cmd_check(
             "broker_snapshot_dock_verify",
-            [sys.executable, str(WORKSPACE / "scripts" / "apply-openclaw-frontstage-broker-data.py"), "--verify-control-ui-snapshot-dock"],
+            [sys.executable, str(FRONTSTAGE_APPLY_SCRIPT), "--verify-control-ui-snapshot-dock"],
             '"snapshotFirstReady": true',
         ))
         checks.append(check_infos_handle_contract_entry())
         checks.append(check_infos_handle_snapshot_summary_entry())
         checks.append(check_infos_handle_sources_latest_entry())
+        checks.append(check_infos_handle_sidecar_live())
+        checks.append(check_user_service(SIDECAR_USER_SERVICE))
+        checks.append(check_user_service(UNIFIED_PROXY_USER_SERVICE))
+        checks.append(check_infos_handle_unified_proxy_verify())
         checks.append(run_cmd_check(
             "broker_test",
             [sys.executable, str(WORKSPACE / "scripts" / "test-frontstage-broker.py")],
+            "ALL PASS",
+        ))
+        checks.append(run_cmd_check(
+            "infos_handle_test",
+            [sys.executable, str(INFOS_HANDLE_TEST)],
+            "ALL PASS",
+        ))
+        checks.append(run_cmd_check(
+            "infos_handle_callers_test",
+            [sys.executable, str(INFOS_HANDLE_CALLERS_TEST)],
             "ALL PASS",
         ))
         checks.append(run_cmd_check(
@@ -315,8 +414,8 @@ def build_report(force: bool = False) -> dict[str, Any]:
     summary = "未检测到版本变化，本轮跳过升级后自检。"
     boot_message = DEFAULT_ONLINE_MESSAGE
     if should_verify and ok:
-        summary = f"已完成 OpenClaw {version or 'unknown'} 升级后自检：关键补丁、broker 与 recovery watcher 正常。"
-        boot_message = f"贾维斯已上线，我在。刚核对过 OpenClaw {version or '当前版本'} 升级后自检清单：关键补丁、broker 和恢复观察都正常。"
+        summary = f"已完成 OpenClaw {version or 'unknown'} 升级后自检：关键补丁、broker、infos-handle、sidecar 与统一入口都正常。"
+        boot_message = f"贾维斯已上线，我在。刚核对过 OpenClaw {version or '当前版本'} 升级后自检清单：关键补丁、broker、infos-handle、sidecar 和统一入口都正常。"
     elif should_verify and not ok:
         failed = [item["name"] for item in checks if item.get("required", True) and not item.get("ok")]
         summary = f"OpenClaw {version or 'unknown'} 升级后自检未全部通过：{', '.join(failed)}"

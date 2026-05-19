@@ -508,6 +508,70 @@ def main() -> int:
     else:
         print("PASS post_upgrade_infos_handle_sources_latest_consumer")
 
+    post_upgrade.run = lambda cmd: SimpleNamespace(
+        returncode=0,
+        stdout=json.dumps({
+            "controlUiInfosHandleSidecar": {
+                "ok": True,
+                "summaryKind": "snapshot.summary",
+                "summarySeverity": "ok",
+                "sseReady": True,
+            }
+        }, ensure_ascii=False),
+        stderr="",
+    )
+    post_upgrade_sidecar_live = post_upgrade.check_infos_handle_sidecar_live()
+    if post_upgrade_sidecar_live != {
+        "name": "infos_handle_sidecar_live",
+        "ok": True,
+        "required": True,
+        "detail": "summaryKind=snapshot.summary severity=ok sseReady=True",
+    }:
+        failures.append(f"post-upgrade self-check sidecar live mismatch: {post_upgrade_sidecar_live}")
+    else:
+        print("PASS post_upgrade_infos_handle_sidecar_live")
+
+    post_upgrade.run = lambda cmd: SimpleNamespace(
+        returncode=0,
+        stdout=json.dumps({
+            "ok": True,
+            "mode": "http",
+            "verify": {
+                "ok": True,
+                "mode": "http",
+                "port": 18788,
+                "localHealthzOk": True,
+                "localSummaryCode": 200,
+                "lanIp": "192.168.1.20",
+                "remoteNoAuthCode": 401,
+                "remoteWithAuthCode": 200,
+            },
+        }, ensure_ascii=False),
+        stderr="",
+    )
+    post_upgrade_proxy_verify = post_upgrade.check_infos_handle_unified_proxy_verify()
+    if post_upgrade_proxy_verify != {
+        "name": "infos_handle_unified_proxy_verify",
+        "ok": True,
+        "required": True,
+        "detail": "mode=http port=18788 local=200 remoteNoAuth=401 remoteWithAuth=200",
+    }:
+        failures.append(f"post-upgrade self-check unified proxy verify mismatch: {post_upgrade_proxy_verify}")
+    else:
+        print("PASS post_upgrade_infos_handle_unified_proxy_verify")
+
+    post_upgrade.systemd_unit_state = lambda unit: (True, {"LoadState": "loaded", "UnitFileState": "enabled", "ActiveState": "active", "SubState": "running"})
+    post_upgrade_user_service = post_upgrade.check_user_service("openclaw-infos-handle-sidecar.service")
+    if post_upgrade_user_service != {
+        "name": "openclaw-infos-handle-sidecar.service",
+        "ok": True,
+        "required": True,
+        "detail": json.dumps({"LoadState": "loaded", "UnitFileState": "enabled", "ActiveState": "active", "SubState": "running"}, ensure_ascii=False),
+    }:
+        failures.append(f"post-upgrade self-check user service mismatch: {post_upgrade_user_service}")
+    else:
+        print("PASS post_upgrade_infos_handle_sidecar_service")
+
     apply_frontstage = load_module("apply-openclaw-frontstage-broker-data.py", "apply_frontstage_broker_data")
     apply_frontstage.invoke_handle_query = lambda *args, **kwargs: {
         "ok": True,

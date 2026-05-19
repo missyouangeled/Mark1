@@ -20,13 +20,16 @@
 
 ## 最短结论
 
-升级后只要下面 5 条都通过，就可以把这次更新视为“基本正常”：
+升级后只要下面 8 条都通过，就可以把这次更新视为“基本正常”：
 
 1. **Control UI 品牌/聊天补丁仍在**
 2. **snapshot-first 入口仍在**
-3. **broker 视图能重建**
-4. **frontstage recovery watcher 测试通过**
-5. **相关 timer 仍处于 enabled + active(waiting)**
+3. **broker / infos-handle contract 入口仍正常**
+4. **infos-handle sidecar live 链仍正常**
+5. **统一入口 proxy verify 仍正常**
+6. **frontstage recovery watcher 测试通过**
+7. **相关 timer 仍处于 enabled + active(waiting)**
+8. **sidecar / unified proxy service 仍 active**
 
 ---
 
@@ -96,11 +99,12 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-sna
 
 ---
 
-### 4. 三个最小回归仍通过
+### 4. 四个最小回归仍通过
 
 ```bash
 python3 scripts/test-frontstage-broker.py
 python3 scripts/test-openclaw-infos-handle.py
+python3 scripts/test-infos-handle-frontstage-callers.py
 python3 scripts/test-frontstage-recovery-watch.py
 ```
 
@@ -112,7 +116,37 @@ ALL PASS
 
 ---
 
-### 5. 相关 timer 仍正常
+### 5. infos-handle sidecar live 链仍正常
+
+标准检查：
+
+```bash
+python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar
+```
+
+至少应能确认：
+
+- `controlUiInfosHandleSidecar.ok = true`
+- `summaryHref / contractHref / sseHref` 正常
+- `imageArtifactHref` 可取回
+
+### 6. 统一入口 proxy verify 仍正常
+
+标准检查：
+
+```bash
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-json
+```
+
+当前最小要求：
+
+- `localHealthzOk = true`
+- `localSummaryCode = 200`
+- 若当前机器存在可用 LAN IP：
+  - `remoteNoAuthCode = 401`
+  - `remoteWithAuthCode = 200`
+
+### 7. 相关 timer 仍正常
 
 最少检查这两个：
 
@@ -124,6 +158,18 @@ ALL PASS
 - `UnitFileState=enabled`
 - `ActiveState=active`
 - `SubState=waiting`
+
+### 8. sidecar / unified proxy service 仍正常
+
+最少检查：
+
+- `openclaw-infos-handle-sidecar.service`
+- `openclaw-unified-proxy.service`（若已安装）
+
+理想状态：
+
+- `ActiveState=active`
+- `SubState=running`
 
 ---
 
@@ -139,7 +185,8 @@ ALL PASS
 
 ```bash
 python3 scripts/apply-openclaw-control-ui-branding.py
-python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock
+python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-json
 ```
 
 ---
