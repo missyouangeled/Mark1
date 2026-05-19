@@ -129,11 +129,15 @@ class SidecarServer(ThreadingHTTPServer):
         self.events_path = events_path
         self.output_root = output_root
         self.python_executable = python_executable
+        self._sse_connections: int = 0
+        self._sse_lock = __import__('threading').Lock()
 
 
 class SidecarHandler(BaseHTTPRequestHandler):
     server: SidecarServer
     protocol_version = "HTTP/1.1"
+    MAX_BODY_BYTES = 256 * 1024
+    HANDLE_TIMEOUT_SECONDS = 30
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
         sys.stderr.write(f"[infos-handle-sidecar] {self.address_string()} - {format % args}\n")
@@ -177,6 +181,9 @@ class SidecarHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length") or "0")
         except ValueError:
             content_length = 0
+        if content_length > self.MAX_BODY_BYTES:
+            self._write_json({"ok": False, "error": "request body too large", "maxBytes": self.MAX_BODY_BYTES}, status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            return
         raw_body = self.rfile.read(content_length) if content_length > 0 else b""
         try:
             payload = json.loads(raw_body.decode("utf-8") or "{}")

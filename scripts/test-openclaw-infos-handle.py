@@ -550,10 +550,10 @@ def main() -> int:
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["layout"] == "str"
         assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["panels"] == "array[imageCardPanel]"
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segmentCount"] == "int"
-        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["estimatedDurationSeconds"] == "number"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["defaultRenderer"].endswith("tools/voice-reply/voice-reply.sh")
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["renderResultShape"]["segmentCount"] == "int"
+        assert payload["result"]["queryCatalog"]["outputHandlerCatalog"]["audio.local-tts.v2"]["renderResultShape"]["estimatedDurationSeconds"] == "number"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["panelName"] == "str|null"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["format"] == "str"
         assert payload["result"]["queryCatalog"]["responseEnvelope"]["output"] == "object|null"
@@ -615,9 +615,9 @@ def main() -> int:
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["deliveryModes"] == ["none", "frontstage"]
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["frontstageDeliveryKind"] == "artifact_notice"
         assert payload["result"]["handlerCatalog"]["image.summary-card.v2"]["renderResultShape"]["badge"] == "str|null"
-        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["deliveryModes"] == ["none", "frontstage"]
-        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["artifactNoticeContractVersion"] == 1
-        assert payload["result"]["handlerCatalog"]["audio.local-tts.v1"]["renderResultShape"]["segments"] == "array[str]"
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["deliveryModes"] == ["none", "frontstage"]
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["artifactNoticeContractVersion"] == 1
+        assert payload["result"]["handlerCatalog"]["audio.local-tts.v2"]["renderResultShape"]["segments"] == "array[str]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["count"] == "int"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["availableSources"] == "array[str]"
         assert payload["result"]["queryCatalog"]["queries"]["sources.latest"]["resultShape"]["sourceItems"] == "array[sourceLatestItem]"
@@ -820,22 +820,30 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["format"] == "audio"
         assert audio_output["format"] == "audio"
-        assert audio_output["handler"] == "audio.local-tts.v1"
+        assert audio_output["handler"] == "audio.local-tts.v2"
         assert audio_output["preset"] == "demo-voice"
         assert audio_output["mediaType"] == "audio/mpeg"
         assert audio_output["artifact"]["ref"] == audio_output["artifactRef"]
         assert audio_output["artifact"]["fileName"] == audio_output["fileName"]
         assert Path(audio_output["path"]).exists()
         audio_text = Path(audio_output["path"]).read_text(encoding="utf-8")
-        assert audio_text.startswith("FAKE AUDIO | demo-voice | 前台状态总体正常。")
-        assert "broker、监工、恢复观察、本地健康当前都没看到明显异常。" in audio_text
-        assert "建议：一切正常，继续工作。" in audio_text
-        assert audio_output["spokenText"] == "前台状态总体正常。 broker、监工、恢复观察、本地健康当前都没看到明显异常。 建议：一切正常，继续工作。"
+        assert audio_text.startswith("FAKE AUDIO | demo-voice | 系统状态汇报：")
+        assert "前台状态总体正常" in audio_text
+        assert "建议：一切正常，继续工作" in audio_text
+        assert "系统状态汇报" in audio_output["spokenText"]
+        assert "前台状态总体正常" in audio_output["spokenText"]
+        assert "建议：一切正常，继续工作" in audio_output["spokenText"]
         assert audio_output["summary"] == "前台状态总体正常"
-        assert audio_output["result"]["textPlanVersion"] == 2
-        assert audio_output["result"]["strategy"] == "stable_lines"
+        assert audio_output["result"]["textPlanVersion"] == 3
+        assert audio_output["result"]["strategy"] == "stable_lines_v3"
+        assert audio_output["result"]["connectorStyle"] == "natural_transitions"
         assert audio_output["result"]["segmentCount"] == 3
-        assert audio_output["result"]["segments"] == ["前台状态总体正常。", "broker、监工、恢复观察、本地健康当前都没看到明显异常。", "建议：一切正常，继续工作。"]
+        assert audio_output["result"]["segments"][0] == "前台状态总体正常。"
+        assert "——" in audio_output["result"]["segments"][1]
+        assert "——" in audio_output["result"]["segments"][2]
+        assert "broker、监工" in audio_output["result"]["segments"][1]
+        assert "建议：一切正常，继续工作。" in audio_output["result"]["segments"][2]
+        assert audio_output["result"]["preamble"] == "系统状态汇报："
         assert audio_output["result"]["estimatedDurationSeconds"] > 1
         assert audio_output["result"]["sourceKind"] == "snapshot.summary"
         assert audio_output["sourcePath"].endswith("reply.mp3")
@@ -856,10 +864,15 @@ def main() -> int:
         assert payload["ok"] is True
         assert payload["request"]["kind"] == "health.summary"
         assert payload["request"]["format"] == "audio"
-        assert audio_output["spokenText"] == "健康正常。 当前网络和 Gateway 可达。 建议：继续观察网络与 Gateway。"
+        assert "健康检查结果" in audio_output["spokenText"]
+        assert "健康正常" in audio_output["spokenText"]
+        assert "建议：继续观察网络与 Gateway" in audio_output["spokenText"]
         assert audio_output["summary"] == "健康正常"
         assert audio_output["result"]["segmentCount"] == 3
-        assert audio_output["result"]["segments"] == ["健康正常。", "当前网络和 Gateway 可达。", "建议：继续观察网络与 Gateway。"]
+        assert audio_output["result"]["segments"][0] == "健康正常。"
+        assert "——" in audio_output["result"]["segments"][1]
+        assert "——" in audio_output["result"]["segments"][2]
+        assert audio_output["result"]["preamble"] == "健康检查结果："
         assert audio_output["result"]["sourceKind"] == "health.summary"
         health_audio_text = Path(audio_output["path"]).read_text(encoding="utf-8")
         assert "建议：继续观察网络与 Gateway。" in health_audio_text
@@ -903,7 +916,7 @@ def main() -> int:
         assert audio_delivery["artifactNotice"]["fallbackText"] == "[infos-handle] 音频 artifact 已生成。"
         assert audio_delivery["artifactNotice"]["delivery"]["artifactRef"] == audio_delivery["artifact"]["ref"]
         assert audio_delivery["artifactNotice"]["delivery"]["messageId"].startswith("msg::[infos-handle] 已生成音频 artifact：")
-        assert audio_delivery["metadata"]["handler"] == "audio.local-tts.v1"
+        assert audio_delivery["metadata"]["handler"] == "audio.local-tts.v2"
         assert audio_delivery["metadata"]["requestedSessionKey"] == "agent:main:test"
         assert audio_delivery["metadata"]["targetSessionKey"] == "agent:main:test:frontstage"
         assert audio_delivery["notify"]["targetSessionKey"] == "agent:main:test:frontstage"
@@ -1276,7 +1289,7 @@ def main() -> int:
                 audio_disposition = response.headers.get("Content-Disposition")
             assert audio_content_type == "audio/mpeg"
             assert audio_disposition is not None and audio_disposition.startswith("attachment;")
-            assert audio_body.startswith("FAKE AUDIO | demo-voice | 前台状态总体正常。")
+            assert audio_body.startswith("FAKE AUDIO | demo-voice | 系统状态汇报：")
 
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{sidecar_port}/v1/events/stream?kind=snapshot.summary&intervalMs=1000",

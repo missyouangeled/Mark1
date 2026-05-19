@@ -4,6 +4,12 @@
 - 系统 / OS：Linux
 - 用途：为 `scripts/openclaw-infos-handle.py` 提供最小本地 HTTP / SSE sidecar，让 Control UI / 其他轻量 consumer 优先直连 infos-handle 正式请求层，而不是只读 broker 静态快照。
 
+> **最新增强 (2026-05-19):**
+> - image handler 升级到 `image.summary-card.v2`：per-panel 严重性着色、tone 顶部强调条、面板状态 badge、全新 dashboard 布局（使用真实 snapshot panels）
+> - audio handler 升级到 `audio.local-tts.v2`：自然口语 preamble + conversational connectors 连接 segment
+> - 新增 artifact cleanup：`--cleanup-artifacts-older-than-hours N` 可清理过期 artifact
+> - 所有测试保持绿色
+
 ## 当前入口
 
 - sidecar 脚本：`scripts/openclaw-infos-handle-sidecar.py`
@@ -235,6 +241,7 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-bran
 - 不把 OpenClaw 主聊天链改成依赖 sidecar
 - richer image/audio 仍以 `handle` 主请求面为核心，sidecar 只是 transport
 - 当前 SSE 是定时 query 的最小实现，不是 broker 原生事件流
+- artifact cleanup 可通过 infos-handle 主入口的 `--cleanup-artifacts-older-than-hours N` 手工触发，sidecar 当前不做自动清理
 
 一句话：
 

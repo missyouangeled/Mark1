@@ -132,7 +132,7 @@ def build_output_handler_catalog() -> dict[str, dict[str, Any]]:
             },
             "description": "Richer SVG summary card v2 with per-panel severity coloring, tone-accented top bars, per-panel status badges, and a new dashboard layout for real snapshot panel data; supports headline / focus-columns / activity-grid / dashboard layouts.",
         },
-        "audio.local-tts.v1": {
+        "audio.local-tts.v2": {
             "formats": ["audio"],
             "status": "preview",
             "delivery": "artifact_file",
@@ -145,11 +145,13 @@ def build_output_handler_catalog() -> dict[str, dict[str, Any]]:
             "renderResultShape": {
                 "textPlanVersion": "int",
                 "strategy": "str",
+                "preamble": "str",
+                "connectorStyle": "str",
                 "segmentCount": "int",
                 "segments": "array[str]",
                 "estimatedDurationSeconds": "number",
             },
-            "description": "Best-effort local TTS renderer using the existing voice-reply pipeline; it now shapes a stabilized spoken-text plan with segment metadata before rendering, while frontstage delivery continues to use a text artifact notice plus stable artifact-ref / delivery metadata.",
+            "description": "Best-effort local TTS renderer v2 with natural spoken preamble and conversational connectors between segments; shapes a stabilized spoken-text plan with segment metadata before rendering.",
         },
     }
 
@@ -395,6 +397,33 @@ def file_size_bytes(path: Path) -> int | None:
 def guess_media_type(path: Path, fallback: str) -> str:
     guessed, _ = mimetypes.guess_type(str(path))
     return guessed or fallback
+
+
+def cleanup_stale_artifacts(output_root: Path, *, hours: float) -> dict[str, Any]:
+    """Remove image/audio artifacts older than `hours`."""
+    if hours <= 0:
+        return {"action": "cleanup", "cleaned": 0, "formats": {}}
+    import time
+
+    cutoff = time.time() - hours * 3600
+    cleaned: dict[str, int] = {}
+    for format_name in ("image", "audio"):
+        fmt_dir = (output_root / format_name)
+        if not fmt_dir.is_dir():
+            continue
+        fmt_cleaned = 0
+        for child in fmt_dir.iterdir():
+            if not child.is_file():
+                continue
+            try:
+                if child.stat().st_mtime < cutoff:
+                    child.unlink()
+                    fmt_cleaned += 1
+            except OSError:
+                pass
+        cleaned[format_name] = fmt_cleaned
+    total = sum(cleaned.values())
+    return {"action": "cleanup", "cleaned": total, "formats": cleaned, "cutoffHours": hours}
 
 
 def extract_last_nonempty_line(text: str) -> str | None:
@@ -2160,12 +2189,17 @@ def build_audio_render_plan(query_payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("audio output requires non-empty text")
 
     spoken_segments = [ensure_spoken_sentence(segment) for segment in segments if ensure_spoken_sentence(segment)]
-    spoken_text = " ".join(spoken_segments)
+    preamble = build_spoken_preamble(kind, result.get("summary", ""))
+    connected_segments = apply_spoken_connectors(spoken_segments)
+    spoken_text = (preamble + " ") if preamble else ""
+    spoken_text += " ".join(connected_segments)
     return {
-        "textPlanVersion": 2,
-        "strategy": "stable_lines",
-        "segmentCount": len(spoken_segments),
-        "segments": spoken_segments,
+        "textPlanVersion": 3,
+        "strategy": "stable_lines_v3",
+        "preamble": preamble,
+        "connectorStyle": "natural_transitions",
+        "segmentCount": len(connected_segments),
+        "segments": connected_segments,
         "estimatedDurationSeconds": estimate_spoken_duration_seconds(spoken_text),
         "summary": spoken_segments[0].rstrip("。！？!?"),
         "sourceKind": kind,
@@ -2213,7 +2247,7 @@ def render_audio_output(query_payload: dict[str, Any], output_root: Path, audio_
     return {
         "format": "audio",
         "status": "rendered",
-        "handler": "audio.local-tts.v1",
+        "handler": "audio.local-tts.v2",
         "delivery": "artifact_file",
         "mediaType": guess_media_type(output_path, "audio/mpeg"),
         "preset": audio_preset,
@@ -2579,6 +2613,7 @@ def main() -> int:
     parser.add_argument("--audio-preset", default=DEFAULT_AUDIO_PRESET, help="Audio preset for handle --format audio")
     parser.add_argument("--broker-state-dir", help="Optional broker state dir override for notify-frontstage / handle delivery")
     parser.add_argument("--broker-data-dir", help="Optional broker data dir override for notify-frontstage / handle delivery")
+    parser.add_argument("--cleanup-artifacts-older-than-hours", type=float, default=0, help="Remove image/audio artifacts older than N hours")
     args = parser.parse_args()
 
     snapshot_path = Path(args.snapshot_path).expanduser().resolve()
@@ -2589,6 +2624,10 @@ def main() -> int:
 
     if args.response_file and args.action != "handle":
         raise SystemExit("--response-file currently only supports handle")
+
+    if args.cleanup_artifacts_older_than_hours > 0:
+        cleanup_result = cleanup_stale_artifacts(output_root, hours=args.cleanup_artifacts_older_than_hours)
+        print(json.dumps(cleanup_result, ensure_ascii=False, indent=2), file=sys.stderr)
 
     if args.action == "query":
         if args.format not in READY_OUTPUT_FORMATS:
