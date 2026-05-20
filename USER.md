@@ -2,11 +2,11 @@
 
 _Learn about the person you're helping. Update this as you go._
 
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
+- **Name:** 袁文涛
+- **What to call them:** 点点（网名：子时点点）
+- **Pronouns:** 他
+- **Timezone:** Asia/Shanghai (UTC+8)
+- **Notes:** 习惯用"点点"自称，日常聊天中优先以此称呼
 
 ## Context
 

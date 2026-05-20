@@ -83,6 +83,9 @@ Don't ask permission. Just do it.
    - 若上游大版本结构变化可能导致补丁失效，要明确记成维护边界，但仍需把当前可重复应用方案接好。
 4. **同步留痕**
    - 修改完成后，默认把落点写进对应文档、记忆与必要的 learnings，保证以后继续改时能快速找到入口。
+   - 以后凡是实际改了功能、补丁、脚本、配置、自动链路或维护文档，默认还要**追加一条补丁变更流水**到 `docs/通用-OpenClaw-补丁变更流水.md`；优先用 `python3 scripts/openclaw-change-log.py capture ...` 自动生成这条记录，而不是只口头说“我记住了”。
+   - 若本次改动还不适合登记为正式补丁、但对后续排查/恢复仍重要（例如临时修复、手工补配、外部插件修改、故意不默认启用的维护动作），则除了写变更流水外，还应同步补进 `docs/通用-OpenClaw-非正式修改备忘录.md`；优先用 `python3 scripts/openclaw-change-log.py memo ...` 追加。
+   - 若本次改动已经达到“正式补丁”标准，则除了写变更流水外，还要同步检查并更新：`docs/通用-OpenClaw-补丁注册表.md`、`docs/通用-OpenClaw-补丁重建清单.md`、以及必要时的 `docs/通用-OpenClaw-升级后自检清单.md`。
 
 **Ask first:**
 

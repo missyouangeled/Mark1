@@ -129,9 +129,61 @@ systemctl --user show openclaw-frontstage-broker-rebuild.timer -p UnitFileState 
 
 ---
 
+### 2.3 infos-handle sidecar
+
+检查：
+
+- `scripts/openclaw-infos-handle-sidecar.py`
+- `tools/openclaw-infos-handle-sidecar/README.md`
+- `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+- `~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
+
+动作：
+
+```bash
+cp tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now openclaw-infos-handle-sidecar.service
+python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar
+```
+
+验收：
+
+```bash
+curl -s http://127.0.0.1:18790/healthz
+curl -s 'http://127.0.0.1:18790/v1/query/snapshot.summary?format=json'
+curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'
+systemctl --user show openclaw-infos-handle-sidecar.service -p ActiveState -p SubState
+```
+
+### 2.4 infos-handle unified proxy
+
+检查：
+
+- `scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+- `tools/openclaw-infos-handle-gateway-proxy/README.md`
+- `tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+- `tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+- `~/.config/systemd/user/openclaw-unified-proxy.service`
+
+动作：
+
+```bash
+python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --install-user-systemd --enable --restart --verify --print-json
+```
+
+验收：
+
+- verify 输出中至少应有：
+  - `localHealthzOk = true`
+  - `localSummaryCode = 200`
+- 若当前机器存在可用 LAN IP，还应有：
+  - `remoteNoAuthCode = 401`
+  - `remoteWithAuthCode = 200`
+
 ## 3. 恢复各类自动触发 watcher / service
 
-### 3.1 supervisor 自动回报
+### 3.1 supervisor 状态层 + 自动回报
 
 检查：
 
@@ -147,9 +199,18 @@ cp tools/openclaw-supervisor/openclaw-supervisor-watch.service ~/.config/systemd
 cp tools/openclaw-supervisor/openclaw-supervisor-watch.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now openclaw-supervisor-watch.timer
+python3 scripts/test-openclaw-supervisor-status.py
+python3 scripts/openclaw-supervisor-status.py --print-json
 ```
 
-### 3.2 local-health 前台回报
+验收：
+
+```bash
+systemctl --user show openclaw-supervisor-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+systemctl --user show openclaw-supervisor-watch.timer -p UnitFileState -p ActiveState -p SubState
+```
+
+### 3.2 local-health 诊断层 + 前台回报
 
 检查：
 
@@ -165,6 +226,15 @@ cp tools/openclaw-local-health/openclaw-local-health-watch.service ~/.config/sys
 cp tools/openclaw-local-health/openclaw-local-health-watch.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now openclaw-local-health-watch.timer
+python3 scripts/openclaw-local-health-diagnose.py --print-json
+```
+
+验收：
+
+```bash
+systemctl --user show openclaw-local-health-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+systemctl --user show openclaw-local-health-watch.timer -p UnitFileState -p ActiveState -p SubState
+ls -l ~/.local/state/openclaw/local-health/
 ```
 
 ### 3.3 frontstage recovery watcher
@@ -191,6 +261,29 @@ systemctl --user enable --now openclaw-frontstage-recovery-watch.timer
 python3 scripts/test-frontstage-recovery-watch.py
 systemctl --user start openclaw-frontstage-recovery-watch.service
 systemctl --user show openclaw-frontstage-recovery-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+```
+
+### 3.4 Linux resume-watch
+
+检查：
+
+- `scripts/openclaw-resume-watch.sh`
+- `~/.config/systemd/user/openclaw-resume-watch.service`
+- `~/.config/systemd/user/openclaw-resume-watch.timer`
+
+动作：
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now openclaw-resume-watch.timer
+systemctl --user start openclaw-resume-watch.service
+```
+
+验收：
+
+```bash
+systemctl --user show openclaw-resume-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState
 ```
 
 ---
@@ -220,6 +313,25 @@ systemctl --user restart openclaw-nvidia-audio-bridge.service
 
 按 `tools/nvidia-audio-bridge/README.md` 的步骤回归。
 
+### 4.2 Windows battery policy（掌机）
+
+检查：
+
+- `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.ps1`
+- `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.cmd`
+- `docs/掌机-Windows-OpenClaw-维护说明.md`
+
+动作（在掌机 Windows 上）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\repair-openclaw-gateway-battery-policy-zhangji-windows.ps1
+```
+
+验收：
+
+- `DisallowStartIfOnBatteries = false`
+- `StopIfGoingOnBatteries = false`
+
 ---
 
 ## 5. 如果某条补丁升级后失配
@@ -241,4 +353,4 @@ systemctl --user restart openclaw-nvidia-audio-bridge.service
 
 ## 6. 当前推荐重建顺序（一句话版）
 
-> 先恢复补丁自动重打入口 → 再恢复 broker → 再恢复 supervisor / local-health / recovery watcher 的 systemd 链路 → 最后恢复机器专用高级 patch，并逐项验收。
+> 先恢复补丁自动重打入口 → 再恢复 broker / infos-handle sidecar / unified proxy → 再恢复 supervisor / local-health / recovery watcher / resume-watch 的 systemd 链路 → 最后恢复机器专用高级 patch，并逐项验收。

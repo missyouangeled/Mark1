@@ -53,6 +53,24 @@
   - `BOOT.md`
   - `TOOLS.md`
 
+### PATCH-LINUX-RESUME-RECOVERY
+
+- **结果目标**：当公司（Linux）机器从休眠恢复、宿主机长时间暂停、或发生明显时间跳变后，自动重启 `openclaw-gateway.service`，尽量把“恢复后前台像没活过来”的情况收敛成可自愈的一次 gateway 恢复。
+- **当前实现**：`scripts/openclaw-resume-watch.sh` + `~/.config/systemd/user/openclaw-resume-watch.service` + `~/.config/systemd/user/openclaw-resume-watch.timer`
+- **自动触发**：user systemd timer；当前默认 `OnBootSec=2min`、`OnUnitActiveSec=1min`
+- **适用范围**：当前主落地为 公司（Linux）
+- **升级风险点**：`openclaw-gateway.service` 单元名变化；user systemd 行为变化；`/proc/sys/kernel/random/boot_id` 或时间跳变判定逻辑变化
+- **失效判断**：休眠/恢复后 gateway 没被自动拉起；`resume-watch.log` 长期无新记录；或 timer / service 不再处于正常启用状态
+- **最小验收**：执行 `systemctl --user show openclaw-resume-watch.service -p ActiveState -p SubState -p Result`、`systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState` 应正常；必要时手工执行 `bash scripts/openclaw-resume-watch.sh` 确认脚本可运行并会写状态文件/日志
+- **维护落点**：
+  - `scripts/openclaw-resume-watch.sh`
+  - `docs/公司-Linux-OpenClaw-维护说明.md`
+  - `TOOLS.md`
+  - `~/.config/systemd/user/openclaw-resume-watch.service`
+  - `~/.config/systemd/user/openclaw-resume-watch.timer`
+  - `~/.local/state/openclaw/resume-watch.env`
+  - `~/.local/state/openclaw/resume-watch.log`
+
 ### PATCH-CTRLUI-BRANDING
 
 - **结果目标**：Control UI 左上角品牌、浏览器标题、图标、页面内可见 OpenClaw 品牌尽量统一替换为“贾维斯”风格。
@@ -82,6 +100,26 @@
   - `docs/公司-Linux-OpenClaw-维护说明.md`
   - `TOOLS.md`
 
+### PATCH-SUPERVISOR-SERVICE-STATE
+
+- **结果目标**：持续产出一份稳定可读的监工状态层，让主会话的 `policyMode/taskActive/desiredState`、活跃任务聚焦、`stalled/failed/done/waiting` 状态，以及“完成后约 10 分钟等待接续任务窗口”都有可复读、可恢复的统一状态来源。
+- **当前实现**：`scripts/openclaw-supervisor-status.py` + `tools/openclaw-supervisor/openclaw-supervisor-watch.service` + `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
+- **自动触发**：user systemd timer；当前默认开机约 1 分钟首次运行，之后约每 30 秒刷新一次
+- **适用范围**：当前主落地为 公司（Linux）
+- **升级风险点**：任务库结构变化；session / transcript 尾部解析规则变化；控制语义（`auto|force_on|force_off`、followup window）变化
+- **失效判断**：`supervisor-status.json` / `service-control.json` / `supervisor-events.log` 不再更新；或复杂任务已开启监工语义但状态长期停留错误；或 10 分钟接续窗口语义失效
+- **最小验收**：运行 `python3 scripts/test-openclaw-supervisor-status.py` 应通过；运行 `python3 scripts/openclaw-supervisor-status.py --print-json` 应返回完整状态；`openclaw-supervisor-watch.timer` 应处于 `enabled + active(waiting)`
+- **维护落点**：
+  - `scripts/openclaw-supervisor-status.py`
+  - `scripts/test-openclaw-supervisor-status.py`
+  - `tools/openclaw-supervisor/README.md`
+  - `tools/openclaw-supervisor/openclaw-supervisor-watch.service`
+  - `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
+  - `~/.config/systemd/user/openclaw-supervisor-watch.service`
+  - `~/.config/systemd/user/openclaw-supervisor-watch.timer`
+  - `~/.local/state/openclaw/supervisor/`
+  - `TOOLS.md`
+
 ### PATCH-FRONTSTAGE-BROKER
 
 - **结果目标**：把监工、本地健康、前台恢复观察等辅助消息统一收口后，再稳定投递到“当前前台 dashboard”，并沉淀成统一 snapshot 口径的 sidecar 数据源，供 renderer / dock 等消费方直接复用；`overview` / `frontstage-status.json` 等旧名字只保留为兼容层。
@@ -105,6 +143,61 @@
   - `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
   - `~/.local/state/openclaw/frontstage/broker-state.json`
   - `~/.local/state/openclaw/broker/`
+
+### PATCH-LOCAL-HEALTH-DIAGNOSTIC-LAYER
+
+- **结果目标**：在不依赖 AI 回复的前提下，持续产出本机 OpenClaw 的本地健康诊断结果，把故障尽量分类到 gateway、本机外联、主线 provider 路由、温度、负载/内存，并同步生成本地健康页面与公共静态副本。
+- **当前实现**：`scripts/openclaw-local-health-diagnose.py` + `tools/openclaw-local-health/openclaw-local-health-watch.service` + `tools/openclaw-local-health/openclaw-local-health-watch.timer`
+- **自动触发**：user systemd timer；当前默认开机约 2 分钟首次运行，之后约每 5 分钟一次
+- **适用范围**：当前主落地为 公司（Linux）
+- **升级风险点**：`openclaw status --json` 输出变化；provider 配置结构变化；公共静态副本路径变化；宿主机温度桥接路径与格式变化
+- **失效判断**：`last-report.json` / `last-summary.txt` / `health-diagnostic.log` 长期不更新；`jarvis-local-health-status.html/.json` 不再刷新；或页面不再能给出 gateway/网络/provider 的明确分类
+- **最小验收**：运行 `python3 scripts/openclaw-local-health-diagnose.py --print-json` 应成功并生成状态文件；`openclaw-local-health-watch.timer` 应处于 `enabled + active(waiting)`；`~/.openclaw/canvas/documents/local-health-status/index.html` 与 `jarvis-local-health-status.json` 应存在
+- **维护落点**：
+  - `scripts/openclaw-local-health-diagnose.py`
+  - `tools/openclaw-local-health/README.md`
+  - `tools/openclaw-local-health/openclaw-local-health-watch.service`
+  - `tools/openclaw-local-health/openclaw-local-health-watch.timer`
+  - `~/.config/systemd/user/openclaw-local-health-watch.service`
+  - `~/.config/systemd/user/openclaw-local-health-watch.timer`
+  - `~/.local/state/openclaw/local-health/`
+  - `~/.openclaw/canvas/documents/local-health-status/`
+  - `TOOLS.md`
+
+### PATCH-INFOS-HANDLE-SIDECAR
+
+- **结果目标**：为 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE live 入口，优先读取正式请求层结果，而不是只依赖 broker 静态快照；同时保持“localhost 免鉴权、远程/LAN 需 Bearer token”的受控访问语义。
+- **当前实现**：`scripts/openclaw-infos-handle-sidecar.py` + `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+- **自动触发**：当前主落地依赖 user systemd：`openclaw-infos-handle-sidecar.service`
+- **适用范围**：当前主落地为 公司（Linux）
+- **升级风险点**：sidecar 路由 / 返回结构变化；artifact href 语义变化；Control UI 注入的 `infosHandle*Href` 契约变化；remote auth / rate-limit 语义变化
+- **失效判断**：`/healthz`、`/v1/query/*`、`/v1/events/stream` 无法正常访问；或 Control UI 不再能通过 sidecar 读取 summary / contract；或 image/audio artifactHref 无法继续取回文件
+- **最小验收**：运行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar` 应通过；必要时补跑 `python3 scripts/test-openclaw-infos-handle.py`；并确认 `curl -s http://127.0.0.1:18790/healthz`、`curl -s 'http://127.0.0.1:18790/v1/query/snapshot.summary?format=json'`、`curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'` 可用
+- **维护落点**：
+  - `scripts/openclaw-infos-handle-sidecar.py`
+  - `scripts/test-openclaw-infos-handle.py`
+  - `scripts/apply-openclaw-frontstage-broker-data.py`
+  - `tools/openclaw-infos-handle-sidecar/README.md`
+  - `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+  - `docs/公司-Linux-OpenClaw-维护说明.md`
+  - `TOOLS.md`
+
+### PATCH-INFOS-HANDLE-UNIFIED-PROXY
+
+- **结果目标**：给 Gateway 与 infos-handle sidecar 提供单端口统一入口，并把原始客户端 IP 正确透传给 sidecar，避免远程请求被误判成 localhost 免鉴权。
+- **当前实现**：`tools/openclaw-infos-handle-gateway-proxy/Caddyfile` + `scripts/apply-openclaw-infos-handle-gateway-proxy.py` + `tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+- **自动触发**：当前主落地依赖 user systemd：`openclaw-unified-proxy.service`
+- **适用范围**：当前主落地为 公司（Linux）
+- **升级风险点**：Gateway / sidecar 端口变化；Caddy 路由规则变化；原始客户端 IP 透传头语义变化；verify 逻辑与 token 校验预期变化
+- **失效判断**：`18788` 统一入口无法同时代理 Gateway 与 sidecar；`/healthz`、`/v1/query/*` 返回异常；或远程无 token 时没有得到 `401`、带 token 时也不能正常 `200`
+- **最小验收**：运行 `python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-json`，至少确认 `localHealthzOk=true`、`localSummaryCode=200`；若当前机器可从 LAN 访问，再确认 `remoteNoAuthCode=401`、`remoteWithAuthCode=200`
+- **维护落点**：
+  - `scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+  - `tools/openclaw-infos-handle-gateway-proxy/README.md`
+  - `tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+  - `tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+  - `docs/公司-Linux-OpenClaw-维护说明.md`
+  - `TOOLS.md`
 
 ### PATCH-SUPERVISOR-AUTO-NOTIFY
 
@@ -148,6 +241,21 @@
   - `scripts/test-frontstage-recovery-watch.py`
   - `tools/openclaw-frontstage-recovery/README.md`
   - `~/.local/state/openclaw/frontstage-recovery/`
+
+### PATCH-WINDOWS-GATEWAY-BATTERY-POLICY
+
+- **结果目标**：修复掌机（Windows）上原生 `OpenClaw Gateway` 计划任务在电池模式下“禁止启动 / 切到电池自动停止”的设置，避免拔电后因为任务计划策略把 OpenClaw 直接停掉。
+- **当前实现**：`scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.ps1` + `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.cmd`
+- **自动触发**：当前依赖手工修复入口，不默认自动重打
+- **适用范围**：掌机（Windows）
+- **升级风险点**：Windows 计划任务 XML 结构变化；任务名 `OpenClaw Gateway` 变化；系统权限或 `schtasks` 行为变化
+- **失效判断**：计划任务重新出现 `DisallowStartIfOnBatteries=True` 或 `StopIfGoingOnBatteries=True`；拔电后 OpenClaw 因任务计划限制被停掉
+- **最小验收**：运行 `powershell -ExecutionPolicy Bypass -File .\scripts\repair-openclaw-gateway-battery-policy-zhangji-windows.ps1` 后，应能看到 `DisallowStartIfOnBatteries = false`、`StopIfGoingOnBatteries = false`
+- **维护落点**：
+  - `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.ps1`
+  - `scripts/repair-openclaw-gateway-battery-policy-zhangji-windows.cmd`
+  - `docs/掌机-Windows-OpenClaw-维护说明.md`
+  - `TOOLS.md`
 
 ### PATCH-NVIDIA-AUDIO-GATEWAY-BRIDGE
 

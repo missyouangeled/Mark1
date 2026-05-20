@@ -48,6 +48,13 @@ Things like:
   - 常用命令：`python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
   - 启动行为：当前 `BOOT.md` 已改成启动时先跑这支脚本；若版本未变，只发普通上线消息；若版本变化，则先做升级后自检，再带结果上线
   - 状态目录：`~/.local/state/openclaw/post-upgrade-self-check/`
+- 变更流水文档：`docs/通用-OpenClaw-补丁变更流水.md`
+- 非正式修改备忘录：`docs/通用-OpenClaw-非正式修改备忘录.md`
+- 变更流水脚本：`scripts/openclaw-change-log.py`
+  - 用途：每次做完修改/修补后，把“这次实际改了什么”按时间追加到变更流水里；若是未进入正式补丁体系的临时/手工/外部修改，也可直接追加到非正式修改备忘录
+  - 推荐命令（变更流水）：`python3 scripts/openclaw-change-log.py capture --title '本次改动标题' --kind patch --scope 通用 --summary '一句结果摘要' --verify '最小验收结果' --registry-status 已更新 --rebuild-status 已更新 --selfcheck-status 不适用 --file path/to/file`
+  - 推荐命令（非正式修改备忘录）：`python3 scripts/openclaw-change-log.py memo --title '本次备忘录标题' --kind manual-fix --scope 通用 --current-status 备查 --reason '为何未纳入正式补丁' --recovery '后续排查提示' --file path/to/file`
+  - 说明：正式补丁除了写流水，还要同步更新补丁注册表 / 重建清单 / 必要时更新升级后自检清单；非正式但重要的修改还应补进非正式修改备忘录
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
 - WebChat / Control UI 直聊里的轻量后台分身，不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话；默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
 - 本地健康诊断层（公司 / Linux 机器）：
