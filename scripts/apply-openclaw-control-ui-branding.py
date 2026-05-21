@@ -442,6 +442,7 @@ def write_override_script(
         flex-direction: column;
         align-items: flex-end;
         gap: 10px;
+        pointer-events: none;
       }}
       #${{HEALTH_DOCK_ID}}[data-expanded="false"] .jarvis-health-dock__panel {{
         display: none;
@@ -465,6 +466,7 @@ def write_override_script(
         cursor: pointer;
         font-size: 12px;
         font-weight: 700;
+        pointer-events: auto;
       }}
       #${{HEALTH_DOCK_ID}} .jarvis-health-dock__fab-label {{
         letter-spacing: 0.02em;
@@ -515,6 +517,7 @@ def write_override_script(
         display: flex;
         flex-direction: column;
         gap: 8px;
+        pointer-events: auto;
       }}
       #${{HEALTH_DOCK_ID}} .jarvis-health-dock__top {{
         display: flex;
@@ -1029,8 +1032,11 @@ def write_override_script(
       if (document.title !== BRAND.windowTitle) document.title = BRAND.windowTitle;
 
       document.querySelectorAll('link[rel="icon"]').forEach((link) => {{
-        setAttr(link, 'href', BRAND.faviconHref);
-        setAttr(link, 'type', 'image/png');
+        const href = BRAND.faviconHref || '';
+        setAttr(link, 'href', href);
+        if (href && /\\.svg(\\?|$)/.test(href)) {{
+          setAttr(link, 'type', 'image/svg+xml');
+        }}
       }});
 
       document.querySelectorAll('link[rel="apple-touch-icon"]').forEach((link) => {{
@@ -1127,7 +1133,16 @@ def main() -> int:
     user_avatar_source = resolve_source(str(user_avatar_source_value)) if user_avatar_source_value else None
     runtime_logo_file = str(assets.get("runtimeLogoFile") or f"jarvis-brand{logo_source.suffix.lower() or '.png'}")
     favicon_file = str(assets.get("favicon32File") or "favicon-32.png")
+    favicon_16_file = str(assets.get("favicon16File") or "favicon-16.png")
+    favicon_svg_file = str(assets.get("faviconSvgFile") or "favicon.svg")
+    favicon_ico_file = str(assets.get("faviconIcoFile") or "favicon.ico")
     apple_touch_file = str(assets.get("appleTouchIconFile") or "apple-touch-icon.png")
+
+    favicon_32_source_value = assets.get("favicon32Source")
+    favicon_16_source_value = assets.get("favicon16Source")
+    favicon_svg_source_value = assets.get("faviconSvgSource")
+    favicon_ico_source_value = assets.get("faviconIcoSource")
+    apple_touch_source_value = assets.get("appleTouchIconSource")
     infos_handle_base_url = str(control_ui.get("infosHandleBaseUrl") or "http://127.0.0.1:18790")
     infos_handle_summary_href = resolve_runtime_href(
         infos_handle_base_url,
@@ -1154,8 +1169,30 @@ def main() -> int:
 
     runtime_logo_path = dist_root / runtime_logo_file
     shutil.copyfile(logo_source, runtime_logo_path)
-    shutil.copyfile(logo_source, dist_root / favicon_file)
-    shutil.copyfile(logo_source, dist_root / apple_touch_file)
+
+    if favicon_32_source_value:
+        favicon_32_source = resolve_source(favicon_32_source_value)
+        shutil.copyfile(favicon_32_source, dist_root / favicon_file)
+    else:
+        shutil.copyfile(logo_source, dist_root / favicon_file)
+
+    if favicon_16_source_value:
+        favicon_16_source = resolve_source(favicon_16_source_value)
+        shutil.copyfile(favicon_16_source, dist_root / favicon_16_file)
+
+    if favicon_svg_source_value:
+        favicon_svg_source = resolve_source(favicon_svg_source_value)
+        shutil.copyfile(favicon_svg_source, dist_root / favicon_svg_file)
+
+    if favicon_ico_source_value:
+        favicon_ico_source = resolve_source(favicon_ico_source_value)
+        shutil.copyfile(favicon_ico_source, dist_root / favicon_ico_file)
+
+    if apple_touch_source_value:
+        apple_touch_source = resolve_source(apple_touch_source_value)
+        shutil.copyfile(apple_touch_source, dist_root / apple_touch_file)
+    else:
+        shutil.copyfile(logo_source, dist_root / apple_touch_file)
 
     index_html_path = dist_root / "index.html"
     html = index_html_path.read_text(encoding="utf-8")

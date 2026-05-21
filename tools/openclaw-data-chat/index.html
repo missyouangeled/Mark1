@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>贾维斯</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;
+    --text:#c9d1d9;--text2:#8b949e;--accent:#58a6ff;
+    --radius:8px
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column}
+
+  /* header — minimal */
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);
+    padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .header .dot{width:7px;height:7px;border-radius:50%;background:#3fb950;box-shadow:0 0 4px #3fb950}
+  .header span{font-size:13px;font-weight:600;letter-spacing:-0.2px}
+  .model-select{font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 6px;cursor:pointer;outline:none;font-family:inherit;margin-left:auto;max-width:160px}
+.model-select:focus{border-color:var(--accent)}
+.model-select option{background:var(--bg2);color:var(--text);font-size:12px}
+
+  /* chat */
+  .chat-wrap{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+  .msg{display:flex;flex-direction:column;max-width:88%;animation:in .2s ease}
+  @keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  .msg.user{align-self:flex-end}
+  .msg.agent{align-self:flex-start}
+  .msg .bubble{padding:10px 14px;border-radius:var(--radius);font-size:13.5px;line-height:1.6;
+    word-break:break-word}
+  .msg.user .bubble{background:#1f6feb22;border:1px solid #1f6feb33}
+  .msg.agent .bubble{background:#161b22;border:1px solid var(--border)}
+  .msg .time{font-size:10px;color:var(--text2);margin-top:2px;padding:0 4px}
+  .msg.user .time{text-align:right}
+
+  /* inline elements */
+  .bubble img,.bubble video{max-width:100%;max-height:320px;border-radius:6px;margin:6px 0;display:block}
+  .bubble audio{width:100%;margin:6px 0;outline:none}
+  .bubble code{font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px}
+  .bubble pre{background:var(--bg);border:1px solid var(--border);border-radius:4px;
+    padding:8px 10px;overflow-x:auto;font-size:12px;line-height:1.4;margin:6px 0}
+
+  .loading .bubble{opacity:.5}
+
+  /* input */
+  .input-bar{background:var(--bg2);border-top:1px solid var(--border);
+    padding:8px 12px;display:flex;gap:8px;align-items:center;flex-shrink:0}
+  .input-bar input{flex:1;background:var(--bg);border:1px solid var(--border);
+    border-radius:var(--radius);padding:9px 12px;font-size:14px;color:var(--text);
+    font-family:inherit;outline:none;transition:border-color .15s}
+  .input-bar input:focus{border-color:var(--accent)}
+  .input-bar input::placeholder{color:var(--text2)}
+  .input-bar button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+    font-family:inherit;white-space:nowrap}
+  .input-bar button:hover{filter:brightness(1.15)}
+  .input-bar button:active{transform:scale(.96)}
+  .input-bar button:disabled{opacity:.4;cursor:default}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="dot"></div>
+    <span>贾维斯</span>
+    <select id="modelSelect" class="model-select">
+      <option value="deepseek/deepseek-chat">DeepSeek V4</option>
+      <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>
+      <option value="nvidia/z-ai/glm-5.1">GLM-5.1</option>
+      <option value="github-copilot/gpt-5.4">GPT-5.4</option>
+      <option value="google/gemma-4-31b-it">Gemma 4 31B</option>
+      <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
+      <option value="nvidia/nemotron-3-super-120b-a12b">Nemotron 120B</option>
+    </select>
+  </div>
+
+  <div class="chat-wrap" id="chatWrap">
+    <div class="msg agent">
+      <div class="bubble">你好，我在。需要什么？</div>
+      <div class="time">--</div>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <input type="text" id="msgInput" placeholder="说点什么..."
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}">
+    <button onclick="sendMsg()" id="sendBtn">发送</button>
+  </div>
+
+<script>
+const HISTORY = [];
+
+function scrollBottom(){
+  const w = document.getElementById('chatWrap');
+  requestAnimationFrame(() => { w.scrollTop = w.scrollHeight; });
+}
+
+function timeNow(){
+  return new Date().toLocaleTimeString('zh-CN',{hour12:false});
+}
+
+function esc(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function addMsg(role, html, time){
+  const wrap = document.getElementById('chatWrap');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = '<div class="bubble">' + html + '</div><div class="time">' + (time||timeNow()) + '</div>';
+  wrap.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addLoading(){
+  const div = addMsg('agent', '⏳');
+  div.classList.add('loading');
+  return div;
+}
+
+function renderContent(text){
+  // Escape HTML first
+  let html = esc(text);
+  // **bold**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // *italic*
+  html = html.replace(/\*(.+?)\*/g, '<i>$1</i>');
+  // `code`
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Newlines
+  html = html.replace(/\n/g, '<br>');
+  // Detect MEDIA: references — map workspace paths to /media/ proxy
+  html = html.replace(/MEDIA:(\S+)/g, (m, path) => {
+    // resolve workspace-relative paths to /media/ proxy
+    let url = path;
+    if (url.startsWith('/media/')) {
+      // already proxied
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      // absolute URL, use as-is
+    } else {
+      // workspace-relative → /media/ proxy
+      url = '/media/' + url.replace(/^\.?\/?/, '');
+    }
+    if (/\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url)){
+      return '<img src="'+url+'" alt="image" loading="lazy">';
+    }
+    if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(url)){
+      return '<audio controls src="'+url+'"></audio>';
+    }
+    if (/\.(mp4|webm|mov)(\?.*)?$/i.test(url)){
+      return '<video controls src="'+url+'" style="max-width:100%;max-height:240px"></video>';
+    }
+    return '<a href="'+url+'" target="_blank">📎 '+path+'</a>';
+  });
+  // Detect markdown images ![alt](url) — route relative paths through /media/
+  html = html.replace(/!\[([^\]]*)\]\((\S+)\)/g, (m, alt, url) => {
+    if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('/media/')) {
+      url = '/media/' + url.replace(/^\.?\/?/, '');
+    }
+    return '<img src="'+url+'" alt="'+alt+'" loading="lazy">';
+  });
+  // Detect bare image URLs on their own line
+  html = html.replace(/(?:^|<br>)(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp)(?:\?\S+)?)(?:<br>|$)/gi,
+    '<br><img src="$1" loading="lazy"><br>');
+  return html;
+}
+
+async function sendMsg(){
+  const inp = document.getElementById('msgInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  inp.focus();
+
+  addMsg('user', esc(text));
+
+  const loadDiv = addLoading();
+  const sendBtn = document.getElementById('sendBtn');
+  sendBtn.disabled = true;
+
+  HISTORY.push({role:'user', content:text});
+
+  try {
+    const resp = await fetch('/api/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-OpenClaw-Model': document.getElementById('modelSelect').value,
+      },
+      body: JSON.stringify({
+        model: 'openclaw',
+        messages: [
+          {role:'system', content:'你是贾维斯，中文 AI 助手。\n\n关键规则：当用户要求图片/声音/视频时，你必须调用工具实际生成，并在回复正文中用 MEDIA: 格式给出文件路径。\n\n示例：\n用户："生成一张猫的图片"\n你的回复："好的，给你一只猫~\\n\\nMEDIA:tmp/nvidia-image-test/cat.jpg"\n\n图片路径必须以 MEDIA: 开头，后面跟相对于工作区根目录的路径。MEDIA: 必须出现在回复正文里，不能省略。生成后文件默认放在 tmp/nvidia-image-test/ 下。\n\n回复简洁自然，用中文。'},
+          ...HISTORY.slice(-20)
+        ],
+        max_tokens: 3000,
+      })
+    });
+
+    const data = await resp.json();
+    loadDiv.remove();
+
+    if (data.choices && data.choices[0]){
+      const reply = data.choices[0].message?.content || '';
+      console.log('[data-chat] 模型回复:', reply.substring(0,200));
+      HISTORY.push({role:'assistant', content:reply});
+      if (HISTORY.length > 40) HISTORY.splice(0, HISTORY.length - 40);
+
+      addMsg('agent', renderContent(reply));
+    } else if (data.error){
+      addMsg('agent', '⚠️ ' + esc(JSON.stringify(data.error)));
+    } else {
+      addMsg('agent', '⚠️ 未收到有效回复');
+    }
+  } catch(e){
+    loadDiv.remove();
+    addMsg('agent', '❌ 请求失败: ' + esc(e.message));
+  }
+
+  sendBtn.disabled = false;
+}
+
+document.getElementById('msgInput').focus();
+</script>
+</body>
+</html>

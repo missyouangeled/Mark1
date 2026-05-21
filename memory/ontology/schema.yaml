@@ -1,0 +1,59 @@
+types:
+  Person:
+    required: [name]
+    properties:
+      name: string
+      alias: string
+      relationship: string
+      notes: string
+
+  Device:
+    required: [name, type]
+    properties:
+      name: string
+      type: string
+      os: string
+      location: string
+      identifiers: list
+
+  Project:
+    required: [name]
+    properties:
+      name: string
+      status: string
+      description: string
+
+  Skill:
+    required: [name]
+    properties:
+      name: string
+      description: string
+      path: string
+
+  Event:
+    required: [title]
+    properties:
+      title: string
+      description: string
+      date: string
+
+relations:
+  knows:
+    from_types: [Person]
+    to_types: [Person]
+    cardinality: many_to_many
+
+  introduced:
+    from_types: [Person]
+    to_types: [Person, Person]
+    cardinality: many_to_many
+
+  belongs_to:
+    from_types: [Device, Skill, Project]
+    to_types: [Person, Device]
+    cardinality: many_to_one
+
+  uses:
+    from_types: [Person]
+    to_types: [Device]
+    cardinality: many_to_many

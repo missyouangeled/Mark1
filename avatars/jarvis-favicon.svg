@@ -1,0 +1,26 @@
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="jarvis-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="jarvis-core-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="60" cy="60" r="54" stroke="url(#jarvis-ring-grad)" stroke-width="4" fill="none" opacity="0.9"/>
+  <!-- Middle ring -->
+  <circle cx="60" cy="60" r="44" stroke="url(#jarvis-ring-grad)" stroke-width="2.5" fill="none" opacity="0.7"/>
+  <!-- Inner ring -->
+  <circle cx="60" cy="60" r="32" stroke="url(#jarvis-ring-grad)" stroke-width="2" fill="none" opacity="0.5"/>
+  <!-- Center circle -->
+  <circle cx="60" cy="60" r="18" fill="url(#jarvis-core-grad)" opacity="0.9"/>
+  <!-- Inner dot -->
+  <circle cx="60" cy="60" r="6" fill="#050810"/>
+  <!-- Arc decorations -->
+  <path d="M22 60 A38 38 0 0 1 98 60" stroke="#60a5fa" stroke-width="1.5" fill="none" opacity="0.4" stroke-dasharray="8 6"/>
+  <path d="M30 60 A30 30 0 0 0 90 60" stroke="#60a5fa" stroke-width="1" fill="none" opacity="0.3" stroke-dasharray="5 5"/>
+</svg>

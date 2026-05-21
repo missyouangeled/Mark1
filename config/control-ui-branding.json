@@ -15,7 +15,15 @@
     "logoSource": "avatars/jarvis-neon-20260507.png",
     "chatUserAvatarSource": "avatars/jarvis-chat-user-20260515.png",
     "runtimeLogoFile": "jarvis-brand.png",
+    "favicon32Source": "avatars/favicon-32.png",
+    "favicon16Source": "avatars/favicon-16.png",
+    "faviconSvgSource": "avatars/jarvis-favicon.svg",
+    "faviconIcoSource": "avatars/favicon.ico",
     "favicon32File": "favicon-32.png",
+    "favicon16File": "favicon-16.png",
+    "faviconSvgFile": "favicon.svg",
+    "faviconIcoFile": "favicon.ico",
+    "appleTouchIconSource": "avatars/apple-touch-icon.png",
     "appleTouchIconFile": "apple-touch-icon.png"
   },
   "controlUi": {

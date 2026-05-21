@@ -92,3 +92,31 @@
 - `docs/通用-OpenClaw-非正式修改备忘录.md`
 - `memory/daily/2026-05-20.md`
 - `scripts/openclaw-change-log.py`
+
+## 2026-05-21 10:12:53 CST (+08:00) — Control UI 模型选择下拉修复
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修复 Control UI 中模型选择下拉列表选择后不生效的问题。在 branding override 中新增 WebSocket 拦截 + capture 阶段事件监听，确保 change/input 事件能直接触发 sessions.patch。
+- 验收 / 验证：
+- JS 语法验证通过；branding re-apply 成功；Gateway 日志会话正常
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-05-21 13:28:35 CST (+08:00) — 修复 Control UI 模型选择器因品牌覆盖JS劫持导致不工作
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 从 jarvis-branding-override.js 及其生成脚本 apply-openclaw-control-ui-branding.py 中移除模型选择器劫持代码（~59行），该代码在 capture 阶段重复拦截 change/input 事件，与 Control UI 自带的模型切换处理冲突导致下拉列表切换失效，严重时触发页面刷新。
+- 验收 / 验证：
+- agent-browser 验证：下拉列表可展开、模型可正常切换、无页面刷新。JS/Python 语法检查通过。
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`

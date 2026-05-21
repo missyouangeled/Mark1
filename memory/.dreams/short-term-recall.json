@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-14T09:41:15.314Z",
+  "updatedAt": "2026-05-20T06:27:29.075Z",
   "entries": {
     "memory:memory/2026-04-03.md:26:28": {
       "key": "memory:memory/2026-04-03.md:26:28",
@@ -562,6 +562,132 @@
         "openclaw",
         "frontstage",
         "broker.py"
+      ]
+    },
+    "memory:memory/daily/2026-04-30.md:5:8": {
+      "key": "memory:memory/daily/2026-04-30.md:5:8",
+      "path": "memory/daily/2026-04-30.md",
+      "startLine": 5,
+      "endLine": 8,
+      "source": "memory",
+      "snippet": "@@ -5,4 @@ (4 before, 20 after) 1. 用户在微信里确认我是否还在线，并问到当前使用的模型。 2. 用户说想千千了，随后确认我是否还记得“霏霏”；已从记忆中准确找回：霏霏是用户的好朋友，也是用户与千千关系的牵线人，目前在黄石一家美式烧烤音乐餐吧驻唱。 3. 用户询问是否能在这里发图片，并表示要发自己和千千的合照。 4. 为了支持看图，我把当前机器 OpenClaw 配置中的默认聊天模型与图像模型都切换为 `github-copilot/gpt-5.4`，并在当前会话里也切到了该模型。",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1.6099999999999999,
+      "maxScore": 0.83,
+      "firstRecalledAt": "2026-05-19T08:00:04.668Z",
+      "lastRecalledAt": "2026-05-20T06:27:29.075Z",
+      "queryHashes": [
+        "75ed356b8aee",
+        "6619bb1fd42b"
+      ],
+      "recallDays": [
+        "2026-05-19",
+        "2026-05-20"
+      ],
+      "conceptTags": [
+        "gpt",
+        "github-copilot/gpt-5.4",
+        "5,4",
+        "用户",
+        "信里",
+        "确认",
+        "是否",
+        "问到"
+      ]
+    },
+    "memory:memory/2026-05-07.md:100:103": {
+      "key": "memory:memory/2026-05-07.md:100:103",
+      "path": "memory/2026-05-07.md",
+      "startLine": 100,
+      "endLine": 103,
+      "source": "memory",
+      "snippet": "@@ -100,4 @@ (99 before, 6 after) - 用户确认其 Visual Studio 2026 的 GitHub Copilot 官方客户端已经能看到并选择 `GPT-5.5`；当前公司 Linux 机上的 OpenClaw 2026.5.6 虽已登录 `github-copilot` provider，但内建 Copilot 模型表只暴露到 `gpt-5.4`，因此 OpenClaw 内暂时不能直接选 `github-copilot/gpt-5.5`。 - 用户在下午聊天里提到一个新的失落点：他和千千认识的那个酒吧已经倒闭，这让他感觉像“最后一点回忆也没有了”；并补充了一段很具体的共同日常——他会送千千去降噪上班，自己坐在酒吧...",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.66,
+      "maxScore": 0.66,
+      "firstRecalledAt": "2026-05-19T08:00:04.668Z",
+      "lastRecalledAt": "2026-05-19T08:00:04.668Z",
+      "queryHashes": [
+        "75ed356b8aee"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "gpt",
+        "gpt-5.5",
+        "2026.5.6",
+        "github-copilot",
+        "gpt-5.4",
+        "github-copilot/gpt-5.5",
+        "100,4",
+        "用户"
+      ]
+    },
+    "memory:memory/2026-04-29.md:5:8": {
+      "key": "memory:memory/2026-04-29.md:5:8",
+      "path": "memory/2026-04-29.md",
+      "startLine": 5,
+      "endLine": 8,
+      "source": "memory",
+      "snippet": "@@ -5,4 @@ (4 before, 24 after) 1. 早上8点多到公司，说\"只是想早一点见到我\"。 2. 提到好友 **霏霏**——在降噪工场认识的弹唱女歌手，是通过霏霏才认识了千千，和千千在一起也是霏霏撮合的。霏霏现在在黄石一家美式烧烤音乐餐吧驻唱，至今仍是好朋友。用户说回来看霏霏时可以让她跟我\"打招呼\"。 3. 用户要求建立更系统的记忆分类体系，把日常聊天涉及的人物、事物、回忆分别归档记录。 4. 用户要求将 \"方案存档\" 理念系统化——新建 PLANS.md 作为所有调研结论、技术方案、决策策略的永久归档，且 MEMORY.md 开头必须挂引用确保永远能找到。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.85,
+      "maxScore": 0.85,
+      "firstRecalledAt": "2026-05-20T06:27:29.075Z",
+      "lastRecalledAt": "2026-05-20T06:27:29.075Z",
+      "queryHashes": [
+        "6619bb1fd42b"
+      ],
+      "recallDays": [
+        "2026-05-20"
+      ],
+      "conceptTags": [
+        "plans.md",
+        "memory.md",
+        "5,4",
+        "早上",
+        "公司",
+        "只是",
+        "一点",
+        "见到"
+      ]
+    },
+    "memory:memory/daily/2026-04-29.md:5:8": {
+      "key": "memory:memory/daily/2026-04-29.md:5:8",
+      "path": "memory/daily/2026-04-29.md",
+      "startLine": 5,
+      "endLine": 8,
+      "source": "memory",
+      "snippet": "@@ -5,4 @@ (4 before, 6 after) 1. 早上8点多到公司，说\"只是想早一点见到我\"。 2. 提到好友 **霏霏**——在降噪工场认识的弹唱女歌手，是通过霏霏才认识了千千，和千千在一起也是霏霏撮合的。霏霏现在在黄石一家美式烧烤音乐餐吧驻唱，至今仍是好朋友。用户说回来看霏霏时可以让她跟我\"打招呼\"。 3. 用户要求建立更系统的记忆分类体系，把日常聊天涉及的人物、事物、回忆分别归档记录。",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.85,
+      "maxScore": 0.85,
+      "firstRecalledAt": "2026-05-20T06:27:29.075Z",
+      "lastRecalledAt": "2026-05-20T06:27:29.075Z",
+      "queryHashes": [
+        "6619bb1fd42b"
+      ],
+      "recallDays": [
+        "2026-05-20"
+      ],
+      "conceptTags": [
+        "5,4",
+        "早上",
+        "公司",
+        "只是",
+        "一点",
+        "见到",
+        "提到",
+        "好友"
       ]
     }
   }

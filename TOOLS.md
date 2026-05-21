@@ -31,6 +31,11 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+## 权限规则
+
+- 适用机器：公司（Linux）
+- 本机默认拥有最高权限，无需逐次确认；涉及连接到其他设备操作时，再询问权限。
+
 ## Local Setup Notes
 
 ### OpenClaw automation
