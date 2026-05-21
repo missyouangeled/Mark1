@@ -271,6 +271,19 @@
   - `tools/nvidia-audio-bridge/README.md`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
 
+### PATCH-LANGUAGE-LOCK
+
+- **结果目标**：无论主会话切换什么模型（DeepSeek / GLM / Kimi / NVIDIA 等），所有回复必须锁定为中文，不出现英文回复。
+- **当前实现**：`SOUL.md` 顶部双语硬约束段落 + 底部精简引用
+- **自动触发**：每次会话启动时 SOUL.md 作为 system prompt 注入，无需额外触发
+- **适用范围**：通用
+- **升级风险点**：如果 OpenClaw 更改 system prompt 组装方式或 contextInjection 行为，顶部规则仍会随 SOUL.md 注入
+- **失效判断**：切换模型后出现英文回复即视为失效；检查 SOUL.md 第一段是否仍为双语语言锁定规则
+- **最小验收**：用至少两种不同模型各发一条中文问题，验证回复均为中文
+- **维护落点**：
+  - `SOUL.md`（顶部段落 + 底部引用）
+  - 若 OpenClaw 后续提供 `systemPromptOverride` 或预处理 hook，可进一步加固
+
 ---
 
 ## 当前使用规则

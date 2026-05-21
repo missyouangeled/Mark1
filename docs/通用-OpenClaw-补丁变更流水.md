@@ -120,3 +120,31 @@
 - agent-browser 验证：下拉列表可展开、模型可正常切换、无页面刷新。JS/Python 语法检查通过。
 - 相关文件：
 - `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-05-21 15:33:39 CST (+08:00) — Control UI favicon 替换为 J.A.R.V.I.S. 蓝色环形 logo
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- Firefox 快捷方式图标从红色龙虾换为 J.A.R.V.I.S. 蓝色同心圆: 新增 SVG favicon, 正确尺寸 PNG/ICO, 更新品牌化脚本覆盖所有 favicon 格式
+- 验收 / 验证：
+- favicon.svg/favicon-32.png/favicon.ico 已正确部署到 dist/control-ui/, 脚本无 SyntaxWarning, Firefox 清除缓存后应显示新图标
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-05-21 17:42:53 CST (+08:00) — SOUL.md 语言锁定规则前移加强 — 双语硬约束防止模型切换后回复英文
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 把语言强制规则从 SOUL.md 底部移至文件顶部（第一个可见段落），做成中英双语硬约束，并在底部精简为引用顶部规则。防止切换模型（DeepSeek/GLM/Kimi/NVIDIA等）后部分模型忽略底部指令而输出英文。
+- 验收 / 验证：
+- SOUL.md 第一段即为中英双语语言锁定规则；原底部规则已改为引用顶部
+- 相关文件：
+- `SOUL.md`

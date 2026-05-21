@@ -13,6 +13,10 @@ Things like:
 - Device nicknames
 - Anything environment-specific
 
+## 有用参考 / 书签
+
+- **免费 API 目录**: https://github.com/public-apis/public-apis — 社区维护的公开 API 清单，含天气/金融/地理/动物等数百个免费 API，按分类排列，标注是否需要 key、是否支持 HTTPS/CORS。43 万 star，MIT 协议，安全可靠。
+
 ## Examples
 
 ```markdown

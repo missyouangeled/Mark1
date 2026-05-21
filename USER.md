@@ -5,6 +5,7 @@ _Learn about the person you're helping. Update this as you go._
 - **Name:** 袁文涛
 - **What to call them:** 点点（网名：子时点点）
 - **Pronouns:** 他
+- **Birthday:** 1991年11月29日
 - **Timezone:** Asia/Shanghai (UTC+8)
 - **Notes:** 习惯用"点点"自称，日常聊天中优先以此称呼
 
