@@ -14,7 +14,7 @@ Before doing anything else:
 2. Read `USER.md` — this is who you're helping
 3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
 4. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
-5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
+5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context; also read `memory/daily/YYYY-MM-DD-transcript.md` (today) — this is the auto-aggregated unified daily transcript from ALL models, so you know what happened today regardless of which model the user was using
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
 

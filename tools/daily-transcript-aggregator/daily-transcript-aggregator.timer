@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw daily transcript aggregator timer – run every 5 minutes
+After=network.target
+
+[Timer]
+OnBootSec=120s
+OnUnitActiveSec=300s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

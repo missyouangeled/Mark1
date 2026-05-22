@@ -286,6 +286,34 @@ systemctl --user show openclaw-resume-watch.service -p Result -p ExecMainStatus 
 systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState
 ```
 
+### 3.5 daily-transcript-aggregator
+
+检查：
+
+- `scripts/aggregate-daily-transcript.py`
+- `tools/daily-transcript-aggregator/daily-transcript-aggregator.service`
+- `tools/daily-transcript-aggregator/daily-transcript-aggregator.timer`
+- `~/.config/systemd/user/daily-transcript-aggregator.service`
+- `~/.config/systemd/user/daily-transcript-aggregator.timer`
+
+动作：
+
+```bash
+cp tools/daily-transcript-aggregator/daily-transcript-aggregator.service ~/.config/systemd/user/
+cp tools/daily-transcript-aggregator/daily-transcript-aggregator.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now daily-transcript-aggregator.timer
+systemctl --user start daily-transcript-aggregator.service
+```
+
+验收：
+
+```bash
+systemctl --user show daily-transcript-aggregator.service -p Result -p ExecMainStatus -p ActiveState -p SubState
+systemctl --user show daily-transcript-aggregator.timer -p UnitFileState -p ActiveState -p SubState
+python3 scripts/aggregate-daily-transcript.py --print | head -20
+```
+
 ---
 
 ## 4. 最后恢复机器专用高级补丁

@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenClaw daily transcript aggregator – one-shot collection of all today's sessions
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/aggregate-daily-transcript.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=daily-transcript-aggregator
+
+[Install]
+WantedBy=default.target

@@ -162,3 +162,17 @@
 - AGENTS.md 启动序列含第7步、HANDOFF.md 顶部含 SKILL_CATALOG.md 索引、SKILL_CATALOG.md 内容完整
 - 相关文件：
 - `SKILL_CATALOG.md`
+
+## 2026-05-22 08:20:30 CST (+08:00) — 新增统一日报采集层（跨模型对话记录聚合）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 scripts/aggregate-daily-transcript.py + systemd timer（每5分钟），自动扫描所有模型的当天 session JSONL，汇集成 memory/daily/YYYY-MM-DD-transcript.md；AGENTS.md 第5步扩展为同时读取统一日报，换模型后不再丢失当天对话上下文
+- 验收 / 验证：
+- timer enabled+active，script 首跑成功（27条消息），transcript.md 已生成，journalctl 日志正常
+- 相关文件：
+- `scripts/aggregate-daily-transcript.py`
