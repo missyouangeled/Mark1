@@ -169,14 +169,123 @@
 
 ---
 
-## 与监工系统的关系
+## 🎯 监工系统 × 方法论：完整配合机制
 
-本方法论与现有监工/分身体系**互补不冲突**：
+### 架构概览
 
-- **监工服务**（`main-supervisor-lite`）：全局兜底，复杂工程必须在线
-- **本方法论**：给出"在监工注视下，每个任务如何执行"的纪律
-- **任务分身**：按照本方法论的两级审查来质量把关
-- **3 分钟回报**：监工链路兜底，方法论正常执行时不会触发
+```
+┌──────────────────────────────────────────────────────┐
+│                    监工服务 (底座)                      │
+│  scripts/openclaw-supervisor-status.py                │
+│  策略: auto|force_on|force_off + taskActive=true|false │
+│  职责: 全局状态追踪 · 3 分钟回报 · 异常检测             │
+└──────────────┬───────────────────────────────────────┘
+               │ 盯住 ↓
+┌──────────────┴──────────────┬────────────────────────┐
+│  方法论：五阶段执行纪律        │  main-supervisor-lite   │
+│  脑暴 → 拆解 → 执行 → 验证 → 收尾 │  按需拉起 · 补位协作      │
+│  每阶段有硬规则、有输入输出标准   │  兜底回报 · 异常接管      │
+└─────────────────────────────┴────────────────────────┘
+```
+
+两套体系的分工：
+- **方法论** = 做事纪律（怎么把活干好）
+- **监工服务** = 安全网（活干得对不对、人找不找得到）
+- **监工分身** = 桥梁（真需要插播/协作时补位，平常不占资源）
+
+---
+
+### 五阶段 × 监工行为联动表
+
+| 阶段 | 监工服务状态 | 监工分身 | 此行此刻监工在做什么 |
+|------|-------------|---------|-------------------|
+| ① 脑暴设计 | `auto + taskActive=true` | 可不拉 | 记录"进入脑暴"，若设计讨论超 3 分钟未进展→补一句提示 |
+| ② 任务拆解 | `auto + taskActive=true` | 可不拉 | 等待计划产出；若拆解超时→询问是否卡住 |
+| ③ 分身执行 | `auto + taskActive=true` | **必须拉**（有普通分身时） | 盯每个分身状态：DONE→正常 / BLOCKED→接管报告 / 空返回→告警 |
+| ④ 验证闭环 | `auto + taskActive=true` | 保留在位 | 见证验证结果；若验证命令跑崩→补报异常 |
+| ⑤ 收尾清理 | 完成后切回 `auto + taskActive=false` | 关闭（无后台任务 10 分钟后） | 确认分身关闭、git 已推送、变更流水已写 → 自身退回待命 |
+
+---
+
+### 阶段 ③ 细节：分身执行期监工如何配合
+
+这是方法论和监工配合最紧密的阶段：
+
+```
+派发任务分身 (sessions_spawn)
+      │
+      ▼
+监工: 记录 activeRun, taskActive=true ✅
+      │
+      ├─ 分身正常执行中...
+      │    └─ 监工: 每 3 分钟检查一次，有进度→静默 / 无进度→补: "任务仍在执行，当前阶段: xxx"
+      │
+      ├─ 分身返回 DONE
+      │    └─ 监工: 记录完成，等待主会话启动两级审查
+      │
+      ├─ 分身返回 BLOCKED
+      │    └─ 监工: 立刻向主会话报告 "任务 xxx 阻塞，原因: ..."
+      │         主会话介入：补充上下文 / 换模型 / 拆更小任务 / 改计划
+      │
+      ├─ 分身空返回 / 异常退出
+      │    └─ 监工: 立刻向主会话报告 "⚠️ 任务 xxx 异常结束（空返回/超时/被杀）"
+      │         主会话接管：检查日志 → 决定重试 or 手动修复
+      │
+      └─ 两级审查未通过
+           └─ 监工: 记录审查结果，等待重修
+                重修后重新审查 → 通过 → 标记任务完成
+```
+
+**关键规则**：
+- 只要存在普通任务分身且有前台协作/插播需要，`main-supervisor-lite` 必须在位
+- 监工发现异常时，**先报告再处理**，不要默默修
+- 正常流程中监工保持静默，不刷屏不打扰
+
+---
+
+### 监工命令速查
+
+```bash
+# 进入复杂工程模式（方法论阶段 ①-⑤ 全程保持）
+python3 scripts/openclaw-supervisor-status.py \
+  --set-policy-mode auto --activate-task \
+  --reason 'methodology-stage-1-brainstorm' --print-human
+
+# 查看当前监工状态
+python3 scripts/openclaw-supervisor-status.py --print-human
+
+# 任务完成，恢复日常模式
+python3 scripts/openclaw-supervisor-status.py \
+  --set-policy-mode auto --deactivate-task \
+  --reason 'methodology-complete' --print-human
+
+# 用户强行开启（最高优先）
+python3 scripts/openclaw-supervisor-status.py \
+  --set-policy-mode force_on --reason 'user-request' --print-human
+
+# 用户强行关闭
+python3 scripts/openclaw-supervisor-status.py \
+  --set-policy-mode force_off --reason 'user-request' --print-human
+```
+
+---
+
+### 阶段边界动作模板
+
+**进入方法论（收到修改诉求后）**：
+1. 短反馈："好的，让我先想想。"
+2. 切监工：`--set-policy-mode auto --activate-task --reason '...'`
+3. 开始脑暴设计
+
+**退出方法论（全部完成后）**：
+1. 验证汇总跑完
+2. git push 成功
+3. 变更流水已写
+4. 清理分身：关闭普通任务分身
+5. 切监工：`--set-policy-mode auto --deactivate-task --reason 'methodology-complete'`
+6. 向用户报告："全部完成。监工已退回待命。"
+
+（监工服务会在 10 分钟无新后台任务后自动从 `taskActive=true` 降回 `false`，不用手动催）
 
 ---
 
@@ -184,14 +293,16 @@
 
 ```
 收到修改诉求 →
+  短反馈 + 切监工(auto+taskActive) →
   先查现有能力 →
   再查冲突边界 →
   脑暴设计（写文档）→
   用户批准 →
   拆任务（写计划）→
-  派分身执行（两审）→
+  拉监工分身(有任务分身时) + 派分身执行（两审）→
   验证闭环（看证据）→
   提交推送 →
   变更流水 →
-  收尾清理
+  关任务分身 → 收尾清理 →
+  切监工(auto+taskInactive)
 ```
