@@ -35,6 +35,7 @@
 | `runninghub` | RunningHub API（222 端点），图/视频/音频/3D/ComfyUI | 需要跑 ComfyUI 工作流、生成视频/3D 等 |
 | `video-frames` | ffmpeg 提取视频帧或短片段 | 需要从视频中截图、提取关键帧时 |
 | `douyin` | 下载抖音视频、获取视频信息 | 下载抖音视频、查看视频标题/作者/数据时 |
+| `canvas-design` | Anthropic 设计哲学→视觉艺术，生成 .png/.pdf 海报/艺术品 | 需要做海报、艺术品、抽象设计、设计感静态图时 |
 
 ---
 

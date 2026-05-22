@@ -176,3 +176,17 @@
 - timer enabled+active，script 首跑成功（27条消息），transcript.md 已生成，journalctl 日志正常
 - 相关文件：
 - `scripts/aggregate-daily-transcript.py`
+
+## 2026-05-22 08:39:16 CST (+08:00) — 新增补丁自动修复脚本 openclaw-patch-repair.py
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 对标 openclaw doctor --fix，14条自定义补丁一键检查+修复，支持 --check/--repair/--force/--dry-run/--target；修完自动复查
+- 验收 / 验证：
+- --check 模式通过：12/14 正常（2条FAIL为预存问题），修复动作注册完整
+- 相关文件：
+- `scripts/openclaw-patch-repair.py`

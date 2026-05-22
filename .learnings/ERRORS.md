@@ -10390,3 +10390,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260522-001] user-reported-error
+
+**Logged**: 2026-05-22T00:36:11.261Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: 这个failed 是失败了吗 还能做吗 Description: This is a screenshot of a corrupted console output with gibberish code. Some portions are in English while others are in non-English languages. The English text reads "Memory flush," and at the bottom, there's a failed attempt …
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:1ced80e5-bf2a-4f40-8a10-a2a5a9181ad0
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
