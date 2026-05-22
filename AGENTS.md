@@ -16,6 +16,7 @@ Before doing anything else:
 4. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
 5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
 
 Don't ask permission. Just do it.
 

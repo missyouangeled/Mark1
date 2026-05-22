@@ -148,3 +148,17 @@
 - SOUL.md 第一段即为中英双语语言锁定规则；原底部规则已改为引用顶部
 - 相关文件：
 - `SOUL.md`
+
+## 2026-05-22 08:06:48 CST (+08:00) — 新增 SKILL_CATALOG.md + 换模型强制阅读机制
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 SKILL_CATALOG.md（30个Skill按7类分组），AGENTS.md 启动序列新增第7步强制阅读，HANDOFF.md 顶部新增换模型第一步索引
+- 验收 / 验证：
+- AGENTS.md 启动序列含第7步、HANDOFF.md 顶部含 SKILL_CATALOG.md 索引、SKILL_CATALOG.md 内容完整
+- 相关文件：
+- `SKILL_CATALOG.md`
