@@ -190,3 +190,73 @@
 - --check 模式通过：12/14 正常（2条FAIL为预存问题），修复动作注册完整
 - 相关文件：
 - `scripts/openclaw-patch-repair.py`
+
+## 2026-05-22 09:18:33 CST (+08:00) — 引入 obra/superpowers 工程方法论
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 将 obra/superpowers 的 brainstorming → writing-plans → subagent-driven-dev → verification → finishing 五阶段流程适配到 OpenClaw，新增 docs/methodology/superpowers-adapted.md，AGENTS.md 修改类任务入口已接入引用
+- 验收 / 验证：
+- 方法论文档可读，AGENTS.md 引用可追溯，git 已推送
+- 相关文件：
+- `docs/methodology/superpowers-adapted.md`
+
+## 2026-05-22 09:22:04 CST (+08:00) — 监工系统 × 方法论深度整合
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 将监工服务/监工分身与 obra/superpowers 五阶段方法论做深度配合：每阶段明确监工行为、阶段③执行期给出四种分支处理流程、附命令速查和阶段边界动作模板
+- 验收 / 验证：
+- 方法论文档可读，五阶段联动表完整，快速参考卡片含监工切换步骤
+- 相关文件：
+- `docs/methodology/superpowers-adapted.md`
+
+## 2026-05-22 09:35:27 CST (+08:00) — 提炼上下文工程精华（context-optimization/degradation/multi-agent）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 从 muratcankoylan/agent-skills-for-context-engineering 提炼三个核心文档：上下文优化（四层策略+结构化压缩）、上下文退化诊断（5种模式+修复）、多Agent架构（三种模式+15x成本+六种失败模式），全部适配OpenClaw现有体系
+- 验收 / 验证：
+- 三份文档可读，AGENTS.md引用已接入，git已推送
+- 相关文件：
+- `docs/methodology/context-optimization.md`
+
+## 2026-05-22 09:42:13 CST (+08:00) — 上下文优化规则细化：加入场景判断标准
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 按用户指示：日常聊天可压缩（保留大意即可）、工作/工程/决策/修改尽量不要压缩、拆分身按现有AGENTS.md场景判定表执行。更新context-optimization.md末尾执行规则节
+- 验收 / 验证：
+- 文档已更新，git已推送
+- 相关文件：
+- `docs/methodology/context-optimization.md`
+
+## 2026-05-22 10:14:28 CST (+08:00) — 方法论审查修复：4严重矛盾+8逻辑漏洞+术语统一
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 对S1-S4四个严重矛盾、Y1-Y8八个逻辑漏洞进行系统性修复：联动表对齐AGENTS.md（监工分身触发条件）、场景切换压缩衔接规则、阈值统一、用户中断处理、两级审查明确主会话执行、分批执行规则、poisoning截断后重跑验证、术语统一等。四份文档交叉引用已补全
+- 验收 / 验证：
+- git已推送，4份文档交叉一致，联动表与AGENTS.md判定表口径统一
+- 相关文件：
+- `docs/methodology/superpowers-adapted.md`
