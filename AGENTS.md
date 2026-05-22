@@ -80,6 +80,8 @@ Don't ask permission. Just do it.
 - `docs/methodology/context-degradation.md` — 上下文退化诊断：5 种失败模式（lost-in-middle / poisoning / distraction / confusion / clash）的识别与修复
 - `docs/methodology/multi-agent-patterns.md` — 多 agent 架构模式：三种架构的成本现实与失败模式，与现有监工系统对照
 
+**当 agent 表现变差时**（反复绕在同一问题上、无视已给信息、频频跑题、输出质量下降）：先按 `context-degradation.md` 的 5 种模式排查根因，再对症修复。
+
 1. **先查现有能力**
    - 先检查当前仓库、现有脚本、已有补丁、配置、systemd/service/timer、文档说明里是否已经有类似功能或半成品入口。
    - 不要一上来就另起一套平行实现。
