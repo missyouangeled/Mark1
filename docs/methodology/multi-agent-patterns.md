@@ -86,7 +86,7 @@ Agent A ↔ Agent B ↔ Agent C ↔ Agent D
 ### 1. Supervisor 瓶颈
 Supervisor 的上下文压力随 worker 数量非线性增长。5+ worker 时，supervisor 花在处理摘要上的 token 比重超过 worker 干活的。
 
-→ **对策**：限制每个 supervisor 的 worker 数在 3-5 个。超过就加第二层 supervisor。
+→ **对策**：限制每个 supervisor 的 worker 数在 3-5 个。超过就加第二层 supervisor 或分批顺序执行（具体分批规则见 `superpowers-adapted.md` 的分批执行规则节）。
 
 ### 2. Sycophantic 共识
 Agent 在辩论模式中倾向于达成"大家都同意"的答案，而非正确的答案。LLM 有天然的趋同偏见。
