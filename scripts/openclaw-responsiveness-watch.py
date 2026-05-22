@@ -37,6 +37,10 @@ WARN_THRESHOLD_S = 30   # 第一次提醒
 CRIT_THRESHOLD_S = 60   # 第二次提醒（更紧急）
 MAX_BACKOFF_S = 300      # 同一条消息最多提醒间隔
 
+# 心跳（系统在线信号）
+HEARTBEAT_IDLE_S = 120   # 上次 assistant 回复后静默超过此时间 → 发心跳
+HEARTBEAT_COOLDOWN_S = 600  # 两次心跳最小间隔（10 分钟）
+
 # ---- helpers ----
 
 def now_epoch_s() -> int:
@@ -194,6 +198,84 @@ def read_transcript_last_message(transcript_path: Path, max_lines: int = 20) -> 
             }
 
     return None
+
+
+def detect_idle_heartbeat() -> dict[str, Any] | None:
+    """
+    Check if the system is alive but the frontstage has been silent too long.
+    Returns a heartbeat result dict, or None if not needed.
+    """
+    dash = find_active_dashboard_session()
+    if not dash:
+        return None
+
+    tp = get_session_transcript_path(dash)
+    if not tp:
+        return None
+
+    last_msg = read_transcript_last_message(tp)
+    if not last_msg:
+        return None
+
+    # Only heartbeat after assistant replied and system is idle
+    role = last_msg.get("role", "")
+    if role != "assistant":
+        return None
+
+    # Get assistant message timestamp
+    ts = last_msg.get("timestamp")
+    msg_epoch = timestamp_to_epoch_s(ts)
+    if msg_epoch is None:
+        msg_epoch = dash.get("updatedAt", 0)
+        if isinstance(msg_epoch, (int, float)):
+            msg_epoch = int(msg_epoch / 1000)
+        else:
+            return None
+
+    now = now_epoch_s()
+    elapsed = now - msg_epoch
+
+    if elapsed < HEARTBEAT_IDLE_S:
+        return None  # Too soon since last message
+
+    return {
+        "detectedAt": now_iso(),
+        "detectedAtEpoch": now,
+        "sessionKey": dash.get("key", "unknown"),
+        "sessionId": dash.get("sessionId", "unknown"),
+        "lastMessageEpoch": msg_epoch,
+        "elapsedSeconds": elapsed,
+        "kind": "heartbeat",
+        "fingerprint": "heartbeat",
+    }
+
+
+def maybe_heartbeat(hb: dict[str, Any], state_dir: Path, log_path: Path, enabled: bool) -> None:
+    """Send a subtle 'I'm alive' heartbeat if cooldown has passed."""
+    hb_state_path = state_dir / "heartbeat-state.json"
+    prev = load_json(hb_state_path)
+    now = hb["detectedAtEpoch"]
+    prev_time = prev.get("notifiedAtEpoch", 0)
+
+    if (now - prev_time) < HEARTBEAT_COOLDOWN_S:
+        return  # Cooldown not expired
+
+    message = "🫀 系统在线，等待中"
+
+    if enabled:
+        success = _inject_via_broker(hb["sessionKey"], message)
+    else:
+        success = False
+
+    save_json(hb_state_path, {
+        "notifiedAt": hb["detectedAt"],
+        "notifiedAtEpoch": now,
+        "sessionKey": hb["sessionKey"],
+        "elapsedSeconds": hb["elapsedSeconds"],
+        "injected": success,
+    })
+
+    append_log(log_path, f"[{hb['detectedAt']}] 🫀 HEARTBEAT idle={hb['elapsedSeconds']}s injected={success}")
 
 
 def detect_no_response() -> dict[str, Any] | None:
@@ -403,6 +485,12 @@ def main() -> None:
             print(f"   会话: {detection['sessionKey']}")
             print(f"   最后用户消息: {detection['contentPreview'][:60]}")
             print(f"   严重程度: {detection['severity']}")
+        # Also check heartbeat
+        hb = detect_idle_heartbeat()
+        if hb:
+            print(f"🫀 系统已静默 {hb['elapsedSeconds']}s（会话: {hb['sessionKey']}）")
+        else:
+            print("🫀 心跳无需发送（静默时间未达阈值）")
         return
 
     if args.print_json:
@@ -418,6 +506,12 @@ def main() -> None:
         if prev:
             append_log(log_path, f"[{now_iso()}] ✅ 模型已恢复响应")
             notify_path.unlink(missing_ok=True)
+
+        # Heartbeat check: system alive but frontstage silent too long?
+        if enabled:
+            hb = detect_idle_heartbeat()
+            if hb:
+                maybe_heartbeat(hb, state_dir, log_path, enabled)
 
 
 if __name__ == "__main__":
