@@ -312,4 +312,5 @@
   - `~/.config/systemd/user/daily-transcript-aggregator.service`
   - `~/.config/systemd/user/daily-transcript-aggregator.timer`
   - `AGENTS.md`（第 5 步）
+  - `scripts/openclaw-post-upgrade-self-check.py`（`check_daily_transcript_aggregator()`）
   - `TOOLS.md`

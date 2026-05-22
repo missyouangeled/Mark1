@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +34,7 @@ SIDECAR_USER_SERVICE = "openclaw-infos-handle-sidecar.service"
 UNIFIED_PROXY_USER_SERVICE = "openclaw-unified-proxy.service"
 DEFAULT_ONLINE_MESSAGE = "贾维斯已上线，我在。要开始干活的话，直接喊我。"
 
+SHANGHAI_TZ = timezone(timedelta(hours=8))
 
 
 def now_iso() -> str:
@@ -301,6 +302,30 @@ def check_user_service(unit: str, *, required_if_present: bool = True) -> dict[s
     return make_check(unit, ok, json.dumps(data, ensure_ascii=False), required=required_if_present)
 
 
+def check_daily_transcript_aggregator() -> dict[str, Any]:
+    """检查统一日报采集 timer 和输出文件"""
+    timer_ok = True
+    timer_detail = ""
+    if not sys.platform.startswith("win"):
+        exists, data = systemd_unit_state("daily-transcript-aggregator.timer")
+        timer_ok = (
+            exists
+            and data.get("UnitFileState") == "enabled"
+            and data.get("ActiveState") == "active"
+            and data.get("SubState") in {"waiting", "running", "elapsed"}
+        )
+        timer_detail = json.dumps(data, ensure_ascii=False)
+    # 检查今天的 transcript 文件是否存在
+    today = datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d")
+    transcript_file = WORKSPACE / "memory" / "daily" / f"{today}-transcript.md"
+    file_ok = transcript_file.exists() and transcript_file.stat().st_size > 0
+    ok = timer_ok and file_ok
+    detail = f"timer={timer_ok}, file={'OK' if file_ok else 'MISSING/EMPTY'}"
+    if timer_detail:
+        detail += f" | timer_state={timer_detail}"
+    return make_check("daily-transcript-aggregator", ok, detail)
+
+
 def check_infos_handle_sidecar_live() -> dict[str, Any]:
     cmd = [
         sys.executable,
@@ -409,6 +434,7 @@ def build_report(force: bool = False) -> dict[str, Any]:
         ))
         checks.append(check_timer("openclaw-frontstage-broker-rebuild.timer"))
         checks.append(check_timer("openclaw-frontstage-recovery-watch.timer"))
+        checks.append(check_daily_transcript_aggregator())
     ok = all(item.get("ok") for item in checks if item.get("required", True)) if checks else True
 
     summary = "未检测到版本变化，本轮跳过升级后自检。"
