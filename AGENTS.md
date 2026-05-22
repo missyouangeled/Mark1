@@ -75,6 +75,11 @@ Don't ask permission. Just do it.
 
 **🚦 执行纪律**：当修改涉及脚本/补丁/基础设施/新建项目时，必须先读 `docs/methodology/superpowers-adapted.md`（改编自 obra/superpowers 的工程方法论），遵守「脑暴设计→任务拆解→分身执行→验证闭环→收尾清理」五阶段流程。纯日常聊天不适用。
 
+补充参考：
+- `docs/methodology/context-optimization.md` — 上下文空间管理：分层压缩、工具输出 masking、结构化摘要、坐标预算
+- `docs/methodology/context-degradation.md` — 上下文退化诊断：5 种失败模式（lost-in-middle / poisoning / distraction / confusion / clash）的识别与修复
+- `docs/methodology/multi-agent-patterns.md` — 多 agent 架构模式：三种架构的成本现实与失败模式，与现有监工系统对照
+
 1. **先查现有能力**
    - 先检查当前仓库、现有脚本、已有补丁、配置、systemd/service/timer、文档说明里是否已经有类似功能或半成品入口。
    - 不要一上来就另起一套平行实现。
