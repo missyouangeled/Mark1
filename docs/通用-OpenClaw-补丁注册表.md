@@ -314,3 +314,28 @@
   - `AGENTS.md`（第 5 步）
   - `scripts/openclaw-post-upgrade-self-check.py`（`check_daily_transcript_aggregator()`）
   - `TOOLS.md`
+
+### PATCH-RESPONSIVENESS-WATCHDOG
+
+- **结果目标**：当用户在主会话发消息后，模型超过阈值时间仍未回复时，自动向主会话注入提醒（30s 提醒 / 60s 紧急），不依赖模型自身响应能力。
+- **当前实现**：`scripts/openclaw-responsiveness-watch.py` + systemd timer（每 15 秒）
+- **自动触发**：`openclaw-responsiveness-watch.timer`（`OnBootSec=90s`，`OnUnitActiveSec=15s`）
+- **适用范围**：通用（当前主落地为 公司（Linux））
+- **升级风险点**：
+  - dashboard session transcript 嵌套格式变化（`{"type":"message","message":"..."}` 结构）
+  - infos-handle contract 的 `build_handle_request_payload` / `invoke_handle_request` API 变化
+  - `sessions.json` 结构与 session key 命名规则变化
+  - infos-handle 脚本路径或引入方式变化
+- **失效判断**：`openclaw-responsiveness-watch.timer` 未启用或未运行；`--print-human` 输出报错
+- **最小验收**：
+  - `systemctl --user show openclaw-responsiveness-watch.timer -p UnitFileState -p ActiveState -p SubState` 返回 `enabled` + `active` + `waiting`
+  - `python3 scripts/openclaw-responsiveness-watch.py --print-human` 输出含 "正常" 或明确检测结果（不报错）
+- **维护落点**：
+  - `scripts/openclaw-responsiveness-watch.py`
+  - `tools/openclaw-responsiveness-watch/README.md`
+  - `tools/openclaw-responsiveness-watch/openclaw-responsiveness-watch.service`
+  - `tools/openclaw-responsiveness-watch/openclaw-responsiveness-watch.timer`
+  - `~/.config/systemd/user/openclaw-responsiveness-watch.service`
+  - `~/.config/systemd/user/openclaw-responsiveness-watch.timer`
+  - `scripts/openclaw-post-upgrade-self-check.py`
+  - `TOOLS.md`

@@ -434,6 +434,7 @@ def build_report(force: bool = False) -> dict[str, Any]:
         ))
         checks.append(check_timer("openclaw-frontstage-broker-rebuild.timer"))
         checks.append(check_timer("openclaw-frontstage-recovery-watch.timer"))
+        checks.append(check_timer("openclaw-responsiveness-watch.timer"))
         checks.append(check_daily_transcript_aggregator())
     ok = all(item.get("ok") for item in checks if item.get("required", True)) if checks else True
 

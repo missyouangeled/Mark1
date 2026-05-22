@@ -381,4 +381,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\repair-openclaw-gateway-batte
 
 ## 6. 当前推荐重建顺序（一句话版）
 
-> 先恢复补丁自动重打入口 → 再恢复 broker / infos-handle sidecar / unified proxy → 再恢复 supervisor / local-health / recovery watcher / resume-watch 的 systemd 链路 → 最后恢复机器专用高级 patch，并逐项验收。
+> 先恢复补丁自动重打入口 → 再恢复 broker / infos-handle sidecar / unified proxy → 再恢复 supervisor / local-health / recovery watcher / responsiveness watchdog / resume-watch 的 systemd 链路 → 最后恢复机器专用高级 patch，并逐项验收。
