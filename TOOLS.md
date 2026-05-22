@@ -147,7 +147,7 @@ Things like:
   - 状态目录：`~/.local/state/openclaw/responsiveness-watch/`
   - 默认频率：开机约 90 秒后首次运行，之后约每 15 秒运行一次
   - 用途：在主会话中检测模型层无响应——当用户发消息后超过 30 秒模型仍未回复时，通过 infos-handle 向主会话注入提醒（60 秒后升级为紧急提醒）；独立于模型运行，不依赖模型自身响应能力
-  - 边界：只检测"用户消息 → 模型回复"超时，不覆盖其他类型的异常；依赖 session transcript 文件可读
+  - 边界：只检测"用户消息 → 模型回复"超时，不覆盖其他类型的异常；依赖 session transcript 文件可读。**与本地健康诊断的边界**：健康诊断检测 Gateway 进程/端口/provider 可达性（基础设施层），看门狗检测模型层实际响应行为（应用层）——二者互补但不重叠，看门狗不重复健康诊断的功能。
 - 监工分身管理脚本：`scripts/openclaw-supervisor-subagent.py`
   - 用途：通过 gateway RPC 间接调用 `/subagents`，做 `list / spawn / kill / resolve-frontstage / send-frontstage`
   - 说明：`tools.invoke` 直调 `sessions_spawn` 会被 gateway 拒绝为 `Tool not available: sessions_spawn`；当前可用路线是：

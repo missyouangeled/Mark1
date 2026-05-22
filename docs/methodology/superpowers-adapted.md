@@ -77,11 +77,18 @@
 
 ### 模型选择策略
 
+**通用规则**（适用于公司 Linux / 掌机 Windows）：
+
 | 任务复杂度 | 用哪个 |
 |-----------|--------|
 | 单文件、有完整规格 | 快模型（默认 `nvidia/z-ai/glm-5.1`） |
 | 多文件协调、需要判断 | 标准模型（`deepseek/deepseek-chat`） |
 | 架构设计/审查/排错 | 最强模型（`deepseek/deepseek-v4-pro`） |
+
+**机器差异**：
+- 公司（Linux）：以上三档模型均可直接使用。
+- 掌机（Windows）：NVIDIA 模型（如 `z-ai/glm-5.1`）的可用性取决于掌机 OpenClaw 配置；若不可用，快模型档位回退到 `deepseek/deepseek-chat`，但需注意 token 消耗会上升约 2-3×。具体以当前机器的 `openclaw status` 输出为准。
+- 跨机器分身：当子任务的目标执行环境与当前机器不同（如在公司机部署掌机看门狗），分身不能直接写文件到远程——见 `multi-agent-patterns.md` 跨机器执行协议。
 
 ### 执行流程
 
