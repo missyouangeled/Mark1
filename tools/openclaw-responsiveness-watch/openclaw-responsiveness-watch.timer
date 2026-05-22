@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw Main Session Responsiveness Watchdog Timer
+After=openclaw-gateway.service
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=15s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

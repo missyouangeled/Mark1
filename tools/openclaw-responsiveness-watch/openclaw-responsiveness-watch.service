@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw Main Session Responsiveness Watchdog
+After=openclaw-gateway.service
+Wants=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.openclaw/workspace/scripts/openclaw-responsiveness-watch.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw-responsiveness-watch
