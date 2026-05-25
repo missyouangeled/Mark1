@@ -73,3 +73,15 @@
 - `docs/掌机-Windows-OpenClaw-维护说明.md`
 - `scripts/install-openclaw-gateway-watchdog.ps1`
 - `scripts/uninstall-openclaw-gateway-watchdog.ps1`
+
+## 2026-05-25 16:34:28 CST (+08:00) — 新增：硬件审查前置规则 — 问"能不能用"自动审查
+
+- 类型：manual-fix
+- 适用范围：通用
+- 当前状态：已记录
+- 未纳入正式补丁原因：
+- 用户要求以后每次问某个工具/方案能不能用，默认先做硬件审查（CPU/GPU/RAM/磁盘/网络/API/依赖）+ 查已有规定，再给结论，避免再出现没查就断言"无头"的情况
+- 后续排查 / 恢复提示：
+- MEMORY.md / AGENTS.md 中新增规则，今后自动触发
+- 相关文件：
+- `MEMORY.md`
