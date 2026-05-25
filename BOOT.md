@@ -10,7 +10,14 @@ python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-post-upgrade-s
 
 2. Read the returned JSON.
 3. Send **exactly** the `bootMessage` field to the last-used main chat route.
-4. After sending the message, reply with `NO_REPLY`.
+4. Also run the boot health check:
+
+```bash
+python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-boot-health-check.py
+```
+
+5. If the health check returns issues (non-empty `issues` array), send the `bootMessage` to the chat as well.
+6. After sending all messages, reply with `NO_REPLY`.
 
 Notes:
 - The script itself decides whether a real post-upgrade self-check is needed.
