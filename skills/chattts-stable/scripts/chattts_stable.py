@@ -230,6 +230,7 @@ def synthesize_wav(
     use_refine_text: bool,
     refine_text_prompt: str,
     refine_text_only: bool,
+    seed: int,
 ) -> None:
     patch_chattts_runtime()
 
@@ -237,6 +238,10 @@ def synthesize_wav(
     import soundfile as sf
     import torch
     import ChatTTS
+
+    # 固定随机种子 → 同一预设每次合成同一个声音
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
     device = torch.device("cpu")
     chat = ChatTTS.Chat()
@@ -384,6 +389,8 @@ def main() -> None:
     ap.add_argument("--top-p", type=float, default=0.7)
     ap.add_argument("--top-k", type=int, default=20)
     ap.add_argument("--max-new-token", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=1910,
+                    help="Random seed for reproducible voice (default: 1910)")
     ap.add_argument("--infer-prompt", default="[speed_5]",
                     help="ChatTTS InferCodeParams prompt, e.g. [speed_5]")
     ap.add_argument("--use-refine-text", action="store_true",
@@ -426,6 +433,7 @@ def main() -> None:
             use_refine_text=args.use_refine_text,
             refine_text_prompt=args.refine_text_prompt,
             refine_text_only=args.refine_text_only,
+            seed=args.seed,
         )
         if args.refine_text_only:
             return

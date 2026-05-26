@@ -302,12 +302,12 @@ def check_user_service(unit: str, *, required_if_present: bool = True) -> dict[s
     return make_check(unit, ok, json.dumps(data, ensure_ascii=False), required=required_if_present)
 
 
-def check_daily_transcript_aggregator() -> dict[str, Any]:
-    """检查统一日报采集 timer 和输出文件"""
+def check_lifecycle_maintainer() -> dict[str, Any]:
+    """检查生命周期维护器 timer 和输出文件（替代旧 daily-transcript-aggregator）"""
     timer_ok = True
     timer_detail = ""
     if not sys.platform.startswith("win"):
-        exists, data = systemd_unit_state("daily-transcript-aggregator.timer")
+        exists, data = systemd_unit_state("openclaw-lifecycle-maintainer.timer")
         timer_ok = (
             exists
             and data.get("UnitFileState") == "enabled"
@@ -323,7 +323,7 @@ def check_daily_transcript_aggregator() -> dict[str, Any]:
     detail = f"timer={timer_ok}, file={'OK' if file_ok else 'MISSING/EMPTY'}"
     if timer_detail:
         detail += f" | timer_state={timer_detail}"
-    return make_check("daily-transcript-aggregator", ok, detail)
+    return make_check("lifecycle-maintainer", ok, detail)
 
 
 def check_infos_handle_sidecar_live() -> dict[str, Any]:
@@ -428,14 +428,20 @@ def build_report(force: bool = False) -> dict[str, Any]:
             "ALL PASS",
         ))
         checks.append(run_cmd_check(
-            "recovery_watch_test",
-            [sys.executable, str(WORKSPACE / "scripts" / "test-frontstage-recovery-watch.py")],
-            "ALL PASS",
+            "frontstage_guardian_test",
+            [sys.executable, str(WORKSPACE / "scripts" / "openclaw-frontstage-guardian.py"), "--print-human"],
+            "OK",
         ))
-        checks.append(check_timer("openclaw-frontstage-broker-rebuild.timer"))
-        checks.append(check_timer("openclaw-frontstage-recovery-watch.timer"))
-        checks.append(check_timer("openclaw-responsiveness-watch.timer"))
-        checks.append(check_daily_transcript_aggregator())
+        checks.append(run_cmd_check(
+            "task_scheduler_test",
+            [sys.executable, str(WORKSPACE / "scripts" / "openclaw-task-scheduler.py"), "--print-human"],
+            "idle",
+        ))
+        checks.append(check_timer("openclaw-frontstage-guardian.timer"))
+        checks.append(check_timer("openclaw-health-collector.timer"))
+        checks.append(check_timer("openclaw-task-scheduler.timer"))
+        checks.append(check_lifecycle_maintainer())
+        checks.append(check_timer("openclaw-resume-watch.timer"))
     ok = all(item.get("ok") for item in checks if item.get("required", True)) if checks else True
 
     summary = "未检测到版本变化，本轮跳过升级后自检。"

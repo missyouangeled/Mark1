@@ -260,3 +260,211 @@
 - git已推送，4份文档交叉一致，联动表与AGENTS.md判定表口径统一
 - 相关文件：
 - `docs/methodology/superpowers-adapted.md`
+
+## 2026-05-22 10:28:39 CST (+08:00) — 方法论三审收口：措辞级修复
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 快速参考卡片补分批执行步骤；multi-agent-patterns补分批规则交叉引用。三轮审查+烟测后达到9.5+/10
+- 验收 / 验证：
+- 文档交叉一致，快速参考完整
+- 相关文件：
+- `docs/methodology/superpowers-adapted.md`
+
+## 2026-05-22 10:51:10 CST (+08:00) — 新增主会话响应性看门狗
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 独立于模型的响应性检测：每15秒检查dashboard session transcript，若用户消息超30s无回复则向主会话注入提醒，60s升级紧急提醒
+- 验收 / 验证：
+- systemctl --user status openclaw-responsiveness-watch.timer 确认运行；--print-human确认正常检测
+- 相关文件：
+- `scripts/openclaw-responsiveness-watch.py`
+
+## 2026-05-22 11:00:17 CST (+08:00) — 响应性看门狗接入升级后自检体系
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 补丁注册表+重建清单+升级后自检脚本三条均已加入 watchdog，更新后自检会自动验证 timer 是否在位
+- 验收 / 验证：
+- grep确认自检脚本含responsiveness-watch.timer；注册表成功push
+- 相关文件：
+- `scripts/openclaw-post-upgrade-self-check.py`
+
+## 2026-05-22 11:45:55 CST (+08:00) — 修复终审9个磕碰（实际6个缺项+3个已在位）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 退化5模式统一量化+Agent自检规则+掌机模型差异+跨机器分身协议+场景插问答题标准+TOOLS边界说明；#1阈値#2引用#5sessions.json已在位
+- 验收 / 验证：
+- git push 成功；5文件60行增改；无语法错误
+- 相关文件：
+- `docs/methodology/context-degradation.md`
+
+## 2026-05-25 09:24:01 CST (+08:00) — ChatTTS 音色一致性：全链路固定随机种子 seed=1910
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 在 chattts_stable.py、chattts_daemon.py、chattts-on-demand.sh、chattts_voice_reply.py 四层全部添加 --seed 1910 默认值，确保同一 preset=default + 同一文本 = MD5 完全一致的声音输出
+- 验收 / 验证：
+- 两条相同文本/same preset 的语音 MD5 完全一致
+- 相关文件：
+- `skills/chattts-stable/scripts/chattts_stable.py`
+
+## 2026-05-25 14:56:32 CST (+08:00) — 开机自动体检 + 自愈（boot-health-check）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 openclaw-boot-health-check 脚本 + systemd oneshot 服务，开机后自动扫描 3 个核心服务、3 个定时器、磁盘/内存/端口，缺失服务自动拉起；BOOT.md 集成并在启动消息中回报体检结果
+- 验收 / 验证：
+- 手动运行全绿通过 ✅，提交并推送到 GitHub
+- 相关文件：
+- `scripts/openclaw-boot-health-check.py`
+
+## 2026-05-26 08:53:27 CST (+08:00) — 修复 systemd 启动顺序循环依赖
+
+- 类型：fix
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 去掉 openclaw-infos-handle-sidecar.service 的 After=default.target，改为 After=network-online.target，消除与 gateway(unified-proxy 的 default.target 三方循环。sidecar 重启后正常运行，healthz 双路径验证通过。
+- 验收 / 验证：
+- systemctl restart sidecar 后 ActiveState=active；curl :18790/healthz 和 :18788/healthz 均返回 ok
+- 相关文件：
+- `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+- `~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
+
+## 2026-05-26 08:55:33 CST (+08:00) — 新增自动化临时文件清理（语音/输出/通用tmp）
+
+- 类型：feature
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 openclaw-cleanup-temp.sh + systemd service/timer。每30分钟自动清理：超过4小时的语音回复 mp3/wav、超过4小时的 infos-handle outputs、超过24小时的通用 tmp 旧文件。首次运行清理了27个过期文件(34.57 MB)。
+- 验收 / 验证：
+- systemctl --user show openclaw-cleanup-temp.timer 状态 active/enabled；手动运行脚本正常
+- 相关文件：
+- `scripts/openclaw-cleanup-temp.sh`
+- `tools/openclaw-cleanup/openclaw-cleanup-temp.service`
+- `tools/openclaw-cleanup/openclaw-cleanup-temp.timer`
+
+## 2026-05-26 08:58:12 CST (+08:00) — local-health-watch 新增磁盘空间监控
+
+- 类型：feature
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 在 openclaw-local-health-diagnose.py 新增 collect_disk_usage()，监控 / 和 /mnt/data 两个挂载点。使用率 ≥80% warn、≥90% critical；根盘余量低于 8G 安全线时也会 warn。已接入 issue 检测、canvas HTML 卡片、self-help actions 和 broker 数据流。
+- 验收 / 验证：
+- 脚本编译通过；运行后 report disk.status=ok；根盘 75.8%(11.8G) 未触发告警；/mnt/data 39.1% 正常
+- 相关文件：
+- `scripts/openclaw-local-health-diagnose.py`
+
+## 2026-05-26 08:59:31 CST (+08:00) — 修复 frontstage-recovery 对 NO_REPLY 的假阳性误报
+
+- 类型：fix
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 在 assistant_turn_missing_visible_text 检测中增加 rawText==NO_REPLY 的判断：当 assistant turn 的 rawText 为 NO_REPLY 时，不再上报异常，因为这是预期的静默回应。同时修复了两处中文引号导致的 SyntaxError。
+- 验收 / 验证：
+- 脚本编译通过；运行后输出 OK - latest assistant turn 为 NO_REPLY（预期静默回应），不视为异常
+- 相关文件：
+- `scripts/openclaw-frontstage-recovery-watch.py`
+
+## 2026-05-26 09:07:07 CST (+08:00) — Watcher 整合第一步：前台保护器 + 生命周期维护器
+
+- 类型：refactor
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 8→4 watcher 整合第一步：新增 frontstage-guardian（合并 recovery+responsiveness，每20s）和 lifecycle-maintainer（合并 daily-transcript+cleanup，每5min，cleanup每6次触发）。禁用旧 timer：frontstage-recovery-watch、responsiveness-watch、daily-transcript-aggregator、cleanup-temp。原脚本保留未删，可随时回退。
+- 验收 / 验证：
+- 新 timer active/enabled；旧 timer disabled；frontstage-guardian 运行输出 OK；lifecycle-maintainer 运行输出 OK
+- 相关文件：
+- `scripts/openclaw-frontstage-guardian.py`
+- `scripts/openclaw-lifecycle-maintainer.py`
+- `tools/openclaw-watchers/openclaw-frontstage-guardian.service`
+- `tools/openclaw-watchers/openclaw-frontstage-guardian.timer`
+- `tools/openclaw-watchers/openclaw-lifecycle-maintainer.service`
+- `tools/openclaw-watchers/openclaw-lifecycle-maintainer.timer`
+
+## 2026-05-26 09:08:28 CST (+08:00) — Watcher 整合第二步：健康采集器（合并 supervisor + broker + local-health）
+
+- 类型：refactor
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 health-collector（每60s 轻量层：supervisor 刷新 + broker rebuild；每5次/5min 完整层：追加 local-health 诊断）。禁用旧 timer：supervisor-watch、frontstage-broker-rebuild、local-health-watch。原脚本保留未删。
+- 验收 / 验证：
+- health-collector 运行输出 OK；新 timer active/enabled；3 个旧 timer disabled
+- 相关文件：
+- `scripts/openclaw-health-collector.py`
+- `tools/openclaw-watchers/openclaw-health-collector.service`
+- `tools/openclaw-watchers/openclaw-health-collector.timer`
+
+## 2026-05-26 09:27:21 CST (+08:00) — Watcher 整合第五步：新增任务调度器（Task Scheduler）
+
+- 类型：feature
+- 适用范围：公司-Linux
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 task-scheduler（每30s 扫描 runs.sqlite，自动开关监工、检测静默/僵尸任务、回报前台）。端到端验证：手动关监工→spawn 任务→调度器自动检测 active tasks→auto-enable supervisor 成功。排除主会话持久 running 任务，避免误判。
+- 验收 / 验证：
+- task-scheduler timer active/enabled；端到端 auto-enable 验证通过；5 个 watcher timer 全部正常
+- 相关文件：
+- `scripts/openclaw-task-scheduler.py`
+- `tools/openclaw-watchers/openclaw-task-scheduler.service`
+- `tools/openclaw-watchers/openclaw-task-scheduler.timer`
+
+## 2026-05-26 09:34:24 CST (+08:00) — 任务调度器阶段2+3：清理自动化 + 智能调度
+
+- 类型：feature
+- 适用范围：公司-Linux
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 阶段2：接入 openclaw tasks maintenance --apply（每 10 周期/5min 自动执行 gateway 任务维护）、tasks audit（error 级别审计+通知）、旧 subagent/dashboard 会话清理。阶段3：并发控制（超过 4 个 active 任务告警）、近期失败检测（10min 窗口）+去重通知。run count 持久化，维护按周期频率触发。
+- 验收 / 验证：
+- 编译通过；dry-run 验证 would-run-maintenance/would-audit-tasks/would-scan-sessions 均触发；live 验证 maintenance-applied 成功
+- 相关文件：
+- `scripts/openclaw-task-scheduler.py`

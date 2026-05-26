@@ -1,0 +1,12 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：前台体验保护器 — 合并 frontstage-recovery + responsiveness，每 20s 一次
+
+[Unit]
+Description=OpenClaw frontstage guardian (recovery + responsiveness)
+After=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.openclaw/workspace
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-frontstage-guardian.py --print-human

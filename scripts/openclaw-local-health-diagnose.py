@@ -64,16 +64,22 @@ LOAD_CRITICAL_RATIO = 1.8
 MEM_AVAILABLE_WARN_RATIO = 0.12
 MEM_AVAILABLE_CRITICAL_RATIO = 0.06
 SWAP_FREE_WARN_RATIO = 0.15
+DISK_USE_WARN_PCT = 80.0
+DISK_USE_CRITICAL_PCT = 90.0
+DISK_ROOT_SAFETY_GB = 8.0
+DISK_MONITOR_MOUNTS = ["/", "/mnt/data"]
 ISSUE_PRIORITY = {
     "gateway_service_not_running": 10,
     "gateway_unreachable": 20,
     "external_network_unreachable": 30,
     "thermal_critical": 35,
     "thermal_bridge_unavailable": 38,
+    "disk_space_critical": 39,
     "primary_provider_routes_unreachable": 40,
     "thermal_warn": 45,
     "thermal_bridge_stale": 46,
     "resource_pressure_critical": 48,
+    "disk_space_warn": 49,
     "primary_provider_routes_partially_unreachable": 50,
     "resource_pressure_warn": 55,
     "status_command_failed": 60,
@@ -669,6 +675,55 @@ def collect_system_pressure() -> dict[str, Any]:
 
 
 
+def collect_disk_usage() -> dict[str, Any]:
+    """Collect disk usage for monitored mounts (/ and /mnt/data on this machine)."""
+    partitions: list[dict[str, Any]] = []
+    for mount in DISK_MONITOR_MOUNTS:
+        try:
+            stat = os.statvfs(mount)
+        except OSError:
+            continue
+        total_bytes = stat.f_frsize * stat.f_blocks
+        free_bytes = stat.f_frsize * stat.f_bavail
+        used_bytes = total_bytes - free_bytes
+        use_pct = round((used_bytes / total_bytes) * 100, 1) if total_bytes > 0 else 0.0
+        free_gb = round(free_bytes / (1024 ** 3), 1)
+        total_gb = round(total_bytes / (1024 ** 3), 1)
+        partitions.append({
+            "mount": mount,
+            "totalGb": total_gb,
+            "usedGb": round(used_bytes / (1024 ** 3), 1),
+            "freeGb": free_gb,
+            "usePct": use_pct,
+            "belowSafety": (mount == "/" and free_gb < DISK_ROOT_SAFETY_GB),
+        })
+
+    if not partitions:
+        return {"status": "unavailable", "summary": "磁盘不可读", "detail": "无法读取被监控磁盘分区", "partitions": []}
+
+    worst = max(partitions, key=lambda p: p["usePct"])
+    root_part = next((p for p in partitions if p["mount"] == "/"), None)
+    safety_breach = root_part and root_part.get("belowSafety")
+
+    if worst["usePct"] >= DISK_USE_CRITICAL_PCT:
+        status, summary = "critical", f"磁盘空间严重不足（{worst['mount']} {worst['usePct']}%）"
+    elif worst["usePct"] >= DISK_USE_WARN_PCT or safety_breach:
+        status, summary = "warn", f"磁盘空间偏低（{worst['mount']} {worst['usePct']}%）"
+        if safety_breach and root_part:
+            summary = f"根盘余量已低于 {DISK_ROOT_SAFETY_GB}G 安全线（剩余 {root_part['freeGb']}G）"
+    else:
+        status, summary = "ok", "磁盘空间正常"
+
+    detail_parts = [f"{p['mount']}={p['usePct']}%({p['freeGb']}G)" for p in partitions]
+    return {
+        "status": status,
+        "summary": summary,
+        "detail": "；".join(detail_parts),
+        "partitions": partitions,
+    }
+
+
+
 def add_issue(issues: list[dict[str, Any]], code: str, label: str, detail: str, scope: str, severity: str) -> None:
     issues.append({
         "code": code,
@@ -719,6 +774,7 @@ def derive_summary(
     provider_probes: list[dict[str, Any]],
     thermal_status: dict[str, Any],
     system_pressure: dict[str, Any],
+    disk_usage: dict[str, Any] | None = None,
 ) -> tuple[str, str, list[str], str, list[dict[str, Any]]]:
     issues: list[dict[str, Any]] = []
     extra_reasons: list[str] = []
@@ -838,6 +894,25 @@ def derive_summary(
             label=str(system_pressure.get("summary") or "系统负载偏高"),
             detail=str(system_pressure.get("detail") or "系统资源压力偏高"),
             scope="resource",
+            severity="warn",
+        )
+
+    if disk_usage and disk_usage.get("status") == "critical":
+        add_issue(
+            issues,
+            code="disk_space_critical",
+            label=str(disk_usage.get("summary") or "磁盘空间严重不足"),
+            detail=str(disk_usage.get("detail") or "磁盘空间严重不足"),
+            scope="disk",
+            severity="critical",
+        )
+    elif disk_usage and disk_usage.get("status") == "warn":
+        add_issue(
+            issues,
+            code="disk_space_warn",
+            label=str(disk_usage.get("summary") or "磁盘空间偏低"),
+            detail=str(disk_usage.get("detail") or "磁盘空间偏低"),
+            scope="disk",
             severity="warn",
         )
 
@@ -994,6 +1069,13 @@ def summarize_scope_card(report: dict[str, Any], scope: str) -> tuple[str, str, 
         resource = report.get("resource", {})
         return str(resource.get("summary") or "负载正常"), str(resource.get("detail") or ""), "ok"
 
+    if scope == "disk":
+        if issue:
+            tone = "bad" if issue.get("severity") == "critical" else "warn"
+            return str(issue.get("label") or "异常"), str(issue.get("detail") or ""), tone
+        disk = report.get("disk", {})
+        return str(disk.get("summary") or "磁盘正常"), str(disk.get("detail") or ""), "ok"
+
     if scope == "supervisor":
         supervisor = report.get("supervisor", {})
         service = supervisor.get("service", {}) if isinstance(supervisor.get("service"), dict) else {}
@@ -1090,6 +1172,12 @@ def build_self_help_actions(report: dict[str, Any]) -> list[str]:
             "内存紧张时先关浏览器无关标签页；若 swap 也快吃满，建议重开浏览器或让机器空闲一会儿。",
         ])
 
+    if "disk_space_critical" in codes or "disk_space_warn" in codes:
+        actions.extend([
+            "磁盘空间偏低时，优先清理 tmp/ 目录下的旧文件、删除不用的模型缓存和大体积中间产物。",
+            "大文件/模型建议优先下载到 /mnt/data 数据盘；若根盘长期偏紧，考虑将更多内容迁移到数据盘。",
+        ])
+
     thermal = report.get("thermal", {})
     if thermal.get("bridgePath") and ("桥接" in str(thermal.get("summary") or "") or "桥接" in str(thermal.get("detail") or "")):
         actions.append("若宿主机温度桥接已过期/损坏，优先检查 Windows 计划任务是否仍在更新 host-thermal-bridge.json，以及 VMware 共享文件夹是否还挂着。")
@@ -1133,6 +1221,7 @@ def build_canvas_html(report: dict[str, Any]) -> str:
     model_title, model_detail, model_tone = summarize_scope_card(report, "model")
     thermal_title, thermal_detail, thermal_tone = summarize_scope_card(report, "thermal")
     resource_title, resource_detail, resource_tone = summarize_scope_card(report, "resource")
+    disk_title, disk_detail, disk_tone = summarize_scope_card(report, "disk")
     supervisor_title, supervisor_detail, supervisor_tone = summarize_scope_card(report, "supervisor")
     generic_lines, provider_lines = build_probe_lines(report)
     issues = report.get("issues", [])
@@ -1242,6 +1331,7 @@ def build_canvas_html(report: dict[str, Any]) -> str:
         <div class=\"mini {model_tone}\"><div class=\"k\">AI 模型</div><div class=\"v\">{escape(model_title)}</div><div class=\"d\">{escape(model_detail)}</div></div>
         <div class=\"mini {thermal_tone}\"><div class=\"k\">温度</div><div class=\"v\">{escape(thermal_title)}</div><div class=\"d\">{escape(thermal_detail)}</div></div>
         <div class=\"mini {resource_tone}\"><div class=\"k\">负载 / 内存</div><div class=\"v\">{escape(resource_title)}</div><div class=\"d\">{escape(resource_detail)}</div></div>
+        <div class=\"mini {disk_tone}\"><div class=\"k\">磁盘</div><div class=\"v\">{escape(disk_title)}</div><div class=\"d\">{escape(disk_detail)}</div></div>
         <div class=\"mini {supervisor_tone}\"><div class=\"k\">监工</div><div class=\"v\">{escape(supervisor_title)}</div><div class=\"d\">{escape(supervisor_detail)}</div></div>
       </div>
 
@@ -1387,8 +1477,9 @@ def main() -> int:
     provider_probes = collect_provider_probes(config)
     thermal_status = collect_thermal_status()
     system_pressure = collect_system_pressure()
+    disk_usage = collect_disk_usage()
     supervisor_status = load_supervisor_status()
-    severity, summary, reasons, issue_overview, issues = derive_summary(status_payload, status_error, generic_probes, provider_probes, thermal_status, system_pressure)
+    severity, summary, reasons, issue_overview, issues = derive_summary(status_payload, status_error, generic_probes, provider_probes, thermal_status, system_pressure, disk_usage)
 
     gateway_runtime = status_payload.get("gatewayService", {}).get("runtime", {}) if status_payload else {}
     gateway_info = status_payload.get("gateway", {}) if status_payload else {}
@@ -1414,6 +1505,7 @@ def main() -> int:
         "providerProbes": provider_probes,
         "thermal": thermal_status,
         "resource": system_pressure,
+        "disk": disk_usage,
         "supervisor": supervisor_status,
         "fallback": FALLBACK_INTERFACE,
     }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic task schedule — every 30s scan runs.sqlite, auto-manage supervisor
+
+[Timer]
+OnBootSec=120s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

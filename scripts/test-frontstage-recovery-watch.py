@@ -184,8 +184,8 @@ def main() -> int:
         [message("user", "继续 runtime event", "2026-05-14T17:00:00+08:00"), message("assistant", "NO_REPLY", "2026-05-14T17:00:05+08:00")],
         {"status": "ended", "hasActiveRun": False, "endedAt": "2026-05-14T17:00:06+08:00"},
     )
-    if silent_projection.get("anomalyCode") != "assistant_turn_missing_visible_text":
-        failures.append(f"silent_no_reply_projection: expected assistant_turn_missing_visible_text, got {silent_projection}")
+    if not silent_projection.get("ok") or silent_projection.get("anomalyCode") is not None:
+        failures.append(f"silent_no_reply_projection: expected ok without anomaly (NO_REPLY is expected behavior), got {silent_projection}")
     else:
         print("PASS silent_no_reply_projection")
 

@@ -1,53 +1,53 @@
 # OpenClaw 升级后自检清单
 
-- 适用机器：通用
-- 系统 / OS：通用
-- 文档类型：升级后快速自检清单
+- 适用机器:通用
+- 系统 / OS:通用
+- 文档类型:升级后快速自检清单
 
 ## 用途
 
-这份清单只回答一个问题：
+这份清单只回答一个问题:
 
-> **OpenClaw 更新后，现在这套“贾维斯 + broker + 前台恢复观察”还能不能正常用？**
+> **OpenClaw 更新后,现在这套"贾维斯 + broker + 前台恢复观察"还能不能正常用?**
 
-它不是大修手册，也不是完整重建手册。
+它不是大修手册,也不是完整重建手册。
 
-- 想快速确认“更新后还能不能用” → 看这份
+- 想快速确认"更新后还能不能用" → 看这份
 - 想逐项重建所有补丁 → 看 `docs/通用-OpenClaw-补丁重建清单.md`
-- 当前 broker / infos-handle 已开始分层：broker 更偏数据中心，infos-handle 负责最小 text/json 查询与前台通知
+- 当前 broker / infos-handle 已开始分层:broker 更偏数据中心,infos-handle 负责最小 text/json 查询与前台通知
 
 ---
 
 ## 最短结论
 
-升级后只要下面 8 条都通过，就可以把这次更新视为“基本正常”：
+升级后只要下面 8 条都通过，就可以把这次更新视为"基本正常"：
 
 1. **Control UI 品牌/聊天补丁仍在**
 2. **snapshot-first 入口仍在**
 3. **broker / infos-handle contract 入口仍正常**
 4. **infos-handle sidecar live 链仍正常**
 5. **统一入口 proxy verify 仍正常**
-6. **frontstage recovery watcher 测试通过**
-7. **相关 timer 仍处于 enabled + active(waiting)**
+6. **frontstage-guardian 测试通过**（替代旧 recovery-watch）
+7. **5 个 watcher timer 处于 enabled+active**：guardian(20s) / health-collector(60s) / task-scheduler(30s) / lifecycle-maintainer(5min) / resume-watch(60s)
 8. **sidecar / unified proxy service 仍 active**
 
 ---
 
 ## 标准自检入口
 
-优先使用：
+优先使用:
 
 ```bash
 python3 scripts/openclaw-post-upgrade-self-check.py --print-human
 ```
 
-若需要机器可读结果：
+若需要机器可读结果:
 
 ```bash
 python3 scripts/openclaw-post-upgrade-self-check.py --print-json
 ```
 
-若需要把失败当成退出码：
+若需要把失败当成退出码:
 
 ```bash
 python3 scripts/openclaw-post-upgrade-self-check.py --strict --print-human
@@ -59,22 +59,22 @@ python3 scripts/openclaw-post-upgrade-self-check.py --strict --print-human
 
 ### 1. 启动前自动重打入口仍在
 
-检查：
+检查:
 
 - `~/.config/systemd/user/openclaw-gateway.service.d/branding.conf`
-- 其中仍包含：
+- 其中仍包含:
 
 ```ini
 ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/apply-openclaw-control-ui-branding.py
 ```
 
-含义：每次 gateway 启动前，都会自动重打一遍 Control UI 正式补丁。
+含义:每次 gateway 启动前,都会自动重打一遍 Control UI 正式补丁。
 
 ---
 
 ### 2. live Control UI 关键补丁仍在
 
-最小要求：
+最小要求:
 
 - live asset 里仍有 `JarvisProjectYieldedHistoryReply`
 - live asset 里仍有 `JarvisShouldShowPendingReadingIndicator`
@@ -84,13 +84,13 @@ ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/
 
 ### 3. broker snapshot-first 仍可重建
 
-标准检查：
+标准检查:
 
 ```bash
 python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-snapshot-dock
 ```
 
-通过时应能确认：
+通过时应能确认:
 
 - `snapshotFirst = true`
 - `snapshotFirstReady = true`
@@ -108,7 +108,7 @@ python3 scripts/test-infos-handle-frontstage-callers.py
 python3 scripts/test-frontstage-recovery-watch.py
 ```
 
-都应看到：
+都应看到:
 
 ```text
 ALL PASS
@@ -118,13 +118,13 @@ ALL PASS
 
 ### 5. infos-handle sidecar live 链仍正常
 
-标准检查：
+标准检查:
 
 ```bash
 python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar
 ```
 
-至少应能确认：
+至少应能确认:
 
 - `controlUiInfosHandleSidecar.ok = true`
 - `summaryHref / contractHref / sseHref` 正常
@@ -132,28 +132,28 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-inf
 
 ### 6. 统一入口 proxy verify 仍正常
 
-标准检查：
+标准检查:
 
 ```bash
 python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-json
 ```
 
-当前最小要求：
+当前最小要求:
 
 - `localHealthzOk = true`
 - `localSummaryCode = 200`
-- 若当前机器存在可用 LAN IP：
+- 若当前机器存在可用 LAN IP:
   - `remoteNoAuthCode = 401`
   - `remoteWithAuthCode = 200`
 
 ### 7. 相关 timer 仍正常
 
-最少检查这两个：
+最少检查这两个:
 
 - `openclaw-frontstage-broker-rebuild.timer`
 - `openclaw-frontstage-recovery-watch.timer`
 
-理想状态：
+理想状态:
 
 - `UnitFileState=enabled`
 - `ActiveState=active`
@@ -161,12 +161,12 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
 
 ### 8. sidecar / unified proxy service 仍正常
 
-最少检查：
+最少检查:
 
 - `openclaw-infos-handle-sidecar.service`
-- `openclaw-unified-proxy.service`（若已安装）
+- `openclaw-unified-proxy.service`(若已安装)
 
-理想状态：
+理想状态:
 
 - `ActiveState=active`
 - `SubState=running`
@@ -177,11 +177,11 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
 
 不要直接硬猜。
 
-按这个顺序处理：
+按这个顺序处理:
 
 1. 先看 `docs/通用-OpenClaw-补丁注册表.md`
 2. 再看 `docs/通用-OpenClaw-补丁重建清单.md`
-3. 需要时运行：
+3. 需要时运行:
 
 ```bash
 python3 scripts/apply-openclaw-control-ui-branding.py
@@ -193,15 +193,15 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
 
 ## 现在的默认启动行为
 
-当前已约定：
+当前已约定:
 
-- OpenClaw 启动后，会通过 `BOOT.md` 先跑一遍升级后自检脚本
-- **只有检测到 OpenClaw 版本变化**时，才会主动做一轮升级后核对并回报结果
-- 若版本没变，仍按普通上线消息处理，不重复刷屏
+- OpenClaw 启动后,会通过 `BOOT.md` 先跑一遍升级后自检脚本
+- **只有检测到 OpenClaw 版本变化**时,才会主动做一轮升级后核对并回报结果
+- 若版本没变,仍按普通上线消息处理,不重复刷屏
 
 ---
 
-## 和“补丁重建清单”的区别
+## 和"补丁重建清单"的区别
 
-- **升级后自检清单**：回答“现在还能不能正常用”
-- **补丁重建清单**：回答“如果坏了，按什么顺序重建回来”
+- **升级后自检清单**:回答"现在还能不能正常用"
+- **补丁重建清单**:回答"如果坏了,按什么顺序重建回来"

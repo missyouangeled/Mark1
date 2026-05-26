@@ -307,7 +307,7 @@ def synthesize(
 
     try:
         result = subprocess.run(
-            [on_demand, "--text", clean, "--out", out_path, "--preset", preset, "--tempo", str(effective_tempo), "--max-new-token", str(max_new_token)],
+            [on_demand, "--text", clean, "--out", out_path, "--preset", preset, "--tempo", str(effective_tempo), "--max-new-token", str(max_new_token), "--seed", "1910"],
             capture_output=True,
             text=True,
             timeout=TTS_TIMEOUT_SECONDS,

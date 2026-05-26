@@ -379,27 +379,27 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
     detail = "未发现明显异常。"
     if pending_projection:
         if pending_reason == "session-active-run":
-            detail = "当前 session 仍有 active run；chat.history 暂时没追上最新 transcript，这轮先按进行中处理。"
+            detail = "当前 session 仍有 active run;chat.history 暂时没追上最新 transcript,这轮先按进行中处理。"
         elif pending_reason == "session-running":
-            detail = "当前 session 仍处于 running；chat.history 可能还在追赶 transcript，暂不把这轮视为异常。"
+            detail = "当前 session 仍处于 running;chat.history 可能还在追赶 transcript,暂不把这轮视为异常。"
         elif pending_reason == "session-recently-ended":
-            detail = "当前 session 刚结束不久；chat.history 可能仍在做最终追赶，这轮先按恢复中的短窗口处理。"
+            detail = "当前 session 刚结束不久;chat.history 可能仍在做最终追赶,这轮先按恢复中的短窗口处理。"
         elif pending_reason == "empty-assistant-turn-running":
-            detail = "当前 session 仍处于 running；latest assistant turn 还只有空文本/工具阶段，这轮先按进行中处理。"
+            detail = "当前 session 仍处于 running;latest assistant turn 还只有空文本/工具阶段,这轮先按进行中处理。"
         elif pending_reason == "empty-assistant-turn-active-run":
-            detail = "当前 session 仍有 active run；latest assistant turn 还只有空文本/工具阶段，这轮先按进行中处理。"
+            detail = "当前 session 仍有 active run;latest assistant turn 还只有空文本/工具阶段,这轮先按进行中处理。"
         elif pending_reason == "empty-assistant-turn-recently-ended":
-            detail = "当前 session 刚结束不久；latest assistant turn 还只有空文本/工具阶段，这轮先按恢复中的短窗口处理。"
+            detail = "当前 session 刚结束不久;latest assistant turn 还只有空文本/工具阶段,这轮先按恢复中的短窗口处理。"
         elif pending_reason == "empty-assistant-turn-recent":
-            detail = "latest assistant turn 还只有空文本/工具阶段，先给前台一个短暂追赶窗口。"
+            detail = "latest assistant turn 还只有空文本/工具阶段,先给前台一个短暂追赶窗口。"
         else:
-            detail = "chat.history 可能还在追赶最新 transcript，暂不把这轮视为异常。"
+            detail = "chat.history 可能还在追赶最新 transcript,暂不把这轮视为异常。"
     elif transcript_latest and not history_latest:
         anomaly_code = "assistant_missing_in_history"
-        detail = "transcript 里有可见 assistant 回复，但 chat.history 投影里没有对应稳定结果。"
+        detail = "transcript 里有可见 assistant 回复,但 chat.history 投影里没有对应稳定结果。"
     elif history_latest and history_latest.get("text") == OVERSIZED_PLACEHOLDER:
         anomaly_code = "history_oversized_placeholder"
-        detail = "chat.history 返回了 oversized placeholder，当前前台可能看不到完整稳定文本。"
+        detail = "chat.history 返回了 oversized placeholder,当前前台可能看不到完整稳定文本。"
     elif transcript_latest and history_latest and transcript_latest.get("text") != history_latest.get("text"):
         # Grace period: if transcript is newer than history and within catchup window,
         # treat as pending projection delay rather than a real anomaly.
@@ -407,16 +407,24 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
         if mismatch_history_behind and recent_catchup_window:
             pending_projection = True
             pending_reason = "text-mismatch-catchup"
-            detail = "transcript 已写出最新 assistant 文本，chat.history 的投影仍在追赶中（文本暂不一致）；这轮先按追赶窗口处理，暂不视为异常。"
+            detail = "transcript 已写出最新 assistant 文本,chat.history 的投影仍在追赶中(文本暂不一致);这轮先按追赶窗口处理,暂不视为异常。"
         else:
             anomaly_code = "assistant_text_mismatch"
-            detail = "transcript 与 chat.history 的最新可见 assistant 文本不一致，可能存在投影/渲染层差异。"
+            detail = "transcript 与 chat.history 的最新可见 assistant 文本不一致,可能存在投影/渲染层差异。"
     elif (transcript_latest_yielded or history_latest_yielded) and not transcript_latest and not history_latest and not session_has_active_run and session_status != "running":
         anomaly_code = "yielded_tool_result_missing_visible_reply"
-        detail = "主会话已经收到带 message 的 yielded 结果，但它没有投影成可见 assistant 回复；前台会表现成“三个点消失了，但没回字”。"
+        detail = '主会话已经收到带 message 的 yielded 结果，但它没有投影成可见 assistant 回复；前台会表现成“三个点消失了，但没回字”。'
     elif (transcript_latest_turn or history_latest_turn) and not transcript_latest and not history_latest:
-        anomaly_code = "assistant_turn_missing_visible_text"
-        detail = "latest assistant turn 已经发生，但稳定可见文本为空（例如 silent NO_REPLY 或只剩工具阶段内容）；前台可能会出现“边回边消失”。"
+        turn = transcript_latest_turn or history_latest_turn or {}
+        raw_text = str(turn.get("rawText") or "").strip()
+        # NO_REPLY is an expected silent response, not an anomaly
+        if raw_text.upper() == "NO_REPLY":
+            pending_projection = False
+            anomaly_code = None
+            detail = "latest assistant turn 为 NO_REPLY（预期静默回应），不视为异常。"
+        else:
+            anomaly_code = "assistant_turn_missing_visible_text"
+            detail = 'latest assistant turn 已经发生，但稳定可见文本为空（例如 silent NO_REPLY 或只剩工具阶段内容）；前台可能会出现"边回边消失"。'
 
     return {
         "ok": anomaly_code is None,
@@ -492,7 +500,7 @@ def build_notification_candidate(previous_report: dict[str, Any], previous_notif
             "sessionKey": session_key,
             "status": "replayed" if isinstance(yielded_message, str) and yielded_message.strip() else "anomaly",
             "anomalyCode": anomaly_code,
-            "message": yielded_message if isinstance(yielded_message, str) and yielded_message.strip() else f"[前台恢复观察] 检测到主回复在前台投影里可能不稳定：{current_report.get('detail')}",
+            "message": yielded_message if isinstance(yielded_message, str) and yielded_message.strip() else f"[前台恢复观察] 检测到主回复在前台投影里可能不稳定:{current_report.get('detail')}",
         }
 
     if not current_pending:

@@ -1,0 +1,14 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：每 60s 触发健康采集器
+
+[Unit]
+Description=Periodic health collection (every 60s, full check every 5th run)
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

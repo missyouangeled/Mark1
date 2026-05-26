@@ -207,12 +207,17 @@ def resolve_spk_emb(preset_name: str) -> str | None:
 def synthesize(text: str, out_path: str, preset: str = "default",
                tempo: float = 1.0, temperature: float = 0.3,
                top_p: float = 0.7, top_k: int = 20,
-               max_new_token: int = 384) -> str:
+               max_new_token: int = 384, seed: int = 1910) -> str:
     global last_request_time, current_preset_name, current_spk_emb
 
     import subprocess as _subprocess
     import numpy as np
     import soundfile as sf
+    import torch
+
+    # 固定随机种子 — 确保同一 preset/文本 每次合成一致的音色
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
     last_request_time = time.time()
 
@@ -344,6 +349,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         temperature = float(request.get("temperature", 0.3))
         top_p = float(request.get("top_p", 0.7))
         top_k = int(request.get("top_k", 20))
+        seed = int(request.get("seed", 1910))
         raw_max_new_token = request.get("max_new_token")
         max_new_token = recommend_max_new_token(
             text,
@@ -367,6 +373,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 text=text, out_path=out_path,
                 preset=preset, tempo=tempo,
                 temperature=temperature, top_p=top_p,
+                seed=seed,
                 top_k=top_k, max_new_token=max_new_token,
             )
             response = {"ok": True, "path": final_path}

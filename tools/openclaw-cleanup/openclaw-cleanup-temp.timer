@@ -1,0 +1,14 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：每 30 分钟触发一次过期临时文件清理
+
+[Unit]
+Description=Periodic cleanup of expired OpenClaw temporary files
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

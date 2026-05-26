@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+前台体验保护器 (Frontstage Guardian)
+
+合并了原先两个独立 watcher：
+  - frontstage-recovery-watch: 检测 transcript/history 投影异常
+  - responsiveness-watch:      检测主会话响应性
+
+作为 wrapper 调用两者的 CLI 入口，共享同一个调度节拍（每 20s）。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+WORKSPACE = Path(__file__).resolve().parent.parent
+SCRIPTS = WORKSPACE / "scripts"
+RECOVERY_SCRIPT = str(SCRIPTS / "openclaw-frontstage-recovery-watch.py")
+RESPONSIVENESS_SCRIPT = str(SCRIPTS / "openclaw-responsiveness-watch.py")
+STATE_DIR = Path(
+    os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
+) / "openclaw" / "frontstage-guardian"
+REPORT_PATH = STATE_DIR / "last-report.json"
+LOG_PATH = STATE_DIR / "guardian.log"
+LOG_ROTATE_MAX_BYTES = 512 * 1024
+LOG_ROTATE_KEEP_BYTES = 128 * 1024
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def save_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    tmp.replace(path)
+
+
+def append_log(line: str) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if LOG_PATH.exists() and LOG_PATH.stat().st_size > LOG_ROTATE_MAX_BYTES:
+        try:
+            raw = LOG_PATH.read_bytes()
+            tail = raw[-LOG_ROTATE_KEEP_BYTES:]
+            idx = tail.find(b"\n")
+            if idx != -1:
+                tail = tail[idx + 1:]
+            LOG_PATH.write_bytes(b"[guardian-log-rotated]\n" + tail)
+        except Exception:
+            pass
+    ts = now_iso()
+    with LOG_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(f"[{ts}] {line}\n")
+
+
+def run_sub_check(label: str, script: str, args: list[str]) -> dict[str, Any]:
+    """Run a sub-check script and return structured result."""
+    cmd = [sys.executable, script, *args]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=25, check=False)
+        ok = result.returncode == 0
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        # Try to extract a one-line summary from stdout
+        first_line = stdout.split("\n")[0] if stdout else ""
+        return {
+            "label": label,
+            "ok": ok,
+            "exitCode": result.returncode,
+            "summary": first_line[:200] if first_line else ("error" if not ok else "ok"),
+            "stderr": stderr[:300] if stderr else None,
+        }
+    except subprocess.TimeoutExpired:
+        append_log(f"{label}: TIMEOUT")
+        return {"label": label, "ok": False, "exitCode": -1, "summary": "TIMEOUT", "stderr": "subprocess timed out after 25s"}
+    except Exception as exc:
+        append_log(f"{label}: EXCEPTION {exc}")
+        return {"label": label, "ok": False, "exitCode": -2, "summary": f"EXCEPTION: {exc}", "stderr": str(exc)[:300]}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Frontstage Guardian — 前台体验保护器")
+    parser.add_argument("--print-human", action="store_true")
+    parser.add_argument("--print-json", action="store_true")
+    parser.add_argument("--no-notify", action="store_true", help="Skip frontstage notification")
+    args = parser.parse_args()
+
+    checks = []
+
+    # 1. 前台恢复观察
+    recovery_flags = ["--notify-frontstage", "--print-human"]
+    if args.no_notify:
+        recovery_flags.remove("--notify-frontstage")
+    checks.append(run_sub_check("frontstage-recovery", RECOVERY_SCRIPT, recovery_flags))
+
+    # 2. 主会话响应性
+    checks.append(run_sub_check("responsiveness", RESPONSIVENESS_SCRIPT, ["--print-human"]))
+
+    # Aggregate
+    all_ok = all(c.get("ok") for c in checks)
+    summary = "；".join(c.get("summary", "?") for c in checks)
+    overall = "OK" if all_ok else "⚠"
+
+    report = {
+        "checkedAt": now_iso(),
+        "ok": all_ok,
+        "overall": overall,
+        "summary": summary,
+        "checks": checks,
+    }
+    save_text(REPORT_PATH, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+
+    if not all_ok:
+        failed = [c["label"] for c in checks if not c.get("ok")]
+        append_log(f"ANOMALY overall={overall} failed={','.join(failed)}")
+
+    if args.print_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif args.print_human:
+        print(f"{overall} - {summary}")
+    return 0 if all_ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

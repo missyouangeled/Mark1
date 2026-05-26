@@ -1,0 +1,12 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：系统健康采集器 — 合并 supervisor + broker-rebuild + local-health，每 60s 轻量+每5次完整
+
+[Unit]
+Description=OpenClaw health collector (supervisor + broker + health)
+After=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.openclaw/workspace
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-health-collector.py --print-human

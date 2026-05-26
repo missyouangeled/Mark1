@@ -1,0 +1,14 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：每 5min 触发生命周期维护器
+
+[Unit]
+Description=Periodic lifecycle maintenance (every 5min)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

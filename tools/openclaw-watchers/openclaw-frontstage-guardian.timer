@@ -1,0 +1,14 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：每 20s 触发前台保护器
+
+[Unit]
+Description=Periodic frontstage guardian check (every 20s)
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=20s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

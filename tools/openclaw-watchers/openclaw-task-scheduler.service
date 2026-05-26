@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic task scheduler check — auto supervisor, stall notify, zombie kill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-task-scheduler.py --print-json
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw-task-scheduler

@@ -47,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --format) FORMAT="$2"; shift 2 ;;
     --tempo) TEMPO="$2"; shift 2 ;;
     --max-new-token) MAX_NEW_TOKEN="$2"; shift 2 ;;
+    --seed) SEED="$2"; shift 2 ;;
     --cold) COLD_MODE=true; shift ;;
     --list-presets) LIST_PRESETS=true; shift ;;
     --stop) STOP_DAEMON=true; shift ;;
@@ -130,7 +131,7 @@ fi
 # Build JSON payload via Python tempfile (no shell escaping issues)
 PAYLOAD_FILE=$(mktemp /tmp/chattts-payload-json.XXXXXX)
 CHATTTS_TEXT="$TEXT" CHATTTS_OUT="$OUT" CHATTTS_FORMAT="$FORMAT" \
-  CHATTTS_PRESET="${PRESET:-}" CHATTTS_TEMPO="${TEMPO:-}" CHATTTS_MAX_NEW_TOKEN="${MAX_NEW_TOKEN:-}" CHATTTS_PAYLOAD_FILE="$PAYLOAD_FILE" \
+  CHATTTS_PRESET="${PRESET:-}" CHATTTS_TEMPO="${TEMPO:-}" CHATTTS_MAX_NEW_TOKEN="${MAX_NEW_TOKEN:-}" CHATTTS_SEED="${SEED:-}" CHATTTS_PAYLOAD_FILE="$PAYLOAD_FILE" \
   "$VENV_PYTHON" -c "
 import json, os
 payload = {
@@ -140,10 +141,13 @@ payload = {
 }
 p = os.environ.get('CHATTTS_PRESET', '')
 t = os.environ.get('CHATTTS_TEMPO', '')
+s = os.environ.get('CHATTTS_SEED', '')
 if p:
     payload['preset'] = p
 if t:
     payload['tempo'] = float(t)
+if s:
+    payload['seed'] = int(s)
 m = os.environ.get('CHATTTS_MAX_NEW_TOKEN', '')
 if m:
     payload['max_new_token'] = int(m)

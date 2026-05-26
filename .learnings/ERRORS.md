@@ -10420,3 +10420,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260522-002] user-reported-error
+
+**Logged**: 2026-05-22T09:23:52.917Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: 这是什么意思 另外 ClawReach 我发现有个这个名字的Skill 看看能找得到吗 Description: This is an error message that reads "Compaction failed: GatewayRequestError: Session agent:main:dashboard:[redacted] is still active; try again in a moment." The screenshot also displays the system on Ma…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:1ced80e5-bf2a-4f40-8a10-a2a5a9181ad0
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
