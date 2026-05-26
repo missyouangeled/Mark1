@@ -907,7 +907,7 @@ def main() -> int:
             cmd,
             source="frontstage-recovery",
             event_key="assistant_missing_in_history|agent:main:dashboard:test|2026-05-18T09:47:00+08:00",
-            message="[前台恢复观察] 检测到主回复在前台投影里可能不稳定：transcript 里有可见 assistant 回复，但 chat.history 投影里没有对应稳定结果。",
+            message="[前台恢复观察] 检测到主回复在前台投影里可能不稳定:transcript 里有可见 assistant 回复，但 chat.history 投影里没有对应稳定结果。",
             request_id="frontstage-recovery:assistant_missing_in_history|agent:main:dashboard:test|2026-05-18T09:47:00+08:00",
             input_text=input,
             request_transport="request_file_stdin",
@@ -976,7 +976,7 @@ def main() -> int:
         "sessionKey": "agent:main:main",
         "targetSessionKey": "agent:main:dashboard:test",
         "messageId": "msg-recovery-1",
-        "message": "[前台恢复观察] 检测到主回复在前台投影里可能不稳定：transcript 里有可见 assistant 回复，但 chat.history 投影里没有对应稳定结果。",
+        "message": "[前台恢复观察] 检测到主回复在前台投影里可能不稳定:transcript 里有可见 assistant 回复，但 chat.history 投影里没有对应稳定结果。",
     }:
         failures.append(f"recovery notify state mismatch: {recovery_saved.get('payload')}")
     else:
