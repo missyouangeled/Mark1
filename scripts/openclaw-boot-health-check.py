@@ -19,9 +19,11 @@ SERVICES = {
 }
 
 TIMERS = {
-    "frontstage-recovery-watch": "openclaw-frontstage-recovery-watch.timer",
-    "frontstage-broker-rebuild": "openclaw-frontstage-broker-rebuild.timer",
-    "local-health-watch": "openclaw-local-health-watch.timer",
+    "frontstage-guardian": "openclaw-frontstage-guardian.timer",
+    "health-collector": "openclaw-health-collector.timer",
+    "task-scheduler": "openclaw-task-scheduler.timer",
+    "lifecycle-maintainer": "openclaw-lifecycle-maintainer.timer",
+    "resume-watch": "openclaw-resume-watch.timer",
 }
 
 STATE_DIR = Path.home() / ".local/state/openclaw/boot-health"

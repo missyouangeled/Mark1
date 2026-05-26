@@ -10450,3 +10450,63 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260526-001] tool-explicit-error
+
+**Logged**: 2026-05-26T02:03:59.817Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """Inject Jarvis branding helpers into OpenClaw 2026.5.22 Control UI JS.""" import sys JS_PATH = "/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/control-ui/assets/index-BtIuF4zW.js" BACKUP = JS_PATH + ".bak" JARVIS_FUNCTIONS = """function [redacted](e){let t=typeof e?.role=='string'?e.role.toLowerCase():…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-002] tool-explicit-error
+
+**Logged**: 2026-05-26T02:06:46.512Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll neat-kelp 30000 [redacted] [redacted] failed 0 4821
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
