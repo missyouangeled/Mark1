@@ -132,6 +132,14 @@ def main():
         timeout=30,
     ))
 
+    # 3. 卡住会话检测（每次轻量层都做，截获主会话阻塞等严重问题）
+    checks.append(run_sub_check(
+        "stuck-session-detect",
+        [sys.executable, str(SCRIPTS / "openclaw-stuck-session-detector.py"),
+         "--print-json", "--report"],
+        timeout=20,
+    ))
+
     # ── 完整层（每 N 次一次）──
     if do_full:
         checks.append(run_sub_check(

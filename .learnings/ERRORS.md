@@ -10510,3 +10510,573 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260526-003] tool-policy-blocked
+
+**Logged**: 2026-05-26T02:29:06.775Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 ~/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --activate-task --reason '全面系统审查' --print-human 2>&1 [redacted] [redacted] completed 0 1105
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:fdd53ab5-461c-456e-864c-4878f99e1dab
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-004] tool-explicit-error
+
+**Logged**: 2026-05-26T02:34:27.480Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec openclaw gateway restart 2>&1 30 [redacted] [redacted] failed 2870
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:fdd53ab5-461c-456e-864c-4878f99e1dab
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-005] tool-connection-failure
+
+**Logged**: 2026-05-26T02:57:26.922Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write failed because of a connection or remote access problem.
+
+### Error
+```text
+[write] write # OpenClaw 升级记录 > 📌 **用途**：记录每次 OpenClaw 升级的完整经过——升级了什么、出了什么问题、改了什么、怎么验证的。 > 任何 AI 模型读到这个文件都应该能理解每次升级的全貌，并能据此执行后续的升级适配工作。 --- ## 升级 #1：2026.5.20 → 2026.5.22 ### 基本信息 | 项目 | 内容 | |------|------| | 升级日期 | 2026-05-26 | | 旧版本 | 2026.5.20（推测） | | 新版本 | 2026.5.22 | | 触发方式 | 用户手动 `npm update -g openclaw` | | 升级后动作 | 用户执行 `openclaw gateway restart` |…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:fdd53ab5-461c-456e-864c-4878f99e1dab
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-006] tool-timeout
+
+**Logged**: 2026-05-26T03:18:44.148Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # Look for chat.send entries in the gateway log between 11:08-11:12, and also check for any errors cat /tmp/openclaw/openclaw-2026-05-26.log 2>/dev/null | python3 -c " import sys,json for line in sys.stdin: try: d = json.loads(line.strip()) t = d.get('time','') msg = d.get('message','') if '11:08' <= t[11:16] <= '11:14' or '11:06' <= t[11:16] <=…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-007] tool-timeout
+
+**Logged**: 2026-05-26T03:24:07.542Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cat /tmp/openclaw/openclaw-2026-05-26.log 2>/dev/null | python3 -c " import sys,json for line in sys.stdin: try: d = json.loads(line.strip()) t = d.get('time','') msg = d.get('message','') if '11:16' <= t[11:16] <= '11:23': if any(kw in msg for kw in ['chat.send','chat.run','runId','drain','restart','error','ERROR','Error','fail','stuck','timeou…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-008] tool-timeout
+
+**Logged**: 2026-05-26T03:29:38.945Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ 卡住会话检测器 (Stuck Session Detector) 监控网关日志中的 `long-running session` 警告，检测卡在 model_call 的会话， 通过 broker 向前台报告，帮助及时发现和恢复被阻塞的会话。 设计原则： - 只分析最近 N 分钟的网关日志 - 关注 activeWorkKind=model_call + recovery=none 的卡住会话 - 特别关注 agent:main:main（主会话被阻塞 = 用户发消息无响应） - 输出 JSON 供 health-collector 集成 - 通过 broker emit 向前台报告 用法： python3 scripts/[r…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-009] tool-explicit-error
+
+**Logged**: 2026-05-26T03:32:52.558Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py [redacted] [redacted] 843
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-010] tool-explicit-error
+
+**Logged**: 2026-05-26T03:48:41.305Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 测试恢复逻辑（带二次验证，应该跳过恢复因为我们正在正常对话） cd /home/missyouangeled/.openclaw/workspace && python3 scripts/[redacted].py --print-json --lookback-minutes 5 --recover 2>&1 20 [redacted] [redacted] failed 4110
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-011] tool-timeout
+
+**Logged**: 2026-05-26T04:27:25.230Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 检查网关日志里最近5分钟有无异常（图片处理相关） grep "12:2[2-7]" /tmp/openclaw/openclaw-2026-05-26.log 2>/dev/null | grep -i "image\|error\|stuck\|timeout\|long-running\|blocked\|queue\|model_call" | python3 -c " import json, sys for line in sys.stdin: d = json.loads(line.strip()) t = d.get('time','')[:19] msg = d.get('message','')[:300] print(f'{t} {msg}') " 2>&1 |…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-012] tool-timeout
+
+**Logged**: 2026-05-26T04:28:57.348Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 让我照 MEMORY.md 里的规则做硬件适配性审查 # 以及检查 nvidia/google/gemma-4-31b-it 和 nvidia/z-ai/glm-5.1 的上下文窗口 # nemotron-nano-12b-v2-vl 只有 4096 上下文，显然不够 # 先查这些模型的上下文大小 python3 -c " # 查 openclaw 已知的模型上限 import subprocess, json # 从 models list 获取 result = subprocess.run(['openclaw', 'models', 'list', '--json'], capture_output=True, text=True, timeout=15) if resul…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-013] tool-explicit-error
+
+**Logged**: 2026-05-26T04:29:46.209Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 重启 gateway 让配置生效 openclaw gateway restart 2>&1 30 [redacted] [redacted] failed 3019
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-014] tool-explicit-error
+
+**Logged**: 2026-05-26T04:33:04.714Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && python3 -c " import json c = json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) c['agents']['defaults']['imageModel']['primary'] = 'nvidia/google/gemma-4-31b-it' json.dump(c, open('/home/missyouangeled/.openclaw/openclaw.json','w'), indent=2, ensure_ascii=False) print('imageModel -> nvi…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-015] tool-explicit-error
+
+**Logged**: 2026-05-26T04:35:22.411Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec openclaw gateway restart 2>&1 30 [redacted] [redacted] failed 2857
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-016] tool-explicit-error
+
+**Logged**: 2026-05-26T04:37:24.157Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec openclaw gateway restart 2>&1 & sleep 8 && curl -s [url] 20 [redacted] [redacted] failed 3173
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-017] tool-timeout
+
+**Logged**: 2026-05-26T04:47:27.491Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool image timed out.
+
+### Error
+```text
+[image] image description timed out after 58584ms image /home/missyouangeled/.openclaw/media/inbound/[redacted].png 描述这张截图中的界面元素，特别是蓝色齿轮和文字内容。 [redacted] [redacted] image description timed out after 58584ms error 61215
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: image
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-018] tool-timeout
+
+**Logged**: 2026-05-26T04:56:05.336Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # ======================================================================== # 第1步：视觉模型完整诊断 # ======================================================================== echo "====== 1/6 视觉模型诊断 ======" python3 -c " import json, subprocess c = json.load(open('/home/missyouangeled/.openclaw/openclaw.json')) im = c['agents']['defaults'].get('imageModel'…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-019] tool-timeout
+
+**Logged**: 2026-05-26T04:56:39.002Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # ======================================================================== # 第3-4步：Gateway 核心状态 + 日志异常扫描 # ======================================================================== echo "====== 3/6 Gateway 核心状态 ======" curl -s [url] | python3 -c " import json,sys; d=json.load(sys.stdin) print(f'Gateway health: ok={d.get(\"ok\")}, status={d.get(\"…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-020] tool-explicit-error
+
+**Logged**: 2026-05-26T04:57:03.035Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll briny-otter 15000 [redacted] [redacted] failed 0 6813
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-021] tool-explicit-error
+
+**Logged**: 2026-05-26T04:57:12.762Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # ======================================================================== # 第6步：补丁/品牌/配置一致性检查 # ======================================================================== echo "====== 6/6 配置一致性检查 ======" # 检查关键补丁是否还在 echo "--- Control UI 品牌补丁 ---" grep -c "贾维斯\|JARVIS" /home/missyouangeled/.npm-global/lib/node_modules/openclaw/webchat/dist/index.…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

@@ -85,3 +85,27 @@
 - MEMORY.md / AGENTS.md 中新增规则，今后自动触发
 - 相关文件：
 - `MEMORY.md`
+
+## 2026-05-26 10:51:29 CST (+08:00) — watcher systemd 服务 PATH 环境变量修复
+
+- 类型：config-fix
+- 适用范围：通用
+- 当前状态：已修复
+- 未纳入正式补丁原因：
+- systemd 环境缺少 ~/.npm-global/bin，导致 openclaw CLI 不可用；已更新 frontstage-guardian/health-collector/task-scheduler/lifecycle-maintainer 四个 service 文件
+- 后续排查 / 恢复提示：
+- 若 OpenClaw 升级后 PATH 变化，检查 ~/.config/systemd/user/*.service 的 Environment=PATH 行
+- 相关文件：
+- `~/.config/systemd/user/openclaw-*.service`
+
+## 2026-05-26 11:34:22 CST (+08:00) — health-collector 集成 stuck-session-detect 检测项
+
+- 类型：manual-fix
+- 适用范围：通用
+- 当前状态：已生效
+- 未纳入正式补丁原因：
+- health-collector 轻量层新增第 3 个检测项，每 60s 自动检测卡住会话
+- 后续排查 / 恢复提示：
+- 检测到 stuck-session 时查看状态文件 ~/.local/state/openclaw/stuck-session-detector/status.json
+- 相关文件：
+- `scripts/openclaw-health-collector.py`

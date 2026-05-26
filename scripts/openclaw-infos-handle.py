@@ -59,6 +59,7 @@ QUERY_KINDS = {
     "events.recent",
     "events.timeline",
     "contract.catalog",
+    "healthz",
 }
 
 
@@ -1609,6 +1610,8 @@ def render_text(kind: str, snapshot: dict[str, Any], events: list[dict[str, Any]
                 lines.append(f"  │  {str(summary)[:80]}")
         return "\n".join(lines)
 
+    if kind == "healthz":
+        return "infos-handle healthz ok"
     if kind == "contract.catalog":
         contracts = snapshot.get("contracts") if isinstance(snapshot.get("contracts"), dict) else {}
         snapshot_contract = snapshot.get("snapshotContract") if isinstance(snapshot.get("snapshotContract"), dict) else {}
@@ -1728,6 +1731,8 @@ def build_query_result(
             "recordTypeCounts": recent.get("recordTypeCounts"),
             "timelineItems": timeline_items,
         }
+    if kind == "healthz":
+        return {"ok": True, "kind": "healthz", "service": "infos-handle", "checkedAt": snapshot.get("checkedAt")}
     if kind == "contract.catalog":
         query_catalog = build_query_catalog()
         return {

@@ -468,3 +468,59 @@
 - 编译通过；dry-run 验证 would-run-maintenance/would-audit-tasks/would-scan-sessions 均触发；live 验证 maintenance-applied 成功
 - 相关文件：
 - `scripts/openclaw-task-scheduler.py`
+
+## 2026-05-26 10:51:23 CST (+08:00) — 系统审查后修复：watcher PATH + infos-handle healthz + yt-dlp
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修复4个watcher服务的PATH环境变量缺失、infos-handle的healthz查询支持、安装yt-dlp
+- 验收 / 验证：
+- 所有watcher timer active且最后一次运行SUCCESS；healthz查询经代理返回200；yt-dlp 2026.03.17可用
+- 相关文件：
+- `scripts/openclaw-infos-handle.py`
+
+## 2026-05-26 10:58:05 CST (+08:00) — 新建升级记录文档：跨模型可读的升级全过程记录
+
+- 类型：docs
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 docs/通用-OpenClaw-升级记录.md，记录升级 #1 (2026.5.22) 完整经过：版本变化、4个问题根因与修复、验收、经验教训。接入自检清单和 TOOLS.md 索引。
+- 验收 / 验证：
+- 文档 7.4KB，结构清晰（基本信息/升级内容/问题详情/修复/验收/当前状态），已关联自检清单和 TOOLS.md
+- 相关文件：
+- `docs/通用-OpenClaw-升级记录.md`
+
+## 2026-05-26 11:34:16 CST (+08:00) — 新增卡住会话检测器 (Stuck Session Detector)
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 检测网关日志中 long-running session 警告（activeWorkKind=model_call + recovery=none），通过 health-collector 每 60s 自动检测，发现主会话阻塞时通过 broker 向前台报告
+- 验收 / 验证：
+- 脚本可正常解析并检测到主会话卡住：blockedMain=true，集成到 health-collector 的轻量层
+- 相关文件：
+- `scripts/openclaw-stuck-session-detector.py`
+
+## 2026-05-26 17:27:06 CST (+08:00) — 2026-05-26 系统优化与自动恢复（截图卡死修复+Watcher PATH修复+升级记录体系）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 修复截图发送导致主会话卡死的根因（视觉模型上下文溢出+长运行会话阻塞队列），实现卡住会话自动检测与分级恢复，修复所有 watcher systemd PATH缺失，建立升级记录文档体系
+- 验收 / 验证：
+- 截图发送不再卡死主会话，5个watcher全部正常触发，自动恢复已实战验证，升级记录文档已接入自检和启动流程
+- 相关文件：
+- `scripts/openclaw-stuck-session-detector.py`

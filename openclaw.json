@@ -1,0 +1,574 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.5.22",
+    "lastTouchedAt": "2026-05-26T02:34:14.747Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-05-26T01:50:52.973Z",
+    "lastRunVersion": "2026.5.22",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "browser": {
+    "executablePath": "/usr/bin/google-chrome",
+    "noSandbox": true,
+    "defaultProfile": "openclaw"
+  },
+  "auth": {
+    "profiles": {
+      "github-copilot:github": {
+        "provider": "github-copilot",
+        "mode": "token"
+      },
+      "ollama:default": {
+        "provider": "ollama",
+        "mode": "api_key"
+      },
+      "deepseek:default": {
+        "provider": "deepseek",
+        "mode": "api_key"
+      },
+      "nvidia:default": {
+        "provider": "nvidia",
+        "mode": "api_key"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "deepseek/deepseek-v4-pro"
+      },
+      "models": {
+        "github-copilot/gpt-5.4": {},
+        "ollama/gemma4:31b": {},
+        "deepseek/deepseek-chat": {
+          "alias": "DeepSeek"
+        },
+        "nvidia/nemotron-3-super-120b-a12b": {},
+        "nvidia/moonshotai/kimi-k2.5": {},
+        "nvidia/google/gemma-4-31b-it": {},
+        "nvidia/z-ai/glm-5.1": {},
+        "deepseek/deepseek-v4-pro": {
+          "alias": "DeepSeek V4 Pro"
+        }
+      },
+      "workspace": "/home/missyouangeled/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "imageModel": {
+        "primary": "nvidia/google/gemma-4-31b-it"
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "identity": {
+          "name": "贾维斯",
+          "avatar": "avatars/jarvis-neon-20260507.png"
+        }
+      }
+    ]
+  },
+  "memory": {
+    "backend": "qmd",
+    "citations": "auto",
+    "qmd": {
+      "command": "/home/missyouangeled/.npm-global/bin/qmd",
+      "includeDefaultMemory": false,
+      "searchMode": "search",
+      "update": {
+        "interval": "5m",
+        "debounceMs": 15000,
+        "onBoot": true,
+        "waitForBootSync": false,
+        "embedInterval": "0",
+        "commandTimeoutMs": 30000,
+        "updateTimeoutMs": 120000,
+        "embedTimeoutMs": 15000
+      },
+      "limits": {
+        "maxResults": 6,
+        "timeoutMs": 120000
+      },
+      "scope": {
+        "default": "deny",
+        "rules": [
+          {
+            "action": "allow",
+            "match": {
+              "chatType": "direct"
+            }
+          }
+        ]
+      },
+      "paths": [
+        {
+          "name": "memory-root",
+          "path": ".",
+          "pattern": "MEMORY.md"
+        },
+        {
+          "name": "memory-dir",
+          "path": "memory",
+          "pattern": "**/*.md"
+        }
+      ]
+    }
+  },
+  "tools": {
+    "profile": "coding",
+    "web": {
+      "search": {
+        "provider": "tavily"
+      }
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions",
+    "groupChat": {
+      "visibleReplies": "automatic"
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer",
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "14d",
+      "maxEntries": 120
+    }
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": false
+        },
+        "self-improvement": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "d488a7bb89c5fd8a69d4fe23c53c109017c0a5b8ca2d0a8f"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send"
+      ]
+    },
+    "controlUi": {
+      "allowInsecureAuth": true
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "skills": {
+    "entries": {
+      "tavily-search": {
+        "enabled": true,
+        "apiKey": "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"
+      },
+      "1password": {
+        "enabled": false
+      },
+      "apple-notes": {
+        "enabled": false
+      },
+      "apple-reminders": {
+        "enabled": false
+      },
+      "bear-notes": {
+        "enabled": false
+      },
+      "blogwatcher": {
+        "enabled": false
+      },
+      "blucli": {
+        "enabled": false
+      },
+      "bluebubbles": {
+        "enabled": false
+      },
+      "camsnap": {
+        "enabled": false
+      },
+      "capability-evolver": {
+        "enabled": false
+      },
+      "coding-agent": {
+        "enabled": false
+      },
+      "discord": {
+        "enabled": false
+      },
+      "eightctl": {
+        "enabled": false
+      },
+      "gemini": {
+        "enabled": false
+      },
+      "gh-issues": {
+        "enabled": false
+      },
+      "gifgrep": {
+        "enabled": false
+      },
+      "github": {
+        "enabled": false
+      },
+      "gog": {
+        "enabled": false
+      },
+      "goplaces": {
+        "enabled": false
+      },
+      "himalaya": {
+        "enabled": false
+      },
+      "imsg": {
+        "enabled": false
+      },
+      "mcporter": {
+        "enabled": false
+      },
+      "model-usage": {
+        "enabled": false
+      },
+      "nano-pdf": {
+        "enabled": false
+      },
+      "notion": {
+        "enabled": false
+      },
+      "obsidian": {
+        "enabled": false
+      },
+      "openai-whisper": {
+        "enabled": false
+      },
+      "openai-whisper-api": {
+        "enabled": false
+      },
+      "openhue": {
+        "enabled": false
+      },
+      "oracle": {
+        "enabled": false
+      },
+      "ordercli": {
+        "enabled": false
+      },
+      "peekaboo": {
+        "enabled": false
+      },
+      "sag": {
+        "enabled": false
+      },
+      "session-logs": {
+        "enabled": false
+      },
+      "sherpa-onnx-tts": {
+        "enabled": false
+      },
+      "slack": {
+        "enabled": false
+      },
+      "songsee": {
+        "enabled": false
+      },
+      "sonoscli": {
+        "enabled": false
+      },
+      "spotify-player": {
+        "enabled": false
+      },
+      "summarize": {
+        "enabled": false
+      },
+      "things-mac": {
+        "enabled": false
+      },
+      "tmux": {
+        "enabled": false
+      },
+      "trello": {
+        "enabled": false
+      },
+      "voice-call": {
+        "enabled": false
+      },
+      "wacli": {
+        "enabled": false
+      },
+      "xurl": {
+        "enabled": false
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://192.168.18.13:11434",
+        "api": "ollama",
+        "apiKey": "OLLAMA_API_KEY",
+        "models": [
+          {
+            "id": "gemma4",
+            "name": "gemma4",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 128000,
+            "maxTokens": 8192,
+            "params": {
+              "num_ctx": 128000
+            }
+          },
+          {
+            "id": "gemma4:31b",
+            "name": "gemma4:31b",
+            "reasoning": false,
+            "input": [
+              "text",
+              "image"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 262144,
+            "maxTokens": 8192,
+            "params": {
+              "num_ctx": 262144
+            }
+          }
+        ]
+      },
+      "deepseek": {
+        "baseUrl": "https://api.deepseek.com",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "deepseek-chat",
+            "name": "DeepSeek Chat",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192,
+            "cost": {
+              "input": 0.28,
+              "output": 0.42,
+              "cacheRead": 0.028,
+              "cacheWrite": 0
+            },
+            "compat": {
+              "supportsUsageInStreaming": true
+            },
+            "api": "openai-completions"
+          },
+          {
+            "id": "deepseek-reasoner",
+            "name": "DeepSeek Reasoner",
+            "reasoning": true,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 65536,
+            "cost": {
+              "input": 0.28,
+              "output": 0.42,
+              "cacheRead": 0.028,
+              "cacheWrite": 0
+            },
+            "compat": {
+              "supportsUsageInStreaming": true
+            },
+            "api": "openai-completions"
+          },
+          {
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek V4 Pro",
+            "reasoning": true,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 65536,
+            "cost": {
+              "input": 1.5,
+              "output": 4.2,
+              "cacheRead": 0.15,
+              "cacheWrite": 0
+            },
+            "compat": {
+              "supportsUsageInStreaming": true
+            },
+            "api": "openai-completions"
+          }
+        ]
+      },
+      "nvidia": {
+        "baseUrl": "https://integrate.api.nvidia.com/v1",
+        "api": "openai-completions",
+        "apiKey": "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",
+        "models": [
+          {
+            "id": "nvidia/nemotron-3-super-120b-a12b",
+            "name": "nemotron-3-super-120b-a12b",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          },
+          {
+            "id": "nvidia/nemotron-nano-12b-v2-vl",
+            "name": "nemotron-nano-12b-v2-vl",
+            "reasoning": false,
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 4096,
+            "maxTokens": 1024,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          },
+          {
+            "id": "google/gemma-4-31b-it",
+            "name": "gemma-4-31b-it",
+            "reasoning": false,
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "allow": [
+      "browser",
+      "deepseek",
+      "github-copilot",
+      "memory-core",
+      "nvidia",
+      "ollama",
+      "self-improvement-tool-errors",
+      "tavily",
+      "voice-reply-hard-default"
+    ],
+    "entries": {
+      "browser": {
+        "enabled": true
+      },
+      "github-copilot": {
+        "enabled": true
+      },
+      "self-improvement-tool-errors": {
+        "enabled": true
+      },
+      "ollama": {
+        "enabled": true
+      },
+      "deepseek": {
+        "enabled": true
+      },
+      "nvidia": {
+        "enabled": true
+      },
+      "tavily": {
+        "config": {
+          "webSearch": {
+            "apiKey": "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"
+          }
+        },
+        "enabled": true
+      },
+      "voice-reply-hard-default": {
+        "enabled": true,
+        "config": {
+          "allowedSessionKeys": [
+            "agent:main:dashboard:0f8c81b3-cf9f-4ed2-a6f1-d1772fed8395"
+          ]
+        },
+        "hooks": {
+          "allowConversationAccess": true
+        }
+      }
+    },
+    "bundledDiscovery": "allowlist",
+    "load": {
+      "paths": [
+        "/home/missyouangeled/.openclaw/workspace/plugins/voice-reply-hard-default"
+      ]
+    }
+  }
+}

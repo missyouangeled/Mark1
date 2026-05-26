@@ -56,6 +56,7 @@ Things like:
   - 用途:检测 OpenClaw 版本是否变化;若已升级,则按自检清单主动核对关键补丁 / broker / infos-handle / sidecar / unified proxy / recovery watcher
   - 常用命令:`python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
   - 启动行为:当前 `BOOT.md` 已改成启动时先跑这支脚本;若版本未变,只发普通上线消息;若版本变化,则先做升级后自检,再带结果上线
+- **升级历史记录**:`docs/通用-OpenClaw-升级记录.md` — 每次升级的完整经过:版本号、时间、触发方式、发现的问题、修复详情、验证结果、经验教训。升级后如发现新问题,修复后应追加到该文件。
   - 状态目录:`~/.local/state/openclaw/post-upgrade-self-check/`
 - 变更流水文档:`docs/通用-OpenClaw-补丁变更流水.md`
 - 非正式修改备忘录:`docs/通用-OpenClaw-非正式修改备忘录.md`

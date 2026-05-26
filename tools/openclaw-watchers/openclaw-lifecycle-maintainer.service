@@ -6,6 +6,7 @@
 Description=OpenClaw lifecycle maintainer (transcript + cleanup)
 
 [Service]
+Environment=PATH=/home/missyouangeled/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
 Type=oneshot
 WorkingDirectory=%h/.openclaw/workspace
 ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-lifecycle-maintainer.py --print-human
