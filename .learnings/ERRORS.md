@@ -11427,3 +11427,63 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 
 **验证**: gateway 重启后确认 thinkingDefault:off + reasoning:false 同时生效
 **教训**: thinkingDefault 只控制 OpenClaw 是否请求 thinking，不阻止模型层面的原生 reasoning。两个层面都需要关。
+
+## [ERR-20260527-007] tool-connection-failure
+
+**Logged**: 2026-05-27T09:16:55.872Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 3000 [redacted] [redacted] fetch failed error 2408
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-007] tool-connection-failure
+
+**Logged**: 2026-05-27T09:16:55.445Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] markdown 4000 [redacted] [redacted] fetch failed error 4602
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
