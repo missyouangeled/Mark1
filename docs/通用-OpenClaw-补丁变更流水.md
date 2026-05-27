@@ -555,3 +555,19 @@
 - openclaw gateway 日志中已显示 config change detected: agents.defaults.thinkingDefault。
 - 相关文件：
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-05-27 16:33:39 CST (+08:00) — 关闭 DeepSeek V4 Pro 原生 reasoning 防止 thinking 泄露（第二层修复）
+
+- 类型：patch
+- 适用范围：公司（Linux）
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：已更新
+- 结果摘要：
+- 上次 thinkingDefault:off 只关了 OpenClaw 层面的 thinking，但 DeepSeek V4 Pro 模型的 reasoning:true 仍会在输出中生成 thinking 块。本次直接修改插件 plugin.json 将 reasoning 设为 false，并建立自动重应用脚本。配合 thinkingDefault:off 形成双层防护。
+- 验收 / 验证：
+- 插件文件已修改：reasoning: false。
+- 补丁重应用脚本已创建：patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh。
+- 相关文件：
+- `/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/extensions/deepseek/openclaw.plugin.json`
+- `/home/missyouangeled/.openclaw/workspace/patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh`

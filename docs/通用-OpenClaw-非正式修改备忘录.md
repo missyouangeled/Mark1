@@ -133,3 +133,16 @@
 - 若升级后 thinking 再次泄露，可重新执行：openclaw config set agents.defaults.thinkingDefault off && openclaw gateway restart
 - 相关文件：
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-05-27 16:33:39 CST (+08:00) — thinking 泄露双重修复：OpenClaw thinkingDefault + 模型 reasoning 双开关
+
+- 类型：manual-fix
+- 适用范围：公司（Linux）
+- 当前状态：双重防护已生效
+- 未纳入正式补丁原因：
+- 用户两次反馈中英混合 thinking 泄露。第一层修复 thinkingDefault:off 只阻止 OpenClaw 发起 thinking 请求；第二层修复关闭 DeepSeek V4 Pro 模型定义的 reasoning:true，从模型层面禁止生成 thinking 内容。两层配合确保全场景不漏。
+- 后续排查 / 恢复提示：
+- 若升级后泄露复发：1) 确认 thinkingDefault 仍为 off 2) 执行 patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh 3) 重启 gateway。
+- 相关文件：
+- `/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/extensions/deepseek/openclaw.plugin.json`
+- `/home/missyouangeled/.openclaw/openclaw.json`
