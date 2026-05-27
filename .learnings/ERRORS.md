@@ -11410,3 +11410,20 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+
+## 2026-05-27: DeepSeek V4 Pro thinking 内容泄露到前台
+
+**现象**: 用户看到中文回复前夹杂一大段英文 thinking 内容（非 XML 标签包裹）
+
+**根因**: 两层防护缺失
+1. OpenClaw thinkingDefault 未被设置为 off
+2. DeepSeek V4 Pro 插件中 reasoning:true（模型原生生成 thinking 块），即使 thinkingDefault:off 仍会产生 thinking 内容
+
+**修复**:
+1. openclaw config set agents.defaults.thinkingDefault off（第一层）
+2. 直接修改 deepseek 插件 openclaw.plugin.json，将 deepseek-v4-pro 的 reasoning 改为 false（第二层）
+3. 建立自动重应用脚本 patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh
+
+**验证**: gateway 重启后确认 thinkingDefault:off + reasoning:false 同时生效
+**教训**: thinkingDefault 只控制 OpenClaw 是否请求 thinking，不阻止模型层面的原生 reasoning。两个层面都需要关。
