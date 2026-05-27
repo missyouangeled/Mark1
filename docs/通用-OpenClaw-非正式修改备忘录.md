@@ -109,3 +109,27 @@
 - 检测到 stuck-session 时查看状态文件 ~/.local/state/openclaw/stuck-session-detector/status.json
 - 相关文件：
 - `scripts/openclaw-health-collector.py`
+
+## 2026-05-27 08:48:36 CST (+08:00) — GPT-5.5 已加入可用模型列表但尚未切为默认模型
+
+- 类型：maintenance-note
+- 适用范围：公司（Linux）
+- 当前状态：已在用
+- 未纳入正式补丁原因：
+- 本次目标是让 GPT-5.5 随时可切换使用，不主动改变当前默认模型与现有工作流。
+- 后续排查 / 恢复提示：
+- 若后续希望全局默认改为 GPT-5.5，可再执行 openclaw models set github-copilot/gpt-5.5 并做真实回包验收。
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-05-27 11:28:58 CST (+08:00) — thinkingDefault off 基于用户反馈临时紧急修复
+
+- 类型：manual-fix
+- 适用范围：公司（Linux）
+- 当前状态：已应用
+- 未纳入正式补丁原因：
+- 用户反馈在 NVIDIA nemotron 模型下中英混合的 thinking 内容泄露到前台，影响正常对话体验。此为紧急修复，不是上游架构问题，后续 OpenClaw 升级后需确认未被覆盖。
+- 后续排查 / 恢复提示：
+- 若升级后 thinking 再次泄露，可重新执行：openclaw config set agents.defaults.thinkingDefault off && openclaw gateway restart
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`

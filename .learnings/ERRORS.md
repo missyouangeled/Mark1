@@ -11080,3 +11080,303 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260526-022] tool-connection-failure
+
+**Logged**: 2026-05-26T09:30:22.226Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool web_fetch failed because of a connection or remote access problem.
+
+### Error
+```text
+[web_fetch] fetch failed web_fetch [url] 3000 [redacted] [redacted] fetch failed error 1473
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: web_fetch
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-023] tool-explicit-error
+
+**Logged**: 2026-05-26T09:33:34.759Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process delta-seaslug 10000 poll [redacted] [redacted] failed 0 6533
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-024] tool-policy-blocked
+
+**Logged**: 2026-05-26T10:02:04.894Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec # 停掉 vite dev server pkill -f "vite.*5199" 2>/dev/null echo "vite stopped" # 盘点后台任务 python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --deactivate-task --reason 'session-end' --print-human 2>&1 | tail -3 10 [redacted] [redacted] failed 862
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260526-025] tool-explicit-error
+
+**Logged**: 2026-05-26T10:02:08.914Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec pkill -f "vite.*5199" 2>/dev/null; echo done 3 [redacted] [redacted] failed 1120
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-001] tool-explicit-error
+
+**Logged**: 2026-05-27T00:36:07.666Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec rg -n "github-copilot|Copilot|model override|model alias|provider/model|OpenAI" /home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs /home/missyouangeled/.openclaw/workspace -g '!node_modules' /home/missyouangeled/.openclaw/workspace 10000 [redacted] [redacted]|QQlC2Bc6QT/TZhXjglsi3hfHF0A/[redacted]/[redacted]/[redacted]/wIplDKwrV1R+5…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-002] tool-timeout
+
+**Logged**: 2026-05-27T00:37:01.708Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import socket, ssl host='api.openai.com' try: ip=socket.gethostbyname(host) print('DNS_OK', ip) s=socket.create_connection((host,443), timeout=5) ctx=ssl.create_default_context() ss=ctx.wrap_socket(s, server_hostname=host) print('TLS_OK', ss.version()) ss.close() except Exception as e: print('NET_FAIL', repr(e)) PY /home/missyou…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-003] tool-explicit-error
+
+**Logged**: 2026-05-27T00:41:07.182Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll gentle-rook 30000 [redacted] [redacted]|y/6KoIrMi/LvG8FyO+9ztI5J9HfHYtxvSS+FPdq/AIW7Ezm8/[redacted]+[redacted]+UFF93YnvAOUY8nPr7Ng/CX7n+[redacted]+xBoEY2cFP5+[redacted]/BSISA/F63Y/FPjeH+9ngugTt47/hGrzaK+Tz0y1OEi6Zid07uELxF+[redacted]/ATABibDK6rAHqTQ== failed 0 16397
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-003] tool-explicit-error
+
+**Logged**: 2026-05-27T00:41:07.490Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll wild-nudibranch 30000 [redacted] [redacted]|bnclLSxAF+INNrmL3KcoM9V5lrX9V/P+[redacted]+ESEFUSMUPda+43t/[redacted]/KS+[redacted]+[redacted]+w4dfGhkJ6jB21xe0q/[redacted]+ZjWeMKmEnc7YSMMJfg== failed 0 15981
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-004] tool-policy-blocked
+
+**Logged**: 2026-05-27T00:48:04.311Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write # GPT-5.5（Copilot）接入 OpenClaw 设计与实施计划 - 日期：2026-05-27 - 适用范围：公司（Linux）/ 当前这台 OpenClaw 实例 - 目标：把 `github-copilot/gpt-5.5` 加入 OpenClaw 允许模型列表，让主会话和后续会话都可以随时切换使用；默认模型先保持不变。 ## 现状 - 当前默认模型：`deepseek/deepseek-v4-pro` - 当前已存在 Copilot 授权：`github-copilot:github` - 当前 `agents.defaults.models` 已启用 allowlist，因此新模型若不加入 allowlist，会出现“Model is not allowed”。…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260527-005] tool-explicit-error
+
+**Logged**: 2026-05-27T03:23:35.033Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll quiet-river 10000 [redacted] [redacted] failed 0 6538
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

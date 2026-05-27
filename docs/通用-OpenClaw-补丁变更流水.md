@@ -524,3 +524,34 @@
 - 截图发送不再卡死主会话，5个watcher全部正常触发，自动恢复已实战验证，升级记录文档已接入自检和启动流程
 - 相关文件：
 - `scripts/openclaw-stuck-session-detector.py`
+
+## 2026-05-27 08:48:36 CST (+08:00) — 将 GitHub Copilot GPT-5.5 加入 OpenClaw 可用模型列表
+
+- 类型：maintenance
+- 适用范围：公司（Linux）
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 在 allowlist 模式下新增 github-copilot/gpt-5.5，保留当前默认模型不变。
+- 验收 / 验证：
+- openclaw config validate 通过。
+- openclaw models status --json 已显示 allowed 包含 github-copilot/gpt-5.5。
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`
+- `/home/missyouangeled/.openclaw/workspace/docs/plans/2026-05-27-gpt55-copilot-openclaw-config.md`
+
+## 2026-05-27 11:28:50 CST (+08:00) — 将 thinkingDefault 设为 off 防止思考链路泄露到前台
+
+- 类型：patch
+- 适用范围：公司（Linux）
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 将 agents.defaults.thinkingDefault 设定为 off，确保任何模型（包括 NVIDIA/DeepSeek/Copilot 等）不在前台输出 thinking 内部内容，杜绝中英混合泄露。Gateway 重启后生效。
+- 验收 / 验证：
+- openclaw config validate 通过。
+- openclaw gateway 日志中已显示 config change detected: agents.defaults.thinkingDefault。
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`
