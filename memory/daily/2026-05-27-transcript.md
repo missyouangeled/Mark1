@@ -1,6 +1,6 @@
 # 2026-05-27 统一日报（自动采集）
 
-## unknown
+## deepseek-v4-pro
 - **点点** · 08:04：[Wed 2026-05-27 08:04 GMT+8] 哈喽。 早上好
 - 贾维斯 · 08:05：早上好呀，点点。☀️
 
@@ -678,3 +678,28 @@ Use the warm companion feel that the user has praised. Don't use 你在呢 becau
 - 贾维斯 · 16:27：`reasoningLevel` 也是无效字段。直接走补丁路线——改 DeepSeek 插件的模型定义：
 - 贾维斯 · 16:27：好，补丁打上了。现在创建自动重应用脚本，保证升级后不丢：
 - 贾维斯 · 16:28：现在重启 gateway 让补丁生效：
+- **点点** · 16:31：[Wed 2026-05-27 16:31 GMT+8] 没问题了吗
+- 贾维斯 · 16:32：让我确认一下当前状态。
+- 贾维斯 · 16:33：三层防护全部到位，没问题了。让我把留痕补齐：
+- 贾维斯 · 16:34：最后把这个错误记进 ERRORS.md：
+- 贾维斯 · 16:35：全部到位了。✅
+
+### 这次做了什么（双层修复）
+
+| 层 | 位置 | 改了啥 |
+|---|---|---|
+| **第一层** | `openclaw.json` | `thinkingDefault: off` — 阻止 OpenClaw 向模型请求 thinking |
+| **第二层** | 插件 `plugin.json` | `deepseek-v4-pro` 的 `reasoning: false` — 从模型层面禁止原生 thinking 生成 |
+
+**第一次只修了第一层**，所以 DeepSeek 还是自带英文 thinking；**这次两层一起关**，以后不会再漏。
+
+### 已存档
+- 补丁重应用脚本：`patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh`
+- 错误记录：`.learnings/ERRORS.md`
+- 变更流水 + 备忘录
+- 全部已推送 GitHub
+
+以后再漏，直接跑这个脚本就行，不用再从头排查。
+- **点点** · 16:35：[OpenClaw heartbeat poll]
+- 贾维斯 · 16:35：HEARTBEAT_OK
+- **点点** · 16:36：[Wed 2026-05-27 16:35 GMT+8] DeepSeek flash版本 也修复一下。 不只是V4 PRO
