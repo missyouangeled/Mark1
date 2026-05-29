@@ -43,6 +43,7 @@ Don't ask permission. Just do it.
 ### 写入规则
 
 - **每日记录** (`memory/daily/`): 每次对话结束后写当天的摘要。包含：聊了什么、谁说了什么重要的话、当天的新设定/改进要求。
+- **Memory flush 事件**：OpenClaw 会话压缩时触发的 flush 只能写 `memory/YYYY-MM-DD.md`（扁平路径，不能带子目录）。写成后由 `lifecycle-maintainer` 的 `flush-memory-sync.sh` 每 15 分钟自动追加到 `memory/daily/YYYY-MM-DD.md`。日常主动归档仍直接写 `memory/daily/`。
 - **人物档案** (`memory/people.md`): 聊天中若提到一位新的人物，或补充了已有人的新信息，立即更新该文件。每个人物一段。
 - **回忆录** (`memory/stories.md`): 用户分享人生经历、感悟、回忆片段时，整理写入此文件。保留原始表达风格，不加修饰。
 - **MEMORY.md** (总索引): 保持精简。只放身份设定、偏好规则、关系上下文摘要。人物和回忆的完整内容指向子文件。

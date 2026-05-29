@@ -13003,3 +13003,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260529-030] tool-policy-blocked
+
+**Logged**: 2026-05-29T05:00:02.772Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && git add -A && git commit -m "逻辑优化4项：broker事件驱动+监工内迁+guardian紧急通道+清理统一(timer7→5 cron7→4)" && git push 2>&1 | tail -3 && echo "---" && python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --deactivate-task --reason '逻辑优化完成' --print-human 2>&1 30 [redacted] [red…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

@@ -122,6 +122,13 @@ def main():
         [sys.executable, str(SCRIPTS / "aggregate-daily-transcript.py")]
     ))
 
+    # 1.5 memory flush 同步（每次都做，汇入 daily 归档）
+    checks.append(run_sub_check(
+        "flush-memory-sync",
+        ["/bin/bash", str(SCRIPTS / "flush-memory-sync.sh")],
+        timeout=10,
+    ))
+
     # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
     if do_cleanup:
         checks.append(run_sub_check(
