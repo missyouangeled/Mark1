@@ -697,3 +697,17 @@
 - 贾维斯/语音偏好/监工管理均0.8+置信度短路；task-scheduler dry-run返回idle fast skip；缓存读写正常
 - 相关文件：
 - `memory-search-local-first.py, openclaw-task-scheduler.py, query-cache.py, AGENTS.md`
+
+## 2026-05-29 13:35:41 CST (+08:00) — health-collector：子检查耗时基线监控
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- run_sub_check 新增 elapsedMs 字段；新增 DURATION_BASELINE_MS 基线表；汇总阶段自动检查超基线项并标 degraded（含 degradedReason）
+- 验收 / 验证：
+- 四次检查均正常输出 elapsedMs（supervisor 66ms, broker 110ms, stuck-session 59ms, local-health 20694ms），全部在基线内
+- 相关文件：
+- `openclaw-health-collector.py`

@@ -18,6 +18,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -80,8 +81,10 @@ def append_log(line: str) -> None:
 
 
 def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, Any]:
+    start = time.monotonic()
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        elapsed = round(time.monotonic() - start, 3)
         ok = result.returncode == 0
         degraded = result.returncode == 2  # exit 2 = warning/degraded, not a crash
         stdout = (result.stdout or "").strip()
@@ -92,15 +95,28 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, An
             "ok": ok,
             "degraded": degraded,
             "exitCode": result.returncode,
+            "elapsedMs": int(elapsed * 1000),
             "summary": first_line[:200] if first_line else ("degraded" if degraded else "error" if not ok else "ok"),
             "stderr": stderr[:300] if stderr else None,
         }
     except subprocess.TimeoutExpired:
+        elapsed = round(time.monotonic() - start, 3)
         append_log(f"{label}: TIMEOUT ({timeout}s)")
-        return {"label": label, "ok": False, "exitCode": -1, "summary": f"TIMEOUT({timeout}s)", "stderr": f"subprocess timed out after {timeout}s"}
+        return {"label": label, "ok": False, "exitCode": -1, "elapsedMs": int(elapsed * 1000), "summary": f"TIMEOUT({timeout}s)", "stderr": f"subprocess timed out after {timeout}s"}
     except Exception as exc:
+        elapsed = round(time.monotonic() - start, 3)
         append_log(f"{label}: EXCEPTION {exc}")
-        return {"label": label, "ok": False, "exitCode": -2, "summary": f"EXCEPTION: {exc}", "stderr": str(exc)[:300]}
+        return {"label": label, "ok": False, "exitCode": -2, "elapsedMs": int(elapsed * 1000), "summary": f"EXCEPTION: {exc}", "stderr": str(exc)[:300]}
+
+
+# ── 耗时基线：每个子检查的最大预期耗时（ms），超过则标 degraded ──
+# 基线取正常情况下的 P95 估测值，有 50% 余量
+DURATION_BASELINE_MS: dict[str, float] = {
+    "supervisor-refresh":    8000,   # ~5s P95 → 8s
+    "broker-rebuild":        15000,  # ~10s P95 → 15s
+    "stuck-session-detect":  6000,   # ~3s P95 → 6s
+    "local-health":          30000,  # ~20s P95 → 30s
+}
 
 
 # ── 监工自动管理（从 task-scheduler 内迁）──
@@ -256,6 +272,21 @@ def main():
         append_log(f"run #{new_count}: full check triggered (supervisor + broker + local-health)")
     else:
         append_log(f"run #{new_count}: lightweight (supervisor + broker-on-dirty, next full at #{FULL_CHECK_EVERY_N})")
+
+    # ── 耗时基线检查：超过基线标 degraded ──
+    latency_flags: list[str] = []
+    for c in checks:
+        label = c.get("label", "")
+        baseline = DURATION_BASELINE_MS.get(label)
+        elapsed = c.get("elapsedMs", 0)
+        if baseline and elapsed > baseline:
+            # 未标记为退化但超时了，追加 degraded 标记
+            if not c.get("degraded") and c.get("ok"):
+                c["degraded"] = True
+                c["degradedReason"] = f"latency {elapsed}ms > baseline {baseline}ms"
+                latency_flags.append(f"{label}:{elapsed}ms>{baseline}ms")
+    if latency_flags:
+        append_log(f"LATENCY_DEGRADED: {', '.join(latency_flags)}")
 
     # ── 汇总 ──
     # ok: exit 0 only  |  degraded: exit 2 (warning, not a crash)  |  failed: exit 1/exception/timeout
