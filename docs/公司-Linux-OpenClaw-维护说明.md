@@ -4,6 +4,13 @@
 - 系统 / OS：Linux
 - 文档类型：本机专用说明
 
+## QMD 使用限制（2026-05-29 确定）
+
+- 本机**禁用 QMD 向量搜索**（`qmd vsearch`），原因：无 GPU，vsearch 需加载 1.2GB LLM 做查询扩展，且删除模型后会自动重下。
+- 若误运行 `qmd vsearch`，它会自动从 hf-mirror 下载模型→立即中止并清理残留即可。
+- 日常 `memory_search` 走 builtin + github-copilot 引擎，与本限制无关。
+- QMD BM25 搜索（`qmd search`）可用，但不作为主引擎。
+
 ## 用途
 
 这份说明只面向 **公司 Linux 机**，用于说明这台机器上应优先读取的 OpenClaw 维护内容，以及 Linux 环境下应优先更新的脚本和配置。
