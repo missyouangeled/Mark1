@@ -54,11 +54,6 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 - 聊天页“进行中”逻辑仍包含 `loading / sending / stream / canAbort / queue / hasActiveRun / status=running`
 - 前端资产里仍带 `JarvisProjectYieldedHistoryReply`
 
----
-
-## 2. 再恢复辅助消息基础设施
-
-
 ### 1.2 开机体检自愈（boot-health-check）
 
 检查：`scripts/openclaw-boot-health-check.py` `~/.config/systemd/user/openclaw-boot-health-check.service`
@@ -66,6 +61,11 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 动作：`python3 scripts/openclaw-boot-health-check.py --print-human`
 
 验收：输出核心服务/定时器/磁盘/内存/端口状态，无报错。
+
+---
+
+## 2. 再恢复辅助消息基础设施
+
 ### 2.1 frontstage broker
 
 检查：

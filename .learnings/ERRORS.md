@@ -28,6 +28,35 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260529-002] edit-tool-oldtext-match-and-sed-misplacement
+
+**Logged**: 2026-05-29T14:20:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tool-usage
+
+### Summary
+同一个文件（补丁重建清单.md）连续两次编辑失败：
+1. edit 的 oldText 没能精确匹配原文（空白/换行符差异），返回 "Could not find the exact text"
+2. 改用 sed 按行号插入，但行 60 恰好是 ## 2. 标题，导致 ### 1.2 被插入到 ## 2 下面而不是 ## 1 下面，破坏了文档层级结构
+
+### Root cause
+- edit 的 oldText 匹配是逐字节精确匹配，包含不可见空白和换行符
+- 凭记忆写 oldText 几乎总会有微小差异（Markdown 渲染看到的内容 ≠ 源码内容）
+- sed 按行号插入是脆弱的——行号会随着文件修改而漂移
+
+### Fix
+- 先用 read 精确读取目标区域，复制源码中确切的 oldText 再传给 edit
+- 再用 edit 重做，这次 oldText 来自 read 的精确内容，匹配成功
+
+### Prevention rule（硬规则）
+- ⚠️ 任何 edit 调用前，必须先用 read 获取目标区域的精确原文
+- ⚠️ 禁止凭记忆/凭渲染结果写 oldText
+- ⚠️ 禁止用 sed -i 按行号插入结构化文档——行号不可靠
+- 优先用 edit 配精确 read 原文；若确需 sed，用内容匹配而非行号
+
+---
+
 ## [ERR-20260421-003] noiz-custom-voice-credit-limit
 
 **Logged**: 2026-04-21T13:50:00+08:00
