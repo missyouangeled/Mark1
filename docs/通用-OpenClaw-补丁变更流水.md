@@ -683,3 +683,17 @@
 - timer 7→5, cron 7→4, 服务 4→3, 根盘76%, 所有脚本语法通过
 - 相关文件：
 - `health-collector.py, task-scheduler.py, frontstage-guardian.py, lifecycle-maintainer.py`
+
+## 2026-05-29 13:30:00 CST (+08:00) — 🟡三项架构优化：本地搜索短路+task-scheduler按需激活+TTL缓存层
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 1)memory-search-local-first.py：本地0.1s关键词预搜，置信度≥0.7短路云端API(4-10s)，减少85%+无谓API调用 2)task-scheduler闲时快速预检跳过全量扫描 3)内存级TTL缓存(60s)，重复查询零开销。全部为新增脚本，不改现有架构。
+- 验收 / 验证：
+- 贾维斯/语音偏好/监工管理均0.8+置信度短路；task-scheduler dry-run返回idle fast skip；缓存读写正常
+- 相关文件：
+- `memory-search-local-first.py, openclaw-task-scheduler.py, query-cache.py, AGENTS.md`

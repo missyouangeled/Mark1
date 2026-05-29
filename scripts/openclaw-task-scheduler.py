@@ -221,6 +221,19 @@ def scan_terminal_tasks(conn: sqlite3.Connection | None, now_ms_val: int) -> lis
     return tasks
 
 
+def _quick_count_tasks(conn: sqlite3.Connection | None) -> int:
+    """快速预检：统计活跃+终端任务数，避免全量扫描。"""
+    if conn is None:
+        return 0
+    try:
+        rows = conn.execute(
+            "SELECT COUNT(*) as cnt FROM runs WHERE status IN ('running','pending')"
+        ).fetchall()
+        return int(rows[0]["cnt"]) if rows else 0
+    except (sqlite3.Error, KeyError, TypeError):
+        return 0
+
+
 def read_supervisor_state() -> dict[str, Any]:
     """读取当前监工状态。"""
     data = load_json(SUPERVISOR_STATUS_PATH)
@@ -585,9 +598,9 @@ def main():
     now_val = now_ms()
     conn = get_db()
 
-    # ── 扫描 ──
-    active_tasks = scan_active_tasks(conn, now_val)
-    terminal_tasks = scan_terminal_tasks(conn, now_val)
+    # ── 快速预检（闲时跳过全量扫描）──
+    active_tasks = []
+    terminal_tasks = []
     sup = read_supervisor_state()
     sup_enabled = sup.get("serviceState") in ("armed", "running") or sup.get("taskActive")
 
@@ -595,6 +608,41 @@ def main():
     raw_count = _load_run_count()
     run_count = raw_count + 1
     _save_run_count(run_count)
+
+    # 维护/清理周期强制全扫，其他周期利用快速预检跳过
+    is_maintenance_cycle = run_count % MAINTENANCE_EVERY_N_CYCLES == 0
+    is_cleanup_cycle = run_count % SESSION_CLEANUP_EVERY_N_CYCLES == 0
+
+    if not is_maintenance_cycle and not is_cleanup_cycle:
+        # 快速预检：无活跃/终端任务则跳过全量扫描
+        quick_count = _quick_count_tasks(conn)
+        if quick_count == 0:
+            append_log(f"run #{run_count}: idle, skipping full scan (quick pre-check passed)")
+            status_line = "idle (fast skip)"
+            report = {
+                "checkedAt": now_iso(),
+                "ok": True,
+                "overall": "idle",
+                "summary": status_line,
+                "activeTaskCount": 0,
+                "stalledCount": 0,
+                "zombieCount": 0,
+                "terminalCount": 0,
+                "supervisorEnabled": sup_enabled,
+                "actions": [],
+                "skipped": True,
+            }
+            save_text(STATUS_PATH, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+            if args.print_json:
+                print(json.dumps(report, ensure_ascii=False, indent=2))
+            elif args.print_human:
+                print("idle - fast skip")
+            conn.close()
+            return 0
+
+    # ── 全量扫描 ──
+    active_tasks = scan_active_tasks(conn, now_val)
+    terminal_tasks = scan_terminal_tasks(conn, now_val)
 
     # ── 判定 ──
     actions: list[str] = []

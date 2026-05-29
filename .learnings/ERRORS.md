@@ -13033,3 +13033,93 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260529-031] tool-explicit-error
+
+**Logged**: 2026-05-29T05:24:50.847Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ [redacted].py — 本地预搜短路器 在调用 memory_search（云端 github-copilot，4-10s）之前，先用本地关键词 在 MEMORY.md + memory/*.md 中快速搜索。命中置信度 >= 0.7 则直接返回， 避免无谓的云端 API 调用。 用法： python3 scripts/[redacted].py "搜索词" → stdout: JSON 结果，含 shortCircuited=true/false 和 results → exit 0: 已短路（直接可用） exit 1: 需云端搜索 集成规则（见 AGENTS.md）： 每次调用 memory_search 前，先跑本…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-032] tool-explicit-error
+
+**Logged**: 2026-05-29T05:28:28.606Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ query-cache.py — 轻量 TTL 缓存层 为 memory_search / infos-handle / broker 重复查询提供本地 TTL 缓存。 不依赖 Redis，JSON 文件存储，适合单机低频调用。 默认 TTL: 60s，最大条目: 200 用法： python3 scripts/query-cache.py get <namespace> <key> → stdout: 缓存值或空(NOT_FOUND) python3 scripts/query-cache.py set <namespace> <key> <ttl> → stdin 读值 python3 scripts/query-cache…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-033] tool-timeout
+
+**Logged**: 2026-05-29T05:29:28.696Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec chmod +x /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py && \ chmod +x /home/missyouangeled/.openclaw/workspace/scripts/query-cache.py && \ echo "=== 第一次搜索（miss）===" && \ timeout 3 python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py "贾维斯" 2>&1 | head -3 && \ echo "" && \ echo "=== 第二次搜索（cache hit）===" && \ timeo…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

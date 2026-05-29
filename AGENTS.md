@@ -44,6 +44,23 @@ Don't ask permission. Just do it.
 
 - **每日记录** (`memory/daily/`): 每次对话结束后写当天的摘要。包含：聊了什么、谁说了什么重要的话、当天的新设定/改进要求。
 - **Memory flush 事件**：OpenClaw 会话压缩时触发的 flush 只能写 `memory/YYYY-MM-DD.md`（扁平路径，不能带子目录）。写成后由 `lifecycle-maintainer` 的 `flush-memory-sync.sh` 每 15 分钟自动追加到 `memory/daily/YYYY-MM-DD.md`。日常主动归档仍直接写 `memory/daily/`。
+
+### memory_search 三级搜索策略
+
+每次调用 `memory_search` 前，默认按以下顺序：
+
+1. **本地关键词短路** → `memory-search-local-first.py`
+   - 0.1s 内 grep MEMORY.md + memory/*.md
+   - 置信度 ≥ 0.7 → 直接短路，跳过云端 API
+   - 置信度 < 0.7 → 继续下一步
+   - 结果有 60s TTL 缓存，重复查询零开销
+
+2. **云端语义搜索** → `memory_search` 工具
+   - 本地短路失败时才调用
+   - github-copilot 向量搜索，4-10s
+
+3. **搜索后的再次确认** → `memory_get`
+   - 拿回精确内容，避免摘要偏差
 - **人物档案** (`memory/people.md`): 聊天中若提到一位新的人物，或补充了已有人的新信息，立即更新该文件。每个人物一段。
 - **回忆录** (`memory/stories.md`): 用户分享人生经历、感悟、回忆片段时，整理写入此文件。保留原始表达风格，不加修饰。
 - **MEMORY.md** (总索引): 保持精简。只放身份设定、偏好规则、关系上下文摘要。人物和回忆的完整内容指向子文件。
