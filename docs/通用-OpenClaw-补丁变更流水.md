@@ -655,3 +655,17 @@
 - memory_search 验证：121 文件/1493 chunk，搜索耗时 4-6s，vectorScore 0.54-0.63
 - 相关文件：
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-05-29 12:03:20 CST (+08:00) — 系统减法优化7项：去重+降频+清理闲置
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 1)删QMD模型2.1G(81→76%) 2)禁embedInterval 3)broker-rebuild timer去重 4)task-scheduler 30→60s 5)lifecycle 5→15min 6)删2个失败cron 7)停NVIDIA audio bridge。全为减法，零新增。
+- 验收 / 验证：
+- 根盘76%，服务4→3，timer 7→6，cron 7→5，memory_search正常，QMD BM25正常
+- 相关文件：
+- `openclaw.json, 多个systemd timer, lifecycle-maintainer.py`

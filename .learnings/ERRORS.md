@@ -12673,3 +12673,183 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260529-019] tool-timeout
+
+**Logged**: 2026-05-29T03:23:52.932Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 列出 OpenClaw timer 名称 systemctl --user list-timers --all --no-legend 2>/dev/null | grep openclaw | awk '{printf "%-50s %-12s %s\n", $2, $7, $8}' echo "" echo "=== Cron 任务 ===" python3 << 'PY' import subprocess, json try: result = subprocess.run(['openclaw', 'cron', 'list'], capture_output=True, text=True, timeout=10) print(result.stdout[:2000])…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-020] tool-policy-blocked
+
+**Logged**: 2026-05-29T03:45:58.273Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --activate-task --reason '系统优化清理7项' --print-human 2>&1 10 [redacted] [redacted] completed 0 4023
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-021] tool-explicit-error
+
+**Logged**: 2026-05-29T03:46:58.982Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 -c " import json path='/home/missyouangeled/.openclaw/openclaw.json' with open(path) as f: c=json.load(f) old=c['memory']['qmd']['update']['embedInterval'] c['memory']['qmd']['update']['embedInterval']='0' with open(path,'w') as f: json.dump(c,f,indent=2,ensure_ascii=False) print(f'embedInterval: {old} → 0') " && systemctl --user restart…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-022] tool-explicit-error
+
+**Logged**: 2026-05-29T03:59:34.945Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit - 每 15min 聚合 transcript - 日志轮转（256KB→保留 64KB） - 每 2 次（=30min）做一次文件清理" - 每 5min 聚合 transcript - 日志轮转（256KB→保留 64KB） - 每 6 次（=30min）做一次文件清理" /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py [redacted] [redacted] 1033
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-023] tool-explicit-error
+
+**Logged**: 2026-05-29T04:01:57.720Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process faint-rook 15000 poll [redacted] [redacted] failed 3230
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-024] tool-explicit-error
+
+**Logged**: 2026-05-29T04:02:27.237Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kind-dune 15000 poll [redacted] [redacted] failed 3541
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

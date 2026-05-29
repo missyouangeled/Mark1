@@ -146,3 +146,15 @@
 - 相关文件：
 - `/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/extensions/deepseek/openclaw.plugin.json`
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-05-29 11:19:26 CST (+08:00) — 新增规则：多问题自动拆分+分段回答
+
+- 类型：rule
+- 适用范围：通用
+- 当前状态：已生效
+- 未纳入正式补丁原因：
+- 用户偏好：当问题很多、回答会很长时，自动分问题思考，分段回答，避免一次性超长回复
+- 后续排查 / 恢复提示：
+- N/A
+- 相关文件：
+- `MEMORY.md`

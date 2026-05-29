@@ -6,9 +6,9 @@
   - daily-transcript-aggregator: 聚合当日所有转录
   - cleanup-temp:                清理过期临时文件
 
-每 5min 运行一次：
+每 15min 运行一次：
   - 每次都做转录聚合
-  - 每 6 次（=30min）做一次文件清理
+  - 每 2 次（=30min）做一次文件清理
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ REPORT_PATH = STATE_DIR / "last-report.json"
 LOG_PATH = STATE_DIR / "maintainer.log"
 LOG_ROTATE_MAX_BYTES = 256 * 1024
 LOG_ROTATE_KEEP_BYTES = 64 * 1024
-CLEANUP_EVERY_N = 6  # 5min × 6 = 30min
+CLEANUP_EVERY_N = 2  # 15min × 2 = 30min (timer changed from 5min to 15min)
 
 
 def now_iso() -> str:
