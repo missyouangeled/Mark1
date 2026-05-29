@@ -3683,3 +3683,31 @@ runs.sqlite ──→ 调度器 ──→ supervisor-status.py --set-policy-mode
 - `openclaw tasks audit --severity error`：每 5min 审计，发现问题通知前台
 - 旧 subagent/dashboard 会话自动清理
 - 并发控制（>4 active 告警）+ 失败检测（10min 窗口去重通知）
+
+---
+
+## QMD 语义搜索排查结论 (2026-05-29)
+
+### 背景
+QMD 的 `memory_search` 一直返回 0 结果。排查根因：embedInterval=0 导致向量未生成，修复后发现 vsearch 在无 GPU 机器上不可用。
+
+### 测试结果
+
+| 方案 | 延迟 | 效果 | 结论 |
+|------|------|------|------|
+| QMD `search` (BM25) | <1s | 中文语义弱 | 可用作备用 |
+| QMD `vsearch` (向量) | 120s+/OOM | 需加载 1.2GB LLM | ❌ CPU 不可行 |
+| QMD vsearch + 禁用 LLM | CLI: 3.2s / OpenClaw: ❌ | 缓存不命中 | ❌ 脆弱 |
+| **builtin + github-copilot** | **4-6s** | **语义准确** | ✅ **生产方案** |
+
+### 根因
+QMD vsearch 调用链：`vsearch → expandQuery() → ensureGenerateModel()`，即使纯向量搜索也加载 1.2GB LLM 做查询扩展。禁用 LLM 后 CLI 可跑（走缓存），但 OpenClaw 集成时 collection 名不同，缓存不命中。
+
+### 当前方案
+- 引擎：`builtin`（OpenClaw 内置 SQLite 向量引擎）
+- 嵌入：`github-copilot`（云端 API，无需本地模型）
+- 配置：`memory.backend: "builtin"` + `memorySearch.provider: "github-copilot"`
+- 索引：121 文件 / 1493 chunk，向量优先搜索 + BM25 兜底
+
+### 恢复 QMD
+若后续上 GPU，在 `openclaw.json` 中将 `memory.backend` 改回 `"qmd"` 即可。

@@ -571,3 +571,87 @@
 - 相关文件：
 - `/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/extensions/deepseek/openclaw.plugin.json`
 - `/home/missyouangeled/.openclaw/workspace/patches/auto-reapply/deepseek-v4-pro-reasoning-off.sh`
+
+## 2026-05-28 08:42:52 CST (+08:00) — 批量卸载：OpenCLI + Google Chrome + browser-automation + npm缓存清理；新建安装注册表
+
+- 类型：cleanup
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 卸载 OpenCLI(26MB)、Google Chrome(423MB)、browser-automation软链接、npm缓存(527MB)，共释放约1GB根盘空间。保留 agent-browser。新建 docs/install-registry.md 作为工具/Skill安装卸载的统一注册表，并更新 AGENTS.md / MEMORY.md 引用。
+- 验收 / 验证：
+- 根盘从78%降至76%；所有残留已清理验证通过
+- 相关文件：
+- `docs/install-registry.md`
+
+## 2026-05-28 09:00:35 CST (+08:00) — 卸载系统自带游戏：麻将/扫雷/数独 + 残留依赖
+
+- 类型：cleanup
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 卸载 gnome-mahjongg(4.9M) + gnome-mines(1.7M) + gnome-sudoku(2.0M)，含自动清理残留库 libgnome-games-support/libqqwing，共释放约9.3MB
+- 验收 / 验证：
+- apt list --installed 确认三个包已不在；/usr/games 目录下对应二进制已清除
+- 相关文件：
+- `docs/install-registry.md`
+
+## 2026-05-28 09:16:03 CST (+08:00) — 卸载非必要桌面应用：Onboard/Pluma/PowerStats/Printers + 残留
+
+- 类型：cleanup
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 卸载 onboard(25M) + pluma(27M) + gnome-power-manager(0.3M) + system-config-printer(1.9M) 及 9 个残留依赖，共释放约62MB
+- 验收 / 验证：
+- dpkg -l 确认全部已清除
+- 相关文件：
+- `docs/install-registry.md`
+
+## 2026-05-28 09:21:39 CST (+08:00) — 卸载 LibreOffice Draw/Math（连带 Impress）+ 残留
+
+- 类型：cleanup
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 卸载 libreoffice-draw(12M) + libreoffice-math(2M) + libreoffice-impress(连带移除) 及 6 个残留依赖，共释放约31MB。保留 Writer + Calc 核心组件。
+- 验收 / 验证：
+- dpkg -l 确认 draw/math/impress 已清除；writer/calc 正常保留
+- 相关文件：
+- `docs/install-registry.md`
+
+## 2026-05-28 15:41:12 CST (+08:00) — 系统审计修复：health-collector三态退出/QMD重建/ChatTTS资产确认
+
+- 类型：bugfix
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修复health-collector对supervisor exit2的误判(改为三态OK/⚠/❌)；QMD索引1300块→重建验证119文件；ChatTTS资产确认在tmp/下完整。systemd不再因降级状态误触FAILURE。
+- 验收 / 验证：
+- health-collector exit0 on degraded; QMD index 119/119; ChatTTS 7files 325MB
+- 相关文件：
+- `scripts/openclaw-health-collector.py`
+
+## 2026-05-29 10:57:05 CST (+08:00) — QMD 语义搜索排查 → 切换到 builtin + github-copilot embeddings
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- QMD vsearch 在无 GPU 机器上因需要加载 1.2GB LLM 做查询扩展，导致 120s 超时或 OOM；切到 OpenClaw builtin 引擎 + github-copilot 云端 embedding，向量搜索 4-6s 完成，语义召回正常。
+- 验收 / 验证：
+- memory_search 验证：121 文件/1493 chunk，搜索耗时 4-6s，vectorScore 0.54-0.63
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`

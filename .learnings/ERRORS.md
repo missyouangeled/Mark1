@@ -11487,3 +11487,1189 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+
+## 2026-05-27: OpenCLI 安装（已装，未完成扩展加载）
+
+**安装状态**:
+- ✅ CLI: v1.8.0 已通过 npm 全局安装
+- ✅ Daemon: 运行在 port 19825，正常
+- ⚠️ Chrome 扩展: 文件已下载到 /tmp/opencli-extension，但未手动加载
+
+**核心限制**:
+- OpenCLI 只能配合 Chrome/Chromium 使用（依赖 CDP 协议）
+- Firefox 不支持（Firefox 使用自己的远程调试协议，不兼容 CDP）
+- 用户日常使用 Firefox，Chrome 用得很少
+
+**扩展文件位置**: /tmp/opencli-extension/（已从 jsDelivr CDN 下载）
+**如需继续**: 在 Chrome 里打开 chrome://extensions → 开发者模式 → 加载 /tmp/opencli-extension
+
+## [ERR-20260527-008] tool-explicit-error
+
+**Logged**: 2026-05-27T09:50:53.737Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll calm-atlas 30000 [redacted] [redacted] failed 0 21382
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-001] tool-explicit-error
+
+**Logged**: 2026-05-28T00:30:17.683Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --source 'morning-greeting' --file /tmp/proactive-message.txt /home/missyouangeled/.openclaw/workspace [redacted] [redacted] failed 3041
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:80a930fd-e90a-48e4-8754-5512025bf8da
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-002] tool-explicit-error
+
+**Logged**: 2026-05-28T00:33:49.290Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process lucky-canyon kill [redacted] [redacted] failed 1223
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-003] tool-explicit-error
+
+**Logged**: 2026-05-28T00:54:56.434Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process crisp-summit 15000 poll [redacted] [redacted] failed 9952
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-004] tool-exec-nonzero-exit
+
+**Logged**: 2026-05-28T03:15:17.492Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec exited with non-zero status 35.
+
+### Error
+```text
+[exec] exec echo "Exit code: $?" [redacted] [redacted] completed 0 27
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:28256997-caa7-4688-8a7e-ed52b648df6b:run:35a2c1dc-2c4c-4c43-ac7b-f0becea0f3fe
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-005] tool-timeout
+
+**Logged**: 2026-05-28T06:57:19.779Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 修复1: Gateway TimeoutStopSec 30→120 (防止 SIGKILL) sed -i 's/TimeoutStopSec=30/TimeoutStopSec=120/' ~/.config/systemd/user/openclaw-gateway.service echo "✅ TimeoutStopSec 已改为 120s" echo "" # 修复2: 清理 5个弃用 watcher 的 service + timer (10 个文件) rm -v ~/.config/systemd/user/openclaw-cleanup-temp.* rm -v ~/.config/systemd/user/[redacted].* rm -v ~/.confi…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-006] tool-policy-blocked
+
+**Logged**: 2026-05-28T06:59:22.570Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec # 修复4: 重置 Supervisor python3 ~/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --deactivate-task --reason '审计修复：无active任务不应标记taskActive' --print-human echo "=====分隔=====" # 建议5: agent-browser Chrome 迁数据盘 echo "当前大小:" du -sh ~/.agent-browser/browsers/ 2>/dev/null echo "迁移到 /mnt/data/openclaw/agent-browser-browsers/" mkdir -p /mnt…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-007] tool-policy-blocked
+
+**Logged**: 2026-05-28T07:35:54.283Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec echo "===== supervisor 退出码含义 =====" grep -n "sys.exit\|exit(0\|exit(1\|exit(2\|OK\|WARN\|⚠\|CRITICAL\|ERR" ~/.openclaw/workspace/scripts/[redacted].py | head -20 echo "" echo "===== 测试各种模式下退出码 =====" python3 ~/.openclaw/workspace/scripts/[redacted].py --print-human; echo "EXIT=$?" echo "---" python3 ~/.openclaw/workspace/scripts/[redacted].py --…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-008] tool-explicit-error
+
+**Logged**: 2026-05-28T07:41:14.047Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 更新注册表 cat >> ~/.openclaw/workspace/docs/install-registry.md << 'EOF' ## 2026-05-28 | 系统整体审计 + 三连修复 ### 🔧 修复1：health-collector 误判修复 - **时间**：2026-05-28 15:37 CST - **问题**：supervisor exit 2(warning/degraded) 被当作 crash → `return 1` → systemd FAILURE → 频繁重启循环 - **修复**：修改 `scripts/[redacted].py`： - `run_sub_check` 增加 `degraded` 字段（exit 2） - `overa…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-009] tool-timeout
+
+**Logged**: 2026-05-28T09:51:54.299Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec echo "===== QMD Model Cache =====" ls -la ~/.cache/qmd/models/ 2>/dev/null echo "" du -sh ~/.cache/qmd/models/ 2>/dev/null echo "" echo "===== QMD package.json embedding/model =====" cat ~/.npm-global/lib/node_modules/@tobilu/qmd/package.json 2>/dev/null | python3 -c " import sys,json d=json.load(sys.stdin) print('version:', d.get('version')) pr…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-010] tool-explicit-error
+
+**Logged**: 2026-05-28T09:52:13.155Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # QMD 说 "All content hashes already have embeddings" — 向量已经生成了！ echo "===== 直接测试 QMD 向量搜索 =====" qmd vsearch "贾维斯 点点 身份" -n 5 --json 2>&1 | head -20 echo "" echo "===== 直接测试 hybrid 查询 =====" qmd query "贾维斯 点点" -n 5 --json 2>&1 | head -20 echo "" echo "===== SQLite 数据库检查 =====" sqlite3 ~/.cache/qmd/index.sqlite ".tables" 2>/dev/null echo "" sqlit…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-011] tool-timeout
+
+**Logged**: 2026-05-28T09:52:31.329Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec echo "===== sqlite-vec 安装状态 =====" find ~/.npm-global/lib/node_modules/@tobilu/qmd -name "sqlite-vec*" -type f 2>/dev/null | head -5 echo "" npm ls -g sqlite-vec-linux-x64 2>/dev/null echo "" echo "===== QMD 模块实际 vendor 内容 =====" ls ~/.npm-global/lib/node_modules/@tobilu/qmd/node_modules/ 2>/dev/null | head -15 echo "" echo "===== 强制重新 embed 看看是…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-012] tool-timeout
+
+**Logged**: 2026-05-28T09:55:17.922Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # QMD 模型格式: hf:<user>/<repo>/<file> # 试 HF_ENDPOINT 环境变量切镜像 echo "===== 用 hf-mirror 拉模型 =====" HF_ENDPOINT=[url] timeout 60 qmd embed -f --max-docs-per-batch 3 --max-batch-mb 5 2>&1 echo "EXIT=$?" echo "" echo "===== 检查模型是否下载 =====" du -sh ~/.cache/qmd/models/ find ~/.cache/qmd/models -type f -o -type d 2>/dev/null 75 [redacted] [redacted] compl…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-013] tool-explicit-error
+
+**Logged**: 2026-05-28T09:59:36.035Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll gentle-falcon 120000 [redacted] [redacted] failed 0 34044
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-014] tool-timeout
+
+**Logged**: 2026-05-28T10:01:22.325Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec echo "===== 检查 OOM =====" dmesg | grep -i "oom\|out of memory\|killed" | tail -5 echo "" echo "===== 当前内存 =====" free -h echo "" echo "===== 用更小批量重试 =====" # 每次只处理 5 个文档，内存上限 5MB timeout 300 qmd embed -f --max-docs-per-batch 5 --max-batch-mb 5 2>&1 echo "EXIT=$?" 360 90000 [redacted] [redacted] running 98972
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-015] tool-timeout
+
+**Logged**: 2026-05-28T10:06:03.601Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 开启 OpenClaw 的 embedInterval python3 << 'PYEOF' import json path = "/home/missyouangeled/.openclaw/openclaw.json" with open(path) as f: cfg = json.load(f) # 设置 embedInterval: "0" → "30m" cfg["memory"]["qmd"]["update"]["embedInterval"] = "30m" # 增加 embed 超时 (纯CPU需要更久) cfg["memory"]["qmd"]["update"]["embedTimeoutMs"] = 300000 with open(path, "w")…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-016] tool-explicit-error
+
+**Logged**: 2026-05-28T10:07:58.205Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll grand-kelp 30000 [redacted] [redacted] failed 12043
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-017] tool-explicit-error
+
+**Logged**: 2026-05-28T10:08:37.965Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 杀掉所有 qmd 进程 pkill -f "qmd" 2>/dev/null; sleep 1 echo "残留进程:" pgrep -af qmd 2>/dev/null || echo "✅ 已全部清理" echo "" echo "===== QMD 已下载的模型 =====" du -sh ~/.cache/qmd/models/* echo "" echo "===== 磁盘状态 =====" df -h / [redacted] [redacted] failed 8191
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-018] tool-explicit-error
+
+**Logged**: 2026-05-28T10:12:31.291Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 清理残留 QMD 进程 pkill -9 -f "qmd" 2>/dev/null sleep 1 pgrep -af qmd 2>/dev/null || echo "✅ QMD 清理完毕" echo "" # 删掉未完成的下载 echo "===== 磁盘 =====" df -h / | tail -1 echo "" du -sh ~/.cache/qmd/models/ 2>/dev/null 10 [redacted] [redacted] failed 2695
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-019] tool-timeout
+
+**Logged**: 2026-05-28T10:12:50.973Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write # HANDOFF.md — 2026-05-28 下班 ## 状态：QMD 语义搜索 — 进行中，阻塞于内存 ### 背景 QMD 的 `embedInterval` 被设为 `"0"`，向量搜索一直没开。`memory_search` 返回 0 是因为只能做 BM25 关键词匹配。 ### 已完成 - [x] 模型下载：[redacted].gguf (~334MB) 已在 `~/.cache/qmd/models/` - [x] QMD 集合注册：`memory` 集合 → `~/.openclaw/workspace/memory` (118 文件) - [x] OpenClaw 配置已改：`embedInterval: "30m"`, `embedTimeoutMs: 3…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260528-020] tool-timeout
+
+**Logged**: 2026-05-28T10:13:09.989Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write # 2026-05-28 每日记录 ## 聊天摘要 - 下午四点半，点点说无聊，聊了会天——人在工位心已放假 - 后来转向 QMD 语义搜索排查修复 ## 工作内容 ### 系统审计与清理 - 系统级扫描：回收站 317MB、apt 缓存 172MB、journal 日志压缩(334→96MB)、pip/node-gyp/unity3d 缓存、Chrome deb 残留 → 释放 ~1GB - 根盘 78% → 73% - OpenClaw 架构审计：核心服务 4 个、watcher 4 个、broker、会话、skill、记忆 ### 修复项 - Gateway TimeoutStopSec 30s→120s - 清理 5 个弃用 watcher 的 10 个 systemd 文…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-001] tool-explicit-error
+
+**Logged**: 2026-05-29T00:42:44.212Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd ~/.cache/qmd/models && HF_ENDPOINT=[url] qmd embed --help 2>&1 | head -5 && echo "--- 开始拉取 reranker 模型 ---" && HF_ENDPOINT=[url] huggingface-cli download ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF qwen3-reranker-0.6b-q8_0.gguf --local-dir . 2>&1 300 [redacted] [redacted] failed 127 17481
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-002] tool-explicit-error
+
+**Logged**: 2026-05-29T00:50:55.321Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process neat-harbor 120000 poll [redacted] [redacted] failed 0 39370
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-003] tool-explicit-error
+
+**Logged**: 2026-05-29T01:04:48.587Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process amber-cove 300000 poll [redacted] [redacted] failed 38433
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-004] tool-explicit-error
+
+**Logged**: 2026-05-29T01:09:02.506Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill tide-cove [redacted] [redacted] failed 43659
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-005] tool-explicit-error
+
+**Logged**: 2026-05-29T01:12:45.894Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec pkill -9 -f qmd && sleep 2 && echo "所有 QMD 进程已杀掉" && free -h | head -2 [redacted] [redacted] failed 39472
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-006] tool-explicit-error
+
+**Logged**: 2026-05-29T01:19:02.312Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process tide-glade 60000 poll [redacted] [redacted] failed 13531
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-007] tool-connection-failure
+
+**Logged**: 2026-05-29T01:37:24.043Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool memory_search failed because of a connection or remote access problem.
+
+### Error
+```text
+[memory_search] memory_search 语音回复 默认声音 偏好 [redacted] [redacted] fetch failed | getaddrinfo EAI_AGAIN api.github.com | fetch failed | getaddrinfo EAI_AGAIN api.github.com 154726
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: memory_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-008] tool-connection-failure
+
+**Logged**: 2026-05-29T01:40:01.300Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool memory_search failed because of a connection or remote access problem.
+
+### Error
+```text
+[memory_search] memory_search 贾维斯 身份 名字 [redacted] [redacted] fetch failed | getaddrinfo EAI_AGAIN api.github.com | fetch failed | getaddrinfo EAI_AGAIN api.github.com 317890
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: memory_search
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-009] tool-timeout
+
+**Logged**: 2026-05-29T02:11:58.946Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec timeout 120 qmd vsearch "贾维斯" --json -n 5 -c memory 2>&1 130 [redacted] [redacted] running 25267
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-010] tool-explicit-error
+
+**Logged**: 2026-05-29T02:13:46.672Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process tidy-sable 180000 poll [redacted] [redacted] failed 124 32650
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-011] tool-timeout
+
+**Logged**: 2026-05-29T02:18:08.816Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # Phase 1: 诊断 - QMD vsearch 到底加载了哪些模型？ # 用 strace 跟踪模型文件访问 timeout 15 strace -f -e openat,read qmd vsearch "test" -n 1 -c memory 2>&1 | grep -i "gguf\|model" | head -20 echo "=== exit: $? ===" 20 [redacted] [redacted] completed 0 2570
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-012] tool-policy-blocked
+
+**Logged**: 2026-05-29T02:22:53.728Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec # 开监工服务（工作型任务） python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --activate-task --reason 'QMD系统排查优化' --print-human 2>&1 10 [redacted] [redacted] completed 0 2812
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-013] tool-timeout
+
+**Logged**: 2026-05-29T02:23:32.936Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # A1: 用 QMD_GENERATE_MODEL="" 测试 vsearch 行为 QMD_GENERATE_MODEL="" timeout 60 qmd vsearch "贾维斯" -n 3 -c memory 2>&1 70 10000 [redacted] [redacted] running 13660
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-014] tool-timeout
+
+**Logged**: 2026-05-29T02:25:02.133Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 给 180 秒，看能不能跑完 QMD_GENERATE_MODEL="" timeout 180 qmd vsearch "贾维斯" -n 3 -c memory 2>&1; echo "EXIT: $?" 200 15000 [redacted] [redacted] running 18469
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-015] tool-timeout
+
+**Logged**: 2026-05-29T02:26:21.605Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 用 truthy 但不存在的文件路径来禁用 LLM # 同时计时 export QMD_GENERATE_MODEL="/dev/null/disabled" time timeout 180 qmd vsearch "贾维斯" -n 3 -c memory 2>&1; echo "EXIT: $?" 200 15000 [redacted] [redacted] completed 0 8456
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-016] tool-explicit-error
+
+**Logged**: 2026-05-29T02:40:35.715Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 重启 gateway systemctl --user restart openclaw-gateway && echo "重启中..." && sleep 5 && systemctl --user is-active openclaw-gateway && echo "gateway 运行中" 30 [redacted] [redacted] failed 5457
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-017] tool-explicit-error
+
+**Logged**: 2026-05-29T02:55:38.260Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec systemctl --user daemon-reload && systemctl --user restart openclaw-gateway && echo "已清理并重启" 15 [redacted] [redacted] failed 5332
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-018] tool-policy-blocked
+
+**Logged**: 2026-05-29T02:58:02.746Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec # 工作结束，收监工 python3 /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py --set-policy-mode auto --deactivate-task --reason 'QMD排查完成' --print-human 2>&1 10 [redacted] [redacted] completed 0 806
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

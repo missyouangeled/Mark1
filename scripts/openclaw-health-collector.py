@@ -78,14 +78,16 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, An
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         ok = result.returncode == 0
+        degraded = result.returncode == 2  # exit 2 = warning/degraded, not a crash
         stdout = (result.stdout or "").strip()
         stderr = (result.stderr or "").strip()
         first_line = stdout.split("\n")[0] if stdout else ""
         return {
             "label": label,
             "ok": ok,
+            "degraded": degraded,
             "exitCode": result.returncode,
-            "summary": first_line[:200] if first_line else ("error" if not ok else "ok"),
+            "summary": first_line[:200] if first_line else ("degraded" if degraded else "error" if not ok else "ok"),
             "stderr": stderr[:300] if stderr else None,
         }
     except subprocess.TimeoutExpired:
@@ -153,9 +155,17 @@ def main():
         append_log(f"run #{new_count}: lightweight (supervisor + broker only, next full at #{FULL_CHECK_EVERY_N})")
 
     # ── 汇总 ──
+    # ok: exit 0 only  |  degraded: exit 2 (warning, not a crash)  |  failed: exit 1/exception/timeout
     all_ok = all(c.get("ok") for c in checks)
+    any_degraded = any(c.get("degraded") for c in checks)
+    any_failed = any((not c.get("ok") and not c.get("degraded")) for c in checks)
     summary = "；".join(c.get("summary", "?") for c in checks)
-    overall = "OK" if all_ok else "⚠"
+    if any_failed:
+        overall = "❌"
+    elif any_degraded or not all_ok:
+        overall = "⚠"
+    else:
+        overall = "OK"
 
     report = {
         "checkedAt": now_iso(),
@@ -168,15 +178,19 @@ def main():
     }
     save_text(REPORT_PATH, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
 
-    if not all_ok:
-        failed = [c["label"] for c in checks if not c.get("ok")]
+    if any_failed:
+        failed = [c["label"] for c in checks if not c.get("ok") and not c.get("degraded")]
         append_log(f"ANOMALY overall={overall} failed={','.join(failed)}")
+    elif any_degraded:
+        degraded_list = [c["label"] for c in checks if c.get("degraded")]
+        append_log(f"DEGRADED overall={overall} degraded={','.join(degraded_list)}")
 
     if args.print_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     elif args.print_human:
         print(f"{overall} - {summary}")
-    return 0 if all_ok else 1
+    # exit 0 = all fine or degraded (warning), exit 1 = real failures only
+    return 0 if not any_failed else 1
 
 
 if __name__ == "__main__":

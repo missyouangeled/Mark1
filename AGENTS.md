@@ -20,6 +20,14 @@ Before doing anything else:
 
 Don't ask permission. Just do it.
 
+## 安装注册表 — Install Registry
+
+- 每次安装/卸载工具、Skill、扩展、系统包时，必须同步记录到 `docs/install-registry.md`
+- 格式包括：时间、来源/地址、安装命令、版本、路径、依赖、是否成功、备注
+- 卸载也要记录（包括释放空间和残留清理情况）
+- 这个文件设计为**AI 可读**——无论换什么模型都能直接读取
+- 当用户让你"找什么东西"或"装什么 Skill"时，先查这个文件看历史记录
+
 ## Memory — 分类归档体系
 
 记忆按三类归档，每次会话结束后（或会话中遇到值得记录的内容时）自动整理：
