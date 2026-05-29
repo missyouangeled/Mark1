@@ -76,9 +76,9 @@ def append_log(line: str) -> None:
         fh.write(f"[{ts}] {line}\n")
 
 
-def run_sub_check(label: str, cmd: list[str]) -> dict[str, Any]:
+def run_sub_check(label: str, cmd: list[str], timeout: int = 120) -> dict[str, Any]:
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         ok = result.returncode == 0
         stdout = (result.stdout or "").strip()
         stderr = (result.stderr or "").strip()
@@ -92,7 +92,7 @@ def run_sub_check(label: str, cmd: list[str]) -> dict[str, Any]:
         }
     except subprocess.TimeoutExpired:
         append_log(f"{label}: TIMEOUT")
-        return {"label": label, "ok": False, "exitCode": -1, "summary": "TIMEOUT", "stderr": "subprocess timed out after 120s"}
+        return {"label": label, "ok": False, "exitCode": -1, "summary": "TIMEOUT", "stderr": f"subprocess timed out after {timeout}s"}
     except Exception as exc:
         append_log(f"{label}: EXCEPTION {exc}")
         return {"label": label, "ok": False, "exitCode": -2, "summary": f"EXCEPTION: {exc}", "stderr": str(exc)[:300]}

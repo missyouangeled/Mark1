@@ -173,6 +173,25 @@ def main():
     boot_ok = ok and "错误" not in out and "error" not in out.lower()
     checks.append(check("boot-health-check", boot_ok, out[:100] if out else "no output"))
 
+    # ── 12. timer service 最近一次运行结果 ──
+    timer_services = [
+        "openclaw-health-collector.service",
+        "openclaw-task-scheduler.service",
+        "openclaw-frontstage-guardian.service",
+        "openclaw-lifecycle-maintainer.service",
+        "openclaw-resume-watch.service",
+    ]
+    bad_services = []
+    for unit in timer_services:
+        ok, out, _ = run(["systemctl", "--user", "show", unit, "-p", "Result", "-p", "ExecMainStatus", "--no-pager"], timeout=5)
+        if not ok or "Result=success" not in out or "ExecMainStatus=0" not in out:
+            bad_services.append(f"{unit}:{out.replace(chr(10), ',')}")
+    checks.append(check(
+        "timer-service-last-result",
+        not bad_services,
+        "all timer services last run success" if not bad_services else "; ".join(bad_services)[:200],
+    ))
+
     # ── 输出 ──
     passed = sum(1 for c in checks if c["ok"])
     failed = len(checks) - passed

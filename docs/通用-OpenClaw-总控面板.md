@@ -15,7 +15,7 @@
 
 ---
 
-## 一、全量清单（总 32 项：22 正式补丁 + 3 非正式修复 + 4 维护备忘 + 3 待处理）
+## 一、全量清单（总 39 项：22 正式补丁 + 3 非正式修复 + 4 维护备忘 + 8 自定义 Skill + 2 待处理）
 
 ### 🏗️ 基础设施（infrastructure）
 
@@ -62,6 +62,7 @@
 |----|------|------|--------|------|
 | P20 | `patch` | 升级后自检 | 版本变化时自动跑自检；升级记录回溯历史教训 | [注册表](#patch-post-upgrade-self-check) |
 | P21 | `patch` | 语言锁定 | 所有模型强制中文输出 | [注册表](#patch-language-lock) |
+| P22 | `patch` | 开机体检自愈 | Gateway 启动后扫描核心服务/定时器/磁盘/内存/端口，异常可回报 | [注册表](#patch-boot-health-check) |
 
 ### 📝 非正式修复（MEMO）
 
@@ -99,9 +100,8 @@
 
 | ID | 类型 | 名称 | 说明 |
 |----|------|------|------|
-| C01 | `cleanup` | 淘汰旧 watcher 脚本 | `openclaw-responsiveness-watch.py` / `openclaw-frontstage-recovery-watch.py` / `openclaw-stuck-session-detector.py` — 已被 watcher v2 取代，systemd 不再引用，可归档 |
+| C01 | `cleanup` | 淘汰旧 watcher 脚本 | `openclaw-responsiveness-watch.py` / `openclaw-frontstage-recovery-watch.py` — 已被 watcher v2 取代，systemd 不再引用，可归档；`openclaw-stuck-session-detector.py` 仍被 health-collector 调用，不能归档 |
 | C02 | `cleanup` | ChatTTS 烟雾测试脚本 | `chattts_seeta_smoke*.py` × 17 个测试脚本，可归档到 `tmp/` |
-| C03 | `todo` | boot-health-check 晋升 | `openclaw-boot-health-check.py` 已稳定运行多日，可升级为正式补丁 PATCH-BOOT-HEALTH-CHECK |
 
 ---
 
@@ -117,7 +117,7 @@
               ▼                  ▼                   ▼
      ┌──────────────┐  ┌──────────────┐   ┌──────────────┐
      │ P01 Branding │  │ P02 进行中   │   │ P21 语言锁定 │
-     │ P20 升级自检 │  │   信号       │   │              │
+     │ P20/P22 自检 │  │   信号       │   │              │
      └──────────────┘  └──────────────┘   └──────────────┘
               │                  │
               ▼                  ▼
@@ -192,6 +192,7 @@
 |------|------|------|
 | 🤖 **自动** | P01-P02 品牌补丁 | gateway 启动前 ExecStartPre 自动重打 |
 | 🤖 **自动** | P20 升级自检 | BOOT.md → 版本变化时自动跑 self-check |
+| 🤖 **自动** | P22 开机体检 | BOOT.md → gateway 启动后跑 boot-health-check |
 | 🤖 **自动** | P12 watcher timer | systemd timer 开机自启 |
 | 🤖 **自动** | P17 resume 恢复 | timer 检测唤醒后自动重启 gateway |
 | 🔄 **半自动** | P03-P05 broker/sidecar/proxy | timer 周期重建，但升级后需手工 apply 一次 |

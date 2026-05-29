@@ -753,3 +753,17 @@
 - verify-today-patches.py 11/11 passed; 总控面板覆盖所有22个正式补丁+3非正式+4备忘+3待处理
 - 相关文件：
 - `总控面板.md, 补丁注册表.md, 补丁重建清单.md, 升级后自检清单.md, verify-today-patches.py`
+
+## 2026-05-29 16:21:15 CST (+08:00) — 架构巡检修复：lifecycle-maintainer参数漂移+验证脚本补timer服务结果
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：已更新
+- 结果摘要：
+- 架构巡检发现 lifecycle-maintainer.service 每15分钟失败，根因是 run_sub_check 不接收 timeout 参数；已修复函数签名并补 verify 脚本检查5个timer service最近一次Result/ExecMainStatus；总控面板同步校正P22和stuck-session-detector归属
+- 验收 / 验证：
+- python3 scripts/verify-today-patches.py --print => 12/12 passed；systemctl show openclaw-lifecycle-maintainer.service => Result=success ExecMainStatus=0
+- 相关文件：
+- `scripts/openclaw-lifecycle-maintainer.py,scripts/verify-today-patches.py,docs/通用-OpenClaw-总控面板.md`
