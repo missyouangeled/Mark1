@@ -12913,3 +12913,93 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260529-027] tool-explicit-error
+
+**Logged**: 2026-05-29T04:49:52.668Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 1. 检查 builtin memory search 代码位置 find ~/.npm-global/lib/node_modules/openclaw -path "*/memory/builtin*" -o -path "*/memory-search*" 2>/dev/null | head -10 && echo "---" && grep -rl "searchMode\|vectorScore\|bm25\|textScore" ~/.npm-global/lib/node_modules/openclaw/dist/ 2>/dev/null | head -5 5 [redacted] [redacted] failed 0 10570
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-028] tool-explicit-error
+
+**Logged**: 2026-05-29T04:52:13.686Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit append_log(f"run #{new_count}: full check triggered (supervisor + broker + local-health)") else: append_log(f"run #{new_count}: lightweight (supervisor + broker-on-dirty only, next full at #{FULL_CHECK_EVERY_N})") append_log(f"run #{new_count}: full check triggered (supervisor + broker + local-health)") else: a…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-029] tool-timeout
+
+**Logged**: 2026-05-29T04:53:13.580Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit timed out.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py # 1. 刷新 supervisor 状态\n checks.append(run_sub_check(\n \"supervisor-refresh\",\n [sys.executable, str(SCRIPTS / \"[redacted].py\"),\n \"--notify-transitions\", \"--print-human\"],\n timeout=30,\n )) [redacted] [redacted] 960
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

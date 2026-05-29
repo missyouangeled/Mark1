@@ -32,6 +32,27 @@ LOG_PATH = STATE_DIR / "guardian.log"
 LOG_ROTATE_MAX_BYTES = 512 * 1024
 LOG_ROTATE_KEEP_BYTES = 128 * 1024
 
+# broker dirty flag — 发现异常时置脏，触发 health-collector 下一次立即重建
+BROKER_DIRTY_PATH = Path(
+    os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
+) / "openclaw" / "broker" / ".dirty"
+
+
+def _mark_broker_dirty(reason: str = "") -> None:
+    """设置 broker dirty flag。"""
+    try:
+        BROKER_DIRTY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps({
+            "source": "frontstage-guardian",
+            "reason": reason,
+            "at": now_iso(),
+        }, ensure_ascii=False)
+        tmp = BROKER_DIRTY_PATH.with_suffix(".dirty.tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(BROKER_DIRTY_PATH)
+    except Exception:
+        pass
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
@@ -121,6 +142,7 @@ def main():
     if not all_ok:
         failed = [c["label"] for c in checks if not c.get("ok")]
         append_log(f"ANOMALY overall={overall} failed={','.join(failed)}")
+        _mark_broker_dirty(reason=f"guardian detection: {','.join(failed)}")
 
     if args.print_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

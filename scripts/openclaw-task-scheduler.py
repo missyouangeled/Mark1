@@ -5,13 +5,13 @@
 Watcher 体系第 5 个成员：自动管理后台任务的生命周期。
 取代之前的"手动判断→手动开监工→手动关监工→手动清理"流程。
 
-每 30s 运行一次：
-  1. 扫描 runs.sqlite → 找 active 任务
-  2. 有任务 + 监工未开 → 自动开启监工
-  3. 无任务 + 监工开启 + 冷却到期 → 自动关闭监工
-  4. 任务静默 > 3min → broker 回报前台
-  5. 僵尸任务（无活动 > 30min）→ 自动 kill
-  6. 终端任务过期 → 标记可清理
+每 60s 运行一次：
+  1. 扫描 runs.sqlite → 僵尸/静默/并发检测
+  2. 任务静默 > 3min → broker 回报前台
+  3. 僵尸任务（无活动 > 30min）→ 自动 kill
+  4. 终端任务过期 → 标记可清理
+  5. 旧会话清理
+  （监工自动管理已内迁到 health-collector）
 
 依赖：
   - supervisor-status.py  (开关监工)
@@ -603,48 +603,9 @@ def main():
     ready_cleanup_count = sum(1 for t in terminal_tasks if t.get("readyForCleanup"))
     active_count = len(active_tasks)
 
-    # 1. 有 active 任务 + 监工未开启 → 自动开
-    if active_count > 0 and not sup_enabled:
-        if not args.dry_run:
-            ok, msg = call_supervisor_enable()
-            action = "auto-enable-supervisor" if ok else "enable-failed"
-            actions.append(f"{action}: {msg[:80]}")
-            append_log(f"ENABLE supervisor (active={active_count}): {'OK' if ok else msg[:100]}")
-        else:
-            actions.append("would-enable-supervisor")
-
-    # 2. 无 active 任务 + 监工开启 + 冷却到期 → 自动关
-    if active_count == 0 and sup_enabled:
-        last_ended_str = sup.get("lastTaskEndedAt")
-        should_disable = False
-        if last_ended_str:
-            try:
-                last_ended_dt = datetime.fromisoformat(last_ended_str.replace("Z", "+00:00"))
-                last_ended_ms = int(last_ended_dt.timestamp() * 1000)
-                since_end_s = (now_val - last_ended_ms) / 1000
-                if since_end_s >= COOLDOWN_AFTER_DONE_S:
-                    should_disable = True
-            except (ValueError, TypeError):
-                pass
-        else:
-            checked_at = sup.get("checkedAt")
-            if checked_at:
-                try:
-                    checked_dt = datetime.fromisoformat(checked_at.replace("Z", "+00:00"))
-                    since_checked_s = (now_val - int(checked_dt.timestamp() * 1000)) / 1000
-                    if since_checked_s >= COOLDOWN_AFTER_DONE_S:
-                        should_disable = True
-                except (ValueError, TypeError):
-                    pass
-
-        if should_disable:
-            if not args.dry_run:
-                ok, msg = call_supervisor_disable()
-                action = "auto-disable-supervisor" if ok else "disable-failed"
-                actions.append(f"{action}: {msg[:80]}")
-                append_log(f"DISABLE supervisor (cooldown): {'OK' if ok else msg[:100]}")
-            else:
-                actions.append("would-disable-supervisor")
+    # 1. 监工自动开关已内迁到 health-collector（2026-05-29）
+    # task-scheduler 不再管理 supervisor，只做僵尸检测 + 会话清理 + 维护
+    # (原 enable/disable 逻辑保留作参考，已禁用)
 
     # 3. 僵尸任务 → kill
     zombies = [t for t in active_tasks if t.get("zombie")]

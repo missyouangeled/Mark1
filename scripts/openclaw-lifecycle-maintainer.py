@@ -5,6 +5,7 @@
 合并了原先两个独立维护任务：
   - daily-transcript-aggregator: 聚合当日所有转录
   - cleanup-temp:                清理过期临时文件
+  - chattts-on-demand:           清理过期 ChatTTS 音频（原独立 cron 已并入）
 
 每 15min 运行一次：
   - 每次都做转录聚合
@@ -121,13 +122,19 @@ def main():
         [sys.executable, str(SCRIPTS / "aggregate-daily-transcript.py")]
     ))
 
-    # 2. 临时文件清理（每 6 次一次）
+    # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
     if do_cleanup:
         checks.append(run_sub_check(
             "temp-cleanup",
             ["/bin/bash", str(SCRIPTS / "openclaw-cleanup-temp.sh")]
         ))
-        append_log(f"run #{new_count}: triggering cleanup")
+        # 并入原独立 cron 的 ChatTTS 过期音频清理
+        checks.append(run_sub_check(
+            "chattts-cleanup",
+            ["/bin/bash", str(WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"), "--quiet"],
+            timeout=120,
+        ))
+        append_log(f"run #{new_count}: triggering cleanup (temp + chattts)")
     else:
         append_log(f"run #{new_count}: skip cleanup (next at #{CLEANUP_EVERY_N})")
 

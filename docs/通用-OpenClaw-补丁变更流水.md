@@ -669,3 +669,17 @@
 - 根盘76%，服务4→3，timer 7→6，cron 7→5，memory_search正常，QMD BM25正常
 - 相关文件：
 - `openclaw.json, 多个systemd timer, lifecycle-maintainer.py`
+
+## 2026-05-29 12:59:48 CST (+08:00) — 逻辑优化4项：broker事件驱动+监工内迁+guardian紧急通道+清理统一
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 1)broker改为dirty flag事件驱动(90%+跳过重建) 2)监工管理从task-scheduler内迁到health-collector 3)guardian异常时直接写broker dirty(通知延迟79→60s) 4)ChatTTS清理并入lifecycle-maintainer。全为减法或逻辑调整。
+- 验收 / 验证：
+- timer 7→5, cron 7→4, 服务 4→3, 根盘76%, 所有脚本语法通过
+- 相关文件：
+- `health-collector.py, task-scheduler.py, frontstage-guardian.py, lifecycle-maintainer.py`
