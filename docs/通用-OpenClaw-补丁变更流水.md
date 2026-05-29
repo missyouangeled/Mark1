@@ -767,3 +767,17 @@
 - python3 scripts/verify-today-patches.py --print => 12/12 passed；systemctl show openclaw-lifecycle-maintainer.service => Result=success ExecMainStatus=0
 - 相关文件：
 - `scripts/openclaw-lifecycle-maintainer.py,scripts/verify-today-patches.py,docs/通用-OpenClaw-总控面板.md`
+
+## 2026-05-29 16:22:47 CST (+08:00) — 总控面板纠偏：旧watcher脚本仍为guardian依赖，不能归档
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：待后续清理旧章节
+- 升级后自检清单：不适用
+- 结果摘要：
+- 架构复核确认 frontstage-guardian 仍调用 openclaw-responsiveness-watch.py 与 openclaw-frontstage-recovery-watch.py，health-collector 仍调用 stuck-session-detector；总控面板改为仅可归档旧独立timer/unit，脚本本体保留为active dependency
+- 验收 / 验证：
+- grep确认guardian/health-collector仍直接调用对应脚本；verify-today-patches.py 12/12 passed
+- 相关文件：
+- `docs/通用-OpenClaw-总控面板.md`

@@ -100,7 +100,7 @@
 
 | ID | 类型 | 名称 | 说明 |
 |----|------|------|------|
-| C01 | `cleanup` | 淘汰旧 watcher 脚本 | `openclaw-responsiveness-watch.py` / `openclaw-frontstage-recovery-watch.py` — 已被 watcher v2 取代，systemd 不再引用，可归档；`openclaw-stuck-session-detector.py` 仍被 health-collector 调用，不能归档 |
+| C01 | `cleanup` | 淘汰旧 watcher 独立 timer/unit | 只归档旧 `openclaw-responsiveness-watch.*` / `openclaw-frontstage-recovery-watch.*` 的 systemd 单元与重建说明；脚本本体仍被 `frontstage-guardian` 调用，不能归档；`openclaw-stuck-session-detector.py` 仍被 `health-collector` 调用，不能归档 |
 | C02 | `cleanup` | ChatTTS 烟雾测试脚本 | `chattts_seeta_smoke*.py` × 17 个测试脚本，可归档到 `tmp/` |
 
 ---
