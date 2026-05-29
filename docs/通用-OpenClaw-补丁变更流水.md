@@ -781,3 +781,17 @@
 - grep确认guardian/health-collector仍直接调用对应脚本；verify-today-patches.py 12/12 passed
 - 相关文件：
 - `docs/通用-OpenClaw-总控面板.md`
+
+## 2026-05-29 16:26:35 CST (+08:00) — 保存周一架构优化待办计划
+
+- 类型：note
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 保存周一继续推进的 OpenClaw 架构优化计划：全局健康验收脚本、补丁文档一致性审计、旧watcher状态修正、Skill总控清单、实验脚本归档
+- 验收 / 验证：
+- docs/plans/2026-06-01-openclaw-architecture-optimization.md 已创建
+- 相关文件：
+- `docs/plans/2026-06-01-openclaw-architecture-optimization.md`
