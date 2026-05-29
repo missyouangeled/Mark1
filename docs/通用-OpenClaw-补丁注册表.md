@@ -271,6 +271,24 @@
   - `tools/nvidia-audio-bridge/README.md`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
 
+### PATCH-BOOT-HEALTH-CHECK
+
+- **结果目标**：Gateway 启动后自动扫描核心服务/定时器/磁盘/内存/端口，缺失服务自动拉起，问题回报前台
+- **当前实现**：`scripts/openclaw-boot-health-check.py` + systemd oneshot 服务 `openclaw-boot-health-check.service`
+- **自动触发**：`BOOT.md` 启动流程 — 先跑 post-upgrade self-check → 再跑 boot-health-check → 带结果上线
+- **适用范围**：通用（当前主落地为 公司（Linux））
+- **升级风险点**：systemd unit 文件被移除；`BOOT.md` 启动流程被覆盖
+- **失效判断**：`systemctl --user show openclaw-boot-health-check.service` 无输出或状态异常；启动消息中无体检摘要
+- **最小验收**：
+  - `systemctl --user start openclaw-boot-health-check.service` 正常返回
+  - `python3 scripts/openclaw-boot-health-check.py --print-human` 无报错，列出服务/定时器/磁盘/内存/端口状态
+- **维护落点**：
+  - `scripts/openclaw-boot-health-check.py`
+  - `tools/openclaw-boot-health-check/`
+  - `~/.config/systemd/user/openclaw-boot-health-check.service`
+  - `BOOT.md`
+  - `TOOLS.md`
+
 ### PATCH-LANGUAGE-LOCK
 
 - **结果目标**:无论主会话切换什么模型(DeepSeek / GLM / Kimi / NVIDIA 等),所有回复必须锁定为中文,不出现英文回复。

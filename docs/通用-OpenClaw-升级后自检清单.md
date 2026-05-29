@@ -34,6 +34,7 @@
 8. **sidecar / unified proxy service 仍 active**
 9. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
 10. **耗时基线验证通过**：所有子检查含 elapsedMs
+11. **boot-health-check 通过**：核心服务/定时器/磁盘/内存/端口扫描无异常
 
 ---
 

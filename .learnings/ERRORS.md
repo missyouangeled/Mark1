@@ -4,6 +4,30 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260529-001] edit-tool-missing-path-key
+
+**Logged**: 2026-05-29T14:05:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tool-usage
+
+### Summary
+在编辑文件时连续两次忘记传入 `path` 字段，导致 `edit` 调用被 API 校验拒绝。第三次才写对。所有后续编辑已添加 `path`，无实际文件损坏。
+
+### Root cause
+- `edit` 工具签名为 `{path, edits}`
+- 惯性思维只写了 `edits` 和 `oldText`/`newText`，漏了最外层的 `path`
+
+### Fix
+- 恢复：第三次调用补上 `path`，立即通过
+- 预防：凡涉及多文件编辑，先检查 `path` 是否传入；批量操作时用 `sed`/`exec` 替代逐条 `edit`
+
+### Prevention rule
+- 任何 `edit` 调用必须包含三个键：`path`、`edits`、`edits[].oldText`、`edits[].newText`
+- 第一次失败后，不要重复同样的格式再试；先检查参数结构是否完整
+
+---
+
 ## [ERR-20260421-003] noiz-custom-voice-credit-limit
 
 **Logged**: 2026-04-21T13:50:00+08:00
@@ -13262,6 +13286,66 @@ Tool process returned an explicit error state.
 ### Context
 - Hook source: plugin:after_tool_call
 - Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-039] tool-policy-blocked
+
+**Logged**: 2026-05-29T06:12:01.538Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[write] write # OpenClaw 总控面板 — 全补丁/修复/自定义统一管理 - 适用机器：通用 - 系统 / OS：通用 - 文档类型：总控（单文件索引所有补丁/修复/Skill/自定义） - 最后更新：2026-05-29 14:08 CST ## 用途 打开这个文件，就知道： > 现在有多少补丁、多少修复、多少自定义？哪个归哪个管？出问题先看哪？ 它是**总目录**，不是正文。每个条目都指向对应的注册表/备忘录/脚本位置。 --- ## 一、全量清单（总 31 项：21 正式补丁 + 3 非正式修复 + 4 维护备忘 + 3 待处理） ### 🏗️ 基础设施（infrastructure） | ID | 类型 | 名称 | 一句话 | 位置 | |----|------|------|…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-040] tool-explicit-error
+
+**Logged**: 2026-05-29T06:12:32.811Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/docs/通用-OpenClaw-补丁重建清单.md [redacted] [redacted] 1127
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
 - Session Key: agent:main:main
 
 ### Suggested Fix

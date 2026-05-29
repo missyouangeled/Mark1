@@ -739,3 +739,17 @@
 - verify-today-patches.py 10/10 passed; 所有文档已更新
 - 相关文件：
 - `补丁注册表.md, 补丁重建清单.md, 升级后自检清单.md, verify-today-patches.py`
+
+## 2026-05-29 14:14:21 CST (+08:00) — 总控面板：全补丁统一管理+遗漏补全(boot-health-check纳入注册表)
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 创建总控面板文档（32项全量清单+依赖图+恢复优先级+自愈策略+文档入口map）；boot-health-check晋级为PATCH-BOOT-HEALTH-CHECK正式补丁；重建清单/自检清单/verify脚本同步更新；verify 11/11全绿
+- 验收 / 验证：
+- verify-today-patches.py 11/11 passed; 总控面板覆盖所有22个正式补丁+3非正式+4备忘+3待处理
+- 相关文件：
+- `总控面板.md, 补丁注册表.md, 补丁重建清单.md, 升级后自检清单.md, verify-today-patches.py`

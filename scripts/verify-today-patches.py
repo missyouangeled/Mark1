@@ -7,6 +7,7 @@ verify-today-patches.py — 一键验证今日全部改动
   搜索短路 + TTL 缓存
   task-scheduler 闲时跳过
   耗时基线监控
+  boot-health-check 开机体检
 
 用法：
   python3 scripts/verify-today-patches.py           → 全量验证，退出码 0=全部通过
@@ -166,6 +167,11 @@ def main():
         content = agents.read_text()
         rule_ok = "memory-search-local-first" in content and "三级搜索策略" in content
     checks.append(check("agents-search-rule", rule_ok, "AGENTS.md contains search strategy"))
+
+    # ── 11. boot-health-check ──
+    ok, out, _ = run([PY, str(SCRIPTS / "openclaw-boot-health-check.py"), "--print-human"], timeout=20)
+    boot_ok = ok and "错误" not in out and "error" not in out.lower()
+    checks.append(check("boot-health-check", boot_ok, out[:100] if out else "no output"))
 
     # ── 输出 ──
     passed = sum(1 for c in checks if c["ok"])
