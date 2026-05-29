@@ -725,3 +725,17 @@
 - 图文件19087字节，SVG正常渲染，右侧文字完整
 - 相关文件：
 - `贾维斯系统架构图-2026-05-29.html`
+
+## 2026-05-29 13:54:50 CST (+08:00) — 四层保障：补丁注册表+重建清单+自检清单+一键验证脚本
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 注册表新增4条（WATCHER-V2/SEARCH-SHORTCIRCUIT/TASK-SCHEDULER-IDLE/LATENCY-BASELINE）；重建清单新增3.6-3.8节；自检清单新增检查9-10并更新timer名；新增verify-today-patches.py一键验证（10项全部通过）
+- 验收 / 验证：
+- verify-today-patches.py 10/10 passed; 所有文档已更新
+- 相关文件：
+- `补丁注册表.md, 补丁重建清单.md, 升级后自检清单.md, verify-today-patches.py`

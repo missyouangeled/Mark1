@@ -288,31 +288,49 @@ systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveStat
 
 ### 3.5 daily-transcript-aggregator
 
-检查：
+检查：如上不变。
 
-- `scripts/aggregate-daily-transcript.py`
-- `tools/daily-transcript-aggregator/daily-transcript-aggregator.service`
-- `tools/daily-transcript-aggregator/daily-transcript-aggregator.timer`
-- `~/.config/systemd/user/daily-transcript-aggregator.service`
-- `~/.config/systemd/user/daily-transcript-aggregator.timer`
+### 3.6 新版 Watcher 体系（v2 整合）
+
+**背景**：watcher 从 7 timer 精简为 5（health-collector 合并 3 个，lifecycle-maintainer 合并 2 个，task-scheduler 监工管理内迁）。
+
+检查：`scripts/openclaw-health-collector.py` `scripts/openclaw-task-scheduler.py` `scripts/openclaw-frontstage-guardian.py` `scripts/openclaw-lifecycle-maintainer.py` `scripts/flush-memory-sync.sh`
 
 动作：
-
 ```bash
-cp tools/daily-transcript-aggregator/daily-transcript-aggregator.service ~/.config/systemd/user/
-cp tools/daily-transcript-aggregator/daily-transcript-aggregator.timer ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now daily-transcript-aggregator.timer
-systemctl --user start daily-transcript-aggregator.service
+systemctl --user restart openclaw-health-collector.timer
+systemctl --user restart openclaw-task-scheduler.timer
+systemctl --user restart openclaw-frontstage-guardian.timer
+systemctl --user restart openclaw-lifecycle-maintainer.timer
+python3 scripts/openclaw-health-collector.py --print-human
+python3 scripts/openclaw-task-scheduler.py --dry-run --print-human
 ```
 
-验收：
+验收：timer 数量 = 5；health-collector 日志 brocker rebuild skipped（非每次重建）；task-scheduler dry-run 输出 idle - fast skip。
 
+### 3.7 搜索短路 + TTL 缓存
+
+检查：`scripts/memory-search-local-first.py` `scripts/query-cache.py` `AGENTS.md`（三级搜索策略）
+
+动作：
 ```bash
-systemctl --user show daily-transcript-aggregator.service -p Result -p ExecMainStatus -p ActiveState -p SubState
-systemctl --user show daily-transcript-aggregator.timer -p UnitFileState -p ActiveState -p SubState
-python3 scripts/aggregate-daily-transcript.py --print | head -20
+python3 scripts/memory-search-local-first.py "贾维斯" | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['shortCircuited']==True; print('PASS: short-circuited')"
+python3 scripts/memory-search-local-first.py "xyz不存在xyz" | python3 -c "import json,sys; assert json.load(sys.stdin)['shortCircuited']==False; print('PASS: fallback')"
+python3 scripts/query-cache.py stats
 ```
+
+验收：精确搜索短路 true (≥0.7)；无匹配短路 false；缓存 stats 正常。
+
+### 3.8 耗时基线监控
+
+检查：`scripts/openclaw-health-collector.py`（DURATION_BASELINE_MS）
+
+动作：
+```bash
+python3 scripts/openclaw-health-collector.py --print-json | python3 -c "import json,sys; [assert isinstance(c.get('elapsedMs'),int) for c in json.load(sys.stdin)['checks']]; print('PASS')"
+```
+
+验收：所有 checks 含 `elapsedMs` 字段；无报错。
 
 ---
 

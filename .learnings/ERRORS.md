@@ -13123,3 +13123,153 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260529-034] tool-explicit-error
+
+**Logged**: 2026-05-29T05:49:17.314Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit ### 3.5 [redacted] ### 3.6 新版 Watcher 体系（v2 整合） **背景**：watcher 从 7 timer 精简为 5（health-collector 合并 3 个，lifecycle-maintainer 合并 2 个，task-scheduler 监工管理内迁）。 检查： - `scripts/[redacted].py`（含 supervisor 管理 + broker dirty flag + 耗时基线） - `scripts/openclaw-task-scheduler.py`（含快速预检跳过） - `scripts/[redacted].py`（含紧急通道 _ma…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-035] tool-explicit-error
+
+**Logged**: 2026-05-29T05:49:38.011Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit ### 3.5 [redacted] 检查： - `scripts/[redacted].py` - `tools/[redacted]/[redacted].service` - `tools/[redacted]/[redacted].timer` - `~/.config/systemd/user/[redacted].service` - `~/.config/systemd/user/[redacted].timer` 动作： ```bash cp tools/[redacted]/[redacted].service ~/.config/systemd/user/ cp tools/[redacted]/…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-036] tool-timeout
+
+**Logged**: 2026-05-29T05:51:07.390Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ verify-today-patches.py — 一键验证今日全部改动 覆盖： Watcher v2 整合（broker dirty flag + 监工内迁 + guardian 紧急通道 + 清理统一 + flush 同步） 搜索短路 + TTL 缓存 task-scheduler 闲时跳过 耗时基线监控 用法： python3 scripts/verify-today-patches.py → 全量验证，退出码 0=全部通过 python3 scripts/verify-today-patches.py --print → 逐项打印结果 python3 scripts/verify-today-patches.py --s…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-037] tool-explicit-error
+
+**Logged**: 2026-05-29T05:51:45.650Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process good-shore 45000 poll [redacted] [redacted] failed 1 17260
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260529-038] tool-explicit-error
+
+**Logged**: 2026-05-29T05:54:20.933Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process calm-pine 45000 poll [redacted] [redacted] failed 1 12983
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

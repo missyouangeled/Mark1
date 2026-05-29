@@ -30,8 +30,10 @@
 4. **infos-handle sidecar live 链仍正常**
 5. **统一入口 proxy verify 仍正常**
 6. **frontstage-guardian 测试通过**（替代旧 recovery-watch）
-7. **5 个 watcher timer 处于 enabled+active**：guardian(20s) / health-collector(60s) / task-scheduler(30s) / lifecycle-maintainer(5min) / resume-watch(60s)
+7. **5 个 watcher timer 处于 enabled+active**：health-collector(60s) / task-scheduler(60s) / guardian(20s) / lifecycle-maintainer(5min) / resume-watch(60s)
 8. **sidecar / unified proxy service 仍 active**
+9. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
+10. **耗时基线验证通过**：所有子检查含 elapsedMs
 
 ---
 
@@ -148,18 +150,17 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
   - `remoteNoAuthCode = 401`
   - `remoteWithAuthCode = 200`
 
-### 7. 相关 timer 仍正常
+### 7. 相关 watcher timer 仍正常
 
-最少检查这两个:
+最少检查这 5 个：
 
-- `openclaw-frontstage-broker-rebuild.timer`
-- `openclaw-frontstage-recovery-watch.timer`
+- `openclaw-health-collector.timer`（60s，含监工管理+broker dirty+耗时基线）
+- `openclaw-task-scheduler.timer`（60s，含闲时跳过）
+- `openclaw-frontstage-guardian.timer`（20s，含紧急→broker dirty）
+- `openclaw-lifecycle-maintainer.timer`（15min，含ChatTTS清理+flush同步）
+- `openclaw-resume-watch.timer`（断线恢复）
 
-理想状态:
-
-- `UnitFileState=enabled`
-- `ActiveState=active`
-- `SubState=waiting`
+理想状态：`UnitFileState=enabled`、`ActiveState=active`、`SubState=waiting`
 
 ### 8. sidecar / unified proxy service 仍正常
 
@@ -172,6 +173,27 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
 
 - `ActiveState=active`
 - `SubState=running`
+
+### 9. 搜索短路仍正常
+
+检查：
+
+```bash
+python3 scripts/memory-search-local-first.py "贾维斯" | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['shortCircuited']==True; print('PASS')"
+python3 scripts/memory-search-local-first.py "xyz不存在xyz" | python3 -c "import json,sys; assert json.load(sys.stdin)['shortCircuited']==False; print('PASS')"
+```
+
+通过：精确搜索短路(true)，无匹配降级(false)。
+
+### 10. 耗时基线监控仍正常
+
+检查：
+
+```bash
+python3 scripts/openclaw-health-collector.py --print-json | python3 -c "import json,sys; [assert isinstance(c.get('elapsedMs'),int) for c in json.load(sys.stdin)['checks']]; print('PASS')"
+```
+
+通过：所有 checks 含 `elapsedMs` 字段，无报错。
 
 ---
 

@@ -339,3 +339,72 @@
   - `~/.config/systemd/user/openclaw-responsiveness-watch.timer`
   - `scripts/openclaw-post-upgrade-self-check.py`
   - `TOOLS.md`
+
+### PATCH-WATCHER-V2
+
+- **结果目标**：watcher 体系从 7 timer 精简为 5，broker 从盲重建改为事件驱动（dirty flag），监工管理统一到 health-collector，guardian 异常时紧急触发 broker 刷新，ChatTTS 清理并入 lifecycle-maintainer，flush memory 自动同步到 daily 归档。
+- **当前实现**：
+  - `scripts/openclaw-health-collector.py`（含 _auto_manage_supervisor + dirty flag 检查 + 耗时基线）
+  - `scripts/openclaw-task-scheduler.py`（已移除监工管理代码）
+  - `scripts/openclaw-frontstage-guardian.py`（紧急通道 _mark_broker_dirty）
+  - `scripts/openclaw-lifecycle-maintainer.py`（含 ChatTTS 清理 + flush 同步）
+  - `scripts/flush-memory-sync.sh`
+- **自动触发**：systemd timer（health-collector 60s, task-scheduler 60s, guardian 20s, lifecycle-maintainer 15min, resume-watch）
+- **适用范围**：通用（当前主落地为 公司（Linux））
+- **升级风险点**：watcher 脚本被覆盖（workspace 中，不受 OpenClaw 升级影响）；systemd timer 被禁用；broker dirty flag 路径变化
+- **失效判断**：timer 数量回到 7；broker 每次周期都重建（dirty flag 失效）；监工管理出现双入口（task-scheduler 又出现 supervisor 管理日志）
+- **最小验收**：`systemctl --user list-timers 'openclaw-*' --no-pager | grep -c "openclaw"` 应为 5；`python3 scripts/openclaw-health-collector.py --print-human` 正常输出；查看 `health-collector` 日志中应出现 "broker rebuild skipped" 或 "broker rebuild triggered by dirty flag"，而非每次都重建
+- **维护落点**：
+  - `scripts/openclaw-health-collector.py`
+  - `scripts/openclaw-task-scheduler.py`
+  - `scripts/openclaw-frontstage-guardian.py`
+  - `scripts/openclaw-lifecycle-maintainer.py`
+  - `scripts/flush-memory-sync.sh`
+  - `~/.config/systemd/user/openclaw-health-collector.*`
+  - `~/.config/systemd/user/openclaw-task-scheduler.*`
+  - `~/.config/systemd/user/openclaw-frontstage-guardian.*`
+  - `~/.config/systemd/user/openclaw-lifecycle-maintainer.*`
+  - `TOOLS.md`
+
+### PATCH-SEARCH-SHORTCIRCUIT
+
+- **结果目标**：memory_search 不再每次走云端 github-copilot（4-10s），先经本地关键词预搜（0.1s），置信度 ≥ 0.7 直接返回；重复查询走 60s TTL 缓存零开销。
+- **当前实现**：`scripts/memory-search-local-first.py` + `scripts/query-cache.py` + AGENTS.md 三级搜索规则
+- **自动触发**：AGENTS.md 规则引导 agent 行为；本地脚本无需 systemd
+- **适用范围**：通用
+- **升级风险点**：AGENTS.md 规则被覆盖；记忆文件结构变化导致分词策略失效；缓存文件路径变化
+- **失效判断**：`python3 scripts/memory-search-local-first.py "贾维斯"` 返回 `shortCircuited: false`（正常应 true）；缓存文件无新条目
+- **最小验收**：`python3 scripts/memory-search-local-first.py "贾维斯"` → `shortCircuited: true, confidence >= 0.7`；`python3 scripts/memory-search-local-first.py "xyz不存在的词"` → `shortCircuited: false`；`python3 scripts/query-cache.py stats` → 正常返回 JSON
+- **维护落点**：
+  - `scripts/memory-search-local-first.py`
+  - `scripts/query-cache.py`
+  - `AGENTS.md`（memory_search 三级搜索策略段）
+  - `~/.local/state/openclaw/cache/query-cache.json`
+  - `TOOLS.md`
+
+### PATCH-TASK-SCHEDULER-IDLE
+
+- **结果目标**：task-scheduler 在无活跃任务时跳过全量扫描，仅做 0.1s SQLite 快速预检；有任务时才全量扫描。消除 95%+ 的无效周期开销。
+- **当前实现**：`scripts/openclaw-task-scheduler.py`（新增 _quick_count_tasks + 快速预检跳过逻辑）
+- **自动触发**：systemd timer（`openclaw-task-scheduler.timer`，60s）
+- **适用范围**：通用（当前主落地为 公司（Linux））
+- **升级风险点**：runs.sqlite 表结构变化导致 COUNT 查询失败；脚本被覆盖（workspace 中）
+- **失效判断**：即便无活跃任务，日志仍显示每次全量扫描（而非 "idle, skipping full scan"）；dry-run 不输出 "idle - fast skip"
+- **最小验收**：`python3 scripts/openclaw-task-scheduler.py --dry-run --print-human` → 输出 "idle - fast skip"（当前无活跃任务）
+- **维护落点**：
+  - `scripts/openclaw-task-scheduler.py`
+  - `~/.config/systemd/user/openclaw-task-scheduler.*`
+  - `TOOLS.md`
+
+### PATCH-LATENCY-BASELINE
+
+- **结果目标**：health-collector 每次子检查记录耗时，超过基线自动标 ⚠DEGRADED 并附带原因。在 guardian 发现异常前提前预警。
+- **当前实现**：`scripts/openclaw-health-collector.py`（DURATION_BASELINE_MS + 汇总前基线检查逻辑）
+- **自动触发**：health-collector timer（60s）
+- **适用范围**：通用（当前主落地为 公司（Linux））
+- **升级风险点**：脚本被覆盖导致基线表丢失
+- **失效判断**：报告 checks 中无 `elapsedMs` 字段；超基线项未被标 degraded
+- **最小验收**：`python3 scripts/openclaw-health-collector.py --print-json | python3 -c "import json,sys; r=json.load(sys.stdin); assert all('elapsedMs' in c for c in r['checks'])"` 应通过且无误
+- **维护落点**：
+  - `scripts/openclaw-health-collector.py`
+  - `TOOLS.md`
