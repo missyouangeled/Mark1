@@ -836,3 +836,17 @@
 - `docs/通用-OpenClaw-补丁重建清单.md`
 - `scripts/openclaw-local-health-diagnose.py`
 - `scripts/openclaw-patch-repair.py`
+
+## 2026-06-01 11:48:51 CST (+08:00) — 清理历史lost任务并收紧本机安全审计配置
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 清理3条backing session missing的历史lost任务；移除webchat elevated通配符，关闭Control UI insecure auth，并配置loopback trustedProxies；broker-rebuild timer保持不启用
+- 验收 / 验证：
+- openclaw tasks audit => 0 findings；openclaw security audit => 0 critical / 0 warn；python3 scripts/verify-today-patches.py --print => 12/12 passed；local-health => OK gateway=reachable service=running
+- 相关文件：
+- `docs/通用-OpenClaw-补丁变更流水.md`
