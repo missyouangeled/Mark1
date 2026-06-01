@@ -50,7 +50,11 @@ DEFAULT_GENERIC_PROBES = [
     ("baidu-home", "https://www.baidu.com"),
 ]
 REQUEST_TIMEOUT_SECONDS = 5.0
-OPENCLAW_STATUS_TIMEOUT_SECONDS = 15.0
+# `openclaw status --json` can legitimately take >15s on this VM when the
+# gateway is busy (model prewarm, session list, or heavy background checks).
+# Keep this above the CLI's observed cold/busy latency to avoid misclassifying
+# a slow but reachable gateway as unreachable in local-health reports.
+OPENCLAW_STATUS_TIMEOUT_SECONDS = 45.0
 LOG_ROTATE_MAX_BYTES = 2 * 1024 * 1024
 LOG_ROTATE_KEEP_BYTES = 1 * 1024 * 1024
 CANVAS_STALE_WARN_MINUTES = 12

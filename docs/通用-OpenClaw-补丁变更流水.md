@@ -817,3 +817,22 @@
 - `docs/通用-OpenClaw-补丁注册表.md`
 - `docs/通用-OpenClaw-补丁重建清单.md`
 - `scripts/apply-openclaw-session-model-selector-fix.py`
+
+## 2026-06-01 11:16:45 CST (+08:00) — 架构巡检修正Watcher v2文档漂移与local-health误报
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修正local-health状态探测超时、补丁修复器不再复活旧watcher timer，并同步总控面板/注册表/重建清单为Watcher v2现状
+- 验收 / 验证：
+- python3 scripts/verify-today-patches.py --print => 12/12 passed；python3 scripts/openclaw-patch-repair.py --check => 12/12 正常；python3 scripts/openclaw-local-health-diagnose.py --print-human => OK gateway=reachable service=running
+- 相关文件：
+- `TOOLS.md`
+- `docs/通用-OpenClaw-总控面板.md`
+- `docs/通用-OpenClaw-补丁注册表.md`
+- `docs/通用-OpenClaw-补丁重建清单.md`
+- `scripts/openclaw-local-health-diagnose.py`
+- `scripts/openclaw-patch-repair.py`

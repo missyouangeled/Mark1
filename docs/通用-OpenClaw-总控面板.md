@@ -3,7 +3,7 @@
 - 适用机器：通用
 - 系统 / OS：通用
 - 文档类型：总控（单文件索引所有补丁/修复/Skill/自定义）
-- 最后更新：2026-05-29 14:08 CST
+- 最后更新：2026-06-01 11:20 CST
 
 ## 用途
 
@@ -35,8 +35,8 @@
 | P07 | `patch` | supervisor 自动通知 | 监工状态变化（stalled/failed/done）→ 自动通知前台 | [注册表](#patch-supervisor-auto-notify) |
 | P08 | `patch` | local-health 诊断层 | 不依赖 AI 回复，对 gateway/外联/provider 做周期探测 | [注册表](#patch-local-health-diagnostic-layer) |
 | P09 | `patch` | local-health 前台回报 | 健康状态变化（warn/critical/recovered）→ 前台通知 | [注册表](#patch-local-health-frontstage) |
-| P10 | `patch` | responsiveness watchdog | 主会话超时 → 自动注入提醒（30s/60s） | [注册表](#patch-responsiveness-watchdog) |
-| P11 | `patch` | daily-transcript 聚合 | 每日转录跨模型自动聚合 | [注册表](#patch-daily-transcript-aggregator) |
+| P10 | `patch/module` | responsiveness watchdog | 主会话超时提醒能力；当前作为 `frontstage-guardian` 子模块承载，不再有独立 timer | [注册表](#patch-responsiveness-watchdog) |
+| P11 | `patch/module` | daily-transcript 聚合 | 每日转录跨模型自动聚合；当前由 `lifecycle-maintainer` 承载，不再有独立 timer | [注册表](#patch-daily-transcript-aggregator) |
 | P12 | `patch` | **Watcher v2 整合** 🔄 | 7→5 timer；broker 事件驱动（dirty flag）；监工内迁到 health-collector；guardian 紧急通道；ChatTTS 清理 + flush 同步并入 lifecycle-maintainer | [注册表](#patch-watcher-v2) |
 
 ### ⚡ 性能优化
@@ -54,7 +54,7 @@
 |----|------|------|--------|------|
 | P17 | `patch` | Linux resume 恢复 | 机器休眠唤醒后自动检测 gateway → 重启 | [注册表](#patch-linux-resume-recovery) |
 | P18 | `patch` | 掌机 battery 策略 | 禁止 Windows 电池模式自动停 gateway | [注册表](#patch-windows-gateway-battery-policy) |
-| P19 | `patch` | NVIDIA 音频 gateway bridge | 公司 Linux 的 NVIDIA 音频到 gateway 桥接 | [注册表](#patch-nvidia-audio-gateway-bridge) |
+| P19 | `patch/optional` | NVIDIA 音频 gateway bridge | 公司 Linux 的 NVIDIA 音频到 gateway 桥接；辅助语音支路，默认可保持 disabled，按需手工启用 | [注册表](#patch-nvidia-audio-gateway-bridge) |
 
 ### 🛡️ 升级保护
 
@@ -195,7 +195,7 @@
 | 🤖 **自动** | P22 开机体检 | BOOT.md → gateway 启动后跑 boot-health-check |
 | 🤖 **自动** | P12 watcher timer | systemd timer 开机自启 |
 | 🤖 **自动** | P17 resume 恢复 | timer 检测唤醒后自动重启 gateway |
-| 🔄 **半自动** | P03-P05 broker/sidecar/proxy | timer 周期重建，但升级后需手工 apply 一次 |
+| 🔄 **半自动** | P03-P05 broker/sidecar/proxy | broker 由 Watcher v2 dirty flag 事件驱动重建；升级后仍建议手工 apply/verify 一次 |
 | 🔄 **半自动** | P13 搜索短路 | 脚本在 workspace，但依赖 AGENTS.md 规则引导 agent |
 | ✋ **手动** | M01-M03 非正式修复 | 只在特定场景触发，不自动 |
 | ✋ **手动** | S01-S08 自定义 Skill | Skill 文件在 workspace，不需要恢复 |

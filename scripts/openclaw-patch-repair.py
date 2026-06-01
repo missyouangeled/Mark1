@@ -8,7 +8,7 @@
   python3 scripts/openclaw-patch-repair.py --repair             # 自动修复
   python3 scripts/openclaw-patch-repair.py --repair --force     # 激进修复
   python3 scripts/openclaw-patch-repair.py --repair --dry-run   # 预览修复计划
-  python3 scripts/openclaw-patch-repair.py --repair --target daily_transcript ctrlui_branding  # 只修指定
+  python3 scripts/openclaw-patch-repair.py --repair --target watcher_v2 ctrlui_branding  # 只修指定
 """
 
 import json
@@ -54,12 +54,13 @@ REPAIR_ACTIONS = {
         "verify": lambda: broker_integration_smoke(),
         "auto": True,
     },
-    "broker_rebuild_timer": {
-        "name": "Broker 周期重建 Timer",
-        "check": lambda: check_timer("openclaw-frontstage-broker-rebuild.timer"),
-        "repair": lambda: install_timer("openclaw-frontstage-broker-rebuild"),
-        "verify": lambda: check_timer("openclaw-frontstage-broker-rebuild.timer"),
+    "broker_dirty_rebuild": {
+        "name": "Broker 事件驱动重建",
+        "check": lambda: check_broker_views_current(),
+        "repair": lambda: run_cmd([sys.executable, str(SCRIPTS / "openclaw-frontstage-broker.py"), "rebuild-views", "--print-json"]),
+        "verify": lambda: check_broker_views_current(),
         "auto": True,
+        "note": "Watcher v2 后 broker 默认由 health-collector/guardian dirty flag 触发；不再自动复活旧 broker-rebuild timer。",
     },
     "infos_handle_sidecar": {
         "name": "Infos-Handle Sidecar",
@@ -81,26 +82,13 @@ REPAIR_ACTIONS = {
         "verify": lambda: verify_unified_proxy_local(),
         "auto": True,
     },
-    "supervisor": {
-        "name": "监工状态层",
-        "check": lambda: check_timer("openclaw-supervisor-watch.timer"),
-        "repair": lambda: install_timer("openclaw-supervisor-watch"),
-        "verify": lambda: check_timer("openclaw-supervisor-watch.timer"),
+    "watcher_v2": {
+        "name": "Watcher v2 五定时器",
+        "check": lambda: check_watcher_v2(),
+        "repair": lambda: install_watcher_v2_timers(),
+        "verify": lambda: check_watcher_v2(),
         "auto": True,
-    },
-    "local_health": {
-        "name": "本地健康诊断层",
-        "check": lambda: check_timer("openclaw-local-health-watch.timer"),
-        "repair": lambda: install_timer("openclaw-local-health-watch"),
-        "verify": lambda: check_timer("openclaw-local-health-watch.timer"),
-        "auto": True,
-    },
-    "recovery_watcher": {
-        "name": "前台恢复观察",
-        "check": lambda: check_timer("openclaw-frontstage-recovery-watch.timer"),
-        "repair": lambda: install_timer("openclaw-frontstage-recovery-watch"),
-        "verify": lambda: check_timer("openclaw-frontstage-recovery-watch.timer"),
-        "auto": True,
+        "note": "覆盖 health-collector / task-scheduler / frontstage-guardian / lifecycle-maintainer / resume-watch；不再复活旧 supervisor/local-health/recovery 独立 timer。",
     },
     "resume_watch": {
         "name": "休眠恢复 Watcher",
@@ -114,22 +102,23 @@ REPAIR_ACTIONS = {
         "auto": True,
     },
     "daily_transcript": {
-        "name": "统一日报采集器",
-        "check": lambda: check_timer("daily-transcript-aggregator.timer"),
-        "repair": lambda: install_timer("daily-transcript-aggregator"),
-        "verify": lambda: check_timer("daily-transcript-aggregator.timer"),
+        "name": "统一日报采集器（lifecycle-maintainer 承载）",
+        "check": lambda: check_lifecycle_transcript(),
+        "repair": lambda: install_watcher_v2_timers(),
+        "verify": lambda: check_lifecycle_transcript(),
         "auto": True,
+        "note": "Watcher v2 后由 openclaw-lifecycle-maintainer.timer 聚合，不再复活旧 daily-transcript-aggregator.timer。",
     },
     "nvidia_audio": {
-        "name": "NVIDIA 音频 Gateway Patch",
-        "check": lambda: check_nvidia_audio(),
+        "name": "NVIDIA 音频 Gateway Patch（可选/手动）",
+        "check": lambda: check_nvidia_audio_optional(),
         "repair": lambda: (
             run_cmd([sys.executable, str(SCRIPTS / "apply-openclaw-nvidia-audio-gateway-patch.py")]) and
             systemctl("--user", "restart", "openclaw-nvidia-audio-bridge.service")
         ),
-        "verify": lambda: True,
-        "auto": True,
-        "note": "修复后建议手动验证 /health + TTS + ASR",
+        "verify": lambda: check_nvidia_audio_optional(),
+        "auto": False,
+        "note": "辅助语音桥默认不强制启用；只有用户明确要求恢复 NVIDIA 语音桥时才用 --force/--target nvidia_audio。",
     },
     "language_lock": {
         "name": "语言锁定 SOUL.md",
@@ -176,6 +165,41 @@ def check_timer(unit: str) -> bool:
         return True
     d = systemd_show(unit, "UnitFileState", "ActiveState", "SubState", "LoadState")
     return bool(d) and d.get("UnitFileState") == "enabled" and d.get("ActiveState") == "active" and d.get("SubState") in {"waiting","running","elapsed"}
+
+def check_watcher_v2() -> bool:
+    required = [
+        "openclaw-health-collector.timer",
+        "openclaw-task-scheduler.timer",
+        "openclaw-frontstage-guardian.timer",
+        "openclaw-lifecycle-maintainer.timer",
+        "openclaw-resume-watch.timer",
+    ]
+    return all(check_timer(unit) for unit in required)
+
+def install_watcher_v2_timers() -> bool:
+    names = [
+        "openclaw-health-collector",
+        "openclaw-task-scheduler",
+        "openclaw-frontstage-guardian",
+        "openclaw-lifecycle-maintainer",
+        "openclaw-resume-watch",
+    ]
+    ok = True
+    for name in names:
+        ok = install_timer(name) and ok
+    return ok
+
+def check_lifecycle_transcript() -> bool:
+    if not check_timer("openclaw-lifecycle-maintainer.timer"):
+        return False
+    today = datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d")
+    transcript = WORKSPACE / "memory" / "daily" / f"{today}-transcript.md"
+    return transcript.exists() and transcript.stat().st_size > 0
+
+def check_broker_views_current() -> bool:
+    views = Path.home() / ".local" / "state" / "openclaw" / "broker" / "views"
+    required = ["snapshot.json", "frontstage.json", "health.json", "tasks.json", "recovery.json", "overview.json"]
+    return all((views / name).exists() and (views / name).stat().st_size > 0 for name in required)
 
 def install_service(name: str) -> bool:
     svc = TOOLS / name / f"{name}.service" if (TOOLS / name).is_dir() else TOOLS / f"{name}/{name}.service"
@@ -241,12 +265,27 @@ def broker_integration_smoke() -> bool:
                  "query", "--kind", "snapshot.summary", "--format", "text"])
     )
 
-def check_nvidia_audio() -> bool:
+def check_nvidia_audio_optional() -> bool:
+    """NVIDIA audio bridge is an optional auxiliary path.
+
+    Disabled/inactive service is acceptable because the main OpenClaw gateway
+    stability has priority over experimental voice routing.  If the service is
+    explicitly enabled, require the gateway patch marker to exist.
+    """
+    service = systemd_show(
+        "openclaw-nvidia-audio-bridge.service",
+        "LoadState", "UnitFileState", "ActiveState", "SubState",
+    )
+    unit_state = service.get("UnitFileState")
+    active_state = service.get("ActiveState")
+    if unit_state in {"", None, "disabled"} and active_state in {"", None, "inactive", "failed"}:
+        return True
     impls = sorted(Path.home().glob(".npm-global/lib/node_modules/openclaw/dist/server.impl-*.js"))
     if not impls:
         return True
     try:
-        return "nvidia-audio-bridge" in impls[-1].read_text() or "nvidiaAudioBridge" in impls[-1].read_text()
+        text = impls[-1].read_text(errors="ignore")
+        return "nvidia-audio-bridge" in text or "nvidiaAudioBridge" in text
     except Exception:
         return True
 

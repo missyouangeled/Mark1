@@ -150,33 +150,33 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
 - `rebuild-views` 能在不依赖新事件触发的情况下重建视图与前台状态页
 - `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 能直接返回摘要，不依赖 Control UI
 
-### 2.2 broker 周期重建 timer
+### 2.2 broker 事件驱动重建（Watcher v2）
+
+Watcher v2 后，broker 默认不再依赖 `openclaw-frontstage-broker-rebuild.timer` 每 60 秒盲重建；该旧 timer/service 仅保留为手工兜底模板，常规重建由 `openclaw-health-collector` / `openclaw-frontstage-guardian` 的 dirty flag 触发。
 
 检查：
 
-- `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service`
-- `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
-- `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service`
-- `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
+- `scripts/openclaw-frontstage-broker.py`
+- `scripts/openclaw-health-collector.py`
+- `scripts/openclaw-frontstage-guardian.py`
+- `~/.local/state/openclaw/broker/views/snapshot.json`
 
 动作：
 
 ```bash
-python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
-# 或手工执行：
-cp tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service ~/.config/systemd/user/
-cp tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now openclaw-frontstage-broker-rebuild.timer
-systemctl --user start openclaw-frontstage-broker-rebuild.service
+python3 scripts/openclaw-frontstage-broker.py rebuild-views --print-json
+python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text
 ```
 
 验收：
 
 ```bash
-systemctl --user show openclaw-frontstage-broker-rebuild.service -p Result -p ExecMainStatus -p ActiveState -p SubState
-systemctl --user show openclaw-frontstage-broker-rebuild.timer -p UnitFileState -p ActiveState -p SubState
+systemctl --user show openclaw-health-collector.timer -p UnitFileState -p ActiveState -p SubState
+systemctl --user show openclaw-frontstage-guardian.timer -p UnitFileState -p ActiveState -p SubState
+ls -l ~/.local/state/openclaw/broker/views/snapshot.json
 ```
+
+不要在常规重建中重新启用旧 `openclaw-frontstage-broker-rebuild.timer`，除非明确选择把它作为额外兜底安全网。
 
 ---
 
@@ -234,87 +234,50 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --install-user-syst
 
 ## 3. 恢复各类自动触发 watcher / service
 
-### 3.1 supervisor 状态层 + 自动回报
+### 3.1 Watcher v2：supervisor / local-health / frontstage recovery
+
+Watcher v2 已把旧独立 timer 合并为 5 个 timer：
+
+- supervisor 状态刷新与自动回报 → `openclaw-health-collector.timer`
+- local-health 诊断与前台回报 → `openclaw-health-collector.timer`
+- frontstage recovery + responsiveness → `openclaw-frontstage-guardian.timer`
+
+旧 `openclaw-supervisor-watch.*`、`openclaw-local-health-watch.*`、`openclaw-frontstage-recovery-watch.*` 只保留为历史回退模板，不要在常规重建中重新启用。
 
 检查：
 
-- `tools/openclaw-supervisor/openclaw-supervisor-watch.service`
-- `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
-- `~/.config/systemd/user/openclaw-supervisor-watch.service`
-- `~/.config/systemd/user/openclaw-supervisor-watch.timer`
+- `scripts/openclaw-health-collector.py`
+- `scripts/openclaw-frontstage-guardian.py`
+- `scripts/openclaw-supervisor-status.py`
+- `scripts/openclaw-local-health-diagnose.py`
+- `scripts/openclaw-frontstage-recovery-watch.py`
 
 动作：
 
 ```bash
-cp tools/openclaw-supervisor/openclaw-supervisor-watch.service ~/.config/systemd/user/
-cp tools/openclaw-supervisor/openclaw-supervisor-watch.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now openclaw-supervisor-watch.timer
-python3 scripts/test-openclaw-supervisor-status.py
+systemctl --user enable --now openclaw-health-collector.timer
+systemctl --user enable --now openclaw-frontstage-guardian.timer
+python3 scripts/openclaw-health-collector.py --print-human
+python3 scripts/openclaw-frontstage-guardian.py --print-human
 python3 scripts/openclaw-supervisor-status.py --print-json
-```
-
-验收：
-
-```bash
-systemctl --user show openclaw-supervisor-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
-systemctl --user show openclaw-supervisor-watch.timer -p UnitFileState -p ActiveState -p SubState
-```
-
-### 3.2 local-health 诊断层 + 前台回报
-
-检查：
-
-- `tools/openclaw-local-health/openclaw-local-health-watch.service`
-- `tools/openclaw-local-health/openclaw-local-health-watch.timer`
-- `~/.config/systemd/user/openclaw-local-health-watch.service`
-- `~/.config/systemd/user/openclaw-local-health-watch.timer`
-
-动作：
-
-```bash
-cp tools/openclaw-local-health/openclaw-local-health-watch.service ~/.config/systemd/user/
-cp tools/openclaw-local-health/openclaw-local-health-watch.timer ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now openclaw-local-health-watch.timer
 python3 scripts/openclaw-local-health-diagnose.py --print-json
 ```
 
 验收：
 
 ```bash
-systemctl --user show openclaw-local-health-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
-systemctl --user show openclaw-local-health-watch.timer -p UnitFileState -p ActiveState -p SubState
-ls -l ~/.local/state/openclaw/local-health/
+systemctl --user show openclaw-health-collector.timer -p UnitFileState -p ActiveState -p SubState
+systemctl --user show openclaw-frontstage-guardian.timer -p UnitFileState -p ActiveState -p SubState
+ls -l ~/.local/state/openclaw/supervisor/supervisor-status.json
+ls -l ~/.local/state/openclaw/local-health/last-report.json
 ```
 
-### 3.3 frontstage recovery watcher
+### 3.2 旧 watcher 独立 timer 状态
 
-检查：
+旧 timer 若仍有 unit 文件但处于 `disabled + inactive`，属于可接受的历史残留；不要把它们当作必须恢复项。若需要彻底收敛，可另开清理任务先确认没有脚本引用后再归档。
 
-- `tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.service`
-- `tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.timer`
-- `~/.config/systemd/user/openclaw-frontstage-recovery-watch.service`
-- `~/.config/systemd/user/openclaw-frontstage-recovery-watch.timer`
-
-动作：
-
-```bash
-cp tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.service ~/.config/systemd/user/
-cp tools/openclaw-frontstage-recovery/openclaw-frontstage-recovery-watch.timer ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now openclaw-frontstage-recovery-watch.timer
-```
-
-验收：
-
-```bash
-python3 scripts/test-frontstage-recovery-watch.py
-systemctl --user start openclaw-frontstage-recovery-watch.service
-systemctl --user show openclaw-frontstage-recovery-watch.service -p Result -p ExecMainStatus -p ActiveState -p SubState
-```
-
-### 3.4 Linux resume-watch
+### 3.3 Linux resume-watch
 
 检查：
 
@@ -337,11 +300,26 @@ systemctl --user show openclaw-resume-watch.service -p Result -p ExecMainStatus 
 systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState
 ```
 
-### 3.5 daily-transcript-aggregator
+### 3.4 daily-transcript 聚合（lifecycle-maintainer 承载）
 
-检查：如上不变。
+检查：`scripts/aggregate-daily-transcript.py` `scripts/openclaw-lifecycle-maintainer.py`
 
-### 3.6 新版 Watcher 体系（v2 整合）
+动作：
+```bash
+systemctl --user enable --now openclaw-lifecycle-maintainer.timer
+python3 scripts/aggregate-daily-transcript.py --print | head -20
+python3 scripts/openclaw-lifecycle-maintainer.py --print-human
+```
+
+验收：
+```bash
+systemctl --user show openclaw-lifecycle-maintainer.timer -p UnitFileState -p ActiveState -p SubState
+ls -l memory/daily/$(date +%Y-%m-%d)-transcript.md
+```
+
+不要在常规重建中重新启用旧 `daily-transcript-aggregator.timer`。
+
+### 3.5 新版 Watcher 体系（v2 整合）
 
 **背景**：watcher 从 7 timer 精简为 5（health-collector 合并 3 个，lifecycle-maintainer 合并 2 个，task-scheduler 监工管理内迁）。
 
@@ -450,4 +428,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\repair-openclaw-gateway-batte
 
 ## 6. 当前推荐重建顺序（一句话版）
 
-> 先恢复补丁自动重打入口 → 再恢复 broker / infos-handle sidecar / unified proxy → 再恢复 supervisor / local-health / recovery watcher / responsiveness watchdog / resume-watch 的 systemd 链路 → 最后恢复机器专用高级 patch，并逐项验收。
+> 先恢复补丁自动重打入口 → 再恢复 broker / infos-handle sidecar / unified proxy → 再恢复 Watcher v2 五定时器（health-collector / task-scheduler / guardian / lifecycle-maintainer / resume-watch）→ 最后恢复机器专用高级 patch，并逐项验收。

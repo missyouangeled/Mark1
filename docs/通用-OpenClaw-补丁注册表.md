@@ -120,20 +120,21 @@
 ### PATCH-SUPERVISOR-SERVICE-STATE
 
 - **结果目标**:持续产出一份稳定可读的监工状态层,让主会话的 `policyMode/taskActive/desiredState`、活跃任务聚焦、`stalled/failed/done/waiting` 状态,以及"完成后约 10 分钟等待接续任务窗口"都有可复读、可恢复的统一状态来源。
-- **当前实现**:`scripts/openclaw-supervisor-status.py` + `tools/openclaw-supervisor/openclaw-supervisor-watch.service` + `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
-- **自动触发**:user systemd timer;当前默认开机约 1 分钟首次运行,之后约每 30 秒刷新一次
+- **当前实现**:`scripts/openclaw-supervisor-status.py` + Watcher v2 的 `scripts/openclaw-health-collector.py` 子检查;旧 `tools/openclaw-supervisor/openclaw-supervisor-watch.*` 仅保留作历史回退参考
+- **自动触发**:`openclaw-health-collector.timer` 周期刷新;当前不再启用旧 `openclaw-supervisor-watch.timer`
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:任务库结构变化;session / transcript 尾部解析规则变化;控制语义(`auto|force_on|force_off`、followup window)变化
 - **失效判断**:`supervisor-status.json` / `service-control.json` / `supervisor-events.log` 不再更新;或复杂任务已开启监工语义但状态长期停留错误;或 10 分钟接续窗口语义失效
-- **最小验收**:运行 `python3 scripts/test-openclaw-supervisor-status.py` 应通过;运行 `python3 scripts/openclaw-supervisor-status.py --print-json` 应返回完整状态;`openclaw-supervisor-watch.timer` 应处于 `enabled + active(waiting)`
+- **最小验收**:运行 `python3 scripts/openclaw-supervisor-status.py --print-json` 应返回完整状态;`openclaw-health-collector.timer` 应处于 `enabled + active(waiting)`;`python3 scripts/openclaw-health-collector.py --print-human` 应能刷新监工/健康汇总
 - **维护落点**:
   - `scripts/openclaw-supervisor-status.py`
   - `scripts/test-openclaw-supervisor-status.py`
   - `tools/openclaw-supervisor/README.md`
-  - `tools/openclaw-supervisor/openclaw-supervisor-watch.service`
-  - `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
-  - `~/.config/systemd/user/openclaw-supervisor-watch.service`
-  - `~/.config/systemd/user/openclaw-supervisor-watch.timer`
+  - `tools/openclaw-supervisor/openclaw-supervisor-watch.service`（历史回退模板）
+  - `tools/openclaw-supervisor/openclaw-supervisor-watch.timer`（历史回退模板）
+  - `scripts/openclaw-health-collector.py`
+  - `~/.config/systemd/user/openclaw-health-collector.service`
+  - `~/.config/systemd/user/openclaw-health-collector.timer`
   - `~/.local/state/openclaw/supervisor/`
   - `TOOLS.md`
 
@@ -141,11 +142,11 @@
 
 - **结果目标**:把监工、本地健康、前台恢复观察等辅助消息统一收口后,再稳定投递到"当前前台 dashboard",并沉淀成统一 snapshot 口径的 sidecar 数据源,供 renderer / dock 等消费方直接复用;`overview` / `frontstage-status.json` 等旧名字只保留为兼容层。
 - **当前实现**:`scripts/openclaw-frontstage-broker.py` + `scripts/openclaw-infos-handle.py` + `scripts/apply-openclaw-frontstage-broker-data.py`
-- **自动触发**:由 `supervisor` / `local-health` / `frontstage-recovery` 等调用方间接触发;当前另外有 `openclaw-frontstage-broker-rebuild.service` + `openclaw-frontstage-broker-rebuild.timer` 周期刷新视图
+- **自动触发**:由 `supervisor` / `local-health` / `frontstage-recovery` 等调用方间接触发;Watcher v2 后默认通过 `openclaw-health-collector` / `openclaw-frontstage-guardian` 的 dirty flag 事件驱动重建视图,旧 `openclaw-frontstage-broker-rebuild.*` 仅保留作手工兜底模板
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:`openclaw-supervisor-subagent.py send-frontstage` 调用约定变化;`chat.inject` 路由变化;broker 视图模型与事件契约从"纯 delivery"演进为"source + delivery 双记录"后的兼容性;`infos-handle` 与 broker CLI 参数约定变化
 - **失效判断**:辅助消息仍回到旧 dashboard,或 `broker-state.json` / `events.jsonl` / `views/*.json` 不再更新;或 `events.jsonl` 里不再出现 `broker.source.event`;或 `openclaw-infos-handle.py query` 不能正常返回 text/json
-- **最小验收**:执行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock` 应成功;执行一次 `ingest` 烟测后,确认 `~/.local/state/openclaw/broker/events.jsonl` 出现 `broker.source.event`;执行 `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 应能正常返回;`views/snapshot.json` 与 `jarvis-frontstage-snapshot.json` 已刷新,`manifest.json` / `snapshot.json` 都声明 `snapshotContract.primaryView = snapshot`,并把 `overview` / `frontstage-status.json` 标成 `legacy_alias`、把 `frontstage / health / tasks / recovery` 标成 `supporting_view`;apply 输出里的 `controlUiSnapshotDock.snapshotJsonHref` 应指向 `/jarvis-frontstage-snapshot.json`,`frontstagePublication.snapshotFirstReady` 应为 `true`;`openclaw-frontstage-broker-rebuild.timer` 处于 `enabled + active(waiting)`
+- **最小验收**:执行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --apply-control-ui-branding --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock` 应成功;执行一次 `ingest` 烟测后,确认 `~/.local/state/openclaw/broker/events.jsonl` 出现 `broker.source.event`;执行 `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 应能正常返回;`views/snapshot.json` 与 `jarvis-frontstage-snapshot.json` 已刷新,`manifest.json` / `snapshot.json` 都声明 `snapshotContract.primaryView = snapshot`,并把 `overview` / `frontstage-status.json` 标成 `legacy_alias`、把 `frontstage / health / tasks / recovery` 标成 `supporting_view`;apply 输出里的 `controlUiSnapshotDock.snapshotJsonHref` 应指向 `/jarvis-frontstage-snapshot.json`,`frontstagePublication.snapshotFirstReady` 应为 `true`;`python3 scripts/openclaw-frontstage-broker.py rebuild-views --print-json` 可手工重建成功,且 Watcher v2 的 dirty flag 链路可触发刷新
 - **维护落点**:
   - `scripts/openclaw-frontstage-broker.py`
   - `scripts/test-frontstage-broker.py`
@@ -154,29 +155,30 @@
   - `scripts/apply-openclaw-frontstage-broker-data.py`
   - `scripts/openclaw-supervisor-subagent.py`
   - `tools/openclaw-frontstage-broker/README.md`
-  - `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service`
-  - `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
-  - `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service`
-  - `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
+  - `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service`（手工兜底模板,默认不启用）
+  - `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`（手工兜底模板,默认不启用）
+  - `scripts/openclaw-health-collector.py`
+  - `scripts/openclaw-frontstage-guardian.py`
   - `~/.local/state/openclaw/frontstage/broker-state.json`
   - `~/.local/state/openclaw/broker/`
 
 ### PATCH-LOCAL-HEALTH-DIAGNOSTIC-LAYER
 
 - **结果目标**:在不依赖 AI 回复的前提下,持续产出本机 OpenClaw 的本地健康诊断结果,把故障尽量分类到 gateway、本机外联、主线 provider 路由、温度、负载/内存,并同步生成本地健康页面与公共静态副本。
-- **当前实现**:`scripts/openclaw-local-health-diagnose.py` + `tools/openclaw-local-health/openclaw-local-health-watch.service` + `tools/openclaw-local-health/openclaw-local-health-watch.timer`
-- **自动触发**:user systemd timer;当前默认开机约 2 分钟首次运行,之后约每 5 分钟一次
+- **当前实现**:`scripts/openclaw-local-health-diagnose.py` + Watcher v2 的 `scripts/openclaw-health-collector.py` 子检查;旧 `tools/openclaw-local-health/openclaw-local-health-watch.*` 仅保留作历史回退参考
+- **自动触发**:`openclaw-health-collector.timer`;轻量检查每轮运行,完整 local-health 诊断约每 5 轮/5 分钟运行一次;当前不再启用旧 `openclaw-local-health-watch.timer`
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:`openclaw status --json` 输出变化;provider 配置结构变化;公共静态副本路径变化;宿主机温度桥接路径与格式变化
 - **失效判断**:`last-report.json` / `last-summary.txt` / `health-diagnostic.log` 长期不更新;`jarvis-local-health-status.html/.json` 不再刷新;或页面不再能给出 gateway/网络/provider 的明确分类
-- **最小验收**:运行 `python3 scripts/openclaw-local-health-diagnose.py --print-json` 应成功并生成状态文件;`openclaw-local-health-watch.timer` 应处于 `enabled + active(waiting)`;`~/.openclaw/canvas/documents/local-health-status/index.html` 与 `jarvis-local-health-status.json` 应存在
+- **最小验收**:运行 `python3 scripts/openclaw-local-health-diagnose.py --print-json` 应成功并生成状态文件;`openclaw-health-collector.timer` 应处于 `enabled + active(waiting)`;`~/.openclaw/canvas/documents/local-health-status/index.html` 与 `jarvis-local-health-status.json` 应存在
 - **维护落点**:
   - `scripts/openclaw-local-health-diagnose.py`
   - `tools/openclaw-local-health/README.md`
-  - `tools/openclaw-local-health/openclaw-local-health-watch.service`
-  - `tools/openclaw-local-health/openclaw-local-health-watch.timer`
-  - `~/.config/systemd/user/openclaw-local-health-watch.service`
-  - `~/.config/systemd/user/openclaw-local-health-watch.timer`
+  - `tools/openclaw-local-health/openclaw-local-health-watch.service`（历史回退模板）
+  - `tools/openclaw-local-health/openclaw-local-health-watch.timer`（历史回退模板）
+  - `scripts/openclaw-health-collector.py`
+  - `~/.config/systemd/user/openclaw-health-collector.service`
+  - `~/.config/systemd/user/openclaw-health-collector.timer`
   - `~/.local/state/openclaw/local-health/`
   - `~/.openclaw/canvas/documents/local-health-status/`
   - `TOOLS.md`
@@ -220,7 +222,7 @@
 
 - **结果目标**:监工状态在 `stalled / failed / done` 变化时,自动经由 broker 回前台,并能跟随当前 dashboard 页面。
 - **当前实现**:`scripts/openclaw-supervisor-status.py --notify-transitions`
-- **自动触发**:`openclaw-supervisor-watch.service` + `openclaw-supervisor-watch.timer`
+- **自动触发**:`openclaw-health-collector.timer` 调用 `scripts/openclaw-supervisor-status.py --notify-transitions`
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:task 状态模型变化;frontstage 解析规则变化;broker `emit` 返回结构(尤其 `messageId` 字段位置)变化
 - **失效判断**:`notify-state.json` 不更新、事件日志无 `notify_sent`、前台无监工摘要;或摘要误落回 `agent:main:main` 而不是当前 dashboard;或日志里的 `messageId` 异常为 `null`
@@ -234,7 +236,7 @@
 
 - **结果目标**:本地健康在 `warn / critical / recovered` 变化时,经由 broker 回前台一条简明辅助摘要,但不周期性"报平安"。
 - **当前实现**:`scripts/openclaw-local-health-diagnose.py --notify-frontstage`
-- **自动触发**:`openclaw-local-health-watch.service` + `openclaw-local-health-watch.timer`
+- **自动触发**:`openclaw-health-collector.timer` 周期调用 local-health 子检查
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:local-health 状态摘要结构变化;broker 接口变化
 - **失效判断**:健康状态变化时 `transition-state.json` 更新,但前台和 broker state 没有对应消息
@@ -248,7 +250,7 @@
 
 - **结果目标**:周期对比 durable transcript 与 `chat.history` 投影,尽早发现"主回复前台没稳定留下 / 投影异常"的情况,并在 anomaly / recovered 变化时经由 broker 回前台。
 - **当前实现**:`scripts/openclaw-frontstage-recovery-watch.py`
-- **自动触发**:`openclaw-frontstage-recovery-watch.service` + `openclaw-frontstage-recovery-watch.timer`
+- **自动触发**:`openclaw-frontstage-guardian.timer` 子检查调用;旧独立 `openclaw-frontstage-recovery-watch.*` 不再启用
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:`chat.history` 投影规则变化;`sessions.list` 状态字段变化;前端 optimistic-tail 行为变化
 - **失效判断**:`last-report.json` 停更;明明出现 anomaly/recovered,`notify-state.json` 和事件日志不变;或频繁误报
@@ -278,11 +280,11 @@
 
 - **结果目标**:让当前机器的 OpenClaw gateway 暴露 NVIDIA 音频代理接口(TTS / ASR),并保持主 gateway 继续稳定运行。
 - **当前实现**:`scripts/apply-openclaw-nvidia-audio-gateway-patch.py` + `tools/nvidia-audio-bridge/bridge.py`
-- **自动触发**:当前依赖手工补丁重打;bridge 本身由用户态 systemd 运行
+- **自动触发**:当前依赖手工补丁重打;bridge 本身由用户态 systemd 运行,但这是辅助语音支路,默认允许保持 `disabled + inactive`,不应为了常规自检强行启动
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:`dist/server.impl-*.js` 结构变化;新增代理模块注入位变化
-- **失效判断**:TTS/ASR 路由变回 404/502,或 gateway 升级后补丁丢失
-- **最小验收**:按 README 做 `/health`、TTS、ASR 三步验证
+- **失效判断**:在用户明确启用 NVIDIA 音频桥后,TTS/ASR 路由变回 404/502,或 gateway 升级后补丁丢失;若 service 处于 `disabled + inactive`,视为可选支路待命而不是系统错误
+- **最小验收**:仅在需要启用时按 README 做 `/health`、TTS、ASR 三步验证;常规系统自检只确认脚本/README/service 模板存在且不会影响主 gateway
 - **维护落点**:
   - `scripts/apply-openclaw-nvidia-audio-gateway-patch.py`
   - `tools/nvidia-audio-bridge/README.md`
@@ -333,19 +335,20 @@
 ### PATCH-DAILY-TRANSCRIPT-AGGREGATOR
 
 - **结果目标**：无论用户切换哪个模型，当天所有模型的对话记录都会自动汇集到 `memory/daily/YYYY-MM-DD-transcript.md`；新模型启动时必读此文件，不再出现"换模型后发现昨天对话不见了"的情况。
-- **当前实现**：`scripts/aggregate-daily-transcript.py` + systemd timer（每 5 分钟）
-- **自动触发**：`daily-transcript-aggregator.timer`（`OnBootSec=120s`，`OnUnitActiveSec=300s`）
+- **当前实现**：`scripts/aggregate-daily-transcript.py` + `scripts/openclaw-lifecycle-maintainer.py` 子检查
+- **自动触发**：`openclaw-lifecycle-maintainer.timer`;旧 `daily-transcript-aggregator.timer` 已被 Watcher v2 合并,默认不再启用
 - **适用范围**：通用（当前主落地为 公司（Linux））
 - **升级风险点**：OpenClaw session JSONL 格式变化；sessions.json 结构变化；路径变化
-- **失效判断**：`memory/daily/YYYY-MM-DD-transcript.md` 超过 10 分钟不更新；`daily-transcript-aggregator.timer` 未启用或未运行
-- **最小验收**：运行 `python3 scripts/aggregate-daily-transcript.py --print | head -20` 应有输出；`systemctl --user show daily-transcript-aggregator.timer -p UnitFileState -p ActiveState -p SubState` 应返回 `enabled` + `active` + `waiting`；检查 `memory/daily/$(date +%Y-%m-%d)-transcript.md` 存在且内容不空
+- **失效判断**：`memory/daily/YYYY-MM-DD-transcript.md` 超过 20 分钟不更新；`openclaw-lifecycle-maintainer.timer` 未启用或未运行
+- **最小验收**：运行 `python3 scripts/aggregate-daily-transcript.py --print | head -20` 应有输出；`systemctl --user show openclaw-lifecycle-maintainer.timer -p UnitFileState -p ActiveState -p SubState` 应返回 `enabled` + `active` + `waiting`；检查 `memory/daily/$(date +%Y-%m-%d)-transcript.md` 存在且内容不空
 - **维护落点**：
   - `scripts/aggregate-daily-transcript.py`
-  - `tools/daily-transcript-aggregator/README.md`
-  - `tools/daily-transcript-aggregator/daily-transcript-aggregator.service`
-  - `tools/daily-transcript-aggregator/daily-transcript-aggregator.timer`
-  - `~/.config/systemd/user/daily-transcript-aggregator.service`
-  - `~/.config/systemd/user/daily-transcript-aggregator.timer`
+  - `tools/daily-transcript-aggregator/README.md`（历史说明,当前由 lifecycle-maintainer 承载）
+  - `scripts/openclaw-lifecycle-maintainer.py`
+  - `tools/openclaw-watchers/openclaw-lifecycle-maintainer.service`
+  - `tools/openclaw-watchers/openclaw-lifecycle-maintainer.timer`
+  - `~/.config/systemd/user/openclaw-lifecycle-maintainer.service`
+  - `~/.config/systemd/user/openclaw-lifecycle-maintainer.timer`
   - `AGENTS.md`（第 5 步）
   - `scripts/openclaw-post-upgrade-self-check.py`（`check_daily_transcript_aggregator()`）
   - `TOOLS.md`
@@ -353,25 +356,26 @@
 ### PATCH-RESPONSIVENESS-WATCHDOG
 
 - **结果目标**：当用户在主会话发消息后，模型超过阈值时间仍未回复时，自动向主会话注入提醒（30s 提醒 / 60s 紧急），不依赖模型自身响应能力。
-- **当前实现**：`scripts/openclaw-responsiveness-watch.py` + systemd timer（每 15 秒）
-- **自动触发**：`openclaw-responsiveness-watch.timer`（`OnBootSec=90s`，`OnUnitActiveSec=15s`）
+- **当前实现**：`scripts/openclaw-responsiveness-watch.py` 作为 `scripts/openclaw-frontstage-guardian.py` 子检查承载;旧独立 systemd timer 已被 Watcher v2 合并
+- **自动触发**：`openclaw-frontstage-guardian.timer`（内部调用 responsiveness 子检查）;当前不再启用旧 `openclaw-responsiveness-watch.timer`
 - **适用范围**：通用（当前主落地为 公司（Linux））
 - **升级风险点**：
   - dashboard session transcript 嵌套格式变化（`{"type":"message","message":"..."}` 结构）
   - infos-handle contract 的 `build_handle_request_payload` / `invoke_handle_request` API 变化
   - `sessions.json` 结构与 session key 命名规则变化
   - infos-handle 脚本路径或引入方式变化
-- **失效判断**：`openclaw-responsiveness-watch.timer` 未启用或未运行；`--print-human` 输出报错
+- **失效判断**：`openclaw-frontstage-guardian.timer` 未启用或未运行；guardian 输出中 responsiveness 子检查报错或长期不更新
 - **最小验收**：
-  - `systemctl --user show openclaw-responsiveness-watch.timer -p UnitFileState -p ActiveState -p SubState` 返回 `enabled` + `active` + `waiting`
-  - `python3 scripts/openclaw-responsiveness-watch.py --print-human` 输出含 "正常" 或明确检测结果（不报错）
+  - `systemctl --user show openclaw-frontstage-guardian.timer -p UnitFileState -p ActiveState -p SubState` 返回 `enabled` + `active` + `waiting`
+  - `python3 scripts/openclaw-frontstage-guardian.py --print-human` 输出 `OK` 或明确检测结果（不报错）
 - **维护落点**：
   - `scripts/openclaw-responsiveness-watch.py`
-  - `tools/openclaw-responsiveness-watch/README.md`
-  - `tools/openclaw-responsiveness-watch/openclaw-responsiveness-watch.service`
-  - `tools/openclaw-responsiveness-watch/openclaw-responsiveness-watch.timer`
-  - `~/.config/systemd/user/openclaw-responsiveness-watch.service`
-  - `~/.config/systemd/user/openclaw-responsiveness-watch.timer`
+  - `tools/openclaw-responsiveness-watch/README.md`（历史说明/子模块参考）
+  - `scripts/openclaw-frontstage-guardian.py`
+  - `tools/openclaw-watchers/openclaw-frontstage-guardian.service`
+  - `tools/openclaw-watchers/openclaw-frontstage-guardian.timer`
+  - `~/.config/systemd/user/openclaw-frontstage-guardian.service`
+  - `~/.config/systemd/user/openclaw-frontstage-guardian.timer`
   - `scripts/openclaw-post-upgrade-self-check.py`
   - `TOOLS.md`
 

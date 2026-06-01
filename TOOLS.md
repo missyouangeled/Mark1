@@ -106,8 +106,8 @@ Things like:
   - 最小回归:`scripts/test-frontstage-broker.py`
   - 重建入口:`scripts/apply-openclaw-frontstage-broker-data.py` / `scripts/openclaw-frontstage-broker.py rebuild-views`
   - systemd 模板:`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service` / `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
-  - 当前用户态 systemd:`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service` / `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer`
-  - 默认频率:开机约 75 秒后首次运行,之后约每 60 秒重建一次 broker 视图
+  - 旧用户态 systemd:`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service` / `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer` 当前保留为模板/手工兜底,默认不启用
+  - 当前默认刷新策略:Watcher v2 后由 `openclaw-health-collector` / `openclaw-frontstage-guardian` 通过 dirty flag 事件驱动重建 broker 视图,不再每 60 秒盲重建
   - 用途:把监工、本地健康、前台恢复观察这类辅助消息统一收口后再发回当前前台 dashboard,并在当前阶段开始沉淀成 sidecar 数据源
   - 当前来源:`supervisor` / `local-health` / `frontstage-recovery`
   - 当前动作:`emit` / `rebuild-views`
@@ -183,11 +183,9 @@ Things like:
   - 适用机器:公司(Linux)
   - 系统 / OS:Linux
   - README:`tools/openclaw-supervisor/README.md`
-  - service:`tools/openclaw-supervisor/openclaw-supervisor-watch.service`
-  - timer:`tools/openclaw-supervisor/openclaw-supervisor-watch.timer`
-  - 当前已安装到:`~/.config/systemd/user/openclaw-supervisor-watch.service` / `~/.config/systemd/user/openclaw-supervisor-watch.timer`
-  - 当前状态:timer 已启用并开始周期刷新
-  - 默认频率:开机约 1 分钟后首次运行,之后约每 30 秒刷新一次监工状态
+  - 旧模板:`tools/openclaw-supervisor/openclaw-supervisor-watch.service` / `tools/openclaw-supervisor/openclaw-supervisor-watch.timer` 当前仅作历史回退参考,默认不再安装启用
+  - 当前实现:Watcher v2 已把监工状态刷新/自动回报内迁到 `openclaw-health-collector.timer`;手工查看/控制仍使用 `scripts/openclaw-supervisor-status.py`
+  - 当前验收:`systemctl --user show openclaw-health-collector.timer -p UnitFileState -p ActiveState -p SubState` 应为 enabled + active + waiting;`python3 scripts/openclaw-supervisor-status.py --print-human` 应能输出当前监工状态
 - 监工分身保留标签:`main-supervisor-lite`
 - 监工唯一标号格式:`main-supervisor-lite@<runtime-host>`(`<runtime-host>` 优先取运行时 host 元数据)
 - 规则:这个标签只给主会话监工分身使用;普通任务分身不要复用。只有当当前轮确实需要聊天插播 / 额外协作时,才按需拉起监工分身;整体数量应为 `0 或 1`。若未来出现监工重复,先比较唯一标号;标号相同则保留最新且健康的一个(健康 = 未失败、未超时、未被杀,且近期仍有活动或可见进度)。
