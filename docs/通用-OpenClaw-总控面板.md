@@ -13,6 +13,10 @@
 
 它是**总目录**，不是正文。每个条目都指向对应的注册表/备忘录/脚本位置。
 
+当前正式运行状态的权威源：`docs/通用-OpenClaw-当前正式架构状态.md`。若修复器、自检脚本、注册表或重建清单与该文件冲突，优先按该文件纠偏。
+
+一眼总览命令：`python3 scripts/openclaw-system-summary.py --print-human`。
+
 ---
 
 ## 一、全量清单（总 39 项：22 正式补丁 + 3 非正式修复 + 4 维护备忘 + 8 自定义 Skill + 2 待处理）
@@ -213,6 +217,9 @@
 
 想快速确认升级后还能不能用（30 秒自检）
   → docs/通用-OpenClaw-升级后自检清单.md
+
+想看当前系统一眼总览
+  → python3 scripts/openclaw-system-summary.py --print-human
 
 想一条命令验证今天全部改动
   → python3 scripts/verify-today-patches.py --print

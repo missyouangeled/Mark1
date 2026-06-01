@@ -19,7 +19,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +98,48 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 120) -> dict[str, A
         return {"label": label, "ok": False, "exitCode": -2, "summary": f"EXCEPTION: {exc}", "stderr": str(exc)[:300]}
 
 
+
+def ensure_daily_skeleton() -> dict[str, Any]:
+    """Ensure today/yesterday daily summary files exist.
+
+    The transcript aggregator writes `YYYY-MM-DD-transcript.md`, while startup
+    rules read `YYYY-MM-DD.md` for curated daily notes.  Creating a light
+    skeleton avoids ENOENT without invoking a model or doing expensive summary
+    work.
+    """
+    daily_dir = WORKSPACE / "memory" / "daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().astimezone().date()
+    created: list[str] = []
+    existing: list[str] = []
+    for day in (today, today - timedelta(days=1)):
+        label = day.isoformat()
+        path = daily_dir / f"{label}.md"
+        if path.exists():
+            existing.append(str(path.relative_to(WORKSPACE)))
+            continue
+        content = (
+            f"# {label} 日常记录\n\n"
+            "## 今日摘要\n\n"
+            "待整理。\n\n"
+            "## 重要事项\n\n"
+            "- 暂无。\n\n"
+            "## 后续待办\n\n"
+            "- 暂无。\n"
+        )
+        save_text(path, content)
+        created.append(str(path.relative_to(WORKSPACE)))
+    summary = "created " + ",".join(created) if created else "daily skeletons present"
+    return {
+        "label": "daily-skeleton",
+        "ok": True,
+        "exitCode": 0,
+        "summary": summary,
+        "created": created,
+        "existing": existing,
+        "stderr": None,
+    }
+
 def main():
     parser = argparse.ArgumentParser(description="Lifecycle Maintainer — 生命周期维护器")
     parser.add_argument("--print-human", action="store_true")
@@ -128,6 +170,9 @@ def main():
         ["/bin/bash", str(SCRIPTS / "flush-memory-sync.sh")],
         timeout=10,
     ))
+
+    # 1.6 daily 摘要骨架（每次轻量确认，避免启动读取 ENOENT）
+    checks.append(ensure_daily_skeleton())
 
     # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
     if do_cleanup:

@@ -850,3 +850,24 @@
 - openclaw tasks audit => 0 findings；openclaw security audit => 0 critical / 0 warn；python3 scripts/verify-today-patches.py --print => 12/12 passed；local-health => OK gateway=reachable service=running
 - 相关文件：
 - `docs/通用-OpenClaw-补丁变更流水.md`
+
+## 2026-06-01 12:09:52 CST (+08:00) — 收敛OpenClaw架构状态源与日常归档闭环
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增当前正式架构状态源，明确正式/历史/可选组件边界；新增系统总览脚本；新增公司Linux本机配置期望；新增Git工作区污染规则并忽略transcript/fallback临时产物；lifecycle-maintainer自动创建今日/昨日daily摘要骨架
+- 验收 / 验证：
+- python3 scripts/openclaw-system-summary.py --print-human => OK；python3 scripts/verify-today-patches.py --print => 12/12 passed；python3 scripts/openclaw-patch-repair.py --check => 12/12 正常；openclaw security audit => 0 critical / 0 warn；openclaw tasks audit => 0 findings；daily骨架已创建
+- 相关文件：
+- `.gitignore`
+- `TOOLS.md`
+- `docs/公司-Linux-OpenClaw-本机配置期望.md`
+- `docs/通用-OpenClaw-Git工作区污染规则.md`
+- `docs/通用-OpenClaw-当前正式架构状态.md`
+- `docs/通用-OpenClaw-总控面板.md`
+- `scripts/openclaw-lifecycle-maintainer.py`
+- `scripts/openclaw-system-summary.py`

@@ -59,6 +59,15 @@ Things like:
 - **升级历史记录**:`docs/通用-OpenClaw-升级记录.md` — 每次升级的完整经过:版本号、时间、触发方式、发现的问题、修复详情、验证结果、经验教训。升级后如发现新问题,修复后应追加到该文件。
   - 状态目录:`~/.local/state/openclaw/post-upgrade-self-check/`
 - 变更流水文档:`docs/通用-OpenClaw-补丁变更流水.md`
+
+- 系统一眼总览脚本：`scripts/openclaw-system-summary.py`
+  - 用途：聚合 gateway / security / tasks / watcher / patch verify / local-health / daily / git 工作区状态，快速判断当前系统是否干净
+  - 常用命令：`python3 scripts/openclaw-system-summary.py --print-human`
+  - 边界：只做低侵入聚合检查，不新增 timer，不替代细分诊断脚本
+- 当前正式架构状态源：`docs/通用-OpenClaw-当前正式架构状态.md`
+  - 用途：定义哪些组件是正式运行、哪些是历史回退、哪些是可选/手动，修复器和自检脚本应优先对齐此文件
+- Git 工作区污染规则：`docs/通用-OpenClaw-Git工作区污染规则.md`
+  - 用途：区分系统补丁提交、记忆/学习低频整理、运行态/临时文件忽略，避免 `git add .` 混入 transcript/fallback/tmp
 - 非正式修改备忘录:`docs/通用-OpenClaw-非正式修改备忘录.md`
 - 变更流水脚本:`scripts/openclaw-change-log.py`
   - 用途:每次做完修改/修补后,把"这次实际改了什么"按时间追加到变更流水里;若是未进入正式补丁体系的临时/手工/外部修改,也可直接追加到非正式修改备忘录
