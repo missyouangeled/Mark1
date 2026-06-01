@@ -233,6 +233,32 @@ def run_openclaw_status_json() -> tuple[dict[str, Any] | None, str | None]:
         return None, f"status_json_invalid: {exc}"
 
 
+
+def run_openclaw_gateway_status_probe() -> dict[str, Any]:
+    """Fast fallback probe for transient `openclaw status --json` false negatives."""
+    try:
+        result = subprocess.run(
+            ["openclaw", "gateway", "status"],
+            cwd=str(WORKSPACE),
+            capture_output=True,
+            text=True,
+            timeout=35,
+            check=False,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": f"gateway_status_exec_failed: {exc}"}
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    runtime_running = "Runtime: running" in stdout
+    probe_ok = "Connectivity probe: ok" in stdout
+    return {
+        "ok": result.returncode == 0 and runtime_running and probe_ok,
+        "exitCode": result.returncode,
+        "runtimeRunning": runtime_running,
+        "connectivityProbeOk": probe_ok,
+        "detail": "; ".join(line.strip() for line in stdout.splitlines() if line.startswith(("Runtime:", "Connectivity probe:"))) or (stderr.strip()[:300]),
+    }
+
 def tcp_probe(host: str, port: int, timeout: float = REQUEST_TIMEOUT_SECONDS) -> tuple[bool, str, float | None]:
     started = time.monotonic()
     try:
@@ -1477,6 +1503,18 @@ def main() -> int:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     config = load_json(CONFIG_PATH)
     status_payload, status_error = run_openclaw_status_json()
+    gateway_status_probe = run_openclaw_gateway_status_probe()
+    if status_payload and not status_payload.get("gateway", {}).get("reachable") and gateway_status_probe.get("ok"):
+        status_payload.setdefault("gateway", {})["reachable"] = True
+        status_payload["gateway"].setdefault("fallbackProbe", gateway_status_probe)
+        status_payload.setdefault("gatewayService", {}).setdefault("runtime", {})["status"] = "running"
+    if status_error and gateway_status_probe.get("ok"):
+        status_error = None
+        status_payload = status_payload or {}
+        status_payload.setdefault("gateway", {})["reachable"] = True
+        status_payload["gateway"]["fallbackProbe"] = gateway_status_probe
+        status_payload.setdefault("gatewayService", {}).setdefault("runtime", {})["status"] = "running"
+
     generic_probes = collect_generic_probes()
     provider_probes = collect_provider_probes(config)
     thermal_status = collect_thermal_status()
@@ -1487,7 +1525,8 @@ def main() -> int:
 
     gateway_runtime = status_payload.get("gatewayService", {}).get("runtime", {}) if status_payload else {}
     gateway_info = status_payload.get("gateway", {}) if status_payload else {}
-    host = gateway_info.get("self", {}).get("host") or socket.gethostname()
+    gateway_self = gateway_info.get("self") if isinstance(gateway_info.get("self"), dict) else {}
+    host = gateway_self.get("host") or socket.gethostname()
     report = {
         "checkedAt": now_iso(),
         "host": host,
@@ -1504,6 +1543,7 @@ def main() -> int:
             "serviceState": gateway_runtime.get("state") or "unknown",
             "serviceSubState": gateway_runtime.get("subState") or "unknown",
             "pid": gateway_runtime.get("pid"),
+            "fallbackProbe": gateway_info.get("fallbackProbe"),
         },
         "genericProbes": generic_probes,
         "providerProbes": provider_probes,

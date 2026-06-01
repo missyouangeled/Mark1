@@ -87,6 +87,12 @@ python3 scripts/verify-today-patches.py --print
 
 本机实际配置期望见：`docs/公司-Linux-OpenClaw-本机配置期望.md`。
 
+## 应急入口
+
+| 入口 | 用途 | 命令 |
+|---|---|---|
+| Control UI 黑屏应急修复器 | 页面黑屏 / 打不开时逐层诊断和低风险修复 | `python3 scripts/openclaw-control-ui-emergency.py --check --print-human` |
+
 ## 当前总体验收入口
 
 优先使用：

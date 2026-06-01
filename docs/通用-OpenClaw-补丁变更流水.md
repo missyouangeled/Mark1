@@ -871,3 +871,26 @@
 - `docs/通用-OpenClaw-总控面板.md`
 - `scripts/openclaw-lifecycle-maintainer.py`
 - `scripts/openclaw-system-summary.py`
+
+## 2026-06-01 12:55:03 CST (+08:00) — 新增Control UI黑屏应急修复器
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 Control UI 黑屏应急诊断/修复脚本，按浏览器HTTP、Gateway、静态资源、branding/model selector、broker/sidecar/proxy 分层检查；支持 check/repair/safe-mode 三档；补 runbook 与总控入口
+- 顺手修复 local-health 对 gateway_info.self=None 的容错，并为 gateway reachable=false 增加 gateway status 二次确认，避免 Gateway 实际可达时误报 critical；verify-today-patches 对 health-collector 并发空输出增加 last-report 兜底
+- 验收 / 验证：
+- python3 scripts/openclaw-control-ui-emergency.py --check --print-human => OK；python3 scripts/openclaw-system-summary.py --print-human => OK；python3 scripts/verify-today-patches.py --print => 12/12 passed；python3 scripts/openclaw-patch-repair.py --check => 12/12 正常；openclaw security audit => 0 critical / 0 warn；openclaw tasks audit => 0 findings
+- 相关文件：
+- `TOOLS.md`
+- `docs/plans/2026-06-01-control-ui-emergency-recovery.md`
+- `docs/通用-OpenClaw-ControlUI黑屏应急修复.md`
+- `docs/通用-OpenClaw-当前正式架构状态.md`
+- `docs/通用-OpenClaw-总控面板.md`
+- `scripts/openclaw-control-ui-emergency.py`
+- `scripts/openclaw-local-health-diagnose.py`
+- `scripts/openclaw-system-summary.py`
+- `scripts/verify-today-patches.py`

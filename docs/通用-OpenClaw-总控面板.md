@@ -221,6 +221,10 @@
 想看当前系统一眼总览
   → python3 scripts/openclaw-system-summary.py --print-human
 
+Control UI 黑屏 / 打不开应急修复
+  → docs/通用-OpenClaw-ControlUI黑屏应急修复.md
+  → python3 scripts/openclaw-control-ui-emergency.py --check --print-human
+
 想一条命令验证今天全部改动
   → python3 scripts/verify-today-patches.py --print
 

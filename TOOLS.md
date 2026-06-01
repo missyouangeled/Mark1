@@ -60,6 +60,12 @@ Things like:
   - 状态目录:`~/.local/state/openclaw/post-upgrade-self-check/`
 - 变更流水文档:`docs/通用-OpenClaw-补丁变更流水.md`
 
+- Control UI 黑屏应急修复器：`scripts/openclaw-control-ui-emergency.py`
+  - 用途：从浏览器 HTTP 视角、Gateway、Control UI 静态资源、自定义 branding / 模型选择器补丁、broker/sidecar/proxy 逐层诊断 Control UI 黑屏/打不开问题
+  - 常用命令：`python3 scripts/openclaw-control-ui-emergency.py --check --print-human`
+  - 低风险修复：`python3 scripts/openclaw-control-ui-emergency.py --repair --print-human`
+  - 兜底 safe mode：`python3 scripts/openclaw-control-ui-emergency.py --safe-mode --print-human`（临时禁用 branding 注入，优先救回原始页面）
+  - 文档：`docs/通用-OpenClaw-ControlUI黑屏应急修复.md`
 - 系统一眼总览脚本：`scripts/openclaw-system-summary.py`
   - 用途：聚合 gateway / security / tasks / watcher / patch verify / local-health / daily / git 工作区状态，快速判断当前系统是否干净
   - 常用命令：`python3 scripts/openclaw-system-summary.py --print-human`

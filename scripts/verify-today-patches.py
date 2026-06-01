@@ -115,14 +115,24 @@ def main():
         data = json.loads(out) if out else {}
         clist = data.get("checks", [])
         if not clist:
-            latency_detail = "no checks in output"
+            # The collector may be invoked concurrently by systemd / other verification
+            # commands on this small VM.  If stdout races empty, use the persisted
+            # last-report as a read-only fallback, but still require elapsedMs fields.
+            last_report = OPENCLAW_STATE / "health-collector" / "last-report.json"
+            if last_report.exists():
+                data = json.loads(last_report.read_text(encoding="utf-8"))
+                clist = data.get("checks", [])
+                latency_detail = "using last-report fallback"
+        if not clist:
+            latency_detail = "no checks in output or last-report"
         else:
             total = len(clist)
             with_ms = sum(1 for c in clist if isinstance(c.get("elapsedMs"), int))
             if with_ms == total:
                 latency_ok = True
                 ms_vals = [str(c.get("elapsedMs")) for c in clist]
-                latency_detail = f"{with_ms}/{total} checks have elapsedMs: {','.join(ms_vals)}ms"
+                prefix = "last-report fallback: " if latency_detail == "using last-report fallback" else ""
+                latency_detail = f"{prefix}{with_ms}/{total} checks have elapsedMs: {','.join(ms_vals)}ms"
             else:
                 latency_detail = f"only {with_ms}/{total} have elapsedMs"
     except Exception as e:

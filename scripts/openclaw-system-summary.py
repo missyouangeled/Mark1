@@ -128,8 +128,14 @@ def main() -> int:
 
     local_health = run([sys.executable, str(SCRIPTS / "openclaw-local-health-diagnose.py"), "--print-human"], timeout=90)
     local_health_first_line = local_health["stdout"].splitlines()[0].strip() if local_health["stdout"].splitlines() else ""
+    # local-health exits 1 for warn (for example temporary CPU pressure).
+    # The summary card should only fail on command errors/critical/unreachable;
+    # warn stays visible in the summary text without making the whole system red.
+    local_health_text = "\n".join([local_health.get("stdout", ""), local_health.get("stderr", "")])
+    local_health_command_ok = local_health["exitCode"] in (0, 1) and "Traceback" not in local_health_text
+    local_health_not_critical = "CRITICAL" not in local_health_first_line and "Gateway 不可达" not in local_health_text
     checks["localHealth"] = {
-        "ok": local_health["ok"] and "OK" in local_health_first_line,
+        "ok": local_health_command_ok and local_health_not_critical,
         "summary": local_health_first_line or local_health["stderr"][:160],
     }
 
