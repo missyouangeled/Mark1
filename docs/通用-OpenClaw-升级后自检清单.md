@@ -67,10 +67,12 @@ python3 scripts/openclaw-post-upgrade-self-check.py --strict --print-human
 检查:
 
 - `~/.config/systemd/user/openclaw-gateway.service.d/branding.conf`
+- `~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf`
 - 其中仍包含:
 
 ```ini
 ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/apply-openclaw-control-ui-branding.py
+ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/apply-openclaw-session-model-selector-fix.py
 ```
 
 含义:每次 gateway 启动前,都会自动重打一遍 Control UI 正式补丁。
@@ -84,6 +86,7 @@ ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/
 - live asset 里仍有 `JarvisProjectYieldedHistoryReply`
 - live asset 里仍有 `JarvisShouldShowPendingReadingIndicator`
 - live override 里仍优先指向 `/jarvis-frontstage-snapshot.json`
+- live asset 里模型下拉仍带 `s?.resolved?.modelProvider` / `refresh-tools-effective`，且旧的 `if(_U(e)===t)return!0` 早退分支不存在
 
 ---
 

@@ -54,6 +54,49 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 - 聊天页“进行中”逻辑仍包含 `loading / sending / stream / canAbort / queue / hasActiveRun / status=running`
 - 前端资产里仍带 `JarvisProjectYieldedHistoryReply`
 
+### 1.1.1 Control UI 当前会话模型下拉补丁
+
+目标：让聊天页模型下拉真正写入当前会话的 `sessions.patch` 模型覆盖，并使用后端 resolved 结果回填 UI。
+
+检查：
+
+- `~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf`
+- `scripts/apply-openclaw-session-model-selector-fix.py`
+- `dist/control-ui/assets/index-*.js` 中 `data-chat-model-select="true"` 所在函数
+- `dist/session-utils-*.js` 中 `resolveSessionModelRef` / `resolveSessionSelectedModelRef`
+
+动作：
+
+```bash
+python3 scripts/apply-openclaw-session-model-selector-fix.py
+```
+
+验收：
+
+```bash
+python3 scripts/apply-openclaw-session-model-selector-fix.py
+python3 - <<'PY'
+from pathlib import Path
+p=Path.home()/'.npm-global/lib/node_modules/openclaw/dist/control-ui/assets/index-BtIuF4zW.js'
+t=p.read_text(errors='ignore')
+assert 'data-chat-model-select="true"' in t
+assert 's?.resolved?.modelProvider' in t
+assert 'refresh-tools-effective' in t
+assert 'if(_U(e)===t)return!0' not in t
+html=(Path.home()/'.npm-global/lib/node_modules/openclaw/dist/control-ui/index.html').read_text(errors='ignore')
+assert '?jarvisModelSelector=' in html
+print('PASS')
+PY
+```
+
+如果要做当前主会话烟测，先确保目标仍是默认要求的 GPT-5.5：
+
+```bash
+openclaw gateway call sessions.patch --timeout 60000 --json --params '{"key":"agent:main:main","model":"github-copilot/gpt-5.5"}'
+```
+
+通过时返回 `resolved.modelProvider=github-copilot`、`resolved.model=gpt-5.5`。
+
 ### 1.2 开机体检自愈（boot-health-check）
 
 检查：`scripts/openclaw-boot-health-check.py` `~/.config/systemd/user/openclaw-boot-health-check.service`

@@ -65,6 +65,11 @@ Things like:
   - 推荐命令(变更流水):`python3 scripts/openclaw-change-log.py capture --title '本次改动标题' --kind patch --scope 通用 --summary '一句结果摘要' --verify '最小验收结果' --registry-status 已更新 --rebuild-status 已更新 --selfcheck-status 不适用 --file path/to/file`
   - 推荐命令(非正式修改备忘录):`python3 scripts/openclaw-change-log.py memo --title '本次备忘录标题' --kind manual-fix --scope 通用 --current-status 备查 --reason '为何未纳入正式补丁' --recovery '后续排查提示' --file path/to/file`
   - 说明:正式补丁除了写流水,还要同步更新补丁注册表 / 重建清单 / 必要时更新升级后自检清单;非正式但重要的修改还应补进非正式修改备忘录
+- Control UI 当前会话模型下拉补丁：`scripts/apply-openclaw-session-model-selector-fix.py`
+  - 用途：修复聊天页模型下拉“选了但当前会话实际不切”的问题；下拉选择后调用 `sessions.patch {key, model}`，使用后端 `resolved.modelProvider/model` 回填 UI，并刷新 `tools-effective`。
+  - 自动触发（公司 Linux）：`~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf` 的 `ExecStartPre`。
+  - 最小验收：`python3 scripts/apply-openclaw-session-model-selector-fix.py`；live asset 应包含 `data-chat-model-select="true"`、`s?.resolved?.modelProvider`、`refresh-tools-effective`，且旧早退 `if(_U(e)===t)return!0` 不存在；`index.html` 主 bundle 引用应带 `?jarvisModelSelector=`。
+  - 当前主会话模型与默认模型需保持 `github-copilot/gpt-5.5`；做烟测时不要随手把主会话切到别的模型，若必须测试切换，优先新建测试会话或最后立刻切回 GPT-5.5。
 - Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
 - WebChat / Control UI 直聊里的轻量后台分身,不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话;默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
 - 本地健康诊断层(公司 / Linux 机器):

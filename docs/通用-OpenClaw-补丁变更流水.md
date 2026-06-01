@@ -795,3 +795,25 @@
 - docs/plans/2026-06-01-openclaw-architecture-optimization.md 已创建
 - 相关文件：
 - `docs/plans/2026-06-01-openclaw-architecture-optimization.md`
+
+## 2026-06-01 09:30:02 CST (+08:00) — 修复 Control UI 当前会话模型下拉真实切换
+
+- 类型：patch
+- 适用范围：通用 / 公司（Linux）
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 模型下拉选择后现在会走 sessions.patch 写入当前会话，并使用后端 resolved provider/model 回填 UI。
+- 补丁允许 active run 期间提交 live model switch，并为 Control UI 主 bundle 添加 jarvisModelSelector 缓存破坏参数。
+- 验收 / 验证：
+- python3 scripts/apply-openclaw-session-model-selector-fix.py 成功输出 patched-or-current。
+- 前端资产检查通过：data-chat-model-select、s?.resolved?.modelProvider、refresh-tools-effective 存在，旧 if(_U(e)===t)return!0 早退不存在，index.html 带 ?jarvisModelSelector=。
+- openclaw gateway call sessions.patch --timeout 60000 --json --params {key:agent:main:main,model:github-copilot/gpt-5.5} 返回 resolved=github-copilot/gpt-5.5。
+- 相关文件：
+- `TOOLS.md`
+- `docs/公司-Linux-OpenClaw-维护说明.md`
+- `docs/通用-OpenClaw-升级后自检清单.md`
+- `docs/通用-OpenClaw-补丁注册表.md`
+- `docs/通用-OpenClaw-补丁重建清单.md`
+- `scripts/apply-openclaw-session-model-selector-fix.py`

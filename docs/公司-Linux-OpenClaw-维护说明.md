@@ -76,6 +76,34 @@
 
 ## 当前已知 Linux 维护点
 
+### Control UI 当前会话模型下拉补丁（公司 Linux）
+
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 维护时间：2026-06-01
+- 目标：聊天页模型下拉选择哪个模型，当前会话后续回复就使用哪个模型；切换后以前端显示为辅，以 `sessions.patch` 后端 resolved 结果为准。
+
+相关文件：
+
+- 补丁脚本：`scripts/apply-openclaw-session-model-selector-fix.py`
+- 当前用户态 systemd drop-in：`~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf`
+- live 前端资产：`~/.npm-global/lib/node_modules/openclaw/dist/control-ui/assets/index-*.js`
+- session 工具资产：`~/.npm-global/lib/node_modules/openclaw/dist/session-utils-*.js`
+
+当前自动触发：
+
+- gateway 启动前通过 `ExecStartPre=-/usr/bin/python3 .../apply-openclaw-session-model-selector-fix.py` 自动重打。
+
+当前最小验收：
+
+```bash
+python3 scripts/apply-openclaw-session-model-selector-fix.py
+openclaw gateway call sessions.patch --timeout 60000 --json --params '{"key":"agent:main:main","model":"github-copilot/gpt-5.5"}'
+```
+
+通过时应返回 resolved 为 `github-copilot/gpt-5.5`。补丁脚本会给 `index.html` 主 bundle 引用追加 `?jarvisModelSelector=<mtime>`，绕开 service worker 对 hashed assets 的 cache-first；浏览器端若仍旧显示不变，再做硬刷新 / 清 service worker 缓存。
+
+
 ### 0. 双盘空间预检与落盘规则（公司 Linux）
 
 - 适用机器：公司（Linux）

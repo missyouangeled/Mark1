@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # 适用机器：通用（当前已在公司（Linux）验证）
 # 系统 / OS：Linux / macOS / Windows（取决于本机 OpenClaw 安装位置）
-# 用途：修复 sessions.list / Control UI 模型下拉在运行中会话里优先显示旧 override、而不是当前实际运行模型的问题。
+# 用途：修复 Control UI / sessions.list 模型下拉与当前会话实际模型不一致的问题。
+#   1) sessions.list / Control UI 会话列表：运行中会话优先显示真实运行模型，而不是旧 override。
+#   2) Control UI 聊天页模型下拉：选择后必须调用 sessions.patch，使用后端 resolved 结果回填 UI，并允许 active run 期间提交 live-switch。
 
 from __future__ import annotations
 
@@ -9,13 +11,14 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 DEFAULT_PACKAGE_ROOT = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw"
-TARGET_RELATIVE = Path("dist") / "session-utils-BcTdpiLf.js"
+CONTROL_UI_ASSETS_RELATIVE = Path("dist") / "control-ui" / "assets"
 
 OLD_BLOCK_SELECTED = """function createSessionRowModelCacheKey(provider, model) {
-\treturn `${normalizeLowercaseStringOrEmpty(provider)}\\0${normalizeOptionalString(model) ?? \"\"}`;
+\treturn `${normalizeLowercaseStringOrEmpty(provider)}\\0${normalizeOptionalString(model) ?? ""}`;
 }
 function resolveSessionSelectedModelRef(params) {
 \tconst override = normalizeStoredOverrideModel({
@@ -26,9 +29,9 @@ function resolveSessionSelectedModelRef(params) {
 \tif (!params.rowContext) return resolveSessionModelRef(params.cfg, params.entry, params.agentId, { allowPluginNormalization: params.allowPluginNormalization });
 \tconst key = [
 \t\tnormalizeAgentId(params.agentId),
-\t\toverride.providerOverride ?? \"\",
+\t\toverride.providerOverride ?? "",
 \t\toverride.modelOverride
-\t].join(\"\\0\");
+\t].join("\\0");
 \tconst cached = params.rowContext.selectedModelByOverrideRef.get(key);
 \tif (cached) return cached;
 \tconst selected = resolveSessionModelRef(params.cfg, params.entry, params.agentId, { allowPluginNormalization: params.allowPluginNormalization });
@@ -37,7 +40,7 @@ function resolveSessionSelectedModelRef(params) {
 }"""
 
 NEW_BLOCK_SELECTED = """function createSessionRowModelCacheKey(provider, model) {
-\treturn `${normalizeLowercaseStringOrEmpty(provider)}\\0${normalizeOptionalString(model) ?? \"\"}`;
+\treturn `${normalizeLowercaseStringOrEmpty(provider)}\\0${normalizeOptionalString(model) ?? ""}`;
 }
 function resolveSessionPromptReportModelRef(entry) {
 \tconst reportProvider = normalizeOptionalString(entry?.systemPromptReport?.provider);
@@ -57,13 +60,13 @@ function resolveSessionSelectedModelRef(params) {
 \t\tmodelOverride: params.entry?.modelOverride
 \t});
 \tif (!override.modelOverride) return null;
-\tif (params.entry?.status === \"running\" && resolveSessionPromptReportModelRef(params.entry)) return null;
+\tif (params.entry?.status === "running" && resolveSessionPromptReportModelRef(params.entry)) return null;
 \tif (!params.rowContext) return resolveSessionModelRef(params.cfg, params.entry, params.agentId, { allowPluginNormalization: params.allowPluginNormalization });
 \tconst key = [
 \t\tnormalizeAgentId(params.agentId),
-\t\toverride.providerOverride ?? \"\",
+\t\toverride.providerOverride ?? "",
 \t\toverride.modelOverride
-\t].join(\"\\0\");
+\t].join("\\0");
 \tconst cached = params.rowContext.selectedModelByOverrideRef.get(key);
 \tif (cached) return cached;
 \tconst selected = resolveSessionModelRef(params.cfg, params.entry, params.agentId, { allowPluginNormalization: params.allowPluginNormalization });
@@ -99,7 +102,7 @@ OLD_BLOCK_MODEL_REF = """function resolveSessionModelRef(cfg, entry, agentId, op
 \t\tallowPluginNormalization: options?.allowPluginNormalization
 \t});
 \tconst persisted = resolvePersistedSelectedModelRef({
-\t\tdefaultProvider: resolved.provider || \"openai\",
+\t\tdefaultProvider: resolved.provider || "openai",
 \t\truntimeProvider,
 \t\truntimeModel,
 \t\toverrideProvider: normalizedOverride.providerOverride,
@@ -121,7 +124,7 @@ NEW_BLOCK_MODEL_REF = """function resolveSessionModelRef(cfg, entry, agentId, op
 \t\tprovider: runtimeProvider,
 \t\tmodel: runtimeModel
 \t};
-\tconst promptReportRef = entry?.status === \"running\" ? resolveSessionPromptReportModelRef(entry) : null;
+\tconst promptReportRef = entry?.status === "running" ? resolveSessionPromptReportModelRef(entry) : null;
 \tif (promptReportRef) return promptReportRef;
 \tif (normalizedOverride.providerOverride && normalizedOverride.modelOverride) return resolvePersistedSelectedModelRef({
 \t\tdefaultProvider: normalizedOverride.providerOverride,
@@ -140,7 +143,7 @@ NEW_BLOCK_MODEL_REF = """function resolveSessionModelRef(cfg, entry, agentId, op
 \t\tallowPluginNormalization: options?.allowPluginNormalization
 \t});
 \tconst persisted = resolvePersistedSelectedModelRef({
-\t\tdefaultProvider: resolved.provider || \"openai\",
+\t\tdefaultProvider: resolved.provider || "openai",
 \t\truntimeProvider,
 \t\truntimeModel,
 \t\toverrideProvider: normalizedOverride.providerOverride,
@@ -151,8 +154,15 @@ NEW_BLOCK_MODEL_REF = """function resolveSessionModelRef(cfg, entry, agentId, op
 \treturn resolved;
 }"""
 
+OLD_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;if(_U(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{return await i.request(`sessions.patch`,{key:n,model:t||null}),mW(e),await RU(e),!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
 
-def die(message: str) -> "NoReturn":
+NEW_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{let s=await i.request(`sessions.patch`,{key:n,model:t||null}),c=typeof s?.resolved?.modelProvider==`string`?s.resolved.modelProvider.trim():``,l=typeof s?.resolved?.model==`string`?s.resolved.model.trim():``,u=t?c&&l?`${c}/${l}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:u?yp(u):null};let d=e.sessionsResult;if(d&&s?.entry)e.sessionsResult={...d,sessions:d.sessions.map(e=>e.key===n||s.key&&e.key===s.key?{...e,...s.entry,key:e.key}:e)};await e.onSlashAction?.(`refresh-tools-effective`),mW(e),await RU(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
+
+OLD_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatLoading||e.chatSending||!!e.chatRunId||e.chatStream!==null,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
+NEW_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatSending,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
+
+
+def die(message: str) -> NoReturn:
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(1)
 
@@ -161,17 +171,17 @@ def resolve_package_root() -> Path:
     env_override = os.environ.get("OPENCLAW_PACKAGE_ROOT")
     if env_override:
         candidate = Path(env_override).expanduser().resolve()
-        if (candidate / TARGET_RELATIVE).exists():
+        if (candidate / "dist").exists():
             return candidate
         die(f"OPENCLAW_PACKAGE_ROOT 无效：{candidate}")
 
-    if (DEFAULT_PACKAGE_ROOT / TARGET_RELATIVE).exists():
+    if (DEFAULT_PACKAGE_ROOT / "dist").exists():
         return DEFAULT_PACKAGE_ROOT
 
     try:
         npm_root = subprocess.run(["npm", "root", "-g"], check=True, capture_output=True, text=True).stdout.strip()
         candidate = (Path(npm_root) / "openclaw").resolve()
-        if (candidate / TARGET_RELATIVE).exists():
+        if (candidate / "dist").exists():
             return candidate
     except Exception:
         pass
@@ -182,27 +192,95 @@ def resolve_package_root() -> Path:
 def patch_once(text: str, old: str, new: str, description: str) -> tuple[str, bool]:
     if new in text:
         return text, False
-    if old not in text:
-        die(f"未能定位需要替换的 {description}")
+    count = text.count(old)
+    if count != 1:
+        die(f"未能唯一定位需要替换的 {description}（匹配数：{count}）")
     return text.replace(old, new, 1), True
+
+
+def patch_session_utils(package_root: Path) -> list[Path]:
+    dist_dir = package_root / "dist"
+    candidates = sorted(dist_dir.glob("session-utils-*.js"))
+    if not candidates:
+        # 上游大版本可能改了文件名；这部分只影响 sessions.list 显示，不应阻断聊天页模型切换补丁。
+        return []
+    patched: list[Path] = []
+    for target in candidates:
+        content = target.read_text(encoding="utf-8")
+        if "function resolveSessionSelectedModelRef" not in content or "function resolveSessionModelRef" not in content:
+            continue
+        changed_any = False
+        content, changed = patch_once(content, OLD_BLOCK_SELECTED, NEW_BLOCK_SELECTED, "sessions.list selected model block")
+        changed_any = changed_any or changed
+        content, changed = patch_once(content, OLD_BLOCK_MODEL_REF, NEW_BLOCK_MODEL_REF, "sessions.list runtime model block")
+        changed_any = changed_any or changed
+        if changed_any:
+            target.write_text(content, encoding="utf-8")
+        patched.append(target)
+    return patched
+
+
+def patch_control_ui_model_selector(package_root: Path) -> list[Path]:
+    assets_dir = package_root / CONTROL_UI_ASSETS_RELATIVE
+    if not assets_dir.exists():
+        die(f"Control UI assets 目录不存在：{assets_dir}")
+    patched: list[Path] = []
+    candidates = sorted(assets_dir.glob("index-*.js"))
+    if not candidates:
+        die(f"找不到 Control UI index-*.js：{assets_dir}")
+    for asset in candidates:
+        content = asset.read_text(encoding="utf-8")
+        if 'data-chat-model-select="true"' not in content:
+            continue
+        updated = content
+        changed_any = False
+        updated, changed = patch_once(updated, OLD_CHAT_MODEL_SWITCH, NEW_CHAT_MODEL_SWITCH, "chat model dropdown switch handler")
+        changed_any = changed_any or changed
+        updated, changed = patch_once(updated, OLD_MODEL_SELECT_BUSY_GUARD, NEW_MODEL_SELECT_BUSY_GUARD, "chat model dropdown active-run disable guard")
+        changed_any = changed_any or changed
+        if changed_any:
+            asset.write_text(updated, encoding="utf-8")
+        patched.append(asset)
+    if not patched:
+        die("未能定位 Control UI 聊天页模型下拉补丁入口")
+    return patched
+
+
+def patch_control_ui_cache_bust(package_root: Path, assets: list[Path]) -> list[Path]:
+    """Force browsers/service workers to fetch the patched hashed bundle."""
+    index_html = package_root / "dist" / "control-ui" / "index.html"
+    if not index_html.exists() or not assets:
+        return []
+    version = str(max(int(asset.stat().st_mtime) for asset in assets))
+    html = index_html.read_text(encoding="utf-8")
+    updated = html
+    for asset in assets:
+        name = asset.name
+        old_plain = f'src="./assets/{name}"'
+        old_with_query_prefix = f'src="./assets/{name}?jarvisModelSelector='
+        new_src = f'src="./assets/{name}?jarvisModelSelector={version}"'
+        if old_plain in updated:
+            updated = updated.replace(old_plain, new_src, 1)
+            break
+        if old_with_query_prefix in updated:
+            start = updated.index(old_with_query_prefix)
+            end = updated.index('"', start + len('src="'))
+            updated = updated[:start] + new_src + updated[end + 1:]
+            break
+    if updated != html:
+        index_html.write_text(updated, encoding="utf-8")
+    return [index_html]
 
 
 def main() -> int:
     package_root = resolve_package_root()
-    target = package_root / TARGET_RELATIVE
-    content = target.read_text(encoding="utf-8")
-
-    changed_any = False
-    content, changed = patch_once(content, OLD_BLOCK_SELECTED, NEW_BLOCK_SELECTED, "selected model patch block")
-    changed_any = changed_any or changed
-    content, changed = patch_once(content, OLD_BLOCK_MODEL_REF, NEW_BLOCK_MODEL_REF, "runtime model patch block")
-    changed_any = changed_any or changed
-
-    if changed_any:
-        target.write_text(content, encoding="utf-8")
-        print(f"patched: {target}")
-    else:
-        print(f"already-patched: {target}")
+    patched_paths: list[Path] = []
+    patched_paths.extend(patch_session_utils(package_root))
+    control_ui_assets = patch_control_ui_model_selector(package_root)
+    patched_paths.extend(control_ui_assets)
+    patched_paths.extend(patch_control_ui_cache_bust(package_root, control_ui_assets))
+    for path in patched_paths:
+        print(f"patched-or-current: {path}")
     return 0
 
 

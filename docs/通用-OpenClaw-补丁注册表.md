@@ -100,6 +100,23 @@
   - `docs/公司-Linux-OpenClaw-维护说明.md`
   - `TOOLS.md`
 
+### PATCH-CTRLUI-SESSION-MODEL-SELECTOR
+
+- **结果目标**:Control UI 聊天页模型下拉必须以“当前会话”为作用域；用户选择哪个模型，当前会话后续回复就使用哪个模型。切换后 UI 必须回填后端 `sessions.patch` 的 canonical `resolved.modelProvider/model`，并刷新 tools-effective；active run 期间也允许提交 live model switch，而不是只改前端显示。
+- **当前实现**:`scripts/apply-openclaw-session-model-selector-fix.py`，重打 `dist/control-ui/assets/index-*.js`、`dist/session-utils-*.js`，并给 `dist/control-ui/index.html` 的主 bundle 引用追加 `jarvisModelSelector=<mtime>` 缓存破坏参数
+- **自动触发**:公司(Linux) 已接入 `~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf` 的 `ExecStartPre`；升级或重启 gateway 前自动重打。
+- **适用范围**:通用补丁脚本；当前主落地为 公司(Linux)
+- **升级风险点**:Control UI bundle 中模型下拉函数 `hW/CW/bU/_U` 重构；`sessions.patch` 返回结构或 `resolved.modelProvider/model` 字段变化；`session-utils-*.js` 文件名/hash 或 `resolveSessionModelRef` 逻辑变化。
+- **失效判断**:下拉显示已变化但 `session_status` / 实际下一轮回复仍使用旧模型；下拉选择后没有调用 `sessions.patch`; 切换后 UI 又被旧 `sessionsResult.sessions[].model` 覆盖；active run 时完全无法提交模型切换。
+- **最小验收**:运行 `python3 scripts/apply-openclaw-session-model-selector-fix.py` 应输出 `patched-or-current`; live asset 里应同时存在 `s?.resolved?.modelProvider`、`refresh-tools-effective`、`data-chat-model-select="true"`，且旧的 `_U(e)===t` 早退分支不再存在；RPC 烟测 `openclaw gateway call sessions.patch --timeout 60000 --json --params '{"key":"agent:main:main","model":"github-copilot/gpt-5.5"}'` 应返回 `resolved=github-copilot/gpt-5.5`；`index.html` 主 bundle 引用应带 `?jarvisModelSelector=`。
+- **维护落点**:
+  - `scripts/apply-openclaw-session-model-selector-fix.py`
+  - `~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf`
+  - `docs/通用-OpenClaw-补丁重建清单.md`
+  - `docs/通用-OpenClaw-升级后自检清单.md`
+  - `docs/公司-Linux-OpenClaw-维护说明.md`
+  - `TOOLS.md`
+
 ### PATCH-SUPERVISOR-SERVICE-STATE
 
 - **结果目标**:持续产出一份稳定可读的监工状态层,让主会话的 `policyMode/taskActive/desiredState`、活跃任务聚焦、`stalled/failed/done/waiting` 状态,以及"完成后约 10 分钟等待接续任务窗口"都有可复读、可恢复的统一状态来源。
