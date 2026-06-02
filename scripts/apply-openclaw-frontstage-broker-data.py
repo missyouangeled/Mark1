@@ -106,6 +106,8 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     infos_handle_summary_match = re.search(r'"infosHandleSummaryHref":\s*"([^"]+)"', script_text)
     infos_handle_contract_match = re.search(r'"infosHandleContractHref":\s*"([^"]+)"', script_text)
     infos_handle_sse_match = re.search(r'"infosHandleSseHref":\s*"([^"]+)"', script_text)
+    infos_handle_tasks_match = re.search(r'"infosHandleTasksHref":\s*"([^"]+)"', script_text)
+    infos_handle_recovery_match = re.search(r'"infosHandleRecoveryHref":\s*"([^"]+)"', script_text)
     status_page_match = re.search(r'"href":\s*"([^"]+/jarvis-frontstage-status\.html|/jarvis-frontstage-status\.html)"', script_text)
     snapshot_json_href = snapshot_json_match.group(1) if snapshot_json_match else None
     legacy_status_json_href = legacy_status_json_match.group(1) if legacy_status_json_match else None
@@ -113,6 +115,8 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     infos_handle_summary_href = infos_handle_summary_match.group(1) if infos_handle_summary_match else None
     infos_handle_contract_href = infos_handle_contract_match.group(1) if infos_handle_contract_match else None
     infos_handle_sse_href = infos_handle_sse_match.group(1) if infos_handle_sse_match else None
+    infos_handle_tasks_href = infos_handle_tasks_match.group(1) if infos_handle_tasks_match else None
+    infos_handle_recovery_href = infos_handle_recovery_match.group(1) if infos_handle_recovery_match else None
     status_page_href = status_page_match.group(1) if status_page_match else None
     effective_json_href = snapshot_json_href or status_json_href
     payload["snapshotJsonHref"] = snapshot_json_href
@@ -121,6 +125,8 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     payload["infosHandleSummaryHref"] = infos_handle_summary_href
     payload["infosHandleContractHref"] = infos_handle_contract_href
     payload["infosHandleSseHref"] = infos_handle_sse_href
+    payload["infosHandleTasksHref"] = infos_handle_tasks_href
+    payload["infosHandleRecoveryHref"] = infos_handle_recovery_href
     payload["effectiveJsonHref"] = effective_json_href
     payload["statusPageHref"] = status_page_href
     payload["snapshotFirst"] = effective_json_href == "/jarvis-frontstage-snapshot.json"
@@ -375,7 +381,15 @@ def verify_infos_handle_request_entry() -> dict[str, object]:
         }
 
 
+def resolve_runtime_url(url: str) -> str:
+    if isinstance(url, str) and url.startswith("/"):
+        return urllib.parse.urljoin("http://127.0.0.1:18788/", url.lstrip("/"))
+    return url
+
+
+
 def fetch_json_url(url: str, *, timeout_seconds: float = 5.0) -> dict[str, Any]:
+    url = resolve_runtime_url(url)
     try:
         with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -390,6 +404,7 @@ def fetch_json_url(url: str, *, timeout_seconds: float = 5.0) -> dict[str, Any]:
 
 
 def fetch_sse_preview(url: str, *, timeout_seconds: float = 5.0, lines: int = 4) -> str:
+    url = resolve_runtime_url(url)
     try:
         with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
             chunks: list[str] = []
@@ -408,9 +423,11 @@ def derive_infos_handle_sidecar_base_url(summary_href: str | None) -> str | None
     if not isinstance(summary_href, str) or not summary_href.strip():
         return None
     parsed = urllib.parse.urlsplit(summary_href)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None
-    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+    if summary_href.startswith("/"):
+        return "http://127.0.0.1:18788"
+    return None
 
 
 
@@ -424,6 +441,7 @@ def derive_infos_handle_sidecar_healthz_href(summary_href: str | None) -> str | 
 
 
 def fetch_url_text(url: str, *, timeout_seconds: float = 5.0) -> tuple[str, str]:
+    url = resolve_runtime_url(url)
     try:
         with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
             body = response.read().decode("utf-8", errors="replace")
@@ -469,7 +487,7 @@ def probe_infos_handle_sidecar_image_artifact(summary_href: str) -> dict[str, ob
         raise RuntimeError(f"sidecar image handle not ok: {handle_payload!r}")
     if not isinstance(artifact_href, str) or not artifact_href.startswith("/v1/artifacts/"):
         raise RuntimeError(f"sidecar image artifact href missing: {handle_payload!r}")
-    artifact_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", artifact_href.lstrip("/"))
+    artifact_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", artifact_href)
     artifact_body, artifact_content_type = fetch_url_text(artifact_url)
     if artifact_content_type != "image/svg+xml":
         raise RuntimeError(f"sidecar image artifact content type mismatch: {artifact_content_type!r}")

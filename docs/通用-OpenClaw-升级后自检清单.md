@@ -86,6 +86,9 @@ ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/
 - live asset 里仍有 `JarvisProjectYieldedHistoryReply`
 - live asset 里仍有 `JarvisShouldShowPendingReadingIndicator`
 - live override 里仍优先指向 `/jarvis-frontstage-snapshot.json`
+- live override 的 infos-handle Href 已改为同源 `/v1/...`（如 `/v1/query/snapshot.summary?format=json` / `/v1/query/contract.catalog?format=json` / `/v1/events/stream?kind=snapshot.summary`），且不再写死 `http://127.0.0.1:18790`
+- live asset 里 reading-indicator 片段已使用 `let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e)`，不再出现会触发重复声明的 `let c=...`
+- 对当前 `dist/control-ui/assets/index-*.js` 执行 `node --check` 应通过
 - live asset 里模型下拉仍带 `s?.resolved?.modelProvider` / `refresh-tools-effective`，且旧的 `if(_U(e)===t)return!0` 早退分支不存在
 
 ---
@@ -136,6 +139,7 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-inf
 
 - `controlUiInfosHandleSidecar.ok = true`
 - `summaryHref / contractHref / sseHref` 正常
+- `summaryHref / contractHref / sseHref` 当前默认是同源 `/v1/...` 相对路径，而不是重新退回 `http://127.0.0.1:18790/...`
 - `imageArtifactHref` 可取回
 
 ### 6. 统一入口 proxy verify 仍正常

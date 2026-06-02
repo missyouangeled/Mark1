@@ -679,11 +679,11 @@ def main() -> int:
         print("PASS apply_frontstage_infos_handle_events_recent_consumer")
 
     apply_frontstage.fetch_json_url = lambda url, **kwargs: {
-        "http://127.0.0.1:18790/healthz": {
+        "http://127.0.0.1:18788/healthz": {
             "ok": True,
             "service": "infos-handle-sidecar",
         },
-        "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json": {
+        "/v1/query/snapshot.summary?format=json": {
             "ok": True,
             "kind": "snapshot.summary",
             "requestInputMode": "request_file",
@@ -693,7 +693,7 @@ def main() -> int:
                 "severity": "ok",
             },
         },
-        "http://127.0.0.1:18790/v1/query/contract.catalog?format=json": {
+        "/v1/query/contract.catalog?format=json": {
             "ok": True,
             "kind": "contract.catalog",
             "requestInputMode": "request_file",
@@ -721,17 +721,17 @@ def main() -> int:
         {
             "infosHandleDirectReady": True,
             "usesInfosHandleSse": True,
-            "infosHandleSummaryHref": "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json",
-            "infosHandleContractHref": "http://127.0.0.1:18790/v1/query/contract.catalog?format=json",
-            "infosHandleSseHref": "http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary",
+            "infosHandleSummaryHref": "/v1/query/snapshot.summary?format=json",
+            "infosHandleContractHref": "/v1/query/contract.catalog?format=json",
+            "infosHandleSseHref": "/v1/events/stream?kind=snapshot.summary",
         }
     )
     if apply_sidecar_check != {
         "ok": True,
-        "healthzHref": "http://127.0.0.1:18790/healthz",
-        "summaryHref": "http://127.0.0.1:18790/v1/query/snapshot.summary?format=json",
-        "contractHref": "http://127.0.0.1:18790/v1/query/contract.catalog?format=json",
-        "sseHref": "http://127.0.0.1:18790/v1/events/stream?kind=snapshot.summary",
+        "healthzHref": "http://127.0.0.1:18788/healthz",
+        "summaryHref": "/v1/query/snapshot.summary?format=json",
+        "contractHref": "/v1/query/contract.catalog?format=json",
+        "sseHref": "/v1/events/stream?kind=snapshot.summary",
         "service": "infos-handle-sidecar",
         "summaryKind": "snapshot.summary",
         "summarySeverity": "ok",

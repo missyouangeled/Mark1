@@ -34,7 +34,7 @@
 
 ### 1.1 Control UI 补丁重打链路
 
-目标：让 Control UI 品牌与前台状态补丁能在 gateway 启动前自动重打。
+目标：让 Control UI 品牌与前台状态补丁能在 gateway 启动前自动重打，并避免 branding live 入口 / reading-indicator 补丁再次把 Control UI 打成黑屏。
 
 检查：
 
@@ -53,6 +53,9 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 - 品牌仍是“贾维斯”
 - 聊天页“进行中”逻辑仍包含 `loading / sending / stream / canAbort / queue / hasActiveRun / status=running`
 - 前端资产里仍带 `JarvisProjectYieldedHistoryReply`
+- live `jarvis-branding-override.js` 不再包含 `http://127.0.0.1:18790`，而是包含 `/v1/query/snapshot.summary?format=json`、`/v1/query/contract.catalog?format=json`、`/v1/events/stream?kind=snapshot.summary`
+- live bundle 中坏片段 `let c=JarvisShouldShowPendingReadingIndicator(e)` 不存在，已改为 `let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e)`
+- 对当前 `dist/control-ui/assets/index-*.js` 执行 `node --check` 通过
 
 ### 1.1.1 Control UI 当前会话模型下拉补丁
 
@@ -146,6 +149,7 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --install-user-systemd
 - `~/.npm-global/lib/node_modules/openclaw/dist/control-ui/jarvis-frontstage-status.html` / `.json` 存在（其中 `.json` 只作为兼容别名保留）
 - `~/.npm-global/lib/node_modules/openclaw/dist/control-ui/jarvis-frontstage-snapshot.json` 存在
 - live `jarvis-branding-override.js` 里 `snapshotJsonHref` 已指向 `/jarvis-frontstage-snapshot.json`，`legacyStatusJsonHref` 已指向 `/jarvis-frontstage-status.json`
+- apply 输出里的 `controlUiSnapshotDock.infosHandleSummaryHref` / `infosHandleContractHref` / `infosHandleSseHref` 默认应为同源 `/v1/...` 相对路径，而不是重新退回 `http://127.0.0.1:18790/...`
 - apply 输出里的 `frontstagePublication.snapshotFirstReady` 为 `true`
 - `rebuild-views` 能在不依赖新事件触发的情况下重建视图与前台状态页
 - `python3 scripts/openclaw-infos-handle.py query --kind snapshot.summary --format text` 能直接返回摘要，不依赖 Control UI

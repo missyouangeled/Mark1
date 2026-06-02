@@ -894,3 +894,35 @@
 - `scripts/openclaw-local-health-diagnose.py`
 - `scripts/openclaw-system-summary.py`
 - `scripts/verify-today-patches.py`
+
+## 2026-06-02 08:32:01 CST (+08:00) — Control UI infos-handle 同源入口 CSP 修复
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 把 Control UI branding 的 infos-handle live Href 从写死 127.0.0.1:18790 改为同源 /v1/... 统一入口，消除 connect-src CSP 拦截；同步补 task/recovery live Href 与自检链路。
+- 验收 / 验证：
+- python3 scripts/test-infos-handle-frontstage-callers.py 通过；python3 scripts/apply-openclaw-control-ui-branding.py 成功；python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar 通过；live jarvis-branding-override.js 已不含 http://127.0.0.1:18790。
+- 相关文件：
+- `config/control-ui-branding.json`
+- `docs/公司-Linux-OpenClaw-维护说明.md`
+- `scripts/apply-openclaw-control-ui-branding.py`
+- `scripts/apply-openclaw-frontstage-broker-data.py`
+- `scripts/test-infos-handle-frontstage-callers.py`
+
+## 2026-06-02 08:51:29 CST (+08:00) — 修复 Control UI 黑屏：v2026.5.22 读取指示器补丁语法错误
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 定位并修复 apply-openclaw-control-ui-branding.py 在 v2026.5.22 主 bundle 上打 reading-indicator 补丁时引入的重复变量声明，导致 index-BtIuF4zW.js SyntaxError、Control UI 黑屏。
+- 验收 / 验证：
+- node --check ~/.npm-global/lib/node_modules/openclaw/dist/control-ui/assets/index-BtIuF4zW.js 通过；python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-snapshot-dock --require-control-ui-snapshot-dock --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar 通过；坏片段 let c=JarvisShouldShowPendingReadingIndicator(e) 已被替换为 let pendingIndicator=...。
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`

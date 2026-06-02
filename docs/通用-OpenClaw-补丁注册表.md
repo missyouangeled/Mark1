@@ -73,30 +73,34 @@
 
 ### PATCH-CTRLUI-BRANDING
 
-- **结果目标**:Control UI 左上角品牌、浏览器标题、图标、页面内可见 OpenClaw 品牌尽量统一替换为"贾维斯"风格。
+- **结果目标**:Control UI 左上角品牌、浏览器标题、图标、页面内可见 OpenClaw 品牌尽量统一替换为"贾维斯"风格；同时确保 branding override 注入的前台 live 入口默认走同源 `/v1/...` 统一入口,避免浏览器因 `connect-src` 拦截 `127.0.0.1:18790` 而黑屏。
 - **当前实现**:`scripts/apply-openclaw-control-ui-branding.py`
 - **自动触发**:`~/.config/systemd/user/openclaw-gateway.service.d/branding.conf` 的 `ExecStartPre`
 - **适用范围**:当前主落地为 公司(Linux)
-- **升级风险点**:`dist/control-ui/` 前端结构 / `index.html` 注入点变化
-- **失效判断**:Control UI 刷新后重新出现大量默认 `OpenClaw` 品牌文案
-- **最小验收**:运行 `python3 scripts/apply-openclaw-control-ui-branding.py` 后,确认输出成功;刷新页面后品牌名/标题仍为"贾维斯"
+- **升级风险点**:`dist/control-ui/` 前端结构 / `index.html` 注入点变化; `jarvis-branding-override.js` 的 `infosHandle*Href` 契约或 CSP 行为变化
+- **失效判断**:Control UI 刷新后重新出现大量默认 `OpenClaw` 品牌文案; 或浏览器控制台重新出现 `connect-src` 拦截 `http://127.0.0.1:18790` 导致 live dock 失效 / 黑屏
+- **最小验收**:运行 `python3 scripts/apply-openclaw-control-ui-branding.py` 后,确认输出成功; live `jarvis-branding-override.js` 不再包含 `http://127.0.0.1:18790`,并包含 `/v1/query/snapshot.summary?format=json`、`/v1/query/contract.catalog?format=json`、`/v1/events/stream?kind=snapshot.summary`; 刷新页面后品牌名/标题仍为"贾维斯"
 - **维护落点**:
   - `scripts/apply-openclaw-control-ui-branding.py`
   - `config/control-ui-branding.json`
+  - `docs/通用-OpenClaw-补丁重建清单.md`
+  - `docs/通用-OpenClaw-升级后自检清单.md`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
   - `TOOLS.md`
 
 ### PATCH-CTRLUI-RUNNING-SIGNAL
 
-- **结果目标**:只要聊天页后台 run 还没真结束,前台尽量持续显示"进行中/活着信号",并减少 assistant silent/empty final 时"前台刚有阶段性内容又被立即清掉"的 ghost/disappear 体感;若 `sessions_yield` 已经产出 `message`,也尽量把它稳定留成前台可见文本,而不是让"三个点消失了但没回字"。
+- **结果目标**:只要聊天页后台 run 还没真结束,前台尽量持续显示"进行中/活着信号",并减少 assistant silent/empty final 时"前台刚有阶段性内容又被立即清掉"的 ghost/disappear 体感;若 `sessions_yield` 已经产出 `message`,也尽量把它稳定留成前台可见文本,而不是让"三个点消失了但没回字"。同时要求 reading-indicator 补丁保持 JS 语法安全,不能因 minify 变量重名把主 bundle 打坏造成 Control UI 黑屏。
 - **当前实现**:并入 `scripts/apply-openclaw-control-ui-branding.py`,重打 `dist/control-ui/assets/index-*.js`
 - **自动触发**:同 `PATCH-CTRLUI-BRANDING`,随 gateway 启动前自动重打
 - **适用范围**:当前主落地为 公司(Linux)
-- **升级风险点**:聊天页前端状态机构造变化,`sI(...)` 或等价逻辑重构
-- **失效判断**:tool 阶段 / history reload / active run 明显仍在进行时,前台不流字也不转圈;或 `sessions_yield` 明明已经给了 `message`,前台却出现"三个点消失但没回字"
-- **最小验收**:确认补丁后的条件仍覆盖 `loading / sending / stream / canAbort / queue.length > 0 / session.hasActiveRun / session.status=running`,并确认 `u&&!o&&!a){Gl(e);return}` 这条"silent final 立刻 reload"旧分支已不再存在;再确认前端资产里已带 `JarvisProjectYieldedHistoryReply`,并能把 `yielded toolResult` 里的 `message` 补投影成 assistant 可见文本
+- **升级风险点**:聊天页前端状态机构造变化,`sI(...)` 或等价逻辑重构; minified bundle 局部变量名变化,导致 reading-indicator 补丁出现重复声明
+- **失效判断**:tool 阶段 / history reload / active run 明显仍在进行时,前台不流字也不转圈;或 `sessions_yield` 明明已经给了 `message`,前台却出现"三个点消失但没回字";或浏览器控制台出现 `SyntaxError: Identifier 'c' has already been declared` / 页面直接黑屏
+- **最小验收**:确认补丁后的条件仍覆盖 `loading / sending / stream / canAbort / queue.length > 0 / session.hasActiveRun / session.status=running`,并确认 `u&&!o&&!a){Gl(e);return}` 这条"silent final 立刻 reload"旧分支已不再存在;再确认前端资产里已带 `JarvisProjectYieldedHistoryReply`,并能把 `yielded toolResult` 里的 `message` 补投影成 assistant 可见文本; live bundle 中坏片段 `let c=JarvisShouldShowPendingReadingIndicator(e)` 不存在、已改为 `let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e)`;并执行 `node --check` 验证当前 `dist/control-ui/assets/index-*.js` 无语法错误
 - **维护落点**:
   - `scripts/apply-openclaw-control-ui-branding.py`
+  - `docs/通用-OpenClaw-补丁重建清单.md`
+  - `docs/通用-OpenClaw-升级后自检清单.md`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
   - `TOOLS.md`
 
@@ -185,19 +189,21 @@
 
 ### PATCH-INFOS-HANDLE-SIDECAR
 
-- **结果目标**:为 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE live 入口,优先读取正式请求层结果,而不是只依赖 broker 静态快照;同时保持"localhost 免鉴权、远程/LAN 需 Bearer token"的受控访问语义。
+- **结果目标**:为 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE live 入口,优先读取正式请求层结果,而不是只依赖 broker 静态快照;同时保持"localhost 免鉴权、远程/LAN 需 Bearer token"的受控访问语义。当前浏览器侧 Control UI 默认应通过同源 `/v1/...`（经 `:18788` unified proxy）访问这条 live 链,而不是直接请求 `127.0.0.1:18790`。
 - **当前实现**:`scripts/openclaw-infos-handle-sidecar.py` + `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
 - **自动触发**:当前主落地依赖 user systemd:`openclaw-infos-handle-sidecar.service`
 - **适用范围**:当前主落地为 公司(Linux)
-- **升级风险点**:sidecar 路由 / 返回结构变化;artifact href 语义变化;Control UI 注入的 `infosHandle*Href` 契约变化;remote auth / rate-limit 语义变化
-- **失效判断**:`/healthz`、`/v1/query/*`、`/v1/events/stream` 无法正常访问;或 Control UI 不再能通过 sidecar 读取 summary / contract;或 image/audio artifactHref 无法继续取回文件
-- **最小验收**:运行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar` 应通过;必要时补跑 `python3 scripts/test-openclaw-infos-handle.py`;并确认 `curl -s http://127.0.0.1:18790/healthz`、`curl -s 'http://127.0.0.1:18790/v1/query/snapshot.summary?format=json'`、`curl -s 'http://127.0.0.1:18790/v1/query/contract.catalog?format=json'` 可用
+- **升级风险点**:sidecar 路由 / 返回结构变化;artifact href 语义变化;Control UI 注入的 `infosHandle*Href` 契约变化; unified proxy / same-origin 路由变化; remote auth / rate-limit 语义变化
+- **失效判断**:`/healthz`、`/v1/query/*`、`/v1/events/stream` 无法正常访问;或 Control UI 不再能通过 sidecar 读取 summary / contract;或浏览器重新出现 `connect-src` 拦截 `127.0.0.1:18790`;或 image/audio artifactHref 无法继续取回文件
+- **最小验收**:运行 `python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar --require-control-ui-infos-handle-sidecar` 应通过;必要时补跑 `python3 scripts/test-openclaw-infos-handle.py`;并确认 `curl -s http://127.0.0.1:18788/v1/query/snapshot.summary?format=json`、`curl -s 'http://127.0.0.1:18788/v1/query/contract.catalog?format=json'`、`curl -s http://127.0.0.1:18790/healthz` 可用; apply 输出里的 `summaryHref / contractHref / sseHref` 应为同源 `/v1/...` 相对路径
 - **维护落点**:
   - `scripts/openclaw-infos-handle-sidecar.py`
   - `scripts/test-openclaw-infos-handle.py`
   - `scripts/apply-openclaw-frontstage-broker-data.py`
   - `tools/openclaw-infos-handle-sidecar/README.md`
   - `tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+  - `docs/通用-OpenClaw-补丁重建清单.md`
+  - `docs/通用-OpenClaw-升级后自检清单.md`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
   - `TOOLS.md`
 

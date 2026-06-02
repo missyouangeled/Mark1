@@ -314,7 +314,7 @@ systemctl --user show openclaw-frontstage-broker-rebuild.timer -p UnitFileState 
 用途：
 
 - 给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小本地 HTTP / SSE 直连入口
-- 当前 live branding patch 会优先读这条 sidecar；若 sidecar 不可用，再回退 `jarvis-frontstage-snapshot.json`
+- 当前 live branding patch 在浏览器侧默认走同源 `/v1/...` 统一入口（即经 `:18788` unified proxy 代理到 sidecar）；若这条 live 链不可用，再回退 `jarvis-frontstage-snapshot.json`
 
 相关文件：
 
@@ -408,7 +408,7 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --mode https --doma
 - 同步覆盖浏览器标题、favicon / apple-touch-icon、manifest 名称与默认通知标题
 - 通过页面注入脚本，把 Control UI 里可见的 `OpenClaw` 文案尽量替换成“贾维斯”（保留聊天内容 / 代码块等常见高风险区域的跳过规则）
 - 在 Control UI 顶部工具栏下方稳定挂一个统一的“前台状态”固定入口；当前默认折叠成小圆角按钮，点击后向下展开详情卡片，尽量不遮挡上方按钮
-- 当前这枚入口优先读取 broker sidecar 重建出来的统一 snapshot 公共副本：`/jarvis-frontstage-snapshot.json`，并打开 `/jarvis-frontstage-status.html`
+- 当前这枚入口会先尝试同源 `/v1/query/snapshot.summary?format=json` / `/v1/events/stream?...` 这条 live 链；失败时再回退 broker sidecar 重建出来的统一 snapshot 公共副本：`/jarvis-frontstage-snapshot.json`，并打开 `/jarvis-frontstage-status.html`
 - 本地健康自己的独立公开页仍继续保留：`/jarvis-local-health-status.json` / `/jarvis-local-health-status.html`
 - 健康页与入口卡片都应携带一组无需 AI 参与的本地自救建议；例如“状态正常但页面卡住”时直接提示刷新页面 / 重开浏览器
 - 当前也负责重复应用三个前台状态补丁：
@@ -432,6 +432,7 @@ python3 scripts/apply-openclaw-control-ui-branding.py
 说明：
 
 - 该脚本会把配置中的品牌图复制到本机 OpenClaw 安装目录下的 `dist/control-ui/`，并注入一个额外的 `jarvis-branding-override.js` 覆盖脚本。
+- 当前 `jarvis-branding-override.js` 里的 infos-handle live Href 已改成同源 `/v1/...` 路径，不再写死 `http://127.0.0.1:18790`，以避免被页面 CSP 的 `connect-src` 拦截。
 - 同一个脚本现在还会顺手给 `dist/control-ui/assets/index-*.js` 打三条最小前台状态补丁：
   - 把聊天页的“进行中”条件从只看 `sending / stream`，补成也看 `loading / canAbort / queue.length > 0`，并把 `session.hasActiveRun / session.status=running` 一并算作“前台仍活着”
   - 把 `assistant final 为空 / silent 时立刻强制 reload history` 这条路径改成更保守的收口，减少前台内容一闪而空

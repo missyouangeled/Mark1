@@ -27,9 +27,11 @@
     "appleTouchIconFile": "apple-touch-icon.png"
   },
   "controlUi": {
-    "infosHandleBaseUrl": "http://127.0.0.1:18790",
+    "infosHandleBaseUrl": "",
     "infosHandleSnapshotSummaryPath": "/v1/query/snapshot.summary?format=json",
     "infosHandleContractPath": "/v1/query/contract.catalog?format=json",
-    "infosHandleSsePath": "/v1/events/stream?kind=snapshot.summary"
+    "infosHandleSsePath": "/v1/events/stream?kind=snapshot.summary",
+    "infosHandleTasksPath": "/v1/query/tasks.summary?format=json",
+    "infosHandleRecoveryPath": "/v1/query/recovery.summary?format=json"
   }
 }

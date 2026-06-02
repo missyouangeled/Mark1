@@ -52,7 +52,8 @@ CHAT_RUNNING_PATCH_V22 = "let t=e.connected,a=e.sessions?.sessions?.find(t=>t.ke
 INVALID_FINAL_RELOAD_V22_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){Tx(e);return}f&&!o&&Tx(e)}"
 INVALID_FINAL_RELOAD_V22_NEW = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a)return;f&&!o&&Tx(e)}"
 READING_INDICATOR_V22_OLD = "if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=fj(e.stream);r.length>0?Wb(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}"
-READING_INDICATOR_V22_NEW = "let c=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||c){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=e.stream!==null?fj(e.stream):'';r.length>0?Wb(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}"
+READING_INDICATOR_V22_BAD = "let c=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||c){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=e.stream!==null?fj(e.stream):'';r.length>0?Wb(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}"
+READING_INDICATOR_V22_NEW = "let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||pendingIndicator){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=e.stream!==null?fj(e.stream):'';r.length>0?Wb(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}"
 HISTORY_MERGE_V22_OLD = "e.chatMessages=bx((Array.isArray(a.messages)?a.messages:[]).filter(e=>!gx(e)),i),"
 HISTORY_MERGE_V22_NEW = "e.chatMessages=bx(JarvisProjectYieldedHistoryReply(Array.isArray(a.messages)?a.messages:[]),i),"
 JARVIS_FUNCTIONS_V22 = (
@@ -197,7 +198,10 @@ def patch_chat_running_indicator_v22(asset_path: Path, content: str) -> tuple[st
         changed = True
 
     # 5. Patch reading indicator
-    if READING_INDICATOR_V22_NEW not in updated and READING_INDICATOR_V22_OLD in updated:
+    if READING_INDICATOR_V22_BAD in updated:
+        updated = updated.replace(READING_INDICATOR_V22_BAD, READING_INDICATOR_V22_NEW, 1)
+        changed = True
+    elif READING_INDICATOR_V22_NEW not in updated and READING_INDICATOR_V22_OLD in updated:
         updated = updated.replace(READING_INDICATOR_V22_OLD, READING_INDICATOR_V22_NEW, 1)
         changed = True
 
@@ -319,9 +323,12 @@ def write_override_script(
     favicon_file: str,
     apple_touch_file: str,
     user_avatar_data_url: str | None,
+    infos_handle_base_url: str,
     infos_handle_summary_href: str,
     infos_handle_contract_href: str,
     infos_handle_sse_href: str,
+    infos_handle_tasks_href: str,
+    infos_handle_recovery_href: str,
     version: str,
 ) -> None:
     payload = {
@@ -341,10 +348,12 @@ def write_override_script(
             "snapshotJsonHref": "/jarvis-frontstage-snapshot.json",
             "legacyStatusJsonHref": "/jarvis-frontstage-status.json",
             "statusJsonHref": "/jarvis-frontstage-status.json",
-            "infosHandleBaseUrl": "http://127.0.0.1:18790",
+            "infosHandleBaseUrl": infos_handle_base_url,
             "infosHandleSummaryHref": infos_handle_summary_href,
             "infosHandleContractHref": infos_handle_contract_href,
             "infosHandleSseHref": infos_handle_sse_href,
+            "infosHandleTasksHref": infos_handle_tasks_href,
+            "infosHandleRecoveryHref": infos_handle_recovery_href,
             "refreshMs": 60000,
             "openLabel": "打开状态页",
         },
@@ -1004,8 +1013,7 @@ def write_override_script(
   }}
 
   async function refreshTaskCard() {{
-    const infosHandleBase = BRAND.healthEntry.infosHandleBaseUrl || '';
-    const tasksHref = infosHandleBase ? (infosHandleBase + '/v1/query/tasks.summary?format=json') : '';
+    const tasksHref = BRAND.healthEntry.infosHandleTasksHref || (BRAND.healthEntry.infosHandleBaseUrl ? (BRAND.healthEntry.infosHandleBaseUrl + '/v1/query/tasks.summary?format=json') : '');
     const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
     try {{
       if (tasksHref) {{
@@ -1064,8 +1072,7 @@ def write_override_script(
   }}
 
   async function refreshRecoveryCard() {{
-    const infosHandleBase = BRAND.healthEntry.infosHandleBaseUrl || '';
-    const recoveryHref = infosHandleBase ? (infosHandleBase + '/v1/query/recovery.summary?format=json') : '';
+    const recoveryHref = BRAND.healthEntry.infosHandleRecoveryHref || (BRAND.healthEntry.infosHandleBaseUrl ? (BRAND.healthEntry.infosHandleBaseUrl + '/v1/query/recovery.summary?format=json') : '');
     const snapshotJsonHref = BRAND.healthEntry.snapshotJsonHref || BRAND.healthEntry.statusJsonHref;
     try {{
       if (recoveryHref) {{
@@ -1228,7 +1235,7 @@ def main() -> int:
     favicon_svg_source_value = assets.get("faviconSvgSource")
     favicon_ico_source_value = assets.get("faviconIcoSource")
     apple_touch_source_value = assets.get("appleTouchIconSource")
-    infos_handle_base_url = str(control_ui.get("infosHandleBaseUrl") or "http://127.0.0.1:18790")
+    infos_handle_base_url = str(control_ui.get("infosHandleBaseUrl") or "")
     infos_handle_summary_href = resolve_runtime_href(
         infos_handle_base_url,
         control_ui.get("infosHandleSnapshotSummaryPath"),
@@ -1243,6 +1250,16 @@ def main() -> int:
         infos_handle_base_url,
         control_ui.get("infosHandleSsePath"),
         "/v1/events/stream?kind=snapshot.summary",
+    )
+    infos_handle_tasks_href = resolve_runtime_href(
+        infos_handle_base_url,
+        control_ui.get("infosHandleTasksPath"),
+        "/v1/query/tasks.summary?format=json",
+    )
+    infos_handle_recovery_href = resolve_runtime_href(
+        infos_handle_base_url,
+        control_ui.get("infosHandleRecoveryPath"),
+        "/v1/query/recovery.summary?format=json",
     )
 
     package_root = resolve_package_root()
@@ -1295,9 +1312,12 @@ def main() -> int:
         favicon_file=favicon_file,
         apple_touch_file=apple_touch_file,
         user_avatar_data_url=file_to_data_url(user_avatar_source) if user_avatar_source else None,
+        infos_handle_base_url=infos_handle_base_url,
         infos_handle_summary_href=infos_handle_summary_href,
         infos_handle_contract_href=infos_handle_contract_href,
         infos_handle_sse_href=infos_handle_sse_href,
+        infos_handle_tasks_href=infos_handle_tasks_href,
+        infos_handle_recovery_href=infos_handle_recovery_href,
         version=version,
     )
     patched_assets = patch_chat_running_indicator(dist_root)
@@ -1332,9 +1352,12 @@ def main() -> int:
     print(f"- runtimeLogo: {runtime_logo_path}")
     print(f"- windowTitle: {window_title}")
     print(f"- brandTitle: {brand_title}")
+    print(f"- infosHandleBaseUrl: {infos_handle_base_url or '[same-origin]'}")
     print(f"- infosHandleSummaryHref: {infos_handle_summary_href}")
     print(f"- infosHandleContractHref: {infos_handle_contract_href}")
     print(f"- infosHandleSseHref: {infos_handle_sse_href}")
+    print(f"- infosHandleTasksHref: {infos_handle_tasks_href}")
+    print(f"- infosHandleRecoveryHref: {infos_handle_recovery_href}")
     print("- chatRunningPatched:")
     for path in patched_assets:
         print(f"  - {path}")
