@@ -934,3 +934,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Tags: gpu, voice, routing, correction
 
 ---
+
+## [LRN-20260602-001] correction
+
+**Logged**: 2026-06-02T10:10:01.206Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Tue 2026-06-02 18:09 GMT+8] 工作内容 修改材质命名和模型命名 整理对应文件夹内容 先从标准材质文件夹开整 Material_standard 命名原则 首字母大写 单词用_连结.同一套贴图制作的不同颜色材质变体 加后缀 #red /#dark 1材质 名称精简化 例子 之前材质跟着贴图走 比如下载的材质命名是 xxx网站-砖-尺寸-01-normal 现在改成 将名字简化为Brick01 把原有的名字新建一个txt 保存. 文件夹内:材质球 Mat_Brick01 Brick01_Col/Albedo/D/A彩色图的后缀比…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:dashboard:b82327dd-23f0-4dca-9f34-eb4297ef6c84
+
+---
