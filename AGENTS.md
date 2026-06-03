@@ -10,6 +10,7 @@ If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out w
 
 Before doing anything else:
 
+0. **Read `RULES_INDEX.md` first** — this is the compact rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
@@ -19,6 +20,18 @@ Before doing anything else:
 7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
 
 Don't ask permission. Just do it.
+
+### 域规则触发（收到用户第一条消息后）
+
+读完启动文件后，根据用户第一条消息的类型，从 RULES_INDEX.md 查表加载对应域规则：
+
+- 日常聊天 / 陪伴 → 读 `rules/chat.md`
+- 工作任务 → 读 `rules/work.md`
+- 系统操作 → 读 `rules/system.md` + `rules/work.md`
+- 高风险操作 → 叠加 `rules/safety.md`
+- 拿不准 → 读 `rules/work.md`（默认保守）
+
+每个域文件 ≤ 150 行，读完很快。不依赖读完 MEMORY.md 全文。
 
 ## 安装注册表 — Install Registry
 
