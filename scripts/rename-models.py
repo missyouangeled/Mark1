@@ -1,28 +1,149 @@
 #!/usr/bin/env python3
 """
-模型批量重命名（非单位/人物/机甲/坦克/武器）
-规范: docs/项目资产命名与整理规范.md
+模型批量重命名 v2 — 按新规范执行。
+范围：AssetNature + AssetOther + AssetScene（排除Unit/中的非拖拉机项）
 """
 
 import os, sys, re, argparse
 
-BASE = "/media/missyouangeled/WD_BLACK/Project/Project/Assets"
+BASE = "/media/missyouangeled/WD_BLACK/Project/Assets"
+MODEL_EXT = {'.fbx','.obj','.prefab','.blend','.mesh','.3ds'}
 
-# ─── 工具函数 ─────────────────────────
+# ═══════════════════════════════════════════════════
+# Unit/ 目录中排除的子目录（只留拖拉机）
+# ═══════════════════════════════════════════════════
 
-def rename_file(filepath, new_name, dry_run=True, rename_log=None):
+UNIT_EXCLUDE = {
+    'BeetleFusca', 'Car_Ger_DKW_F8', 'Cart_01', 'Cart_02', 'Cart_03', 'Cart_04',
+    'Crash', 'Field_Kitchen_WW2_YXY241231', 'Old Ford Model T', 'Opel',
+    'Train_German', 'Truck01', 'Truck_Type-06', 'tuoban',
+}
+
+# ═══════════════════════════════════════════════════
+# 复合词拆分
+# ═══════════════════════════════════════════════════
+
+COMPOUNDS = [
+    ('BronzeOld', 'Bronze_Old'), ('BronzeNew', 'Bronze_New'),
+    ('ItalianOld', 'Italian_Old'), ('ItalianNew', 'Italian_New'),
+    ('SquareOld', 'Square_Old'), ('SquareNew', 'Square_New'),
+    ('RoundOld', 'Round_Old'), ('RoundNew', 'Round_New'),
+    ('PantileOld', 'Pantile_Old'),
+    ('AsbestosOndulated', 'Asbestos_Ondulated'),
+    ('WoodPlanks', 'Wood_Planks'),
+    ('CorrugatedRusted', 'Corrugated_Rusted'),
+    ('LightRust', 'Light_Rust'), ('MedRust', 'Med_Rust'), ('HeavyRust', 'Heavy_Rust'),
+    ('BrickIndustrial', 'Brick_Industrial'),
+    ('ConcreteFenceSoviet', 'Fence_Concrete_Soviet'),
+    ('SmallWoodenShingles', 'Roof_Shingle_Wood'),
+    ('RidgeTille', 'Ridge_Tile'),
+    ('castle_wall_slates', 'Wall_Castle_Slate'),
+    ('concrete_floor', 'Floor_Concrete'),
+    ('rusty_metal', 'Metal_Rusty'),
+    ('grey_roof_tiles', 'Roof_Grey_Tile'),
+]
+
+# ═══════════════════════════════════════════════════
+# 需要清除的内容
+# ═══════════════════════════════════════════════════
+
+STRIP_PREFIXES = ['TexturesCom_', 'texturescom_', 'TCom_', 'tcom_']
+
+STRIP_PATTERNS = [
+    r'_1[Kk]', r'_2[Kk]', r'_4[Kk]', r'_6[Kk]', r'_8[Kk]',
+    r'_512', r'_1024', r'_2048', r'_4096',
+    r'_\d+x\d+[a-z]*_\d+', r'_\d[\.,]?\d*x\d[\.,]?\d*[a-z]*',
+]
+
+# ═══════════════════════════════════════════════════
+# 编号修复：把尾部的 01_01 这种重复改成 _(区分词)
+# ═══════════════════════════════════════════════════
+
+def fix_duplicate_number(name):
+    """Props_Box_01_01 → Props_Box_01"""
+    m = re.match(r'^(.+?_\d{2,})_(\d{2,})$', name)
+    if m:
+        return m.group(1)
+    return name
+
+def pad_numbers(name):
+    """数字补零"""
+    def repl(m):
+        word = m.group(1)
+        num = m.group(2)
+        return f'{word}_{int(num):02d}'
+    return re.sub(r'(?<=[a-zA-Z])([a-zA-Z_]+?)(\d{1,2})(?![0-9])', repl, name)
+
+def strip_junk(name):
+    for pfx in STRIP_PREFIXES:
+        if name.lower().startswith(pfx.lower()):
+            name = name[len(pfx):]
+    for pat in STRIP_PATTERNS:
+        name = re.sub(pat, '', name, flags=re.IGNORECASE)
+    name = re.sub(r'_+', '_', name).strip('_')
+    return name
+
+def split_compound(name):
+    for old, new in COMPOUNDS:
+        if name == old or name.startswith(old + '_') or name == old.lower() or name.lower().startswith(old.lower() + '_'):
+            name = new + name[len(old):]
+    return name
+
+def camel_case(name):
+    name = name.replace(' ', '_')
+    name = re.sub(r'_+', '_', name)
+    parts = name.split('_')
+    new_parts = []
+    for p in parts:
+        if not p:
+            continue
+        if re.match(r'^\d', p):
+            new_parts.append(p)
+        elif p.startswith('#'):
+            new_parts.append(p)
+        elif p.startswith('('):
+            new_parts.append(p)
+        else:
+            new_parts.append(p[0].upper() + p[1:])
+    return '_'.join(new_parts)
+
+def clean_model_name(name):
+    original = name
+    
+    # 保留 Unit_/Props_ 等已知前缀
+    known_prefixes = ['Unit_', 'Props_', 'Mat_', 'SM_', 'T_', 'M_']
+    prefix = ''
+    for kp in known_prefixes:
+        if name.startswith(kp):
+            prefix = kp
+            name = name[len(kp):]
+            break
+    
+    name = strip_junk(name)
+    name = split_compound(name)
+    name = fix_duplicate_number(name)
+    name = pad_numbers(name)
+    name = camel_case(name)
+    
+    result = prefix + name
+    return result if result != original else original
+
+
+def rename_file(filepath, new_basename, dry_run=True, rename_log=None):
     dirname = os.path.dirname(filepath)
     oldname = os.path.basename(filepath)
     ext = os.path.splitext(oldname)[1]
-    newname = new_name + ext
+    newname = new_basename + ext
     new_path = os.path.join(dirname, newname)
+    
     if new_path == filepath:
         return None
+    
     if dry_run:
         print(f"  [DRY] {oldname} → {newname}")
     else:
         if os.path.exists(new_path):
-            print(f"  ⚠ 跳过: {newname}")
+            print(f"  ⚠ 跳过（目标已存在）: {newname}")
             return None
         os.rename(filepath, new_path)
         meta_old = filepath + '.meta'
@@ -35,225 +156,87 @@ def rename_file(filepath, new_name, dry_run=True, rename_log=None):
         print(f"  ✓ {oldname} → {newname}")
         if rename_log is not None:
             rename_log.append(f"{oldname}  →  {newname}")
+    
     return (filepath, new_path)
 
 
-def write_rename_log(dirpath, rename_log, label):
-    if not rename_log:
-        return
-    log_path = os.path.join(dirpath, 'rename_log.txt')
-    with open(log_path, 'w') as f:
-        f.write(f"# {label} 重命名日志\n")
-        f.write("# 时间: 2026-06-03\n\n")
-        for entry in rename_log:
-            f.write(entry + '\n')
-    print(f"  📝 rename_log.txt: {len(rename_log)} 条")
+def should_exclude(dirpath):
+    """判断目录是否在排除列表中（Unit/中非拖拉机子目录）"""
+    parts = dirpath.replace(BASE, '').strip('/').split('/')
+    if 'Unit' in parts:
+        idx = parts.index('Unit')
+        if idx + 1 < len(parts):
+            sub = parts[idx + 1]
+            if sub in UNIT_EXCLUDE:
+                return True
+    return False
 
 
-# ─── Building_Standard 命名公式 ───────
-
-def clean_building_name(name):
-    damage = ''
-    name = re.sub(r'\s+', '_', name)
-    m = re.search(r'(_xx|_x)(\s+Variant|\s*$)', name, re.IGNORECASE)
-    if m:
-        damage = '_xx' if m.group(1).lower() == '_xx' else '_X'
-        name = name[:m.start()] + name[m.end():]
-    name = re.sub(r'\s+Variant\s*(\d+)\s*$', r'_Variant_\1', name)
-    name = re.sub(r'\s+Variant\s*$', '', name)
-    removals = [
-        (r'_uv_', '_'), (r'_uv$', ''),
-        (r'_LODSta_', '_'), (r'_LODSta$', ''), (r'_LODSta#', '#'),
-        (r'_LOD_Standard_', '_'), (r'_LOD_Standard$', ''), (r'_LOD_Standard#', '#'),
-        (r'_LOD_Sta_', '_'), (r'_LOD_Sta$', ''), (r'_LOD_Sta#', '#'),
-        (r'_LOD#', '#'), (r'_LOD_', '_'), (r'_LOD$', ''),
-        (r'_LODS_', '_'), (r'_LODS$', ''), (r'_LODS#', '#'),
-        (r'_FJL\d*', ''), (r'_MJ$', ''), (r'_MJ_', '_'),
-        (r'_YXY\d+', ''), (r'_WS\d+', ''),
-        (r'_Sta_', '_'), (r'_Sta$', ''),
-        (r'_Standard_\d+_', '_'), (r'_Standard_\d+$', ''), (r'_Standard_', '_'),
-        (r'_Standard$', ''), (r'_Standard#', '#'),
-        (r'_xable$', '_X'),
-    ]
-    for pat, repl in removals:
-        name = re.sub(pat, repl, name, flags=re.IGNORECASE)
-    name = re.sub(r'_+', '_', name).strip('_')
-    if damage:
-        name = name + damage
-    parts = name.split('_')
-    parts = [p[0].upper() + p[1:] if p else p for p in parts]
-    return '_'.join(parts)
-
-
-# ─── AssetNature 命名清理 ─────────────
-
-VENDOR_PATTERNS = [
-    r'_sjll[Xx]_?', r'_qilgP\d?_?', r'_vmcobd0ja_?', r'_wfzobb2ia_?',
-    r'_wk2oaeyqx_?', r'_kicj[Mm]\d?_?', r'_HDRP_?',
-    r'_ms_?$', r'_raw_?$', r'_3dplant_ms_?$',
-]
-
-def clean_nature_name(name):
-    name = name.replace(' ', '_')
-    for pat in VENDOR_PATTERNS:
-        name = re.sub(pat, '_', name, flags=re.IGNORECASE)
-    name = re.sub(r'_Prefab$', '', name)
-    name = re.sub(r'^P_', '', name)
-    name = re.sub(r'^prefab_', '', name, flags=re.IGNORECASE)
-    # 通用 PascalCase：每部分首字母大写（保留已有的如LOD/Var/Med等）
-    if '_' in name and not name.isupper():
-        parts = name.split('_')
-        new_parts = []
-        for p in parts:
-            if p and p[0].islower():
-                p = p[0].upper() + p[1:]
-            new_parts.append(p)
-        name = '_'.join(new_parts)
-    name = re.sub(r'_+', '_', name).strip('_')
-    return name
-
-
-# ─── 场景物件命名清理 ────────────────
-
-SCENE_CLEAN_PATTERNS = [
-    (r'_YXY\d+', ''),
-    (r'_WS\d+', ''),
-    (r'_FJL\d*', ''),
-    (r'_MJ$', ''),
-    (r'_MJ_', '_'),
-    (r'_LOD$', ''),  # 单独的 LOD 末尾
-    (r'^P_en_', ''),  # P_en_ 前缀
-]
-
-TYPO_FIXES = {
-    'gorup': 'Group', 'Grounp': 'Group', 'Groiup': 'Group',
-    'grounp': 'group', 'groiup': 'group',
-    'Lod': 'LOD', 'lod': 'LOD',
-}
-
-def clean_scene_name(name):
-    name = name.replace(' ', '_')
-    for pat, repl in SCENE_CLEAN_PATTERNS:
-        name = re.sub(pat, repl, name, flags=re.IGNORECASE)
-    name = re.sub(r'_+', '_', name).strip('_')
-    # 修复常见拼写错误
-    for wrong, fix in TYPO_FIXES.items():
-        name = name.replace(wrong, fix)
-    # 移除 Type- 前缀 (Props_Haystack_Type-01 → Props_Haystack_01)
-    name = re.sub(r'_Type-0?', '_', name)
-    # PascalCase
-    parts = name.split('_')
-    parts = [p[0].upper() + p[1:] if p and p[0].islower() else p for p in parts]
-    return '_'.join(parts)
-
-
-def process_scene_category(cat_name, dry_run=True):
-    base = os.path.join(BASE, "AssetScene/SceneModels", cat_name)
-    if not os.path.isdir(base):
+def process_dir(root_dir, dry_run=True):
+    if not os.path.isdir(root_dir):
+        print(f"  ❌ 路径不存在: {root_dir}")
         return []
-    print(f"\n  📁 {cat_name}")
-    rename_log = [] if not dry_run else None
+    
     renamed = []
-    for dirpath, dirs, files in os.walk(base):
+    rename_log = [] if not dry_run else None
+    
+    for dirpath, dirs, files in os.walk(root_dir):
+        if should_exclude(dirpath):
+            dirs.clear()
+            continue
+        
         for f in files:
             if f.endswith('.meta'):
                 continue
             ext = os.path.splitext(f)[1].lower()
-            if ext not in ('.prefab', '.fbx', '.obj', '.blend'):
+            if ext not in MODEL_EXT:
                 continue
             fp = os.path.join(dirpath, f)
             name = os.path.splitext(f)[0]
-            nn = clean_scene_name(name)
-            if nn != name:
-                r = rename_file(fp, nn, dry_run, rename_log)
+            new_name = clean_model_name(name)
+            if new_name != name:
+                r = rename_file(fp, new_name, dry_run, rename_log)
                 if r:
                     renamed.append(r)
-    write_rename_log(base, rename_log, cat_name)
-    print(f"    {len(renamed)} 个文件")
+    
+    if rename_log and renamed:
+        log_path = os.path.join(root_dir, 'model_rename_log.txt')
+        with open(log_path, 'w') as f:
+            f.write(f"# 模型重命名日志 — {os.path.basename(root_dir)}\n")
+            f.write("# 时间: 2026-06-03\n")
+            f.write(f"# 共 {len(rename_log)} 条\n\n")
+            for entry in rename_log:
+                f.write(entry + '\n')
+        print(f"\n  📝 model_rename_log.txt: {len(rename_log)} 条")
+    
     return renamed
 
-
-def process_scene_models(dry_run=True):
-    """处理所有场景物件模型（不含建筑和Unit）"""
-    cats = ['Military', 'Props', 'Farmland', 'Fence', 'FenceAndPierWooden',
-            'Industrial', 'Wall', 'Railway', 'RoadSide', 'SceneStatic',
-            'ChurchAndGrave', 'Fumiture',
-            'Building_Module']  # Building_Module 基本规范，只做轻度清理
-    print(f"\n{'='*60}")
-    print(f"🏗️  场景物件模型\n")
-    total = 0
-    for cat in cats:
-        r = process_scene_category(cat, dry_run)
-        total += len(r)
-    print(f"\n  场景物件合计: {total} 个文件")
-    return total
-
-def process_building_standard(dry_run=True):
-    base = os.path.join(BASE, "AssetScene/SceneModels/Building_Standard")
-    print(f"\n{'='*60}\n🏠 Building_Standard\n")
-    rename_log = [] if not dry_run else None
-    renamed = []
-    for dirpath, dirs, files in os.walk(base):
-        for f in files:
-            if f.endswith('.meta'):
-                continue
-            ext = os.path.splitext(f)[1].lower()
-            if ext not in ('.prefab', '.fbx', '.obj', '.blend'):
-                continue
-            fp = os.path.join(dirpath, f)
-            name = os.path.splitext(f)[0]
-            nn = clean_building_name(name)
-            if nn != name:
-                r = rename_file(fp, nn, dry_run, rename_log)
-                if r:
-                    renamed.append(r)
-    write_rename_log(base, rename_log, "Building_Standard")
-    print(f"  共 {len(renamed)} 个文件\n")
-    return renamed
-
-
-def process_asset_nature(dry_run=True):
-    base = os.path.join(BASE, "AssetNature")
-    print(f"\n{'='*60}\n🌿 AssetNature\n")
-    rename_log = [] if not dry_run else None
-    renamed = []
-    for dirpath, dirs, files in os.walk(base):
-        for f in files:
-            if f.endswith('.meta'):
-                continue
-            ext = os.path.splitext(f)[1].lower()
-            if ext not in ('.prefab', '.fbx', '.obj', '.blend'):
-                continue
-            fp = os.path.join(dirpath, f)
-            name = os.path.splitext(f)[0]
-            nn = clean_nature_name(name)
-            if nn != name:
-                r = rename_file(fp, nn, dry_run, rename_log)
-                if r:
-                    renamed.append(r)
-    write_rename_log(base, rename_log, "AssetNature")
-    print(f"  共 {len(renamed)} 个文件\n")
-    return renamed
-
-
-# ─── 入口 ─────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true', default=True)
     parser.add_argument('--execute', action='store_true')
-    parser.add_argument('--category', choices=['building_std','nature','scene','all'], default='all')
+    parser.add_argument('--dir', type=str, default='',
+                       help='指定目录路径')
     args = parser.parse_args()
     dry_run = not args.execute
-    print("🔍 预览模式\n" if dry_run else "⚠️ 执行模式\n")
-
-    if args.category in ('building_std', 'all'):
-        process_building_standard(dry_run)
-    if args.category in ('scene', 'all'):
-        process_scene_models(dry_run)
-
+    
+    targets = []
+    if args.dir:
+        targets = [args.dir]
+    else:
+        targets = [
+            os.path.join(BASE, 'AssetNature'),
+            os.path.join(BASE, 'AssetOther'),
+            os.path.join(BASE, 'AssetScene'),
+        ]
+    
+    for target in targets:
+        print(f"\n{'🔍 预览模式' if dry_run else '⚠️ 执行模式'}: {target}\n")
+        renamed = process_dir(target, dry_run)
+        print(f"\n📊 {len(renamed)} 个模型文件待重命名\n")
+    
     if dry_run:
-        print(f"{'='*60}")
         print("确认后执行: python3 scripts/rename-models.py --execute")
 
 
