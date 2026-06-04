@@ -160,3 +160,24 @@
 - **时间**：2026-05-28 15:39 CST
 - **结果**：资产在 `tmp/voice-replies/chattts-hybrid/asset/`（7文件，~325MB），完整
 - **是否成功**：✅ 无问题（之前查错了目录 `tools/` → 应为 `tmp/`）
+
+## 2026-06-04 - openclaw-unity-skill
+
+- **时间**: 2026-06-04 10:40 ~ 10:42 GMT+8
+- **来源**: LobeHub Marketplace (`openclaw-skills-openclaw-unity-skill`)
+- **安装命令**:
+  1. `npx -y @lobehub/market-cli register --name "贾维斯" --description "OpenClaw AI Assistant" --source open-claw`
+  2. `npx -y @lobehub/market-cli skills install openclaw-skills-openclaw-unity-skill --agent open-claw`
+  3. `bash scripts/install-extension.sh` (安装 gateway extension)
+  4. `openclaw gateway restart`
+- **版本**: v1.6.1
+- **路径**: `~/.openclaw/skills/openclaw-skills-openclaw-unity-skill/`
+- **扩展路径**: `~/.openclaw/extensions/unity/`
+- **依赖**: `@lobehub/market-cli` (已注册 Client ID: cli_dKyyZLF3vd4smqN0pkPARTXu5T56zJeo)
+- **是否成功**: ✅ 成功
+- **备注**: 
+  - ~100 个 Unity Editor 控制工具（场景/GameObject/Component/Material/Prefab/Shader/Texture 等）
+  - `disableModelInvocation: true` - 不会自动调用，需用户显式请求
+  - 需要掌机 Unity 项目安装 openclaw-unity-plugin 才能连通
+  - 连接模式：HTTP（Unity Editor 侧运行 plugin HTTP server）
+  - LobeHub Client 凭据保存在 `~/.lobehub-market/credentials.json`
