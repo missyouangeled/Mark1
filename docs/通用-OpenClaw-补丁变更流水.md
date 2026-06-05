@@ -968,3 +968,92 @@
 - 文档已写入 docs/通用-Unity-Bridge-连接指南.md，含 6 个坑及解决方案
 - 相关文件：
 - `docs/通用-Unity-Bridge-连接指南.md`
+
+## 2026-06-05 16:52:18 CST (+08:00) — 新增大工程稳定运行方案与收尾脚本
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 docs/通用-OpenClaw-大工程稳定运行方案.md，明确前台轻量化/后台分身/scratch 落地/冲突预扫/收尾清理流程
+- 新增 scripts/openclaw-heavy-task-finish.py，统一执行大工程后的 tmp/pyc 清理、journald 修剪、kernel cache 释放与系统总览检查
+- 同步更新 TOOLS.md 与 MEMORY.md，将大工程默认流程写成规则
+- 验收 / 验证：
+- python3 scripts/openclaw-heavy-task-finish.py 已运行；system summary 显示 gateway/watchers/localHealth 正常；内存 available 约 3.3Gi
+- 相关文件：
+- `MEMORY.md`
+- `TOOLS.md`
+- `docs/通用-OpenClaw-大工程稳定运行方案.md`
+- `scripts/openclaw-heavy-task-finish.py`
+
+## 2026-06-05 16:55:45 CST (+08:00) — 新增批量改名前冲突预扫工具
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 scripts/openclaw-rename-conflict-check.py，用于批量改名前预先扫描原名到目标名映射并拦截撞名覆盖风险
+- 支持 --strip-hash-suffix，可提前抓出像 Wall/H2M 中 #PaintWhite 与 #BrickIndustrial_06 被同名覆盖的问题
+- 同步更新大工程稳定运行方案文档与 TOOLS.md 入口说明
+- 验收 / 验证：
+- python3 scripts/openclaw-rename-conflict-check.py /mnt/data/openclaw/scratch/temp/rename-conflict-sample --strip-hash-suffix 返回 1，并正确报告 Props_Wall_H_02m_02m.prefab 冲突
+- 相关文件：
+- `TOOLS.md`
+- `docs/通用-OpenClaw-大工程稳定运行方案.md`
+- `scripts/openclaw-rename-conflict-check.py`
+
+## 2026-06-05 16:57:47 CST (+08:00) — 新增大工程开工前预检脚本
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 scripts/openclaw-heavy-task-preflight.py，在大工程开始前检查文件量、内存、磁盘、failed units，并给出后台化与 scratch 建议
+- 同步更新大工程稳定运行方案文档与 TOOLS.md，将 preflight / conflict-check / finish 三段式闭环补齐
+- 验收 / 验证：
+- python3 scripts/openclaw-heavy-task-preflight.py /media/missyouangeled/WD_BLACK/Project_amend_01/Assets/AssetScene/SceneModels/Wall --task-name unity_wall_rename 已输出 114 个纳入规则文件、3.2GiB 可用内存、建议分批/优先后台
+- 相关文件：
+- `TOOLS.md`
+- `docs/通用-OpenClaw-大工程稳定运行方案.md`
+- `scripts/openclaw-heavy-task-preflight.py`
+
+## 2026-06-05 17:00:25 CST (+08:00) — 新增 scratch 保留与过期清理机制
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 scripts/openclaw-scratch-cleanup.py，支持 scratch 目录按天数清理、dry-run 预览、.keep 保留标记
+- 保留规则收紧为：顶层项目目录任意子目录内存在 .keep，即整体保留，避免误删重要工程资料
+- 同步更新大工程稳定运行方案与 TOOLS.md，将 scratch 留存/清理纳入闭环
+- 验收 / 验证：
+- python3 scripts/openclaw-scratch-cleanup.py --days 0 --dry-run --print-kept 已正确保留 unity-renames（原因 keep-marker:2026-06-05-wall/.keep）
+- 相关文件：
+- `TOOLS.md`
+- `docs/通用-OpenClaw-大工程稳定运行方案.md`
+- `scripts/openclaw-scratch-cleanup.py`
+
+## 2026-06-05 17:02:54 CST (+08:00) — 新增大工程统一开工入口
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 scripts/openclaw-heavy-task-start.py，统一串联 scratch 建目录、.keep 标记、preflight 预检与 conflict-check 建议命令
+- 同步更新大工程稳定运行方案文档与 TOOLS.md，将 start / preflight / conflict-check / scratch-cleanup / finish 收成完整闭环
+- 验收 / 验证：
+- python3 scripts/openclaw-heavy-task-start.py /media/missyouangeled/WD_BLACK/Project_amend_01/Assets/AssetScene/SceneModels/Wall --task-name unity_wall_start2 --keep --strip-hash-suffix 已正确创建 scratch 目录并输出预检与后续命令
+- 相关文件：
+- `TOOLS.md`
+- `docs/通用-OpenClaw-大工程稳定运行方案.md`
+- `scripts/openclaw-heavy-task-start.py`

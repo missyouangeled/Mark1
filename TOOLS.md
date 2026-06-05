@@ -70,6 +70,30 @@ Things like:
   - 用途：聚合 gateway / security / tasks / watcher / patch verify / local-health / daily / git 工作区状态，快速判断当前系统是否干净
   - 常用命令：`python3 scripts/openclaw-system-summary.py --print-human`
   - 边界：只做低侵入聚合检查，不新增 timer，不替代细分诊断脚本
+- 大工程稳定运行方案：`docs/通用-OpenClaw-大工程稳定运行方案.md`
+  - 用途：统一约束大量文件/长耗时/高 IO/高上下文任务的执行方式，核心是“前台轻量化 + 后台分身 + scratch 落地 + 冲突预扫 + 收尾清理”
+  - 开工前建议：`python3 scripts/openclaw-heavy-task-start.py <目标目录> --task-name <任务名> --keep`，再执行 `python3 scripts/openclaw-system-summary.py --print-human && free -h && df -h / /mnt/data`
+  - 收工后建议：`python3 scripts/openclaw-heavy-task-finish.py`
+  - 当前 scratch：`/mnt/data/openclaw/scratch/`；Unity 重命名相关计划与操作记录默认优先保留到这里，不轻易删除
+- 大工程统一开工入口：`scripts/openclaw-heavy-task-start.py`
+  - 用途：自动建立 scratch 子目录、可选写入 `.keep`、运行 preflight，并给出 conflict-check / summary / finish 建议命令
+  - 常用命令：`python3 scripts/openclaw-heavy-task-start.py <目标目录> --task-name <任务名> --keep`
+  - 若改名规则会删除 `#` 后缀：额外加 `--strip-hash-suffix`
+  - 当前已验证：对 Wall 目录可正确创建 scratch 目录、写入 `.keep` 并输出后续建议命令
+- 大工程开工前预检：`scripts/openclaw-heavy-task-preflight.py`
+  - 用途：在大工程开始前检查文件量、可用内存、根盘/数据盘余量、当前 failed units，并给出后台化与 scratch 建议
+  - 常用命令：`python3 scripts/openclaw-heavy-task-preflight.py <目标目录> --task-name <任务名>`
+  - 当前已验证：对 Wall 目录可正确给出“114 个纳入规则文件、建议分批/优先后台、建议 scratch 路径”的预检结果
+- scratch 过期清理：`scripts/openclaw-scratch-cleanup.py`
+  - 用途：清理 `/mnt/data/openclaw/scratch/` 里超过阈值天数且未标记保留的目录/文件
+  - 保留机制：任一目录树内存在 `.keep`，则对应顶层项目目录整体保留
+  - 常用命令：`python3 scripts/openclaw-scratch-cleanup.py --dry-run --print-kept`
+  - 当前已验证：`unity-renames/2026-06-05-wall/.keep` 可正确保住整个 `unity-renames/` 顶层目录
+- 批量改名前冲突预扫：`scripts/openclaw-rename-conflict-check.py`
+  - 用途：在正式改名前，先扫描“原名 → 目标名”映射，检查是否多个文件会撞到同一个新文件名
+  - 常用命令：`python3 scripts/openclaw-rename-conflict-check.py <目录>`
+  - 若当前规则会删除 `#` 后缀：`python3 scripts/openclaw-rename-conflict-check.py <目录> --strip-hash-suffix --report-out /mnt/data/openclaw/scratch/reports/<name>.json`
+  - 当前已验证：能提前抓出 Wall/H2M 这类 `#PaintWhite` / `#BrickIndustrial_06` 覆盖风险
 - 当前正式架构状态源：`docs/通用-OpenClaw-当前正式架构状态.md`
   - 用途：定义哪些组件是正式运行、哪些是历史回退、哪些是可选/手动，修复器和自检脚本应优先对齐此文件
 - Git 工作区污染规则：`docs/通用-OpenClaw-Git工作区污染规则.md`
