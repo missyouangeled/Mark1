@@ -958,3 +958,147 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:dashboard:b82327dd-23f0-4dca-9f34-eb4297ef6c84
 
 ---
+
+## [LRN-20260603-001] correction
+
+**Logged**: 2026-06-03T07:35:49.102Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Wed 2026-06-03 15:35 GMT+8] 待修改内容: 一,修改材质命名和模型命名 AssetNature AssetOther AssetScene三个文件夹中的文件 1 每个单词的首字母大写 两个未分割的单词的组合词 每个单词首字母大写 比如 StoneWall 2 遇到glass1 glass2 这类 改为Glass_01 Glass_02 3 前缀 理想方式是把上一级分类写成前缀 比如 Props_Box_01 4 分辨内容改名字 比如现在有类似 Props_Box_01_01 应该改成 Props_Box_01_(Big/Sm…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260604-001] correction
+
+**Logged**: 2026-06-04T03:16:32.997Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Thu 2026-06-04 11:16 GMT+8] 应该是。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260604-002] correction
+
+**Logged**: 2026-06-04T07:40:59.463Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Thu 2026-06-04 15:40 GMT+8] 先整理Props文件夹试一下 基础规则 材质球加前缀 Mat_ 模型 预制件加分类名前缀 Props_ 加颜色或者材质后缀#Red #Old #Wood 具体后最名跟着材质走 文件夹 材质球 模型 预制件的单词首字母大写,拼接单词 每个单词的首字母大写. 有些同类比较多的模型之前命名为Box_Type-01 现在去除了type 就命名为 例如Box_01 模型名称精简 比如原名为[redacted] 现在更名为Field_Kitchen_01 比如原名为Box_06-WoodenCrate现在更…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260605-001] correction
+
+**Logged**: 2026-06-05T08:25:27.289Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Fri 2026-06-05 16:25 GMT+8] 不是这个问题，刚才系统有警报，算了 现在好像没了，刚才改玩wall文件夹下的东西 也要保存一个文件夹啊。类似于V4那种格式。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260605-002] correction
+
+**Logged**: 2026-06-05T08:45:36.290Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Fri 2026-06-05 16:45 GMT+8] 然后你帮我想一个方案，因为我感觉每天到下午，或者处理完大工程都有一定的响应问题，因为我看不到代码所以我不确定具体问题，但是初步感觉应该是大工程的问题，所以能不能帮我想一个后续解决办法，我刚才不是说把unity资产重命名相关的东西放到数据盘了吗 这也算一种方式吧。能不能再想一个整体解决方案。能确保系统一直稳定。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260605-003] correction
+
+**Logged**: 2026-06-05T09:33:41.663Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Fri 2026-06-05 17:33 GMT+8] 原始文件名 Xx 应该是两个小写吧 xx
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
