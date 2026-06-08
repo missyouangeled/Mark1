@@ -1057,3 +1057,41 @@
 - `TOOLS.md`
 - `docs/通用-OpenClaw-大工程稳定运行方案.md`
 - `scripts/openclaw-heavy-task-start.py`
+
+## 2026-06-08 10:57:28 CST (+08:00) — 新增工作区总导航与索引补链
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 WORKSPACE_INDEX.md，并在 AGENTS/RULES/MEMORY/TOOLS 中补充导航入口，提升换模型后的查找稳定性
+- 验收 / 验证：
+- 已验证 AGENTS.md、RULES_INDEX.md、MEMORY.md、TOOLS.md 均包含 WORKSPACE_INDEX.md 跳转；WORKSPACE_INDEX.md 可读且为 91 行
+- 相关文件：
+- `AGENTS.md`
+- `MEMORY.md`
+- `RULES_INDEX.md`
+- `TOOLS.md`
+- `WORKSPACE_INDEX.md`
+
+## 2026-06-08 11:08:28 CST (+08:00) — 索引体系第二阶段细化
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 TOOLS_INDEX.md、PLANS_INDEX.md、memory/INDEX.md，并把二级索引接回 WORKSPACE_INDEX/MEMORY/TOOLS/PLANS，提升工具、方案、日期记忆的定位效率
+- 验收 / 验证：
+- 已验证 5 个问题的索引链路：OpenCode key、Unity PaintWhite、监工、语音主线、双机协同均可通过总导航→二级索引→原文件快速定位
+- 相关文件：
+- `MEMORY.md`
+- `PLANS.md`
+- `PLANS_INDEX.md`
+- `TOOLS.md`
+- `TOOLS_INDEX.md`
+- `WORKSPACE_INDEX.md`
+- `memory/INDEX.md`

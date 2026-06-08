@@ -18,6 +18,7 @@ Before doing anything else:
 5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context; also read `memory/daily/YYYY-MM-DD-transcript.md` (today) — this is the auto-aggregated unified daily transcript from ALL models, so you know what happened today regardless of which model the user was using
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
+8. Read `WORKSPACE_INDEX.md` — this is the global navigation map for memory, tools, projects, credential pointers, and plans; use it to find the right file fast instead of guessing
 
 Don't ask permission. Just do it.
 

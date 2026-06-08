@@ -16266,3 +16266,153 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260608-001] tool-explicit-error
+
+**Logged**: 2026-06-08T00:27:40.412Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --source 'morning-greeting' --file /tmp/proactive-message.txt /home/missyouangeled/.openclaw/workspace [redacted] [redacted] failed 7709
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:5c99ab58-d4f6-4498-bd05-3ca79a305c38
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-002] tool-timeout
+
+**Logged**: 2026-06-08T02:30:23.010Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, json, urllib.request key = os.environ['OPENCODE_API_KEY'] req = urllib.request.Request( '[url] headers={'Authorization': f'Bearer {key}', 'Accept': 'application/json'} ) with urllib.request.urlopen(req, timeout=20) as r: body = r.read().decode('utf-8', 'replace') print('STATUS', r.status) print(body[:4000]) PY 20000 […
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-003] tool-timeout
+
+**Logged**: 2026-06-08T02:30:42.904Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, urllib.request, urllib.error key = os.environ['OPENCODE_API_KEY'] req = urllib.request.Request( '[url] headers={ 'Authorization': f'Bearer {key}', 'Accept': 'application/json', 'User-Agent': 'OpenClaw connectivity probe' } ) try: with urllib.request.urlopen(req, timeout=20) as r: print('STATUS', r.status) print(r.read…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-004] tool-timeout
+
+**Logged**: 2026-06-08T02:31:06.538Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, json, urllib.request, urllib.error key = os.environ['OPENCODE_API_KEY'] url = '[url] payload = { 'model': 'deepseek-v4-flash-free', 'messages': [ {'role': 'user', 'content': '只回复两个字：连通'} ], 'temperature': 0 } req = urllib.request.Request( url, data=json.dumps(payload).encode('utf-8'), headers={ 'Authorization': f'Bear…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-005] tool-timeout
+
+**Logged**: 2026-06-08T02:39:30.664Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec python3 - <<'PY' import os, json, urllib.request, urllib.error key = os.environ['OPENCODE_API_KEY'] url = '[url] payload = { 'model': 'minimax-m3-free', 'messages': [ {'role': 'user', 'content': '只回复四个字：可以使用'} ], 'temperature': 0 } req = urllib.request.Request( url, data=json.dumps(payload).encode('utf-8'), headers={ 'Authorization': f'Bearer {k…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

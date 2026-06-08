@@ -4,6 +4,20 @@
 > 每日原始记录见 `memory/daily/`。每日聊天结束后,相关结构化信息会归入上述分类档案。
 > **方案存档**:`PLANS.md` - 所有调研结论、技术方案、决策策略统一归档于此。提到"方案"或"保存方案"时,优先查此文件。
 > **安装注册表**:`docs/install-registry.md` - 所有工具/Skill/扩展的安装卸载记录。查找或安装新东西前先查此文件。
+> **工作区总导航**:`WORKSPACE_INDEX.md` - 记忆 / 工具 / 项目 / 凭据指针 / 历史方案去哪找,先看这里。
+
+## 快速查找
+
+| 要找什么 | 去哪 |
+|---|---|
+| 人物档案 | `memory/people.md` |
+| 回忆 / 千千相关故事 | `memory/stories.md` |
+| 记忆主题锚点 / 某件事在哪天 | `memory/INDEX.md` |
+| 每日上下文 | `memory/daily/YYYY-MM-DD.md` |
+| 历史方案 / 技术决策 | `PLANS.md` / `PLANS_INDEX.md` |
+| 项目入口 | `PROJECT_INDEX.md` |
+| 本地工具 / 凭据路径 / 服务入口 | `TOOLS.md` |
+| 总导航 | `WORKSPACE_INDEX.md` |
 
 ---
 

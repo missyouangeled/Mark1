@@ -35,6 +35,20 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+## 快速导航
+
+| 要找什么 | 看哪 |
+|---|---|
+| 工作区总导航 | `WORKSPACE_INDEX.md` |
+| 工具二级索引 | `TOOLS_INDEX.md` |
+| 本地凭据指针 | `Local-only credential pointers` |
+| OpenClaw 自动化 / 监工 / watcher | `OpenClaw automation` |
+| 升级后自检 / 升级记录 | `OpenClaw automation` |
+| 大工程 / scratch / 批量改名 | `OpenClaw automation` |
+| 视频下载相关入口 | `视频平台下载默认工作流` / 相关下载脚本条目 |
+| 本地语音 / ChatTTS / XTTS | `ChatTTS` / `Local free voice-cloning stack` |
+| SSH / 远端 GPU / API key 路径 | `Local-only credential pointers` |
+
 ## 权限规则
 
 - 适用机器:公司(Linux)
@@ -612,6 +626,11 @@ Things like:
 
 ### Local-only credential pointers
 
+- OpenCode Zen 备用 API key:
+  - 用途:紧急备用的 OpenCode Zen / opencode.ai 模型网关 key,默认不接入 OpenClaw,不设为主模型,只在用户明确要求时再手动启用/测试
+  - 本地保存:`credentials/api/opencode-zen.env`
+  - 当前状态:已验证可访问 `https://opencode.ai/zen/v1/models` 与免费模型最小连通性;默认仅作备用,不用于长期主会话/隐私敏感上下文
+  - 安全边界:优先仅用于公开/低敏测试;如后续正式接入,应继续保持"备用 provider、不改默认模型"原则
 - SeetaCloud 租用 ChatTTS GPU(westd):
   - 用途:远端 GPU 环境,准备给 ChatTTS / 更逼真的主会话语音回复使用
   - 非敏感连接标识:`root@connect.westd.seetacloud.com:18786`
