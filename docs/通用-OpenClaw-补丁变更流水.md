@@ -1151,3 +1151,17 @@
 - 总目录 26.39MB→INFO 级别，checkpoint 4→1，trajectory 10MB→0
 - 相关文件：
 - `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-08 17:03:52 CST (+08:00) — session-size-watcher v2：trajectory 安全清理 + 告警通道 + 跨模型双保险
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- trajectory 改为 mtime 条件删除（>10min 旧于主 jsonl 才清），新增 alerts.json 告警通道（清理错误/检测失效），BOOT.md 启动时强制执行 --check-alerts 作为跨模型兜底，主路径 MEMORY.md 规则为辅
+- 验收 / 验证：
+- --check-alerts 返回正常，trajectory 1.39MB 因 mtime 较近被正确跳过，总目录 27.9MB INFO 级别
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
