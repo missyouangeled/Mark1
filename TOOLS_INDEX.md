@@ -35,6 +35,7 @@
 | Watcher 体系 | `TOOLS.md` → `Watcher 体系（2026-05-26 整合后：8→5）` | frontstage / scheduler / health / lifecycle |
 | 监工相关 | `TOOLS.md` → `监工相关` | `main-supervisor-lite`、监工脚本、前台绑定 |
 | 本地健康诊断 | `TOOLS.md` → `OpenClaw automation` / `本地健康诊断层` | `openclaw-local-health-diagnose.py` |
+| 会话大小监测与自动修复 | `TOOLS.md` → `OpenClaw automation` | `openclaw-session-size-watcher.py`（事件驱动，消息触发，门控去重） |
 | 前台 broker / infos-handle | `TOOLS.md` → `OpenClaw automation` | broker、sidecar、unified proxy |
 
 ## 4. 语音 / TTS / ChatTTS / XTTS

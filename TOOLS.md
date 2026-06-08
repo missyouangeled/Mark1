@@ -137,6 +137,17 @@ Things like:
   - 当前也会读取监工状态文件,并在页面里显示"监工"卡片与明细
   - 当前也可在 `warn / critical / recovered` 这些健康状态变化时,经由 frontstage broker 把一句摘要回到当前 dashboard 前台
   - 边界:不负责页面主会话消息超时监听;那部分继续由监工服务 / 监工分身兜底
+- 会话文件大小监测与自动修复(公司 / Linux 机器):
+  - 适用机器:公司(Linux)
+  - 系统 / OS:Linux
+  - 监测脚本:`scripts/openclaw-session-size-watcher.py`
+  - 触发方式:事件驱动 — 我每次收到消息后在后台跑（`--gate-seconds 60` 门控去重），无常驻 timer 常驻内存
+  - 当前状态目录:`~/.local/state/openclaw/session-size-watcher/`
+  - 默认频率:每收到用户消息触发，门控 60 秒内不重复实扫
+  - 阈值: CRITICAL=40MB 总目录（自动清理旧 checkpoint/trajectory/bak） / FORCE_CLEAN=60MB（强制清理） / 不设 WARN，日常只静默记录
+  - 用途:在会话压缩竞态发生前,提前清理旧会话数据,减少 "session file changed while lock released" 竞态概率
+  - 手动命令:`python3 scripts/openclaw-session-size-watcher.py --print-human`（查看状态） / `python3 scripts/openclaw-session-size-watcher.py --force-clean`（强制清理）
+  - 边界:不直接压缩当前活跃会话（OpenClaw 内部处理）,只清理其他会话的过期 checkpoint/trajectory/bak 文件
 - 监工状态脚本:`scripts/openclaw-supervisor-status.py`
   - 状态文件:`~/.local/state/openclaw/supervisor/supervisor-status.json`
   - 控制文件:`~/.local/state/openclaw/supervisor/service-control.json`

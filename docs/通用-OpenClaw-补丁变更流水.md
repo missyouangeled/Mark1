@@ -1095,3 +1095,59 @@
 - `TOOLS_INDEX.md`
 - `WORKSPACE_INDEX.md`
 - `memory/INDEX.md`
+
+## 2026-06-08 16:29:04 CST (+08:00) — 新增会话文件大小监测与自动修复补丁 (session-size-watcher)
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新增 openclaw-session-size-watcher.py + systemd timer 每 2 分钟监测当前会话 JSONL 大小，超过 WARN(2.5MB)/CRITICAL(3.0MB)/FORCE_CLEAN(50MB) 阈值自动清理旧 checkpoint/trajectory/bak 文件，首轮已释放 93.62MB，缓解会话压缩竞态
+- 验收 / 验证：
+- timer 已启用且活跃，session 目录从 129.63MB 降至 36.06MB，服务退出码 SUCCESS
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-08 16:44:31 CST (+08:00) — session-size-watcher CRITICAL 阈值调整 (3MB→4MB→5MB)
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- CRITICAL 阈值从 3MB 先调到 4MB 再最终调到 5MB，避免与 OpenClaw 内部压缩阈值重叠导致频繁误报
+- 验收 / 验证：
+- 当前会话 4.24MB 显示 WARN 而非 CRITICAL
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-08 16:47:58 CST (+08:00) — session-size-watcher 阈值重构：取消 WARN，CRITICAL→40MB，FORCE_CLEAN→60MB
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 取消 WARN 级别，CRITICAL 改按总目录 40MB 触发清理，FORCE_CLEAN 提到 60MB，不再按单个文件大小频繁触发
+- 验收 / 验证：
+- 当前总目录 40.47MB 触发 CRITICAL，无可清理项（首轮已清 93MB），日常 INFO 静默记录
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-08 16:51:09 CST (+08:00) — session-size-watcher 清理策略升级：纳入当前会话自身旧 checkpoint + trajectory
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 清理从仅限"其他会话"扩展到当前会话自身：旧 checkpoint 只保留最新 1 个、trajectory 全清。首轮当前会话释放 14.13MB（3 checkpoint + 1 trajectory），总目录从 40.52MB 降至 26.39MB，缓解压缩竞态
+- 验收 / 验证：
+- 总目录 26.39MB→INFO 级别，checkpoint 4→1，trajectory 10MB→0
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
