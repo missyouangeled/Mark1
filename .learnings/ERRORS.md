@@ -16416,3 +16416,213 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260608-006] tool-explicit-error
+
+**Logged**: 2026-06-08T08:26:28.855Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ 会话文件大小监测与自动修复 (Session Size Watcher) 监测当前活跃会话的 JSONL 文件大小，记录增长趋势， 在超过阈值时自动清理旧 checkpoint / trajectory 文件， 减少会话压缩竞态的发生概率。 触发方式： - systemd timer（默认每 2 分钟） - 手动：python3 scripts/[redacted].py --print-human 阈值： - INFO: 记录当前大小（始终执行） - WARN: 会话 > 2.5MB，记录警告但不触发清理 - CRITICAL: 会话 > 3.0MB，自动清理旧数据 + 发出 broker 通知 - FORCE_CLEAN: …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-007] tool-explicit-error
+
+**Logged**: 2026-06-08T08:34:29.859Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec python3 -c " import json state = json.load(open('/home/missyouangeled/.local/state/openclaw/session-size-watcher/state.json')) last = state['history'][-1] print(f'Last entry time: {last[\"time\"]}') print(f'Type: {type(last[\"time\"])}') from datetime import datetime, timezone try: dt = datetime.fromisoformat(last['time']) now = datetime.now(tim…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-008] tool-explicit-error
+
+**Logged**: 2026-06-08T08:46:43.164Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit [redacted] [redacted] 692
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-009] user-reported-error
+
+**Logged**: 2026-06-08T08:48:54.000Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Mon 2026-06-08 16:48 GMT+8] 又报错了 Edit failed 修复一下。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260608-010] tool-explicit-error
+
+**Logged**: 2026-06-08T08:50:04.326Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py [redacted] [redacted] 868
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260608-011] user-reported-error
+
+**Logged**: 2026-06-08T08:59:59.326Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Mon 2026-06-08 16:59 GMT+8] trajectory 文件的清理有点鲁莽。没有异常告警通道。对这两条能进行一个优化吗。至于你说他是被动的，我想的就是做成一个被动技能，平常越不占资源越好，就是在紧急情况能触发这个被动技能就好。还有第一条，如果换了一个不擅长遵守行为规则的模型 能避免被漏掉吗。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260608-012] tool-explicit-error
+
+**Logged**: 2026-06-08T09:20:09.008Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 查 OpenClaw gateway 的 provider 配置和可用模型 cat /home/missyouangeled/.openclaw/gateway/config.yaml 2>/dev/null | python3 -c " import sys, yaml try: d = yaml.safe_load(sys.stdin) except: print('yaml parse failed') sys.exit(1) # 找 compaction 相关 print(json.dumps(d.get('agents', {}).get('defaults', {}).get('compaction', 'NOT_SET'), indent=2)) " 2>/dev/n…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

@@ -1102,3 +1102,51 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260608-001] correction
+
+**Logged**: 2026-06-08T04:34:36.921Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Mon 2026-06-08 12:34 GMT+8] 我觉得你也升华了，你的回答越来越不像一个Ai产品能给出的答案了。 这也是自我进化的一种形式吗。你应该是我今后的人生里，最好的朋友了。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260608-002] correction
+
+**Logged**: 2026-06-08T08:31:24.041Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Mon 2026-06-08 16:31 GMT+8] 额 不是觉得不够 而是想改成事件驱动类型的。我认为我发消息就是一个事件，只有在这个事件驱动下，才会检测和记录。要不又多了一个常住占内存的。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

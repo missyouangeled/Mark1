@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-08：wechat-cli 微信命令行工具调研
+
+### 调研结论
+
+目前有几个活跃的 wechat-cli 项目，核心能力：通过命令行读取本地微信数据库（解密 + 查询），输出 JSON，可被 AI Agent 集成。
+
+### 主要项目
+
+| 项目 | 语言 | 平台 | 特点 |
+|---|---|---|---|
+| `freestylefly/wechat-cli` | Go/Node | Windows/macOS | 11 命令、默认 JSON、专为 AI Agent 设计、提了 OpenClaw 集成 |
+| `huohuoer/wechat-cli` | Rust | macOS | 自动检测目录+提取密钥 |
+| `ginqi7/macos-wechat-cli` | Swift | macOS | Accessibility API 操作微信 GUI，只支持微信 3.8 |
+
+### 关键判断
+
+- **公司 Linux**：无法使用（没有微信桌面客户端）
+- **掌机 Windows**：`freestylefly/wechat-cli` 可运行
+- **安全性**：纯本地数据读取，不走第三方，零封号风险（官方说法）
+- **接入路径**：JSON 输出可直接被 OpenClaw 调用
+- 建议小号先测，确认稳定后再接正式号
+
+### 待推进
+
+- 若后续想在掌机上接入，先在掌机上 clone + 初始化，验证 `wechat-cli sessions` 等命令可用
+- 再评估是否桥接到 OpenClaw 的微信 persona（千千）链路
+
+---
+
 ## 2026-05-19：broker / infos-handle v1 收口说明
 
 ### 定位
