@@ -44,6 +44,7 @@ from pathlib import Path
 SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
 STATE_DIR = Path.home() / ".local/state/openclaw/session-size-watcher"
 STATE_FILE = STATE_DIR / "state.json"
+ALERT_FILE = STATE_DIR / "alerts.json"  # 异常告警，启动时检查
 
 # 阈值 (MB) — 只看总目录大小，不管单个文件
 # WARN 已取消（不告警，只记录）
@@ -190,6 +191,56 @@ def save_state(state: dict):
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
 
 
+def raise_alert(level: str, message: str, detail: dict | None = None):
+    """写入告警文件，供启动时（BOOT.md）和手动检查时读取。"""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    alerts = {}
+    if ALERT_FILE.exists():
+        try:
+            alerts = json.loads(ALERT_FILE.read_text())
+        except Exception:
+            pass
+    entry = {
+        "time": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "message": message,
+    }
+    if detail:
+        entry["detail"] = detail
+    # 按时间倒序，保留最近 20 条
+    items = alerts.get("items", [])
+    items.insert(0, entry)
+    if len(items) > 20:
+        items = items[:20]
+    alerts["items"] = items
+    alerts["unread"] = True
+    ALERT_FILE.write_text(json.dumps(alerts, ensure_ascii=False, indent=2))
+
+
+def mark_alerts_read():
+    """标记告警已读。"""
+    if ALERT_FILE.exists():
+        try:
+            alerts = json.loads(ALERT_FILE.read_text())
+            alerts["unread"] = False
+            ALERT_FILE.write_text(json.dumps(alerts, ensure_ascii=False, indent=2))
+        except Exception:
+            pass
+
+
+def get_unread_alerts() -> list[dict]:
+    """获取未读告警列表。"""
+    if not ALERT_FILE.exists():
+        return []
+    try:
+        alerts = json.loads(ALERT_FILE.read_text())
+        if alerts.get("unread"):
+            return alerts.get("items", [])
+    except Exception:
+        pass
+    return []
+
+
 def append_history(state: dict, file_info: dict):
     """追加一条大小记录。"""
     now = datetime.now(timezone.utc).isoformat()
@@ -256,19 +307,32 @@ def cleanup_old_session_data(session_key: str) -> dict:
             except Exception as e:
                 result["errors"].append(str(e))
 
-        # 当前会话的 trajectory
+        # 当前会话的 trajectory — 仅当明显陈旧时才清理
+        # 条件：trajectory 的 mtime 比主 jsonl 早 10 分钟以上（说明是旧压缩的残留，不是当前活跃的）
         traj_f = SESSIONS_DIR / f"{session_key}.trajectory.jsonl"
-        if traj_f.exists():
+        main_f = SESSIONS_DIR / f"{session_key}.jsonl"
+        if traj_f.exists() and main_f.exists():
             try:
-                size = traj_f.stat().st_size
-                traj_f.unlink()
-                files_removed += 1
-                bytes_freed += size
+                traj_mtime = traj_f.stat().st_mtime
+                main_mtime = main_f.stat().st_mtime
+                stale_seconds = main_mtime - traj_mtime
+                if stale_seconds > 600:  # 10 分钟以上未更新 = 旧残留
+                    size = traj_f.stat().st_size
+                    traj_f.unlink()
+                    files_removed += 1
+                    bytes_freed += size
+                # 否则 trajectory 仍在活跃使用，跳过
             except Exception as e:
                 result["errors"].append(str(e))
 
     result["files_removed"] = files_removed
     result["mb_freed"] = round(bytes_freed / (1024 * 1024), 2)
+
+    # 如果有错误，写入告警
+    if result["errors"]:
+        raise_alert("ERROR", f"清理过程中有 {len(result['errors'])} 个错误",
+                     {"errors": result["errors"], "files_removed": files_removed})
+
     return result
 
 
@@ -335,6 +399,32 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
             if len(state["cleanups"]) > 100:
                 state["cleanups"] = state["cleanups"][-100:]
 
+        # 告警触发
+        level = file_info.get("level", "INFO")
+        if level == "FORCE_CLEAN":
+            raise_alert("WARN",
+                f"总目录 {file_info['total_dir_mb']:.1f}MB 触发 FORCE_CLEAN，已清理 {ck.get('mb_freed', 0):.2f}MB",
+                {"total_mb": file_info["total_dir_mb"], "mb_freed": ck.get("mb_freed", 0)})
+        elif level == "CRITICAL" and ck.get("files_removed", 0) == 0:
+            # CRITICAL 但无可清理文件 — 可能是当前会话自身膨胀
+            if file_info.get("cleanable_old_mb", 0) == 0:
+                raise_alert("WARN",
+                    f"CRITICAL 但无可清理项（总目录 {file_info['total_dir_mb']:.1f}MB），当前会话自身膨胀，需关注",
+                    {"total_mb": file_info["total_dir_mb"], "main_mb": file_info["main_jsonl_mb"]})
+
+    # 检测失败告警
+    if file_info.get("error") == "no-session":
+        # 统计连续失败次数
+        failures = state.get("consecutive_failures", 0) + 1
+        state["consecutive_failures"] = failures
+        if failures >= 3:
+            raise_alert("ERROR", f"连续 {failures} 次无法找到活跃会话，检测链路可能失效")
+    else:
+        state["consecutive_failures"] = 0
+
+    # 记录最后一次成功运行的来源（用于跨模型可靠性审计）
+    state["last_success_run"] = datetime.now(timezone.utc).isoformat()
+
     append_history(state, file_info)
     save_state(state)
 
@@ -361,13 +451,15 @@ def format_human(result: dict):
     level_icon = {"INFO": "✅", "WARN": "⚠️", "CRITICAL": "🔴", "FORCE_CLEAN": "🧹"}.get(level, "❓")
     gated = fi.get("gated", False)
     label = f"📋 门控（缓存，{fi.get('gate_delta_s', 0):.0f}s 前刚查过）" if gated else level
+
     print(f"{level_icon} 会话大小监测 [{label}]")
-    print(f"   当前会话 : {fi.get('session_key', 'unknown')}")
-    print(f"   主文件   : {fi.get('main_jsonl_mb', 0):.2f} MB")
-    print(f"   本会话 checkpoint: {fi.get('checkpoint_count', 0)} 个 ({fi.get('checkpoint_mb', 0):.2f} MB)")
-    print(f"   本会话 trajectory: {fi.get('trajectory_mb', 0):.2f} MB")
-    print(f"   其他会话 : {fi.get('other_sessions_mb', 0):.2f} MB（其中可清理 {fi.get('cleanable_old_mb', 0):.2f} MB）")
-    print(f"   总目录   : {fi.get('total_dir_mb', 0):.2f} MB")
+    if not gated:
+        print(f"   当前会话 : {fi.get('session_key', 'unknown')}")
+        print(f"   主文件   : {fi.get('main_jsonl_mb', 0):.2f} MB")
+        print(f"   本会话 checkpoint: {fi.get('checkpoint_count', 0)} 个 ({fi.get('checkpoint_mb', 0):.2f} MB)")
+        print(f"   本会话 trajectory: {fi.get('trajectory_mb', 0):.2f} MB")
+        print(f"   其他会话 : {fi.get('other_sessions_mb', 0):.2f} MB（其中可清理 {fi.get('cleanable_old_mb', 0):.2f} MB）")
+        print(f"   总目录   : {fi.get('total_dir_mb', 0):.2f} MB")
 
     if cl and cl.get("files_removed", 0) > 0:
         print(f"\n🧹 自动清理完成:")
@@ -376,6 +468,17 @@ def format_human(result: dict):
         if cl.get("errors"):
             for e in cl["errors"]:
                 print(f"   ⚠️ 错误: {e}")
+
+    # 未读告警
+    unread = get_unread_alerts()
+    if unread:
+        print(f"\n🚨 未读告警 ({len(unread)} 条):")
+        for a in unread[:5]:
+            print(f"   [{a.get('level', '?')}] {a.get('time', '?')[:19]}")
+            print(f"   {a.get('message', '')}")
+        if len(unread) > 5:
+            print(f"   ... 还有 {len(unread) - 5} 条")
+        print(f"\n   运行 --mark-read 标记已读")
 
     print(f"\n📊 趋势: 共 {ss.get('history_count', 0)} 条记录, {ss.get('cleanup_count', 0)} 次清理")
     if ss.get("last_cleanup"):
@@ -397,11 +500,31 @@ def main():
     parser.add_argument("--init-state", action="store_true", help="初始化状态目录")
     parser.add_argument("--systemd", action="store_true", help="以 systemd 模式运行（总是返回 0）")
     parser.add_argument("--gate-seconds", type=int, default=0, help="时间门：若上次检测在此秒数内则跳过完整扫描（0=不设门）")
+    parser.add_argument("--mark-read", action="store_true", help="标记所有告警已读")
+    parser.add_argument("--check-alerts", action="store_true", help="仅检查未读告警（启动时快速检查用）")
     args = parser.parse_args()
 
     if args.init_state:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         print(f"状态目录已就绪: {STATE_DIR}")
+        return
+
+    if args.mark_read:
+        mark_alerts_read()
+        print("✅ 所有告警已标记为已读")
+        return
+
+    if args.check_alerts:
+        unread = get_unread_alerts()
+        if unread:
+            print(f"🚨 有 {len(unread)} 条未读告警:")
+            for a in unread[:10]:
+                print(f"  [{a.get('level', '?')}] {a.get('time', '')[:19]}")
+                print(f"  {a.get('message', '')}")
+            sys.exit(2)
+        else:
+            print("✅ 无未读告警，检测链路正常")
+            sys.exit(0)
         return
 
     try:

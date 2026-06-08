@@ -19,8 +19,15 @@ python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-post-upgrade-s
 python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-boot-health-check.py
 ```
 
-6. If the health check returns issues (non-empty `issues` array), send the `bootMessage` to the chat as well.
-7. After sending all messages, reply with `NO_REPLY`.
+6. Also run the session watcher alert check:
+
+```bash
+python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-session-size-watcher.py --check-alerts
+```
+- If it exits with code 2 (有未读告警)，把告警内容附加到 bootMessage 一起发送
+
+7. If the health check returns issues (non-empty `issues` array), send the `bootMessage` to the chat as well.
+8. After sending all messages, reply with `NO_REPLY`.
 
 Notes:
 - The script itself decides whether a real post-upgrade self-check is needed.
