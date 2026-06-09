@@ -2,19 +2,17 @@
 """
 会话文件大小监测与自动修复 (Session Size Watcher)
 
-监测当前活跃会话的 JSONL 文件大小，记录增长趋势，
-在超过阈值时自动清理旧 checkpoint / trajectory 文件，
-减少会话压缩竞态的发生概率。
+监测会话目录总大小，在超过阈值时自动分层清理旧数据，
+减少会话压缩竞态和 I/O 争抢的发生概率。
 
 触发方式：
-  - systemd timer（默认每 2 分钟）
+  - 事件驱动：每次收到用户消息时后台运行（--gate-seconds 60 门控去重）
   - 手动：python3 scripts/openclaw-session-size-watcher.py --print-human
 
-阈值：
-  - INFO:   记录当前大小（始终执行）
-  - WARN:   会话 > 2.5MB，记录警告但不触发清理
-  - CRITICAL: 会话 > 3.0MB，自动清理旧数据 + 发出 broker 通知
-  - FORCE_CLEAN: 总 session 目录 > 50MB，强制清理所有非活跃旧数据
+阈值（只看总目录大小）：
+  - INFO:   记录当前大小（始终执行），低于 CRITICAL 不做清理
+  - CRITICAL: 总目录 > 25MB，清理旧 checkpoint/trajectory/bak/reset
+  - FORCE_CLEAN: 总目录 > 40MB，额外清理死会话完整 jsonl（≥4h、不在 sessions.json 索引中）
 
 状态目录：
   ~/.local/state/openclaw/session-size-watcher/
@@ -48,16 +46,21 @@ ALERT_FILE = STATE_DIR / "alerts.json"  # 异常告警，启动时检查
 
 # 阈值 (MB) — 只看总目录大小，不管单个文件
 # WARN 已取消（不告警，只记录）
-CRITICAL_MB = 40   # 总目录到此开始清理旧数据
-FORCE_CLEAN_DIR_MB = 60  # 总目录到此强制大扫除
+CRITICAL_MB = 25   # 总目录到此开始清理旧数据（降低以更早介入）
+FORCE_CLEAN_DIR_MB = 40  # 总目录到此强制大扫除
 
 # 可安全清理的文件类型（非当前活跃会话的）
 CLEANABLE_PATTERNS = [
     "*.checkpoint.*.jsonl",   # 旧 checkpoint
     "*.trajectory.jsonl",     # 旧 trajectory
+    "*.trajectory-path.json", # 旧 trajectory 路径引用
     "*.bak",                  # 备份
     "*.checkpoint.*.jsonl.bak",
+    "*.reset.*",              # 重置残留
 ]
+
+# FORCE_CLEAN 时额外清理：死会话的完整 jsonl（需交叉验证 sessions.json）
+DEAD_SESSION_CLEANUP_MIN_AGE_HOURS = 4  # 会话结束后至少 4 小时才清理
 
 
 # ── 核心逻辑 ──────────────────────────────────────────────
@@ -259,13 +262,86 @@ def append_history(state: dict, file_info: dict):
     state["history"] = history
 
 
+def get_alive_session_keys() -> set[str]:
+    """从 sessions.json 读取 OpenClaw 知道的活跃/历史会话 key，
+    用于判断磁盘上哪些 jsonl 是彻底被遗忘的死会话。
+    """
+    sessions_json = SESSIONS_DIR / "sessions.json"
+    if not sessions_json.exists():
+        return set()
+    try:
+        data = json.loads(sessions_json.read_text())
+        keys: set[str] = set()
+        for entry in data.values():
+            sid = entry.get("sessionId")
+            if sid:
+                keys.add(sid)
+        return keys
+    except Exception:
+        return set()
+
+
+def cleanup_dead_sessions(session_key: str) -> dict:
+    """清理死会话的完整 jsonl 文件。
+
+    判定死会话：
+    1. 不属于当前活跃会话
+    2. 不在 sessions.json 索引中（彻底被遗忘）
+    3. 且至少 DEAD_SESSION_CLEANUP_MIN_AGE_HOURS 小时未修改
+    """
+    result = {"files_removed": 0, "mb_freed": 0, "errors": []}
+    if not SESSIONS_DIR.exists():
+        return result
+
+    alive_keys = get_alive_session_keys()
+    now = time.time()
+    min_age_s = DEAD_SESSION_CLEANUP_MIN_AGE_HOURS * 3600
+
+    for f in sorted(SESSIONS_DIR.glob("*.jsonl")):
+        name = f.name
+        if session_key and name.startswith(session_key):
+            continue
+        if name == "sessions.json":
+            continue
+        if ".checkpoint." in name or ".trajectory" in name:
+            continue
+
+        file_session_key = name.replace(".jsonl", "")
+        if file_session_key not in alive_keys:
+            try:
+                age_h = (now - f.stat().st_mtime) / 3600
+                if age_h >= DEAD_SESSION_CLEANUP_MIN_AGE_HOURS:
+                    size = f.stat().st_size
+                    f.unlink()
+                    result["files_removed"] += 1
+                    result["mb_freed"] += size / (1024 * 1024)
+            except Exception as e:
+                result["errors"].append(f"{name}: {e}")
+
+    # 同时清理死会话的 trajectory-path.json
+    for f in sorted(SESSIONS_DIR.glob("*.trajectory-path.json")):
+        name = f.name
+        if session_key and name.startswith(session_key):
+            continue
+        file_session_key = name.replace(".trajectory-path.json", "")
+        if file_session_key not in alive_keys:
+            try:
+                f.unlink()
+            except Exception:
+                pass
+
+    result["mb_freed"] = round(result["mb_freed"], 2)
+    return result
+
+
 def cleanup_old_session_data(session_key: str) -> dict:
     """清理旧的会话数据。
 
-    三层：
-    1. 其他会话的 checkpoint/trajectory/bak — 全清
+    层数：
+    1. 其他会话的 checkpoint/trajectory/bak/reset — 全清
     2. 当前会话的旧 checkpoint — 只保留最新 1 个
-    3. 当前会话的旧 trajectory — OpenClaw 压缩后会重建，旧的可安全删除
+    3. 当前会话的旧 trajectory — 仅当陈旧时清理
+    （死会话完整 jsonl 由 cleanup_dead_sessions() 在 FORCE_CLEAN 时单独处理）
     """
     result = {
         "action": "cleanup",
@@ -384,7 +460,16 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
     }
 
     if force_clean or file_info.get("level") in ("CRITICAL", "FORCE_CLEAN"):
+        is_force = force_clean or file_info.get("level") == "FORCE_CLEAN"
         ck = cleanup_old_session_data(session_key or "")
+        if is_force:
+            dead = cleanup_dead_sessions(session_key or "")
+            if dead["files_removed"] > 0:
+                ck["files_removed"] += dead["files_removed"]
+                ck["mb_freed"] += dead["mb_freed"]
+                ck["mb_freed"] = round(ck["mb_freed"], 2)
+                if dead.get("errors"):
+                    ck.setdefault("errors", []).extend(dead["errors"])
         result["cleanup"] = ck
         if ck["files_removed"] > 0:
             cleanup_record = {

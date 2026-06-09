@@ -1165,3 +1165,31 @@
 - --check-alerts 返回正常，trajectory 1.39MB 因 mtime 较近被正确跳过，总目录 27.9MB INFO 级别
 - 相关文件：
 - `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-09 14:19:14 CST (+08:00) — session-size-watcher: 修复死会话 jsonl 清理盲区 + 降低阈值
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 根因：watcher 只清理 checkpoint/trajectory/bak，不理死会话主 jsonl，导致 47 个旧 jsonl 堆到 46MB 无法自动清理。修复：①CRITICAL 40→25MB，FORCE_CLEAN 60→40MB；②CLEANABLE_PATTERNS 新增 trajectory-path.json、reset.*；③新增 cleanup_dead_sessions() 在 FORCE_CLEAN 时清理不在 sessions.json 索引中且 ≥4h 的死会话完整 jsonl
+- 验收 / 验证：
+- 语法检查通过；session-size-watcher --print-human 正常；离线模拟验证死会话识别逻辑正确
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-09 14:23:01 CST (+08:00) — session-size-watcher: 同步文档注释 + 清理死参数
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 审查发现文件头注释仍描述旧阈值（CRITICAL 3MB/FORCE_CLEAN 50MB），已同步为新值 25/40MB。cleanup_old_session_data 的 force_dead_cleanup 参数未被使用（死会话清理在 run_check 中独立调用 cleanup_dead_sessions），已移除死参数。
+- 验收 / 验证：
+- 语法检查通过；10 项烟测全部通过（human/json/systemd/gate/alerts/mark-read/init-state 正常；死会话清理模拟：alive 保留、dead 清、<4h 保留、当前会话保留、sessions.json 缺失容错）
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`

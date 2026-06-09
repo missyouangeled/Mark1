@@ -17166,3 +17166,273 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-018] tool-timeout
+
+**Logged**: 2026-06-09T03:30:32.224Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ unity-file-manager.py — 大型 Unity 工程文件管理器 三层架构： Layer 1 — Git 版本控制（回滚层） Layer 2 — JSON 索引数据库（查找层） Layer 3 — 操作工具链（执行层） 安全设计： - 全部变更操作默认 dry-run，必须加 --confirm 才真正执行 - 任何修改前强制 git commit（自动），commit 失败则拒绝操作 - 不提供 delete 命令 - .meta 文件自动配对同步 - 每次变更写入 journal（可审计/可回溯） - git reset --hard 秒级回滚 用法： python3 unity-file-manager.p…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-019] tool-explicit-error
+
+**Logged**: 2026-06-09T03:31:24.508Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll neat-zephyr 20000 [redacted] [redacted] failed 0 3039
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-020] tool-explicit-error
+
+**Logged**: 2026-06-09T03:36:35.001Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ wall-rename-v3.py — Wall 目录 V3 规则重命名（基于新 unity-file-manager 流程） 规则（与 V3 Props 一致）： 1. 前缀: .prefab/.fbx/贴图 → Props_, .mat → Mat_ 2. 删除 Type01/Type02 等类型标记 3. #后缀变体保留（去#变_）：#BrickIndustrial6 → _BrickIndustrial_06 4. PascalCase 分割（H1m → H_01m） 5. 数字规范化：1m→01m, 2m→02m, 0M5→00M75 6. _x/_X → _X, _xx01 → _Xx_01 安全： - dry-ru…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-021] tool-explicit-error
+
+**Logged**: 2026-06-09T04:37:31.328Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll marine-crustacean 10000 [redacted] [redacted] failed 2852
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-022] tool-explicit-error
+
+**Logged**: 2026-06-09T04:38:01.401Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll kind-sage 15000 [redacted] [redacted] failed 0 2616
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-023] tool-explicit-error
+
+**Logged**: 2026-06-09T04:38:54.031Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll quick-meadow 30000 [redacted] [redacted] failed 3774
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-024] tool-explicit-error
+
+**Logged**: 2026-06-09T05:18:00.799Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll neat-slug 15000 [redacted] [redacted] failed 4277
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-025] tool-explicit-error
+
+**Logged**: 2026-06-09T05:29:03.382Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit 'SentrBox': 'Sentry_Box', 'SentryBox': 'Sentry_Box', 'SentrBox': 'Sentry_Box', /home/missyouangeled/.openclaw/workspace/scripts/military-rename-v1.py announce:v1:agent:main:subagent:[redacted]:[redacted] [redacted] 660
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-026] tool-explicit-error
+
+**Logged**: 2026-06-09T05:29:57.394Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ military-rename-v1.py — Military 目录 V3 批量重命名 """ import json, os, re, subprocess, sys from collections import defaultdict from pathlib import Path from datetime import datetime, timezone MILITARY = Path("/media/missyouangeled/WD_BLACK/Project_amend_01/Assets/AssetScene/SceneModels/Military") META_EXTS = {'.prefab', '…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
