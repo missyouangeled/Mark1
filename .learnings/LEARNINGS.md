@@ -1174,3 +1174,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260609-002] correction
+
+**Logged**: 2026-06-09T01:06:23.860Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Tue 2026-06-09 09:06 GMT+8] 这次应该是顺利读取了。 但是我还想在读取完以后再加一句，“OK 已经读取完成。”
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

@@ -17046,3 +17046,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-014] tool-explicit-error
+
+**Logged**: 2026-06-09T01:02:45.296Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll sharp-mist 10000 [redacted] [redacted]|HDf4sMOME7lN0itlg/eWz0q+[redacted]+[redacted]/IqtO+cL9Fva7iP4yT9NgYv7++yQaK3aU5qphH1ROn18+[redacted]+C2cy8JSH3bTrtyDP/ywtCpNKCmtppzZ+[redacted]/Gi/yevYlPPzpF+jYkJDID6A== failed 3210
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
