@@ -4,20 +4,23 @@
 适用机器：公司（Linux）/ 通用
 
 在数据盘 /mnt/data/openclaw/session-backup/ 下保存：
-- 今天的每日记录副本
+- 今天的每日记录副本 + transcript
 - MEMORY.md 副本
-- 当前对话上下文摘要（从最近消息提取）
+- SOUL.md + USER.md 副本
+- session-state.json（会话目录大小/修改时间快照）
+- 上下文摘要（AI 可读的恢复指南）
 - 备份日志
 
 用途：
 - Gateway 重启 / session 压缩 / 意外清理后快速恢复上下文
 - 独立于 workspace 仓库，不受 git 操作影响
-- 默认保留 7 天
+- 默认保留 14 天
 
 用法：
   python3 scripts/openclaw-session-backup.py                 # 执行一次快照
-  python3 scripts/openclaw-session-backup.py --restore-last   # 查看最近备份
-  python3 scripts/openclaw-session-backup.py --clean 7        # 清理 7 天前的备份
+  python3 scripts/openclaw-session-backup.py --quiet         # 静默模式（systemd timer）
+  python3 scripts/openclaw-session-backup.py --restore-last  # 查看最近备份
+  python3 scripts/openclaw-session-backup.py --clean 14      # 清理 14 天前的备份
 """
 
 from __future__ import annotations
@@ -37,8 +40,12 @@ MEMORY_DIR = WORKSPACE / "memory/daily"
 MEMORY_FILE = WORKSPACE / "MEMORY.md"
 SOUL_FILE = WORKSPACE / "SOUL.md"
 USER_FILE = WORKSPACE / "USER.md"
-RETENTION_DAYS = 7
+SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
+RETENTION_DAYS = 14
 MANIFEST_FILE = BACKUP_ROOT / "backup-manifest.json"
+
+# 磁盘安全检查阈值：workspace 所在盘余量低于此值（GB），只写数据盘
+MIN_ROOT_FREE_GB = 2.0
 
 
 def get_date_str() -> str:
@@ -47,6 +54,91 @@ def get_date_str() -> str:
 
 def get_timestamp_str() -> str:
     return datetime.now().strftime("%Y-%m-%dT%H%M%S")
+
+
+def _get_free_gb(path: Path) -> float:
+    """获取路径所在磁盘分区的可用空间（GB）"""
+    try:
+        stat = os.statvfs(str(path))
+        free_bytes = stat.f_frsize * stat.f_bavail
+        return free_bytes / (1024 ** 3)
+    except Exception:
+        return float("inf")
+
+
+def _can_write_workspace_disk() -> bool:
+    """工作区所在盘余量 >= 2GB 才允许写入备份副本"""
+    free = _get_free_gb(WORKSPACE)
+    return free >= MIN_ROOT_FREE_GB
+
+
+def _build_session_state() -> dict:
+    """扫描 ~/.openclaw/agents/main/sessions/ 目录，生成 session-state.json"""
+    state = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "sessions": {},
+        "trajectories": {},
+        "summary": {"total_sessions": 0, "total_mb": 0},
+    }
+
+    if not SESSIONS_DIR.exists():
+        return state
+
+    total_bytes = 0
+
+    for f in sorted(SESSIONS_DIR.glob("*.jsonl")):
+        fname = f.name
+        if fname == "sessions.json":
+            continue
+        is_meta_file = any(
+            marker in fname for marker in (".checkpoint.", ".trajectory", ".reset.")
+        )
+        if is_meta_file:
+            try:
+                size = f.stat().st_size
+                state["trajectories"][fname] = {
+                    "size_bytes": size,
+                    "size_mb": round(size / (1024 ** 2), 2),
+                    "mtime": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                }
+                total_bytes += size
+            except OSError:
+                pass
+            continue
+
+        # 主会话文件：文件名即 sessionKey
+        session_key = fname.replace(".jsonl", "")
+        try:
+            size = f.stat().st_size
+            entry = {
+                "size_bytes": size,
+                "size_mb": round(size / (1024 ** 2), 2),
+                "mtime": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+            }
+
+            # 查找关联的 checkpoint/trajectory
+            for sf in SESSIONS_DIR.glob(f"{session_key}.*"):
+                if sf.name == fname:
+                    continue
+                try:
+                    ss = sf.stat().st_size
+                    entry.setdefault("extras", {})[sf.name] = {
+                        "size_bytes": ss,
+                        "size_mb": round(ss / (1024 ** 2), 2),
+                    }
+                    total_bytes += ss
+                except OSError:
+                    pass
+
+            state["sessions"][session_key] = entry
+            total_bytes += size
+        except OSError:
+            pass
+
+    state["summary"]["total_sessions"] = len(state["sessions"])
+    state["summary"]["total_mb"] = round(total_bytes / (1024 ** 2), 2)
+
+    return state
 
 
 def create_snapshot() -> dict:
@@ -65,12 +157,23 @@ def create_snapshot() -> dict:
         "errors": [],
     }
 
+    workspace_disk_ok = _can_write_workspace_disk()
+
     # 1. 今天 + 昨天的每日记录
     for day_offset in [0, 1]:
         day = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
         src = MEMORY_DIR / f"{day}.md"
         if src.exists():
             dst = snapshot_dir / f"daily-{day}.md"
+            shutil.copy2(src, dst)
+            result["files"].append(str(dst))
+
+    # 1b. Transcript 文件
+    for day_offset in [0, 1]:
+        day = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+        src = MEMORY_DIR / f"{day}-transcript.md"
+        if src.exists():
+            dst = snapshot_dir / f"daily-{day}-transcript.md"
             shutil.copy2(src, dst)
             result["files"].append(str(dst))
 
@@ -87,13 +190,26 @@ def create_snapshot() -> dict:
             shutil.copy2(f, dst)
             result["files"].append(str(dst))
 
-    # 4. 上下文摘要 — 从最近聊天中提取关键信息
+    # 4. 会话状态快照
+    session_state = _build_session_state()
+    state_file = snapshot_dir / "session-state.json"
+    state_file.write_text(json.dumps(session_state, ensure_ascii=False, indent=2), encoding="utf-8")
+    result["files"].append(str(state_file))
+
+    # 5. 上下文摘要 — 增强版（含 transcript 最后 50 行）
     context_summary = build_context_summary()
     summary_file = snapshot_dir / "context-summary.md"
     summary_file.write_text(context_summary, encoding="utf-8")
     result["files"].append(str(summary_file))
 
-    # 5. 更新 manifest
+    # 6. 磁盘安全检查：若 workspace 盘余量不足，不写根盘副本
+    if not workspace_disk_ok:
+        result["errors"].append(
+            f"工作区磁盘余量不足 ({_get_free_gb(WORKSPACE):.1f}GB < {MIN_ROOT_FREE_GB}GB)，"
+            f"已跳过往根盘写副本，仅保存到数据盘 {BACKUP_ROOT}"
+        )
+
+    # 7. 更新 manifest
     manifest = load_manifest()
     manifest["snapshots"].append({
         "timestamp": ts,
@@ -119,7 +235,7 @@ def build_context_summary() -> str:
 在你开始回复点点之前：
 1. 先读完本文件的全部内容（特别是「最近规则」和「今日摘要」）
 2. 然后读本目录下的 `MEMORY.md`（备份副本）
-3. 然后读 `daily-{now.strftime('%Y-%m-%d')}.md`（今日记录）
+3. 然后读 `daily-{now.strftime('%Y-%m-%d')}.md`（今日记录）和 `daily-{now.strftime('%Y-%m-%d')}-transcript.md`（今日对话记录）
 4. 然后再开始回复——不要一张嘴就说"早上好"如果今天已经聊了很久
 
 ## 生成时间
@@ -131,7 +247,6 @@ def build_context_summary() -> str:
     # 最近的核心记忆条目
     try:
         mem = MEMORY_FILE.read_text(encoding="utf-8")
-        # 提取最近一条规则/方法论
         lines = mem.split("\n")
         recent_rules = []
         capture = False
@@ -152,6 +267,20 @@ def build_context_summary() -> str:
     today_file = MEMORY_DIR / f"{get_date_str()}.md"
     if today_file.exists():
         summary += f"## 今日记录\n摘要已备份至 `daily-{get_date_str()}.md`\n\n"
+
+    # 新增：从 transcript 提取最后 50 行
+    transcript_file = MEMORY_DIR / f"{get_date_str()}-transcript.md"
+    if transcript_file.exists():
+        try:
+            full = transcript_file.read_text(encoding="utf-8")
+            lines = full.split("\n")
+            last_50 = lines[-50:] if len(lines) >= 50 else lines
+            summary += "## 今日对话摘要（最后 50 行）\n"
+            summary += "```\n"
+            summary += "\n".join(last_50)
+            summary += "\n```\n\n"
+        except Exception:
+            pass
 
     summary += "## 恢复提示\n"
     summary += "- 主会话中断后，先读取本文件的「最近规则」部分\n"
@@ -227,6 +356,7 @@ def main():
     parser.add_argument("--restore-last", action="store_true", help="查看最近备份")
     parser.add_argument("--clean", type=int, nargs="?", const=RETENTION_DAYS,
                         help=f"清理旧快照（默认保留 {RETENTION_DAYS} 天）")
+    parser.add_argument("--quiet", action="store_true", help="静默模式（systemd timer 用）")
     args = parser.parse_args()
 
     if args.restore_last:
@@ -246,16 +376,20 @@ def main():
         return 0
 
     # 创建快照
-    print(f"📸 创建会话快照...")
+    if not args.quiet:
+        print(f"📸 创建会话快照...")
+
     result = create_snapshot()
-    print(f"   {result['timestamp']}")
-    print(f"   {len(result['files'])} 个文件 → {result['path']}")
-    for f in result["files"]:
-        print(f"     ✓ {Path(f).name}")
-    if result["errors"]:
-        for e in result["errors"]:
-            print(f"     ⚠ {e}")
-    print("✅ 完成")
+
+    if not args.quiet:
+        print(f"   {result['timestamp']}")
+        print(f"   {len(result['files'])} 个文件 → {result['path']}")
+        for f in result["files"]:
+            print(f"     ✓ {Path(f).name}")
+        if result["errors"]:
+            for e in result["errors"]:
+                print(f"     ⚠ {e}")
+        print("✅ 完成")
 
 
 if __name__ == "__main__":

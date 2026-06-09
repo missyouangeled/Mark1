@@ -508,6 +508,556 @@ def cmd_info(args):
     return 0
 
 
+# ── Plan / Apply 命令 ──────────────────────────────────────────
+
+_PLAN_TYPE_DIR = "rename_dir"
+_PLAN_TYPE_MOVE = "move"
+_PLAN_TYPE_PREFIX = "rename_prefix"
+_PLAN_TYPE_CUSTOM = "custom_rename"
+
+
+def _load_rules(rules_path: str) -> dict:
+    """加载规则 JSON 文件"""
+    with open(rules_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _apply_directory_ops(
+    rel_path: str, fname: str, directory_ops: list[dict],
+    changes: list, conflict_map: dict,
+) -> tuple[str, str]:
+    """应用 directoryOps：修改目录路径，必要时 moveToParent"""
+    parent = str(Path(rel_path).parent) if Path(rel_path).parent != Path('.') else ''
+    new_parent = parent
+    matched_op = None
+
+    for op in directory_ops:
+        from_dir = op["from"]
+        to_dir = op["to"]
+
+        # 精确目录名匹配
+        if parent == from_dir or parent.startswith(from_dir + "/"):
+            new_parent = parent.replace(from_dir, to_dir, 1)
+            matched_op = op
+            break
+        # 匹配根目录（无父目录）情况
+        if not parent and op.get("moveToParent"):
+            # moveToParent: 文件从子目录移到父目录
+            pass
+
+    if matched_op:
+        before_full = (parent + "/" if parent else "") + fname
+        after_full = (new_parent + "/" if new_parent else "") + fname
+        reason = f"目录重命名: {matched_op['from']}/ → {matched_op['to']}/"
+
+        entry = {
+            "before": {"path": before_full.rsplit("/", 1)[0] if "/" in before_full else "",
+                       "name": fname},
+            "after": {"path": after_full.rsplit("/", 1)[0] if "/" in after_full else "",
+                      "name": fname},
+            "type": _PLAN_TYPE_DIR,
+            "reason": reason,
+        }
+        changes.append(entry)
+
+        # 冲突检测 key
+        key = after_full
+        conflict_map.setdefault(key, []).append(before_full)
+
+        return new_parent, fname
+
+    return parent, fname
+
+
+def _apply_rename_rules(
+    rel_path: str, fname: str, rename_rules: list[dict],
+    changes: list, conflict_map: dict,
+) -> str:
+    """应用 renameRules：在指定 scope 内做 pattern → replacement"""
+    new_name = fname
+    parent = str(Path(rel_path).parent) if Path(rel_path).parent != Path('.') else ''
+    matched_rule = None
+
+    for rule in rename_rules:
+        scope = rule["scope"].rstrip("/")
+        pattern = rule["pattern"]
+        replacement = rule["replacement"]
+
+        if rel_path.startswith(scope + "/") or rel_path == scope:
+            if pattern in new_name:
+                new_name = new_name.replace(pattern, replacement, 1)
+                matched_rule = rule
+                break
+
+    if matched_rule:
+        before_full = (parent + "/" if parent else "") + fname
+        after_full = (parent + "/" if parent else "") + new_name
+        reason = f"前缀替换: {matched_rule['pattern']} → {matched_rule['replacement']} (scope: {matched_rule['scope']})"
+
+        entry = {
+            "before": {"path": parent, "name": fname},
+            "after": {"path": parent, "name": new_name},
+            "type": _PLAN_TYPE_PREFIX,
+            "reason": reason,
+        }
+        changes.append(entry)
+
+        key = after_full
+        conflict_map.setdefault(key, []).append(before_full)
+
+        return new_name
+
+    return fname
+
+
+def _apply_custom_renames(
+    rel_path: str, fname: str, custom_renames: dict,
+    changes: list, conflict_map: dict,
+) -> str:
+    """应用 customRenames：精确名称映射"""
+    name_no_ext = Path(fname).stem
+    ext = Path(fname).suffix
+
+    if name_no_ext in custom_renames:
+        new_base = custom_renames[name_no_ext]
+        new_name = new_base + ext
+        parent = str(Path(rel_path).parent) if Path(rel_path).parent != Path('.') else ''
+        before_full = (parent + "/" if parent else "") + fname
+        after_full = (parent + "/" if parent else "") + new_name
+
+        entry = {
+            "before": {"path": parent, "name": fname},
+            "after": {"path": parent, "name": new_name},
+            "type": _PLAN_TYPE_CUSTOM,
+            "reason": f"自定义重命名: {name_no_ext} → {new_base}",
+        }
+        changes.append(entry)
+
+        key = after_full
+        conflict_map.setdefault(key, []).append(before_full)
+
+        return new_name
+
+    return fname
+
+
+def _apply_prefix(
+    rel_path: str, fname: str, prefix: str,
+    changes: list, conflict_map: dict,
+) -> str:
+    """应用前缀：给没有前缀的文件加前缀"""
+    # 跳过目录操作类变更 — 已在之前处理
+    # 只检查文件名是否已有 prefix
+    if fname.startswith(prefix):
+        return fname
+
+    new_name = prefix + fname
+    parent = str(Path(rel_path).parent) if Path(rel_path).parent != Path('.') else ''
+    before_full = (parent + "/" if parent else "") + fname
+    after_full = (parent + "/" if parent else "") + new_name
+
+    entry = {
+        "before": {"path": parent, "name": fname},
+        "after": {"path": parent, "name": new_name},
+        "type": _PLAN_TYPE_PREFIX,
+        "reason": f"添加前缀: {prefix}",
+    }
+    changes.append(entry)
+
+    key = after_full
+    conflict_map.setdefault(key, []).append(before_full)
+
+    return new_name
+
+
+def _generate_plan(root: Path, rules: dict, changes: list, conflict_map: dict) -> dict:
+    """遍历文件系统，应用所有规则，生成映射表"""
+    prefix = rules.get("prefix", "")
+    directory_ops = rules.get("directoryOps", [])
+    rename_rules = rules.get("renameRules", [])
+    custom_renames = rules.get("customRenames", {})
+
+    total_files = 0
+    skipped_meta = 0
+    skipped_git = 0
+
+    for fp in sorted(root.rglob('*')):
+        if fp.is_dir():
+            # 跳过 .git 目录
+            if fp.name == '.git':
+                continue
+            continue
+
+        # 跳过 .meta 文件和 .git 目录中的文件
+        if fp.name.endswith('.meta'):
+            skipped_meta += 1
+            continue
+
+        rel = str(fp.relative_to(root)).replace('\\', '/')
+        if '.git/' in rel or rel.startswith('.git'):
+            skipped_git += 1
+            continue
+
+        # 跳过非资产文件（JSON rules/config、.DS_Store、.gitignore 等）
+        ext = fp.suffix.lower()
+        skip_exts = {'.json', '.md', '.txt', '.gitignore', '.ds_store', '.log', '.tmp', '.bak'}
+        if ext in skip_exts and ext not in UNITY_META_EXTS:
+            continue
+
+        total_files += 1
+        fname = fp.name
+
+        # 1. 应用目录操作（可能改变路径）
+        new_parent, current_fname = _apply_directory_ops(
+            rel, fname, directory_ops, changes, conflict_map,
+        )
+
+        # 2. 应用重命名规则
+        current_fname = _apply_rename_rules(
+            rel, current_fname, rename_rules, changes, conflict_map,
+        )
+
+        # 3. 应用自定义重命名
+        current_fname = _apply_custom_renames(
+            rel, current_fname, custom_renames, changes, conflict_map,
+        )
+
+        # 4. 应用前缀（最后一个，确保前面的 rename 不干扰）
+        if prefix:
+            current_fname = _apply_prefix(
+                rel, current_fname, prefix, changes, conflict_map,
+            )
+
+    # 构建冲突列表
+    conflicts_out = []
+    for target, sources in conflict_map.items():
+        if len(sources) > 1:
+            conflicts_out.append({
+                "target": target,
+                "sources": sources,
+            })
+
+    return {
+        "meta": {
+            "root": str(root),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_files": total_files,
+            "skipped_meta": skipped_meta,
+            "skipped_git": skipped_git,
+        },
+        "rules": rules,
+        "changes": changes,
+        "conflicts": conflicts_out,
+    }
+
+
+def _fmt_plan_summary(plan: dict) -> str:
+    """生成终端友好摘要"""
+    meta = plan["meta"]
+    changes = plan["changes"]
+    conflicts = plan["conflicts"]
+    root_name = Path(meta["root"]).name or meta["root"]
+
+    total = meta["total_files"]
+    changed = len(changes)
+    # 去重：同一文件可能被多个规则命中
+    unique_before_paths = set()
+    for c in changes:
+        bp = (c["before"]["path"] + "/" + c["before"]["name"]).strip("/")
+        unique_before_paths.add(bp)
+    unique_changed = len(unique_before_paths)
+    unchanged = total - unique_changed
+
+    lines = []
+    lines.append(f"📋 映射表 — {root_name} 重命名计划")
+    lines.append(f"   根目录: {meta['root']}")
+    lines.append(f"   📊 总文件 {total} | 将变更 {unique_changed} | 不变 {unchanged}")
+    lines.append(f"   ⚠️ 冲突 {len(conflicts)} 项")
+    lines.append("")
+
+    # 按类型聚合
+    by_type = defaultdict(list)
+    for c in changes:
+        by_type[c["type"]].append(c)
+
+    # 目录操作
+    if by_type.get(_PLAN_TYPE_DIR):
+        lines.append(f"📁 目录操作 ({len(by_type[_PLAN_TYPE_DIR])} 项)")
+        # 按目录聚合
+        dir_summary = defaultdict(list)
+        for c in by_type[_PLAN_TYPE_DIR]:
+            old_dir = c["before"]["path"]
+            new_dir = c["after"]["path"]
+            key = f"{old_dir}/ → {new_dir}/"
+            dir_summary[key].append(c)
+        for key, items in sorted(dir_summary.items()):
+            lines.append(f"   {key} [影响 {len(items)} 文件]")
+        lines.append("")
+
+    # 前缀替换
+    if by_type.get(_PLAN_TYPE_PREFIX):
+        lines.append(f"🔤 前缀替换 ({len(by_type[_PLAN_TYPE_PREFIX])} 组)")
+        prefix_summary = defaultdict(list)
+        for c in by_type[_PLAN_TYPE_PREFIX]:
+            # 提取 pattern → replacement 从 reason
+            reason = c.get("reason", "")
+            key = reason
+            prefix_summary[key].append(c)
+        for key, items in sorted(prefix_summary.items(), key=lambda x: -len(x[1])):
+            lines.append(f"   {key} [{len(items)} 文件]")
+        lines.append("")
+
+    # 自定义重命名
+    if by_type.get(_PLAN_TYPE_CUSTOM):
+        lines.append(f"✏️ 精确重命名 ({len(by_type[_PLAN_TYPE_CUSTOM])} 项)")
+        for c in by_type[_PLAN_TYPE_CUSTOM]:
+            before = c["before"]["name"]
+            after = c["after"]["name"]
+            lines.append(f"   {before} → {after}")
+        lines.append("")
+
+    # 冲突
+    if conflicts:
+        lines.append(f"⚠️ 冲突 ({len(conflicts)} 项)")
+        for conflict in conflicts[:10]:
+            lines.append(f"   {conflict['target']} ← {', '.join(conflict['sources'][:3])}")
+        if len(conflicts) > 10:
+            lines.append(f"   ... 还有 {len(conflicts) - 10} 项")
+        lines.append("")
+
+    lines.append(f"💡 下一步: unity-file-manager.py apply <plan.json> [--confirm]")
+
+    return "\n".join(lines)
+
+
+def cmd_plan(args):
+    """生成重命名映射表"""
+    root = _abs(args.directory)
+    if not root.is_dir():
+        print(f'❌ 目录不存在: {root}')
+        return 2
+
+    if not args.rules:
+        print(f'❌ 需要 --rules 指定规则文件')
+        return 2
+
+    rules_path = Path(args.rules)
+    if not rules_path.exists():
+        print(f'❌ 规则文件不存在: {rules_path}')
+        return 2
+
+    rules = _load_rules(str(rules_path))
+
+    output_path = args.output
+    if not output_path:
+        scratch = Path("/mnt/data/openclaw/scratch/ufm-plans")
+        scratch.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+        output_path = str(scratch / f"plan-{root.name}-{ts}.json")
+
+    changes = []
+    conflict_map = {}
+
+    plan = _generate_plan(root, rules, changes, conflict_map)
+
+    # 写入输出文件
+    Path(output_path).write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2),
+        encoding='utf-8',
+    )
+
+    # 打印终端摘要
+    print(_fmt_plan_summary(plan))
+    print(f"\n📄 完整映射表: {output_path}")
+    return 0
+
+
+def _run_apply_dry(plan: dict):
+    """Dry-run 模式：打印每条变更，不执行"""
+    changes = plan.get("changes", [])
+    if not changes:
+        print("(无变更)")
+        return
+
+    for i, c in enumerate(changes, 1):
+        before = f"{c['before']['path']}/{c['before']['name']}" if c['before']['path'] else c['before']['name']
+        after = f"{c['after']['path']}/{c['after']['name']}" if c['after']['path'] else c['after']['name']
+        icon = {"rename_dir": "📁", "move": "📦", "rename_prefix": "🔤", "custom_rename": "✏️"}.get(c["type"], "❓")
+        print(f"  {i:>4}. {icon} {before}")
+        print(f"       → {after}   [{c['type']}]")
+
+
+def _run_apply_confirm(plan: dict) -> dict:
+    """确认执行模式：真正执行变更"""
+    root = Path(plan["meta"]["root"])
+    changes = plan.get("changes", [])
+
+    if not changes:
+        return {"executed": 0, "failed": 0, "errors": []}
+
+    # 1. 自动 git commit（失败则拒绝）
+    if not _ensure_git(root):
+        return {"executed": 0, "failed": -1, "errors": ["git init 失败"]}
+
+    r = _git(["add", "-A"], root)
+    if r.returncode != 0:
+        return {"executed": 0, "failed": -1, "errors": [f"git add 失败: {r.stderr.strip()}"]}
+
+    r = _git(["commit", "-m", f"ufm-apply: pre-rename snapshot {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"], root)
+    if r.returncode != 0 and "nothing to commit" not in (r.stdout + r.stderr):
+        return {"executed": 0, "failed": -1, "errors": [f"git commit 失败: {r.stderr.strip()}"]}
+
+    t0 = time.time()
+    stats = {"rename_dir": 0, "rename_prefix": 0, "custom_rename": 0, "move": 0, "meta_synced": 0}
+    errors = []
+
+    # 2. 按类型分组执行
+    # 目录操作 → 先处理
+    dir_changes = [c for c in changes if c["type"] == _PLAN_TYPE_DIR]
+    file_changes = [c for c in changes if c["type"] != _PLAN_TYPE_DIR]
+
+    # 先创建目标目录 + 执行目录级移动
+    for c in dir_changes:
+        try:
+            old_dir = root / c["before"]["path"]
+            new_dir = root / c["after"]["path"]
+            if not new_dir.exists():
+                new_dir.mkdir(parents=True, exist_ok=True)
+
+            old_path = old_dir / c["before"]["name"]
+            new_path = new_dir / c["after"]["name"]
+
+            # 目录操作实际是 rename_dir，在 os.walk 之前已改变路径
+            # 这里是 move 类型：文件从旧目录移到新目录
+            if old_path.exists():
+                shutil.move(str(old_path), str(new_path))
+                stats["move"] += 1
+
+                # 同步 .meta
+                old_meta = root / (str(c["before"]["path"]) + "/" + c["before"]["name"] + ".meta")
+                if old_meta.exists():
+                    new_meta = root / (str(c["after"]["path"]) + "/" + c["after"]["name"] + ".meta")
+                    shutil.move(str(old_meta), str(new_meta))
+                    stats["meta_synced"] += 1
+        except Exception as e:
+            errors.append(f"{c['before']['name']}: {e}")
+
+    # 然后执行文件级重命名
+    for c in file_changes:
+        try:
+            old_path = root / (c["before"]["path"] + "/" + c["before"]["name"])
+            new_path = root / (c["after"]["path"] + "/" + c["after"]["name"])
+
+            if old_path.exists():
+                os.rename(str(old_path), str(new_path))
+                stats[c["type"]] = stats.get(c["type"], 0) + 1
+
+                # 同步 .meta
+                old_meta = root / (str(c["before"]["path"]) + "/" + c["before"]["name"] + ".meta")
+                if old_meta.exists():
+                    new_meta = root / (str(c["after"]["path"]) + "/" + c["after"]["name"] + ".meta")
+                    os.rename(str(old_meta), str(new_meta))
+                    stats["meta_synced"] += 1
+        except Exception as e:
+            errors.append(f"{c['before']['name']}: {e}")
+
+    elapsed = time.time() - t0
+    total = sum(v for k, v in stats.items() if k != "meta_synced")
+
+    # 3. 写入 journal
+    journal = root / _JOURNAL_FILENAME
+    journal_entry = {
+        "time": datetime.now(timezone.utc).isoformat(),
+        "action": "apply",
+        "stats": stats,
+        "total": total,
+        "errors": errors,
+        "elapsed_s": round(elapsed, 2),
+    }
+    with open(journal, "a", encoding="utf-8") as jf:
+        jf.write(json.dumps(journal_entry, ensure_ascii=False) + "\n")
+
+    return {
+        "executed": total,
+        "failed": len(errors),
+        "errors": errors,
+        "stats": stats,
+        "elapsed": elapsed,
+    }
+
+
+def cmd_apply(args):
+    """执行重命名映射表"""
+    plan_path = Path(args.plan_file)
+    if not plan_path.exists():
+        print(f'❌ 映射表文件不存在: {plan_path}')
+        return 2
+
+    try:
+        plan = json.loads(plan_path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as e:
+        print(f'❌ JSON 解析失败: {e}')
+        return 2
+
+    # 结构验证
+    if "meta" not in plan or "changes" not in plan:
+        print(f'❌ 映射表结构无效，缺少 meta 或 changes')
+        return 2
+
+    if "root" not in plan["meta"]:
+        print(f'❌ 映射表结构无效，缺少 meta.root')
+        return 2
+
+    root = Path(plan["meta"]["root"])
+    if not root.is_dir():
+        print(f'❌ 根目录不存在: {root}')
+        return 2
+
+    conflicts = plan.get("conflicts", [])
+    if conflicts:
+        print(f'⚠️ 映射表包含 {len(conflicts)} 个冲突项，请先解决后重试:')
+        for conflict in conflicts[:5]:
+            print(f'   {conflict["target"]} ← {", ".join(conflict["sources"][:3])}')
+        if len(conflicts) > 5:
+            print(f'   ... 还有 {len(conflicts) - 5} 项')
+        print(f'\n💡 手动编辑映射表解决冲突后重新 apply')
+        return 3
+
+    if args.confirm:
+        print("🚀 执行中...")
+        result = _run_apply_confirm(plan)
+
+        if result.get("failed") == -1:
+            print(f'❌ 前置条件失败: {result.get("errors", ["未知"])[0]}')
+            return 4
+
+        stats = result.get("stats", {})
+        total = result["executed"]
+
+        dir_ops = stats.get("rename_dir", 0) + stats.get("move", 0)
+        renames = stats.get("rename_prefix", 0) + stats.get("custom_rename", 0)
+        meta_sync = stats.get("meta_synced", 0)
+        elapsed = result.get("elapsed", 0)
+
+        print(f"✅ 已执行 {dir_ops}/{dir_ops or total} 项目录操作" if dir_ops > 0 else f"✅ 目录操作: 0 项")
+        print(f"✅ 已执行 {renames}/{renames or total} 项重命名" if renames > 0 else f"✅ 重命名: 0 项")
+        print(f"✅ .meta 同步: {meta_sync} 配对")
+        print(f"📸 快照: git commit 已创建 (可 rollback)")
+        print(f"⏱️ 耗时: {elapsed:.1f}s")
+
+        if result["errors"]:
+            print(f"\n⚠️ {len(result['errors'])} 个错误:")
+            for e in result["errors"][:10]:
+                print(f"   {e}")
+            if len(result["errors"]) > 10:
+                print(f"   ... 还有 {len(result['errors']) - 10} 个")
+    else:
+        print("💡 Dry-run 模式（加 --confirm 真正执行）\n")
+        _run_apply_dry(plan)
+
+    return 0
+
+
 def cmd_export(args):
     """导出索引为可读报告（JSON/Markdown）"""
     root = _abs(args.path)
@@ -606,6 +1156,20 @@ def main():
     p_inf.add_argument('path', help='目标目录')
     p_inf.add_argument('file', help='文件路径（相对于目标目录）')
     p_inf.set_defaults(func=cmd_info)
+
+    # plan
+    p_plan = sub.add_parser('plan', help='生成重命名映射表（dry-run，不改文件）')
+    p_plan.add_argument('directory', help='目标 Unity 项目目录')
+    p_plan.add_argument('--rules', '-r', required=True, help='规则文件路径（JSON 格式）')
+    p_plan.add_argument('--output', '-o', help='映射表输出路径（默认自动生成到 scratch 目录）')
+    p_plan.set_defaults(func=cmd_plan)
+
+    # apply
+    p_apply = sub.add_parser('apply', help='执行重命名映射表')
+    p_apply.add_argument('plan_file', help='plan 命令生成的映射表 JSON 文件')
+    p_apply.add_argument('--confirm', action='store_true', help='真正执行（否则 dry-run）')
+    p_apply.add_argument('--dry-run', action='store_true', help='显式 dry-run 模式（默认）')
+    p_apply.set_defaults(func=cmd_apply)
 
     # export
     p_exp = sub.add_parser('export', help='导出报告')

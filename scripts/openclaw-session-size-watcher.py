@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -561,8 +562,20 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
         "state_summary": {},
     }
 
+    # ── 紧急快照：FORCE_CLEAN 前先备份会话状态 ──
+    is_force = force_clean or file_info.get("level") == "FORCE_CLEAN"
+    if is_force:
+        try:
+            backup_script = str(Path.home() / ".openclaw/workspace/scripts/openclaw-session-backup.py")
+            subprocess.run(
+                [sys.executable, backup_script, "--quiet"],
+                capture_output=True,
+                timeout=30,
+            )
+        except Exception:
+            pass  # 备份失败不阻塞 FORCE_CLEAN
+
     if force_clean or file_info.get("level") in ("CRITICAL", "FORCE_CLEAN"):
-        is_force = force_clean or file_info.get("level") == "FORCE_CLEAN"
         ck = cleanup_old_session_data(session_key or "")
 
         # CRITICAL: 也清理死会话，但用 6h 更保守的年龄窗口
