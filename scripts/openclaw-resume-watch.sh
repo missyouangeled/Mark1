@@ -4,7 +4,7 @@ set -euo pipefail
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/openclaw"
 STATE_FILE="$STATE_DIR/resume-watch.env"
 LOG_FILE="$STATE_DIR/resume-watch.log"
-THRESHOLD_SECONDS=180
+THRESHOLD_SECONDS=600
 
 mkdir -p "$STATE_DIR"
 
