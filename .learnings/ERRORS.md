@@ -17076,3 +17076,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-015] tool-timeout
+
+**Logged**: 2026-06-09T01:34:42.132Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && git add scripts/[redacted].py && git commit -m "fix: OK 已读改为事件驱动——等模型回复完成后再注入 之前固定 3 秒 setTimeout 不可靠，可能在模型回复前/后随机出现。 改为聊天状态监听：等待 chat 从 busy→idle 后才注入。 含 65 秒超时兜底防止无限轮询。" && git push 2>&1 30 [redacted] [redacted] completed 1 1197
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
