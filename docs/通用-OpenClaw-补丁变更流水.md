@@ -1207,3 +1207,17 @@
 - 语法通过；端到端 --print-human 正常；8 项单元烟测全过（cache 排除/盲区消除/trajectory 阈值/并发缓存回退/cleanable 含 dead/sessions.json 排除/last_run/trajectory 告警）;systemd timer 已 enable
 - 相关文件：
 - `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-09 15:53:28 CST (+08:00) — 大工程处理体系全面修复（6项）：--prefix/预检中止/收尾补全/sudo容错/分层显示/文档同步
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- ①rename-conflict-check 加 --prefix 参数（支持 RoadSide_/Wall_/空=无前缀，默认 Props_ 向后兼容）②start.py 预检失败→中止 + 默认写 .keep ③finish.py 大刀阔斧补全→7步收尾（系统快照/临时文件/session清理/子代理检测/scratch过期预览/journald+cache/健康检查）+ sudo 容错 + 手工提醒 ④scratch-cleanup --print-kept 分层显示（🛡️keep/📅近N天）⑤文档第八章更新→标注全部已落地、补 --prefix 和 .meta 提醒。涉及文件：rename-conflict-check.py, start.py, finish.py, scratch-cleanup.py, 大工程稳定运行方案.md
+- 验收 / 验证：
+- 全体语法(5/5)通过；start.py 无路径→exit=2 中止；rename-check --prefix RoadSide_=正确识别49文件5冲突；--prefix 空=无前缀38不变；scratch-cleanup 分层显示 3 keep+6 recent；start.py 正常流程 preflight→exit=0；finish.py import 全模块可用
+- 相关文件：
+- `scripts/openclaw-rename-conflict-check.py`

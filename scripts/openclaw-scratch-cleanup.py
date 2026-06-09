@@ -53,10 +53,20 @@ def main() -> int:
     print(f'⏳ 清理阈值: {args.days} 天')
     print(f'🧾 候选删除: {len(removed)} | 保留: {len(kept)}')
 
-    if args.print_kept:
+    if args.print_kept and kept:
         print('\n保留项:')
-        for item, reason, days in kept:
-            print(f'- {item.name} ({days:.1f} 天, {reason})')
+        # 分层：🛡️ keep 保护 / 📅 近 N 天内
+        protected = [(it, r, d) for it, r, d in kept if r.startswith('keep')]
+        recent = [(it, r, d) for it, r, d in kept if not r.startswith('keep')]
+        if protected:
+            print(f'  🛡️ .keep 保护 ({len(protected)} 项):')
+            for item, reason, days in protected:
+                marker = reason.replace('keep-marker:', '.keep→') if reason != 'keep-marker' else '.keep'
+                print(f'     {item.name}/  ({days:.1f} 天, {marker})')
+        if recent:
+            print(f'  📅 近 {args.days} 天内 ({len(recent)} 项):')
+            for item, _reason, days in recent:
+                print(f'     {item.name}/  ({days:.1f} 天)')
 
     if removed:
         print('\n候选删除项:')

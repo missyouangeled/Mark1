@@ -32,24 +32,38 @@ def cleanup_name(name: str, *, strip_hash_suffix: bool = False) -> str:
     return name
 
 
-def infer_target(filename: str, *, strip_hash_suffix: bool = False) -> str:
+def infer_target(filename: str, *, strip_hash_suffix: bool = False, prefix: str | None = None) -> str:
     p = Path(filename)
     stem = p.stem
     ext = p.suffix
-    cleaned = cleanup_name(stem, strip_hash_suffix=strip_hash_suffix)
 
     if ext.lower() in MAT_EXTS:
+        cleaned = cleanup_name(stem, strip_hash_suffix=strip_hash_suffix)
         if cleaned.startswith('Mat_'):
             base = cleaned
         else:
             base = 'Mat_' + cleaned
     elif ext.lower() in PREFAB_EXTS | MODEL_EXTS | TEXTURE_EXTS:
-        if cleaned.startswith('Props_'):
-            base = cleaned
+        effective = prefix if prefix is not None else 'Props_'
+        if effective == '':
+            base = cleanup_name(stem, strip_hash_suffix=strip_hash_suffix)
         else:
-            base = 'Props_' + cleaned
+            pfx = effective.rstrip('_')
+            # 检查原始 stem 是否已包含该前缀（跳过 cleanup，避免拆分 RoadSide→Road_Side）
+            if stem.startswith(pfx + '_') or stem == pfx:
+                base_stem = stem
+                base_stem = re.sub(r'_Type[_-]?\d+', '', base_stem, flags=re.I)
+                if strip_hash_suffix:
+                    base_stem = re.sub(r'#.*$', '', base_stem)
+                base = base_stem
+            else:
+                cleaned = cleanup_name(stem, strip_hash_suffix=strip_hash_suffix)
+                if cleaned.startswith(pfx + '_'):
+                    base = cleaned
+                else:
+                    base = pfx + '_' + cleaned
     else:
-        base = cleaned
+        base = cleanup_name(stem, strip_hash_suffix=strip_hash_suffix)
     return base + ext
 
 
@@ -59,7 +73,13 @@ def main() -> int:
     ap.add_argument('--report-out', help='输出 JSON 报告路径')
     ap.add_argument('--samples', type=int, default=20)
     ap.add_argument('--strip-hash-suffix', action='store_true', help='按当前任务规则删除 # 及后面内容，用于预扫覆盖风险')
+    ap.add_argument('--prefix', default=None, help='资源前缀（如 Props_/RoadSide_/Wall_）。传空字符串表示无前缀。默认 Props_')
     args = ap.parse_args()
+    prefix = args.prefix if args.prefix is None or args.prefix != '' else ''
+    if args.prefix is None:
+        prefix = None  # None → 向后兼容，走默认 Props_ 逻辑
+    elif args.prefix == '':
+        prefix = ''  # 空字符串 → 无前缀
 
     root = Path(args.path).expanduser().resolve()
     if not root.exists():
@@ -77,7 +97,7 @@ def main() -> int:
         if ext not in (TEXTURE_EXTS | MODEL_EXTS | PREFAB_EXTS | MAT_EXTS):
             continue
         considered += 1
-        target = infer_target(fp.name, strip_hash_suffix=args.strip_hash_suffix)
+        target = infer_target(fp.name, strip_hash_suffix=args.strip_hash_suffix, prefix=prefix)
         rel = str(fp.relative_to(root))
         mapping[target].append(rel)
 
@@ -113,6 +133,7 @@ def main() -> int:
         'unchanged': unchanged,
         'conflictCount': len(conflicts),
         'stripHashSuffix': args.strip_hash_suffix,
+        'prefix': args.prefix,
         'conflicts': conflicts,
     }
     if args.report_out:

@@ -17,7 +17,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description='OpenClaw 大工程统一开工入口')
     ap.add_argument('path', help='目标目录')
     ap.add_argument('--task-name', required=True, help='任务名，用于 scratch 子目录')
-    ap.add_argument('--keep', action='store_true', help='为该任务目录写入 .keep 保留标记')
+    ap.add_argument('--no-keep', action='store_true', help='不写入 .keep 保留标记（默认写入）')
     ap.add_argument('--strip-hash-suffix', action='store_true', help='若改名规则会删除 # 及后面内容，则输出对应冲突预扫建议')
     args = ap.parse_args()
 
@@ -28,17 +28,18 @@ def main() -> int:
 
     task_dir = SCRATCH / args.task_name
     task_dir.mkdir(parents=True, exist_ok=True)
-    if args.keep:
-        (task_dir / '.keep').write_text('keep\n', encoding='utf-8')
+    (task_dir / '.keep').write_text('keep\n', encoding='utf-8')
 
     print('=== OpenClaw 大工程开工入口 ===')
     print(f'📂 目标目录: {target}')
     print(f'📁 scratch 目录: {task_dir}')
-    if args.keep:
-        print('🛡️ 已写入 .keep 保留标记')
+    print('🛡️ 已写入 .keep 保留标记')
 
     print('\n--- 预检 ---', flush=True)
-    run(['python3', 'scripts/openclaw-heavy-task-preflight.py', str(target), '--task-name', args.task_name])
+    rc = run(['python3', 'scripts/openclaw-heavy-task-preflight.py', str(target), '--task-name', args.task_name])
+    if rc != 0:
+        print(f'❌ 预检失败（退出码 {rc}），已中止。请根据以上输出排查问题。')
+        return rc
 
     report = SCRATCH / 'reports' / f'{args.task_name}-conflicts.json'
     report.parent.mkdir(parents=True, exist_ok=True)
