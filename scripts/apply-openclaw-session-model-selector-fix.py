@@ -154,9 +154,11 @@ NEW_BLOCK_MODEL_REF = """function resolveSessionModelRef(cfg, entry, agentId, op
 \treturn resolved;
 }"""
 
-OLD_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;if(_U(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{return await i.request(`sessions.patch`,{key:n,model:t||null}),mW(e),await RU(e),!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
+LEGACY_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;if(_U(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{return await i.request(`sessions.patch`,{key:n,model:t||null}),mW(e),await RU(e),!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
 
-NEW_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{let s=await i.request(`sessions.patch`,{key:n,model:t||null}),c=typeof s?.resolved?.modelProvider==`string`?s.resolved.modelProvider.trim():``,l=typeof s?.resolved?.model==`string`?s.resolved.model.trim():``,u=t?c&&l?`${c}/${l}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:u?yp(u):null};let d=e.sessionsResult;if(d&&s?.entry)e.sessionsResult={...d,sessions:d.sessions.map(e=>e.key===n||s.key&&e.key===s.key?{...e,...s.entry,key:e.key}:e)};await e.onSlashAction?.(`refresh-tools-effective`),mW(e),await RU(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
+CURRENT_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;let n=e.sessionKey,r=e.chatModelOverrides[n];e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{let s=await i.request(`sessions.patch`,{key:n,model:t||null}),c=typeof s?.resolved?.modelProvider==`string`?s.resolved.modelProvider.trim():``,l=typeof s?.resolved?.model==`string`?s.resolved.model.trim():``,u=t?c&&l?`${c}/${l}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:u?yp(u):null};let d=e.sessionsResult;if(d&&s?.entry)e.sessionsResult={...d,sessions:d.sessions.map(e=>e.key===n||s.key&&e.key===s.key?{...e,...s.entry,key:e.key}:e)};await e.onSlashAction?.(`refresh-tools-effective`),mW(e),await RU(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
+
+TARGET_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)return!1;let n=e.sessionKey,r=e.chatModelOverrides[n],p=_U(e);e.lastError=null,e.chatModelOverrides={...e.chatModelOverrides,[n]:yp(t)};let i=e.client,a,o=()=>{if(e.chatModelSwitchPromises?.[n]===a){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}};return a=(async()=>{try{let s=await i.request(`sessions.patch`,{key:n,model:t||null}),c=typeof s?.resolved?.modelProvider==`string`?s.resolved.modelProvider.trim():``,l=typeof s?.resolved?.model==`string`?s.resolved.model.trim():``,u=t?c&&l?`${c}/${l}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:u?yp(u):null};let d=e.sessionsResult;if(d&&s?.entry)e.sessionsResult={...d,sessions:d.sessions.map(e=>e.key===n||s.key&&e.key===s.key?{...e,...s.entry,key:e.key}:e)};if((u??null)!==(p??null))try{await i.request(`chat.inject`,{sessionKey:n,message:`正在加载系统`,label:`system-loading`})}catch{}await e.onSlashAction?.(`refresh-tools-effective`),mW(e),await RU(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},e.lastError=`Failed to set model: ${String(t)}`,!1}finally{o()}})(),e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:a},a}"
 
 OLD_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatLoading||e.chatSending||!!e.chatRunId||e.chatStream!==null,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
 NEW_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatSending,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
@@ -198,6 +200,20 @@ def patch_once(text: str, old: str, new: str, description: str) -> tuple[str, bo
     return text.replace(old, new, 1), True
 
 
+def patch_any_once(text: str, olds: list[str], new: str, description: str) -> tuple[str, bool]:
+    if new in text:
+        return text, False
+    matches = [(old, text.count(old)) for old in olds]
+    present = [old for old, count in matches if count == 1]
+    bad = [(old, count) for old, count in matches if count not in (0, 1)]
+    if bad:
+        die(f"未能唯一定位需要替换的 {description}（存在重复匹配）")
+    if len(present) != 1:
+        die(f"未能定位需要替换的 {description}（候选命中数：{len(present)}）")
+    old = present[0]
+    return text.replace(old, new, 1), True
+
+
 def patch_session_utils(package_root: Path) -> list[Path]:
     dist_dir = package_root / "dist"
     candidates = sorted(dist_dir.glob("session-utils-*.js"))
@@ -234,7 +250,7 @@ def patch_control_ui_model_selector(package_root: Path) -> list[Path]:
             continue
         updated = content
         changed_any = False
-        updated, changed = patch_once(updated, OLD_CHAT_MODEL_SWITCH, NEW_CHAT_MODEL_SWITCH, "chat model dropdown switch handler")
+        updated, changed = patch_any_once(updated, [LEGACY_CHAT_MODEL_SWITCH, CURRENT_CHAT_MODEL_SWITCH], TARGET_CHAT_MODEL_SWITCH, "chat model dropdown switch handler")
         changed_any = changed_any or changed
         updated, changed = patch_once(updated, OLD_MODEL_SELECT_BUSY_GUARD, NEW_MODEL_SELECT_BUSY_GUARD, "chat model dropdown active-run disable guard")
         changed_any = changed_any or changed

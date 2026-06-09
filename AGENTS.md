@@ -10,6 +10,8 @@ If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out w
 
 Before doing anything else:
 
+- **Model handoff detection**：如果当前运行模型 identity（例如 `github-copilot/gpt-5.4`）与当前会话最近一条 assistant 消息的 provider/model 不同，说明这是**同一会话内刚切模型**，也必须视为一次新的启动接管，完整执行下面的启动流程；不要因为 session 没变就跳过。
+
 0. **Read `BOOT_INDEX.md` first** — this is the AI startup entry point (≤50 lines). It contains the complete tiered loading plan. Follow it exactly, including the 「正在加载系统」reply after Tier 1. All startup file paths and loading order are maintained in BOOT_INDEX.md — do not replicate them elsewhere.
    **⚠️ 如果 BOOT_INDEX.md 不存在或无法读取**：不要停，直接按本文件步骤 1-8 顺序逐条读取全部文件，用「正在加载系统」作为第一条回复。这保证换模型/重启后永远不会因索引丢失而卡死。
 0.1 **Read `RULES_INDEX.md`** — compact domain rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.

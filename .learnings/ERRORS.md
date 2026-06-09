@@ -16956,3 +16956,93 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-012] tool-explicit-error
+
+**Logged**: 2026-06-09T00:45:48.840Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll rapid-reef 10000 [redacted] [redacted]|A4ubg0LJbLuOiEdNjJB7Uu/[redacted]+MX+j+[redacted]/2yspCRQxf+Ldce0HxWPMJHnc4yEUXXq+siaAE/G6bmy/[redacted]/8rR8EYeb83t/[redacted]+[redacted]+jEQAvZs9c204jGr8prUQfqA/oeJs1aieuiTfcX77y992Qi+br4aLMX/1dfL+[redacted]/f9AUbtV1Q== failed 3444
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-013] tool-explicit-error
+
+**Logged**: 2026-06-09T00:46:52.528Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll plaid-crest 10000 [redacted] [redacted]|[redacted]+[redacted]/[redacted]+[redacted]/[redacted]/+0ycuLuXag== failed 0 3666
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-013] tool-explicit-error
+
+**Logged**: 2026-06-09T00:46:53.025Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll oceanic-forest 10000 [redacted] [redacted]|h5aynHKQD9m4g1AY+jmrGWRlJ5Ce+WKHQzaBu5dAWHVC/[redacted]/gKqTsp+Ao8zoGZMnG/H3h1feP7fp3xxnPRv8iqX/[redacted]+cpX/[redacted]+[redacted]/[redacted]== failed 1550
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
