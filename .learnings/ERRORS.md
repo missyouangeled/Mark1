@@ -17766,3 +17766,93 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-038] tool-explicit-error
+
+**Logged**: 2026-06-09T08:45:10.011Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process good-daisy kill [redacted] [redacted] failed 6441
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-039] tool-explicit-error
+
+**Logged**: 2026-06-09T08:52:43.565Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill grand-ember [redacted] [redacted] failed 4932
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-040] tool-timeout
+
+**Logged**: 2026-06-09T08:57:03.150Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ openclaw-cpu-emergency.py — CPU 负载过高一键诊断/修复 用法： python3 openclaw-cpu-emergency.py --diagnose # 只看不修 python3 openclaw-cpu-emergency.py --repair # 全自动修复 python3 openclaw-cpu-emergency.py --light-clean # 只清缓存，不杀进程 """ from __future__ import annotations import argparse import os import shutil import subprocess import sys…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

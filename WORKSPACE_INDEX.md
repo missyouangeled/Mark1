@@ -17,6 +17,8 @@
 | 工作任务 / 修改脚本 / 项目推进 | `RULES_INDEX.md` → `rules/work.md` → `PROJECT_INDEX.md` |
 | 系统修复 / 配置 / 服务 / 补丁 | `RULES_INDEX.md` → `rules/system.md` + `rules/work.md` → `TOOLS.md` |
 | 高风险动作 / 权限 / 外部操作 / 稳定性风险 | `rules/safety.md` → `docs/对系统操作必须要参考的崩坏案例.md` |
+| CPU 过载 / 系统卡顿 / 临时处理 | `docs/通用-CPU负载过高临时处理方案.md` → `scripts/openclaw-cpu-emergency.py --diagnose` |
+| Unity 路径过长 / rename 风险 | `docs/通用-Unity资产路径过长风险分析与应对方案.md` |
 | 找历史方案 / 技术决策 | `PLANS.md` |
 | 找项目入口 / 项目目录 | `PROJECT_INDEX.md` |
 | 找本地脚本 / 服务 / 维护入口 | `TOOLS.md` / `TOOLS_INDEX.md` |
@@ -47,6 +49,11 @@
 | `memory/INDEX.md` | 记忆主题锚点索引：某件事发生在哪天 |
 
 ## 3. 常见查找路线
+
+### 找 CPU 过载怎么处理
+- 一键诊断：`python3 scripts/openclaw-cpu-emergency.py --diagnose`
+- 全自动修复：`python3 scripts/openclaw-cpu-emergency.py --repair`
+- 详细方案：`docs/通用-CPU负载过高临时处理方案.md`
 
 ### 找 Unity 那些整理/重命名的事
 - 项目入口：`PROJECT_INDEX.md` → `Unity 模型整理`

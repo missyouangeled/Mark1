@@ -62,6 +62,8 @@
 | 确定所在机器 | `HOST_CONTEXT.md` |
 | 跨模型接力 | `HANDOFF.md` |
 | 系统操作 / 找凭据 | `TOOLS.md` |
+| CPU 负载过高 / 系统卡顿 | `docs/通用-CPU负载过高临时处理方案.md` + `scripts/openclaw-cpu-emergency.py --diagnose` |
+| Unity 路径过长风险 | `docs/通用-Unity资产路径过长风险分析与应对方案.md` |
 | 查历史方案 | `PLANS.md` / `PLANS_INDEX.md` |
 | 查项目入口 | `PROJECT_INDEX.md` |
 | 查安装记录 | `docs/install-registry.md` |
