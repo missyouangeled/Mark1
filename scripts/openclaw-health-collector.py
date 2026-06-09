@@ -98,6 +98,7 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, An
             "elapsedMs": int(elapsed * 1000),
             "summary": first_line[:200] if first_line else ("degraded" if degraded else "error" if not ok else "ok"),
             "stderr": stderr[:300] if stderr else None,
+            "stdoutRaw": stdout,
         }
     except subprocess.TimeoutExpired:
         elapsed = round(time.monotonic() - start, 3)
@@ -263,12 +264,34 @@ def main():
 
     # ── 完整层（每 N 次一次）──
     if do_full:
-        checks.append(run_sub_check(
+        lh_check = run_sub_check(
             "local-health",
             [sys.executable, str(SCRIPTS / "openclaw-local-health-diagnose.py"),
-             "--notify-frontstage", "--print-human"],
+             "--notify-frontstage", "--print-json"],
             timeout=60,
-        ))
+        )
+        checks.append(lh_check)
+
+        # CPU 过载自动响应：loadRatio > 1.8 时触发轻量清理
+        try:
+            lh_data = json.loads(lh_check.get("stdoutRaw", "{}"))
+            load_ratio = lh_data.get("resource", {}).get("loadRatio")
+            if load_ratio is not None and load_ratio > 1.8:
+                append_log(f"CPU critical (loadRatio={load_ratio}), triggering cpu-emergency --light-clean")
+                cpu_result = subprocess.run(
+                    [sys.executable, str(SCRIPTS / "openclaw-cpu-emergency.py"), "--light-clean"],
+                    capture_output=True, text=True, timeout=60, check=False,
+                )
+                lh_check["cpuAutoResponse"] = {
+                    "triggered": True,
+                    "loadRatio": load_ratio,
+                    "exitCode": cpu_result.returncode,
+                    "summary": (cpu_result.stdout or "").strip()[:200],
+                }
+                append_log(f"CPU auto-response done (exit={cpu_result.returncode})")
+        except Exception as exc:
+            append_log(f"CPU auto-response parse error: {exc}")
+
         append_log(f"run #{new_count}: full check triggered (supervisor + broker + local-health)")
     else:
         append_log(f"run #{new_count}: lightweight (supervisor + broker-on-dirty, next full at #{FULL_CHECK_EVERY_N})")

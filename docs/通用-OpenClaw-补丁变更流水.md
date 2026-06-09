@@ -1263,3 +1263,17 @@
 - diagnose/light-clean烟测通过,所有文档已推送
 - 相关文件：
 - `scripts/openclaw-cpu-emergency.py`
+
+## 2026-06-10 07:37:47 CST (+08:00) — health-collector 补 CPU 过载自动响应 + 废弃冗余清理
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- health-collector.py do_full 分支解析 local-health JSON 的 loadRatio，>1.8 自动触发 cpu-emergency --light-clean；清理 16 个 ChatTTS 烟雾脚本 + 旧 session-watcher timer/service
+- 验收 / 验证：
+- 语法检查通过，逻辑干跑验证负载判断正确
+- 相关文件：
+- `scripts/openclaw-health-collector.py`
