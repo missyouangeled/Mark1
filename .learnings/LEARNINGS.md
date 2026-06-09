@@ -1150,3 +1150,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260609-001] correction
+
+**Logged**: 2026-06-08T23:57:46.606Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Tue 2026-06-09 07:57 GMT+8] 不，我觉得改时间不是解决问题，而是避开问题，我想知道的是为什么会断开，如果CPU负载过高就会断开，那有没有什么解决办法，或者紧急应对措施。而不是只是改事件躲避问题。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

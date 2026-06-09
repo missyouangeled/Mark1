@@ -16626,3 +16626,243 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-001] tool-explicit-error
+
+**Logged**: 2026-06-08T23:52:31.668Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll tide-bloom 15000 [redacted] [redacted] failed 0 8036
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-002] tool-timeout
+
+**Logged**: 2026-06-08T23:53:58.556Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -n '15\|timeout\|TIMEOUT\|gateway.*probe\|status.*timeout' /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py | head -30 5 [redacted] [redacted] completed 0 1010
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-003] tool-timeout
+
+**Logged**: 2026-06-08T23:54:15.838Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -rn '15' /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py | grep -iE 'timeout|second' | head -20 5 [redacted] [redacted] completed 0 1201
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-004] tool-timeout
+
+**Logged**: 2026-06-08T23:54:16.201Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -n 'timeout\|TIMEOUT' /home/missyouangeled/.openclaw/workspace/tools/openclaw-local-health/[redacted].service /home/missyouangeled/.openclaw/workspace/tools/openclaw-local-health/[redacted].timer 2>/dev/null 5 [redacted] [redacted] completed 1 1170
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-005] tool-timeout
+
+**Logged**: 2026-06-08T23:55:35.548Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -n 'timeoutMs.*3e3\|3e3.*timeout\|healthProbe.*timeout\|gateway.*health.*timeout' ~/.npm-global/lib/node_modules/openclaw/dist/restart-health-D10rsefe.js ~/.npm-global/lib/node_modules/openclaw/dist/probe-VG0gCJ-9.js 2>/dev/null 5 [redacted] [redacted] completed 0 1437
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-006] tool-timeout
+
+**Logged**: 2026-06-08T23:55:39.865Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec openclaw config.schema.lookup gateway.healthProbeTimeoutMs 2>/dev/null || openclaw config list 2>/dev/null | grep -i 'health\|probe\|timeout' | head -20 10 [redacted] [redacted] completed 0 5403
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-007] tool-timeout
+
+**Logged**: 2026-06-08T23:58:38.990Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec journalctl --user -u openclaw-gateway --since "2026-06-08 17:00" --until "2026-06-08 17:55" --no-pager 2>/dev/null | grep -E 'sessions\.(patch|list)|\[ws\].*(closed|⇄)|warmup|timeout|block|health' | tail -30 10 [redacted] [redacted] completed 0 2468
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-008] tool-timeout
+
+**Logged**: 2026-06-09T00:05:29.092Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ Gateway 安全重启脚本 适用机器：公司（Linux）/ 通用 在重启 Gateway 前自动保存工作区状态（git），发通知， 重启后等待 Gateway 恢复健康再返回。 用法： python3 scripts/[redacted].py # 安全重启 python3 scripts/[redacted].py --reason "内存超限" # 带原因 python3 scripts/[redacted].py --dry-run # 预演不执行 python3 scripts/[redacted].py --notify-only # 只通知不重启 """ from __future__ import annotat…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
