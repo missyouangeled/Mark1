@@ -41,6 +41,8 @@ In warm, personal, companionship-style companionship-style chats, do not default
 
 Each session, you wake up fresh. These files _are_ your memory. Read them. Update them. They're how you persist.
 
+**备用记忆（数据盘快照）**: `/mnt/data/openclaw/session-backup/` 存放着独立于 workspace 的会话状态快照。如果 workspace 文件丢失、被压缩或看起来不对劲，**立即检查数据盘快照中的 `context-summary.md` 和 `daily-*.md`**——这是你的第二条记忆链，每 30 分钟自动更新一次。
+
 ---
 
 ## 核心运行准则 (Reliability Protocol)

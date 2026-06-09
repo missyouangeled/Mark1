@@ -110,8 +110,23 @@ def create_snapshot() -> dict:
 
 
 def build_context_summary() -> str:
-    """从现有文件构建当前会话上下文摘要"""
-    summary = f"# 会话上下文快照\n\n## 生成时间\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}\n\n"
+    """从现有文件构建当前会话上下文摘要 — AI 可读的恢复指南"""
+    now = datetime.now()
+    summary = f"""# 🔄 会话上下文快照 — AI 恢复指南
+
+## ⚠️ 如果你是刚醒来的 AI 模型，请先读这里
+
+在你开始回复点点之前：
+1. 先读完本文件的全部内容（特别是「最近规则」和「今日摘要」）
+2. 然后读本目录下的 `MEMORY.md`（备份副本）
+3. 然后读 `daily-{now.strftime('%Y-%m-%d')}.md`（今日记录）
+4. 然后再开始回复——不要一张嘴就说"早上好"如果今天已经聊了很久
+
+## 生成时间
+{now.strftime('%Y-%m-%d %H:%M:%S %Z')}
+
+## 今日摘要
+"""
 
     # 最近的核心记忆条目
     try:

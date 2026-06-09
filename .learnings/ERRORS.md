@@ -16896,3 +16896,63 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-010] tool-timeout
+
+**Logged**: 2026-06-09T00:19:22.991Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write # 2026-06-09 每日记录 ## 主要工作：Gateway 稳定性根治 ### 问题 本地健康检查间歇性报告"Gateway 不可达"（CRITICAL），用户询问 Gateway 是否容易断开。 ### 调查过程 1. 检查 health-diagnostic.log 历史记录：6 月以来共 5 次 CRITICAL 事件，持续 3-7 分钟，均已自动恢复 2. 关键发现：Gateway 服务进程从未崩溃（systemd 始终 active/running），是 HTTP/WebSocket 层探测超时 3. 深入 Gateway 内部代码：健康探测 WebSocket 超时仅 **3 秒**（`timeoutMs: 3e3`） 4. 分析 06-08 晚间日志：告警前 …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-011] tool-explicit-error
+
+**Logged**: 2026-06-09T00:24:21.976Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write returned an explicit error state.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 """ 会话状态快照备份 — 在数据盘独立保存近期对话与记忆状态 适用机器：公司（Linux）/ 通用 在数据盘 /mnt/data/openclaw/session-backup/ 下保存： - 今天的每日记录副本 - MEMORY.md 副本 - 当前对话上下文摘要（从最近消息提取） - 备份日志 用途： - Gateway 重启 / session 压缩 / 意外清理后快速恢复上下文 - 独立于 workspace 仓库，不受 git 操作影响 - 默认保留 7 天 用法： python3 scripts/openclaw-session-backup.py # 执行一次快照 python3 scripts/openclaw-se…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

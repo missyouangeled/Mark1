@@ -16,6 +16,7 @@ Before doing anything else:
 3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
 4. Read `HANDOFF.md` if it exists — this is the current cross-model / cross-agent continuation map
 5. Read `memory/daily/YYYY-MM-DD.md` (today + yesterday) for recent context; also read `memory/daily/YYYY-MM-DD-transcript.md` (today) — this is the auto-aggregated unified daily transcript from ALL models, so you know what happened today regardless of which model the user was using
+5.1 **Read session backup** — check `/mnt/data/openclaw/session-backup/` and read the latest snapshot's `context-summary.md` and today's `daily-*.md`. This is the independent data-disk backup of recent context, MEMORY, SOUL, and USER files. It survives workspace resets, session compression, and git issues. **Always check this before starting the conversation, especially if workspace files seem stale or missing.**
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
 8. Read `WORKSPACE_INDEX.md` — this is the global navigation map for memory, tools, projects, credential pointers, and plans; use it to find the right file fast instead of guessing
