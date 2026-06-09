@@ -17106,3 +17106,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-016] tool-timeout
+
+**Logged**: 2026-06-09T01:51:52.519Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -o 'chat.inject\|正在加载系统\|OK 已经读取完成\|okPhase\|okCheck\|setTimeout.*65e3' ~/.npm-global/lib/node_modules/openclaw/dist/control-ui/assets/index-BtIuF4zW.js | head -10 8 [redacted] [redacted] completed 0 3209
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
