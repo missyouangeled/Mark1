@@ -1,0 +1,9 @@
+[Unit]
+Description=OpenClaw Session Size Watcher — monitor and auto-clean session files
+After=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-session-size-watcher.py --systemd --print-json
+StandardOutput=journal
+StandardError=journal

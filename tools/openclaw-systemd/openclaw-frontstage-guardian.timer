@@ -1,0 +1,14 @@
+# 适用机器：公司（Linux）
+# 系统 / OS：Linux
+# 用途：每 60s 触发前台保护器
+
+[Unit]
+Description=Periodic frontstage guardian check (every 60s)
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
