@@ -1249,3 +1249,17 @@
 - 10项烟测全通过
 - 相关文件：
 - `scripts/openclaw-session-backup.py`
+
+## 2026-06-09 17:00:04 CST (+08:00) — CPU过载方案 + Unity路径风险 + 应急脚本
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- CPU过载: Stop→Shrink→Single理念,一键脚本 --diagnose/--repair。Unity路径: 实测225字符最长,Windows 256临界,4项应对。3层索引(启动/规则/导航)已穿透。
+- 验收 / 验证：
+- diagnose/light-clean烟测通过,所有文档已推送
+- 相关文件：
+- `scripts/openclaw-cpu-emergency.py`
