@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw Session Size Watcher Timer (10min fallback)
+After=default.target
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+AccuracySec=30
+
+[Install]
+WantedBy=timers.target

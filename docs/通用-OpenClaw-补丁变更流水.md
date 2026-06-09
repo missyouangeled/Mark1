@@ -1193,3 +1193,17 @@
 - 语法检查通过；10 项烟测全部通过（human/json/systemd/gate/alerts/mark-read/init-state 正常；死会话清理模拟：alive 保留、dead 清、<4h 保留、当前会话保留、sessions.json 缺失容错）
 - 相关文件：
 - `scripts/openclaw-session-size-watcher.py`
+
+## 2026-06-09 15:24:04 CST (+08:00) — session-size-watcher 全面修复（8 项）：漏洞修补 + 盲区消除 + 可靠性加固
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- ①.usage-cost-cache 3MB 永久膨胀→FORCE_CLEAN 时清除+不计入 total ②CRITICAL(25MB) 盲区→CRITICAL 也清死会话(6h),FORCE_CLEAN 用 2h ③活跃 trajectory 膨胀→新增 TRAJECTORY_CRITICAL_MB=5 + stale 600→300s ④sessions.json 并发读→缓存+state.json 容灾回退 ⑤cleanable 统计→含死 jsonl ⑥cron fallback→systemd timer 每 10min ⑦静默失败→last_successful_run >30min 告警 ⑧僵尸条目文档化+sessions.json 排除
+- 验收 / 验证：
+- 语法通过；端到端 --print-human 正常；8 项单元烟测全过（cache 排除/盲区消除/trajectory 阈值/并发缓存回退/cleanable 含 dead/sessions.json 排除/last_run/trajectory 告警）;systemd timer 已 enable
+- 相关文件：
+- `scripts/openclaw-session-size-watcher.py`

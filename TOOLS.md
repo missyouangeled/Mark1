@@ -141,10 +141,11 @@ Things like:
   - 适用机器:公司(Linux)
   - 系统 / OS:Linux
   - 监测脚本:`scripts/openclaw-session-size-watcher.py`
-  - 触发方式:事件驱动 — 我每次收到消息后在后台跑（`--gate-seconds 60` 门控去重），无常驻 timer 常驻内存
+  - 触发方式:双重 — (1) 事件驱动：每次收到用户消息时后台运行（`--gate-seconds 60` 门控去重）；(2) cron fallback：systemd timer 每 10 分钟兜底运行（`--systemd` 模式）
+  - systemd 文件:`tools/openclaw-session-watcher/openclaw-session-watcher.service` / `tools/openclaw-session-watcher/openclaw-session-watcher.timer`
   - 当前状态目录:`~/.local/state/openclaw/session-size-watcher/`
-  - 默认频率:每收到用户消息触发，门控 60 秒内不重复实扫
-  - 阈值: CRITICAL=40MB 总目录（自动清理旧 checkpoint/trajectory/bak） / FORCE_CLEAN=60MB（强制清理） / 不设 WARN，日常只静默记录
+  - 默认频率:每收到用户消息触发（门控 60s 去重） + timer 每 10 分钟 cron fallback
+  - 阈值: CRITICAL=25MB（清理旧 checkpoint/trajectory/bak + 死会话 >=6h）/ FORCE_CLEAN=40MB（更强清理：死会话 >=2h + >1MB usage-cost-cache）/ trajectory 单文件 >5MB 告警 / 不设 WARN，日常只静默记录
   - 用途:在会话压缩竞态发生前,提前清理旧会话数据,减少 "session file changed while lock released" 竞态概率
   - 手动命令:`python3 scripts/openclaw-session-size-watcher.py --print-human`（查看状态） / `python3 scripts/openclaw-session-size-watcher.py --force-clean`（强制清理）
   - 边界:不直接压缩当前活跃会话（OpenClaw 内部处理）,只清理其他会话的过期 checkpoint/trajectory/bak 文件

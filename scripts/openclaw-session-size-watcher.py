@@ -5,6 +5,10 @@
 监测会话目录总大小，在超过阈值时自动分层清理旧数据，
 减少会话压缩竞态和 I/O 争抢的发生概率。
 
+注意：sessions.json 的僵尸条目（如已清理 jsonl 但仍保留的 cron 记录）
+由 OpenClaw 内核管理，watcher 不触碰。sessions.json 自身不计入
+other_sessions_mb / total_dir_mb（在遍历时被排除）。
+
 触发方式：
   - 事件驱动：每次收到用户消息时后台运行（--gate-seconds 60 门控去重）
   - 手动：python3 scripts/openclaw-session-size-watcher.py --print-human
@@ -62,6 +66,12 @@ CLEANABLE_PATTERNS = [
 # FORCE_CLEAN 时额外清理：死会话的完整 jsonl（需交叉验证 sessions.json）
 DEAD_SESSION_CLEANUP_MIN_AGE_HOURS = 4  # 会话结束后至少 4 小时才清理
 
+# 单个 trajectory 膨胀告警阈值
+TRAJECTORY_CRITICAL_MB = 5  # 单个 trajectory 超过此值记录告警，建议用户压缩
+
+# trajectory 陈旧判定阈值（秒）：主 jsonl mtime 比 trajectory mtime 早超此值视为陈旧残留
+TRAJECTORY_STALE_SECONDS = 300  # 5 分钟（原 600 秒）
+
 
 # ── 核心逻辑 ──────────────────────────────────────────────
 
@@ -106,6 +116,19 @@ def get_current_session_key() -> str | None:
     return None
 
 
+def _get_usage_cost_cache_info() -> dict:
+    """获取 .usage-cost-cache.json 的信息。该文件是 OpenClaw 内部缓存，
+    删除后会在需要时自动重建。"""
+    cache_f = SESSIONS_DIR / ".usage-cost-cache.json"
+    if not cache_f.exists():
+        return {"exists": False, "size_bytes": 0, "size_mb": 0}
+    try:
+        size = cache_f.stat().st_size
+        return {"exists": True, "size_bytes": size, "size_mb": round(size / (1024 * 1024), 2)}
+    except Exception:
+        return {"exists": False, "size_bytes": 0, "size_mb": 0}
+
+
 def get_session_files(session_key: str | None) -> dict:
     """获取会话相关文件的大小信息。"""
     if not session_key or not SESSIONS_DIR.exists():
@@ -123,6 +146,7 @@ def get_session_files(session_key: str | None) -> dict:
         "total_dir_bytes": 0,
         "level": "INFO",
         "cleanable_old_mb": 0,
+        "usage_cost_cache_mb": 0,
     }
 
     # 主会话文件
@@ -144,22 +168,42 @@ def get_session_files(session_key: str | None) -> dict:
     if traj_f.exists():
         result["trajectory_mb"] = round(traj_f.stat().st_size / (1024 * 1024), 2)
 
+    # .usage-cost-cache.json — 内部缓存，统计大小但不计入 total
+    cache_info = _get_usage_cost_cache_info()
+    result["usage_cost_cache_mb"] = cache_info["size_mb"]
+
     # 其他会话文件大小（非当前 session_key 的）
     other_total = 0
     cleanable_total = 0
+    # 先获取 alive_keys 用于统计死会话 jsonl
+    alive_keys = get_alive_session_keys()
+    now = time.time()
+    dead_age_s = DEAD_SESSION_CLEANUP_MIN_AGE_HOURS * 3600
     for f in SESSIONS_DIR.iterdir():
         if f.is_file():
             fname = f.name
+            if fname == "sessions.json" or fname == ".usage-cost-cache.json":
+                continue
             if not fname.startswith(session_key):
                 other_total += f.stat().st_size
                 # 统计可清理的
                 if any(f.match(p) for p in CLEANABLE_PATTERNS):
                     cleanable_total += f.stat().st_size
+                # 统计死会话完整 jsonl（不在 alive_keys 且 ≥ 最小年龄）
+                elif not (".checkpoint." in fname or ".trajectory" in fname):
+                    file_session_key = fname.replace(".jsonl", "")
+                    if file_session_key not in alive_keys:
+                        try:
+                            age = now - f.stat().st_mtime
+                            if age >= dead_age_s:
+                                cleanable_total += f.stat().st_size
+                        except Exception:
+                            pass
 
     result["other_sessions_mb"] = round(other_total / (1024 * 1024), 2)
     result["cleanable_old_mb"] = round(cleanable_total / (1024 * 1024), 2)
 
-    # 总目录大小
+    # 总目录大小（排除 .usage-cost-cache.json 和 sessions.json）
     total = other_total
     for f in SESSIONS_DIR.glob(f"{session_key}*"):
         if f.is_file():
@@ -262,10 +306,20 @@ def append_history(state: dict, file_info: dict):
     state["history"] = history
 
 
+# sessions.json 并发读保护缓存
+_cached_alive_keys: set[str] | None = None
+_cached_alive_keys_time: float = 0.0
+_ALIVE_KEYS_CACHE_TTL = 1800  # 30 分钟
+
+
 def get_alive_session_keys() -> set[str]:
     """从 sessions.json 读取 OpenClaw 知道的活跃/历史会话 key，
     用于判断磁盘上哪些 jsonl 是彻底被遗忘的死会话。
+
+    带并发读保护：JSONDecodeError 时回退到缓存（≤30 分钟）；
+    成功读取后更新缓存并写入 state.json 用于跨重启恢复。
     """
+    global _cached_alive_keys, _cached_alive_keys_time
     sessions_json = SESSIONS_DIR / "sessions.json"
     if not sessions_json.exists():
         return set()
@@ -276,26 +330,74 @@ def get_alive_session_keys() -> set[str]:
             sid = entry.get("sessionId")
             if sid:
                 keys.add(sid)
+        # 更新缓存
+        _cached_alive_keys = keys
+        _cached_alive_keys_time = time.time()
+        # 异步写入 state.json
+        _save_alive_keys_to_state(keys)
         return keys
+    except json.JSONDecodeError:
+        # 并发截断：回退到缓存
+        if _cached_alive_keys is not None and (time.time() - _cached_alive_keys_time) < _ALIVE_KEYS_CACHE_TTL:
+            return _cached_alive_keys
+        # 缓存过期，尝试从 state.json 恢复
+        return _load_alive_keys_from_state()
     except Exception:
-        return set()
+        # 其他异常（I/O 等），同样尝试缓存
+        if _cached_alive_keys is not None and (time.time() - _cached_alive_keys_time) < _ALIVE_KEYS_CACHE_TTL:
+            return _cached_alive_keys
+        return _load_alive_keys_from_state()
 
 
-def cleanup_dead_sessions(session_key: str) -> dict:
+def _save_alive_keys_to_state(keys: set[str]):
+    """将会话 key 快照写入 state.json。"""
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        state = {}
+        if STATE_FILE.exists():
+            try:
+                state = json.loads(STATE_FILE.read_text())
+            except Exception:
+                pass
+        state["last_known_alive_keys"] = sorted(keys)
+        state["last_known_alive_keys_time"] = datetime.now(timezone.utc).isoformat()
+        STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    except Exception:
+        pass  # 非关键路径
+
+
+def _load_alive_keys_from_state() -> set[str]:
+    """从 state.json 恢复最后一次已知的会话 key 快照。"""
+    try:
+        if STATE_FILE.exists():
+            state = json.loads(STATE_FILE.read_text())
+            keys_list = state.get("last_known_alive_keys", [])
+            if keys_list:
+                return set(keys_list)
+    except Exception:
+        pass
+    return set()
+
+
+def cleanup_dead_sessions(session_key: str, min_age_hours: float | None = None) -> dict:
     """清理死会话的完整 jsonl 文件。
 
     判定死会话：
     1. 不属于当前活跃会话
     2. 不在 sessions.json 索引中（彻底被遗忘）
-    3. 且至少 DEAD_SESSION_CLEANUP_MIN_AGE_HOURS 小时未修改
+    3. 且至少 min_age_hours 小时未修改
+
+    min_age_hours: 覆盖默认 DEAD_SESSION_CLEANUP_MIN_AGE_HOURS；
+    CRITICAL 级别传 6（更保守），FORCE_CLEAN 级别传 2（更激进）
     """
     result = {"files_removed": 0, "mb_freed": 0, "errors": []}
     if not SESSIONS_DIR.exists():
         return result
 
+    age_threshold_h = min_age_hours if min_age_hours is not None else DEAD_SESSION_CLEANUP_MIN_AGE_HOURS
     alive_keys = get_alive_session_keys()
     now = time.time()
-    min_age_s = DEAD_SESSION_CLEANUP_MIN_AGE_HOURS * 3600
+    min_age_s = age_threshold_h * 3600
 
     for f in sorted(SESSIONS_DIR.glob("*.jsonl")):
         name = f.name
@@ -310,7 +412,7 @@ def cleanup_dead_sessions(session_key: str) -> dict:
         if file_session_key not in alive_keys:
             try:
                 age_h = (now - f.stat().st_mtime) / 3600
-                if age_h >= DEAD_SESSION_CLEANUP_MIN_AGE_HOURS:
+                if age_h >= age_threshold_h:
                     size = f.stat().st_size
                     f.unlink()
                     result["files_removed"] += 1
@@ -384,7 +486,7 @@ def cleanup_old_session_data(session_key: str) -> dict:
                 result["errors"].append(str(e))
 
         # 当前会话的 trajectory — 仅当明显陈旧时才清理
-        # 条件：trajectory 的 mtime 比主 jsonl 早 10 分钟以上（说明是旧压缩的残留，不是当前活跃的）
+        # 条件：trajectory 的 mtime 比主 jsonl 早 TRAJECTORY_STALE_SECONDS 以上（说明是旧压缩的残留，不是当前活跃的）
         traj_f = SESSIONS_DIR / f"{session_key}.trajectory.jsonl"
         main_f = SESSIONS_DIR / f"{session_key}.jsonl"
         if traj_f.exists() and main_f.exists():
@@ -392,7 +494,7 @@ def cleanup_old_session_data(session_key: str) -> dict:
                 traj_mtime = traj_f.stat().st_mtime
                 main_mtime = main_f.stat().st_mtime
                 stale_seconds = main_mtime - traj_mtime
-                if stale_seconds > 600:  # 10 分钟以上未更新 = 旧残留
+                if stale_seconds > TRAJECTORY_STALE_SECONDS:
                     size = traj_f.stat().st_size
                     traj_f.unlink()
                     files_removed += 1
@@ -462,14 +564,38 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
     if force_clean or file_info.get("level") in ("CRITICAL", "FORCE_CLEAN"):
         is_force = force_clean or file_info.get("level") == "FORCE_CLEAN"
         ck = cleanup_old_session_data(session_key or "")
+
+        # CRITICAL: 也清理死会话，但用 6h 更保守的年龄窗口
+        # FORCE_CLEAN: 用 2h 更激进的年龄窗口
         if is_force:
-            dead = cleanup_dead_sessions(session_key or "")
-            if dead["files_removed"] > 0:
-                ck["files_removed"] += dead["files_removed"]
-                ck["mb_freed"] += dead["mb_freed"]
-                ck["mb_freed"] = round(ck["mb_freed"], 2)
-                if dead.get("errors"):
-                    ck.setdefault("errors", []).extend(dead["errors"])
+            dead = cleanup_dead_sessions(session_key or "", min_age_hours=2)
+        elif file_info.get("level") == "CRITICAL":
+            dead = cleanup_dead_sessions(session_key or "", min_age_hours=6)
+        else:
+            dead = {"files_removed": 0, "mb_freed": 0, "errors": []}
+
+        if dead["files_removed"] > 0:
+            ck["files_removed"] += dead["files_removed"]
+            ck["mb_freed"] += dead["mb_freed"]
+            ck["mb_freed"] = round(ck["mb_freed"], 2)
+            if dead.get("errors"):
+                ck.setdefault("errors", []).extend(dead["errors"])
+
+        # FORCE_CLEAN: 清理膨胀的 .usage-cost-cache.json（> 1MB）
+        if is_force:
+            cache_file = SESSIONS_DIR / ".usage-cost-cache.json"
+            usage_cost_cache_mb = 1  # 阈值 1MB
+            if cache_file.exists():
+                try:
+                    cache_size = cache_file.stat().st_size
+                    if cache_size > usage_cost_cache_mb * 1024 * 1024:
+                        cache_file.unlink()
+                        ck["files_removed"] += 1
+                        freed = cache_size / (1024 * 1024)
+                        ck["mb_freed"] += freed
+                        ck["mb_freed"] = round(ck["mb_freed"], 2)
+                except Exception as e:
+                    ck.setdefault("errors", []).append(f".usage-cost-cache.json: {e}")
         result["cleanup"] = ck
         if ck["files_removed"] > 0:
             cleanup_record = {
@@ -497,6 +623,13 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
                     f"CRITICAL 但无可清理项（总目录 {file_info['total_dir_mb']:.1f}MB），当前会话自身膨胀，需关注",
                     {"total_mb": file_info["total_dir_mb"], "main_mb": file_info["main_jsonl_mb"]})
 
+    # 活跃 trajectory 膨胀告警（独立于 CRITICAL/FORCE_CLEAN 级别）
+    traj_mb = file_info.get("trajectory_mb", 0)
+    if traj_mb > TRAJECTORY_CRITICAL_MB:
+        raise_alert("WARN",
+            f"当前会话 trajectory 已达 {traj_mb:.2f}MB（阈值 {TRAJECTORY_CRITICAL_MB}MB），建议通过 OpenClaw 压缩会话",
+            {"trajectory_mb": traj_mb, "threshold_mb": TRAJECTORY_CRITICAL_MB})
+
     # 检测失败告警
     if file_info.get("error") == "no-session":
         # 统计连续失败次数
@@ -507,8 +640,9 @@ def run_check(force_clean: bool = False, gate_seconds: int = 0) -> dict:
     else:
         state["consecutive_failures"] = 0
 
-    # 记录最后一次成功运行的来源（用于跨模型可靠性审计）
+    # 记录最后一次成功运行的来源（用于跨模型可靠性审计和静默失败检测）
     state["last_success_run"] = datetime.now(timezone.utc).isoformat()
+    state["last_successful_run"] = datetime.now(timezone.utc).isoformat()
 
     append_history(state, file_info)
     save_state(state)
@@ -544,6 +678,9 @@ def format_human(result: dict):
         print(f"   本会话 checkpoint: {fi.get('checkpoint_count', 0)} 个 ({fi.get('checkpoint_mb', 0):.2f} MB)")
         print(f"   本会话 trajectory: {fi.get('trajectory_mb', 0):.2f} MB")
         print(f"   其他会话 : {fi.get('other_sessions_mb', 0):.2f} MB（其中可清理 {fi.get('cleanable_old_mb', 0):.2f} MB）")
+        uc = fi.get('usage_cost_cache_mb', 0)
+        if uc > 0:
+            print(f"   使用成本缓存: {uc:.2f} MB（不计入总目录，>1MB 时 FORCE_CLEAN 会清除）")
         print(f"   总目录   : {fi.get('total_dir_mb', 0):.2f} MB")
 
     if cl and cl.get("files_removed", 0) > 0:
@@ -601,11 +738,28 @@ def main():
 
     if args.check_alerts:
         unread = get_unread_alerts()
+        has_issues = False
         if unread:
             print(f"🚨 有 {len(unread)} 条未读告警:")
             for a in unread[:10]:
                 print(f"  [{a.get('level', '?')}] {a.get('time', '')[:19]}")
                 print(f"  {a.get('message', '')}")
+            has_issues = True
+
+        # 检查静默失败：last_successful_run 超过 30 分钟
+        state = load_state()
+        last_good = state.get("last_successful_run")
+        if last_good:
+            try:
+                last_time = datetime.fromisoformat(last_good)
+                silence_min = (datetime.now(timezone.utc) - last_time).total_seconds() / 60
+                if silence_min > 30:
+                    print(f"⚠️ 上次成功运行: {silence_min:.0f} 分钟前，检测链路可能静默失败")
+                    has_issues = True
+            except Exception:
+                pass
+
+        if has_issues:
             sys.exit(2)
         else:
             print("✅ 无未读告警，检测链路正常")

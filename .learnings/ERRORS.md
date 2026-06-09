@@ -17436,3 +17436,63 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-027] tool-policy-blocked
+
+**Logged**: 2026-06-09T07:15:38.123Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec # 审查监工策略与会话胀的关系 python3 scripts/[redacted].py --print-json 2>/dev/null | python3 -c " import sys, json d = json.load(sys.stdin) print('===== 审查11: 监工状态 ====') print(f' 策略: {d.get(\"policy_mode\", \"?\")}') print(f' 任务激活: {d.get(\"task_active\", \"?\")}') print(f' 监工状态: {d.get(\"supervisor_state\", \"?\")}') print(f' 活跃任务数: {d.get(\"active_task_c…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-028] tool-policy-blocked
+
+**Logged**: 2026-06-09T07:18:14.461Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode force_on --reason 'session-watcher 全面修复（8 项计划）' --print-human [redacted] [redacted] completed 0 1971
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
