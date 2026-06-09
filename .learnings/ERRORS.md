@@ -17136,3 +17136,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-017] tool-explicit-error
+
+**Logged**: 2026-06-09T02:22:44.079Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py if((u??null)!==(p??null)){try{await i.request(`chat.inject`,{sessionKey:n,message:`正在加载系统`,label:`system-loading`})}catch{};try{await i.request(`chat.inject`,{sessionKey:n,message:`OK 已经读取完成。`,label:`system-ready`})}catch{}} if((u??null)!==(p??null)…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
