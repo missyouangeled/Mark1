@@ -26,9 +26,6 @@ LOAD_THRESHOLD = CORE_COUNT  # 1min 负载 > 核心数 = 过载
 
 # --- helpers ---
 
-def run(cmd: list[str], timeout: int = 30, check: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-
 def run_shell(cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
 
@@ -185,20 +182,19 @@ def step_clean(dry_run: bool = True) -> dict:
             for f in pyc_files:
                 f.unlink(missing_ok=True)
 
-    # journal
-    before_j = run_shell("journalctl --user --no-pager -n 0 2>/dev/null | wc -c")
-    before_bytes = int((before_j.stdout.strip() or "0"))
+    # journal — 用 --disk-usage 直接读实际占用（输出如 "47.3M"）
+    before_j = run_shell("journalctl --user --disk-usage 2>/dev/null")
+    import re
+    before_match = re.search(r'[\d.]+[KMGT]?B?', before_j.stdout)
+    before_str = before_match.group(0) if before_match else "?"
     if not dry_run:
         run_shell("journalctl --user --vacuum-time=2d 2>/dev/null")
-    after_j = run_shell("journalctl --user --no-pager -n 0 2>/dev/null | wc -c") if dry_run else run_shell("journalctl --user --no-pager -n 0 2>/dev/null | wc -c")
-    after_bytes = int((after_j.stdout.strip() or "0"))
-    freed = before_bytes - after_bytes
-    if freed > 1024*1024:
-        print(f"  journal: ~{freed//1024//1024}MB 可释放")
-        if not dry_run:
-            print(f"  journal: 已清理至保留2天")
+        after_j = run_shell("journalctl --user --disk-usage 2>/dev/null")
+        after_match = re.search(r'[\d.]+[KMGT]?B?', after_j.stdout)
+        after_str = after_match.group(0) if after_match else "?"
+        print(f"  journal: {before_str} → {after_str} (保留2天)")
     else:
-        print(f"  journal: journal 已在 2 天内，无需清理")
+        print(f"  journal: 当前占用 {before_str}")
 
     # workspace tmp (保留 voice-replies)
     tmp_dir = WORKSPACE / "tmp"
@@ -272,12 +268,13 @@ def step_memory(dry_run: bool = True) -> None:
 
 # --- Step 5: 验证 ---
 
-def step_verify(before_load: tuple, after_load: tuple) -> None:
+def step_verify(before_load: tuple) -> None:
     print_header("Step 5: 恢复验证")
     load = get_load()
     mem = run_shell("free -h | head -2")
     disk_root = run_shell("df -h / | tail -1")
     print(f"CPU 负载 (1/5/15min): {load[0]} / {load[1]} / {load[2]}")
+    print(f"  修复前: {before_load[0]} → 修复后: {load[0]}")
     print(f"\n{mem.stdout.strip()}")
     print(f"\n{disk_root.stdout.strip()}")
     if load[0] < LOAD_THRESHOLD * 0.7:
@@ -308,7 +305,7 @@ def main() -> None:
     if args.light_clean:
         step_clean(dry_run=False)
         step_memory(dry_run=False)
-        step_verify((0,0,0), (0,0,0))
+        step_verify((0,0,0))
         return
 
     if args.repair:
@@ -331,7 +328,7 @@ def main() -> None:
         step_memory(dry_run=False)
 
         # Step 5: 验证
-        step_verify(before_load, get_load())
+        step_verify(before_load)
 
         print_header("完成")
         print("💡 后续操作请串行化（一个一个来），不要再同时跑多个重任务。")

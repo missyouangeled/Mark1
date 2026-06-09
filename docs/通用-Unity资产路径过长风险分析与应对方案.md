@@ -86,7 +86,7 @@
 
 | 当前 | 修正 |
 |------|------|
-| `Materails/` | `Materials/` ⚠️ 改名会破坏 Unity 引用，需在 plan 中明确标记 |
+| `Materails/` | `Materials/` ⚠️ 改名会触发 Unity 引用丢失，必须在 plan→apply 工作流内通过 `.meta` 配对同步修复；不可手动直接改名 |
 
 #### 2.2.3 最后手段：缩写约定（每处省 5-15 字符）
 
