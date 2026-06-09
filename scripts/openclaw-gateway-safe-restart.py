@@ -187,6 +187,24 @@ def main():
     send_notification(args.reason, "pre")
     print("   → 通知已发送")
 
+    # 1.5 会话状态快照备份（数据盘）
+    print("📸 会话状态快照备份...")
+    if not args.dry_run:
+        try:
+            backup_result = subprocess.run(
+                ["python3", str(WORKSPACE / "scripts/openclaw-session-backup.py")],
+                capture_output=True, text=True, timeout=30,
+                cwd=str(WORKSPACE),
+            )
+            if backup_result.returncode == 0:
+                print("   → 快照已保存到数据盘")
+            else:
+                print(f"   ⚠ 快照备份异常: {backup_result.stderr[:100]}")
+        except Exception as exc:
+            print(f"   ⚠ 快照备份失败: {exc}")
+    else:
+        print("🧪 [预演] 跳过快照备份")
+
     # 2. 保存工作区
     print("💾 保存工作区状态...")
     if args.dry_run:
