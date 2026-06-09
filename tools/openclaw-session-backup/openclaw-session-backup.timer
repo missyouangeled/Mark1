@@ -1,0 +1,9 @@
+[Unit]
+Description=OpenClaw Session Backup Timer — 每 10 分钟备份会话状态
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

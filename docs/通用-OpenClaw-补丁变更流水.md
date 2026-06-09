@@ -1221,3 +1221,31 @@
 - 全体语法(5/5)通过；start.py 无路径→exit=2 中止；rename-check --prefix RoadSide_=正确识别49文件5冲突；--prefix 空=无前缀38不变；scratch-cleanup 分层显示 3 keep+6 recent；start.py 正常流程 preflight→exit=0；finish.py import 全模块可用
 - 相关文件：
 - `scripts/openclaw-rename-conflict-check.py`
+
+## 2026-06-09 16:37:05 CST (+08:00) — 会话备份+UFM全面实施
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- P0修复:备份切systemd timer/增强transcript/紧急快照+UFM新增plan/apply命令
+- 验收 / 验证：
+- 所有脚本语法通过+功能测试通过
+- 相关文件：
+- `scripts/openclaw-session-backup.py`
+
+## 2026-06-09 16:43:00 CST (+08:00) — 会话备份修复 + UFM plan/apply 全面实施
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- P0修复:备份切systemd timer/增强transcript+session-state/紧急快照集成/enhanced context-summary。UFM新增plan/apply命令。
+- 验收 / 验证：
+- 10项烟测全通过
+- 相关文件：
+- `scripts/openclaw-session-backup.py`

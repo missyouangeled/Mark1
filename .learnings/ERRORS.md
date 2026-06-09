@@ -17496,3 +17496,273 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-029] tool-policy-blocked
+
+**Logged**: 2026-06-09T07:29:32.508Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode auto --reason 'session-watcher 修复完成' --print-human [redacted] [redacted] completed 0 2070
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-030] tool-policy-blocked
+
+**Logged**: 2026-06-09T07:48:36.460Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode force_on --reason '大工程体系修复（8项）' --print-human [redacted] [redacted] completed 0 1332
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-031] tool-explicit-error
+
+**Logged**: 2026-06-09T07:50:41.211Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit /home/missyouangeled/.openclaw/workspace/scripts/[redacted].py [redacted] [redacted] 1314
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-032] tool-timeout
+
+**Logged**: 2026-06-09T07:51:11.783Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write #!/usr/bin/env python3 from __future__ import annotations import shutil import subprocess import sys from pathlib import Path WORKSPACE = Path.home() / '.openclaw' / 'workspace' SCRATCH = Path('/mnt/data/openclaw/scratch') def run(cmd: str) -> int: """Run a shell command; print it; return exit code.""" print(f"$ {cmd}") res = subprocess.run(cm…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-033] tool-explicit-error
+
+**Logged**: 2026-06-09T07:51:37.533Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool edit returned an explicit error state.
+
+### Error
+```text
+[edit] Validation failed for tool "edit": edit n, names = clean_idle_subagents() if n > 0: print(f"[info] 检测到 {n} 个疑似闲置子代理") for name in names[:3]: print(f" {name}") print(f"[info] 清理需在 OpenClaw 主会话中执行；已记录为提醒。") else: print(f"[ok] 未检测到闲置子代理") k = clean_idle_subagents() if k > 0: print(f"[ok] 已终止 {k} 个闲置子代理") else: print(f"[ok] 无闲置子代理") /home/missyouangeled/…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: edit
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-034] tool-policy-blocked
+
+**Logged**: 2026-06-09T07:53:53.903Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode auto --reason '大工程体系修复完成' --print-human [redacted] [redacted] completed 0 2605
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-035] tool-policy-blocked
+
+**Logged**: 2026-06-09T08:10:46.720Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode force_on --reason 'session-backup修复 + unity-file-manager设计优先工作流' --print-human 2>&1 | tail -5 [redacted] [redacted] completed 0 5764
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-036] tool-timeout
+
+**Logged**: 2026-06-09T08:12:10.946Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write # 会话备份 + Unity文件管理器 — 全面分析 & 设计方案 > 生成时间: 2026-06-09 16:15 CST > 数据盘备份: `/mnt/data/openclaw/scratch/[redacted]/analysis.md` --- # 第一部分：会话压缩备份机制 ## 1.1 当前现状 ### 已有组件 | 组件 | 路径 | 状态 | |------|------|------| | 备份脚本 | `scripts/openclaw-session-backup.py` | ✅ 存在，功能完整 | | 备份目录 | `/mnt/data/openclaw/session-backup/` | ✅ 22个快照（最新14:55） | | 备份 cron | `…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260609-037] tool-policy-blocked
+
+**Logged**: 2026-06-09T08:26:09.564Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec was blocked by policy or runtime restrictions.
+
+### Error
+```text
+[exec] exec python3 scripts/[redacted].py --set-policy-mode force_on --reason 'session-backup修复 + unity-file-manager plan/apply实施' --print-human 2>&1 | tail -5 [redacted] [redacted] completed 0 6046
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: sometimes
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

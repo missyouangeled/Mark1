@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw Session Backup — 定期备份会话状态到数据盘
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-session-backup.py --quiet
+WorkingDirectory=/home/missyouangeled/.openclaw/workspace
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=session-backup
