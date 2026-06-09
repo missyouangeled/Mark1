@@ -10,7 +10,8 @@ If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out w
 
 Before doing anything else:
 
-0. **Read `RULES_INDEX.md` first** — this is the compact rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.
+0. **Read `BOOT_INDEX.md` first** — this is the AI startup entry point (≤50 lines). It contains the complete tiered loading plan. Follow it exactly, including the 「正在加载系统」reply after Tier 1. All startup file paths and loading order are maintained in BOOT_INDEX.md — do not replicate them elsewhere.
+0.1 **Read `RULES_INDEX.md`** — compact domain rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
