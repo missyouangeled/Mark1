@@ -16866,3 +16866,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260609-009] tool-explicit-error
+
+**Logged**: 2026-06-09T00:11:01.211Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll warm-reef 10000 [redacted] [redacted] failed 0 2260
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:main
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
