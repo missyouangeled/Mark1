@@ -1305,3 +1305,17 @@
 - 语法 OK，四场景模拟全过：聊天中、跳过一次 timer、真睡眠、醒来已重连均正确
 - 相关文件：
 - `scripts/openclaw-resume-watch.sh`
+
+## 2026-06-10 17:20:59 CST (+08:00) — 会话备份链路全面修复 + 问题解决标准流程建立
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修复了导致重启后丢失上下文的链式问题：context-summary 50行→200行+daily正文、备份保留14天→7天、新增每日自动清理、secret-uploads自动清理、Agnes API记录归入MEMORY、建立了六步问题解决标准流程并接入BOOT_INDEX和RULES_INDEX启动链
+- 验收 / 验证：
+- context-summary成功包含daily正文摘要+200行transcript尾部，lifecycle-maintainer日期判断四场景全过
+- 相关文件：
+- `scripts/openclaw-session-backup.py`

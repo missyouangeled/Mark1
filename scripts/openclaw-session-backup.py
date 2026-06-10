@@ -41,7 +41,7 @@ MEMORY_FILE = WORKSPACE / "MEMORY.md"
 SOUL_FILE = WORKSPACE / "SOUL.md"
 USER_FILE = WORKSPACE / "USER.md"
 SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
-RETENTION_DAYS = 14
+RETENTION_DAYS = 7
 MANIFEST_FILE = BACKUP_ROOT / "backup-manifest.json"
 
 # 磁盘安全检查阈值：workspace 所在盘余量低于此值（GB），只写数据盘
@@ -268,16 +268,36 @@ def build_context_summary() -> str:
     if today_file.exists():
         summary += f"## 今日记录\n摘要已备份至 `daily-{get_date_str()}.md`\n\n"
 
-    # 新增：从 transcript 提取最后 50 行
+    # 从 daily.md 提取今日摘要正文（含「今日摘要」+「重要事项」区块）
+    today_md = MEMORY_DIR / f"{get_date_str()}.md"
+    if today_md.exists():
+        try:
+            md_full = today_md.read_text(encoding="utf-8")
+            # 提取从「## 今日摘要」到下一个同级标题或文件末尾
+            import re
+            m = re.search(r'(## 今日摘要.*?)(?=\n## |\Z)', md_full, re.DOTALL)
+            if m:
+                excerpt = m.group(1).strip()
+                # 限制 800 字符防止过长
+                if len(excerpt) > 800:
+                    excerpt = excerpt[:800] + "\n...(已截断)"
+                summary += "## 今日摘要（来自 daily.md）\n"
+                summary += excerpt + "\n\n"
+        except Exception:
+            pass
+
+    # 从 transcript 提取最后 200 行（覆盖约最近 1 小时）
     transcript_file = MEMORY_DIR / f"{get_date_str()}-transcript.md"
     if transcript_file.exists():
         try:
             full = transcript_file.read_text(encoding="utf-8")
             lines = full.split("\n")
-            last_50 = lines[-50:] if len(lines) >= 50 else lines
-            summary += "## 今日对话摘要（最后 50 行）\n"
+            total = len(lines)
+            tail_count = 200 if total >= 200 else total
+            tail_lines = lines[-tail_count:] if total >= tail_count else lines
+            summary += f"## 今日对话摘要（第 {total - tail_count + 1}-{total} 行 / 共 {total} 行）\n"
             summary += "```\n"
-            summary += "\n".join(last_50)
+            summary += "\n".join(tail_lines)
             summary += "\n```\n\n"
         except Exception:
             pass

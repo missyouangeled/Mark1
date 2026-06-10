@@ -41,6 +41,19 @@ if [ -d "${INFO_OUT}" ]; then
     done < <(find "${INFO_OUT}" -type f -mmin +240 -print0 2>/dev/null || true)
 fi
 
+# ── secret-uploads 临时上传页：超过 24 小时 ──
+SECRET_DIR="${WORKSPACE}/tmp/secret-uploads"
+if [ -d "${SECRET_DIR}" ]; then
+    while IFS= read -r -d '' f; do
+        sz=$(stat -c%s "$f" 2>/dev/null || echo 0)
+        rm -f "$f"
+        cleaned_count=$((cleaned_count + 1))
+        cleaned_bytes=$((cleaned_bytes + sz))
+    done < <(find "${SECRET_DIR}" -type f -mmin +1440 -print0 2>/dev/null || true)
+    # 清空后删除空目录
+    find "${SECRET_DIR}" -type d -empty -delete 2>/dev/null || true
+fi
+
 # ── 通用 tmp 旧文件：超过 24 小时（保守，避免误删正在用的） ──
 GENERAL_TMP="${WORKSPACE}/tmp"
 if [ -d "${GENERAL_TMP}" ]; then

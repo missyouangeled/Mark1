@@ -34,6 +34,7 @@ LOG_PATH = STATE_DIR / "maintainer.log"
 LOG_ROTATE_MAX_BYTES = 256 * 1024
 LOG_ROTATE_KEEP_BYTES = 64 * 1024
 CLEANUP_EVERY_N = 2  # 15min × 2 = 30min (timer changed from 5min to 15min)
+DAILY_DATE_KEY = "lastDailyCleanupDate"  # 用于记录上次 daily 清理日期
 
 
 def now_iso() -> str:
@@ -153,8 +154,8 @@ def main():
         if new_count > CLEANUP_EVERY_N:
             new_count = 1
 
+    counter_payload = {"count": new_count, "cleanupEvery": CLEANUP_EVERY_N}
     do_cleanup = (new_count == CLEANUP_EVERY_N)
-    save_json(COUNTER_PATH, {"count": new_count, "cleanupEvery": CLEANUP_EVERY_N})
 
     checks = []
 
@@ -173,6 +174,23 @@ def main():
 
     # 1.6 daily 摘要骨架（每次轻量确认，避免启动读取 ENOENT）
     checks.append(ensure_daily_skeleton())
+
+    # 1.8 每日备份清理 + scratch 清理（每天一次，不依赖计数器）
+    today_str = str(datetime.now().astimezone().date())
+    do_daily = old_counter.get(DAILY_DATE_KEY) != today_str if isinstance(old_counter, dict) else True
+    if do_daily:
+        counter_payload[DAILY_DATE_KEY] = today_str
+        checks.append(run_sub_check(
+            "backup-cleanup",
+            [sys.executable, str(SCRIPTS / "openclaw-session-backup.py"), "--clean", "7"],
+            timeout=30,
+        ))
+        checks.append(run_sub_check(
+            "scratch-cleanup",
+            [sys.executable, str(SCRIPTS / "openclaw-scratch-cleanup.py"), "--days", "7"],
+            timeout=60,
+        ))
+        append_log(f"daily backup & scratch cleanup triggered (date={today_str})")
 
     # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
     if do_cleanup:
@@ -193,6 +211,9 @@ def main():
     all_ok = all(c.get("ok") for c in checks)
     summary = "；".join(c.get("summary", "?") for c in checks)
     overall = "OK" if all_ok else "⚠"
+
+    # 统一保存计数器（包含 daily 日期标记和 run count）
+    save_json(COUNTER_PATH, counter_payload)
 
     report = {
         "checkedAt": now_iso(),
