@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-06-10 | 老电脑（Windows 10 + GTX 1070）计算节点部署
+
+### ✅ 安装：Python 3.12.8 完整版
+- **时间**：2026-06-10 11:30 CST
+- **来源**：https://mirrors.tuna.tsinghua.edu.cn/python/3.12.8/python-3.12.8-amd64.exe
+- **命令**：`python-3.12.8-amd64.exe /quiet InstallAllUsers=0 TargetDir=E:\tools\python312 PrependPath=0 Include_test=0`
+- **安装路径**：`E:\tools\python312\`
+- **依赖**：无
+- **备注**：完整版解决嵌入式 Python DLL 加载问题（PyTorch shm.dll 依赖链断裂）。未加入系统 PATH。pip 已配阿里云镜像。
+
+### ✅ 安装：PyTorch 2.6.0+cu118
+- **时间**：2026-06-10 11:40 CST
+- **来源**：https://download.pytorch.org/whl/cu118/torch-2.6.0%2Bcu118-cp312-cp312-win_amd64.whl（宿主机下载后局域网拷贝到 E 盘）
+- **命令**：`E:\tools\python312\python.exe -m pip install E:\tools\torch-2.6.0+cu118-cp312-cp312-win_amd64.whl`
+- **安装路径**：`E:\tools\python312\Lib\site-packages\torch\`
+- **依赖**：numpy, sympy, jinja2, networkx, filelock, fsspec, typing-extensions 等
+- **备注**：GTX 1070 CUDA 可用，实测 1000×1000 矩阵 2ms（CPU 77ms，快 39 倍）。原尝试 cu124 版但驱动 472.84 只到 CUDA 11.4 不兼容，降级 cu118 成功。直接 SSH 下载 2.5GB 多次断流，改为宿主机下载局域网拷贝。
+
+### ✅ 安装：numpy
+- **时间**：2026-06-10 11:42 CST
+- **来源**：阿里云 PyPI 镜像
+- **命令**：`E:\tools\python312\python.exe -m pip install numpy`
+- **安装路径**：`E:\tools\python312\Lib\site-packages\numpy\`
+- **备注**：PyTorch 的 NumPy 集成所需
+
+### 🔧 配置：SSH Server（OpenSSH）
+- **时间**：2026-06-10 08:30 CST
+- **操作**：启用 Windows 自带的 OpenSSH Server，设为开机自启
+- **防火墙**：已放行 22 端口
+- **VM 侧配置**：`~/.ssh/config` 添加 `Host old-pc` 别名（密码认证）
+- **备注**：局域网直连，ping 延迟 ~7ms
+
+### ⚠️ 已知限制：NVIDIA 驱动过旧
+- **当前版本**：472.84（2021年 R470 分支，CUDA 11.4）
+- **最新可用**：566.36（支持 CUDA 12.4）
+- **影响**：PyTorch cu124+ 不可用，仅能用 cu118
+- **更新尝试**：403 Forbidden 拦下，暂不更新
+- **备注**：cu118 对当前任务完全够用
+
+---
+
 ## 2026-05-28 | 批量卸载清理
 
 ### ❌ 卸载：google-chrome-stable

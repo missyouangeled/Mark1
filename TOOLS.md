@@ -27,7 +27,9 @@ Things like:
 
 ### SSH
 
-- home-server → 192.168.1.100, user: admin
+- old-pc（点点老电脑/公司 Windows） → 192.168.18.13, user: BIT-015, 密码认证（见 ~/.ssh/config）
+  - 用途：GPU 卸载（GTX 1070 4GB）+ 隔离实验 + 长耗时任务
+  - 约束：所有工具装 E 盘，不碰 C 盘和系统
 
 ### TTS
 

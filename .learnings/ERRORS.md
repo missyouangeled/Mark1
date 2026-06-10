@@ -18276,3 +18276,1263 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260610-012] tool-timeout
+
+**Logged**: 2026-06-10T00:56:04.332Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write name: infos-handle 测试 on: push: paths: - scripts/openclaw-infos-handle.py - scripts/core/** - scripts/[redacted].py - scripts/[redacted].py - scripts/[redacted].py - scripts/[redacted].py - .github/workflows/test-infos-handle.yml pull_request: paths: - scripts/openclaw-infos-handle.py - scripts/core/** - scripts/[redacted].py - scripts/[redact…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-013] tool-timeout
+
+**Logged**: 2026-06-10T01:16:30.777Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec sshpass -p '209312' ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 BIT-015@192.168.18.13 'echo connected && whoami && hostname && ver' 2>&1 [redacted] [redacted] completed 255 10760
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-014] user-reported-error
+
+**Logged**: 2026-06-10T01:23:02.091Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-06-10 09:22 GMT+8] 报错
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260610-015] user-reported-error
+
+**Logged**: 2026-06-10T01:25:12.199Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-06-10 09:25 GMT+8] 也是报错
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260610-016] user-reported-error
+
+**Logged**: 2026-06-10T01:27:28.824Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Wed 2026-06-10 09:27 GMT+8] 报错
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260610-017] tool-timeout
+
+**Logged**: 2026-06-10T01:33:53.209Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec sshpass -p '209312' ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 BIT-015@192.168.18.13 'echo connected && whoami && hostname && ver' 2>&1 [redacted] [redacted] completed 255 7366
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-018] tool-timeout
+
+**Logged**: 2026-06-10T01:34:04.740Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec sshpass -p '209312' ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o [redacted]=password BIT-015@192.168.18.13 'echo ok' 2>&1 [redacted] [redacted] completed 0 6939
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-019] tool-timeout
+
+**Logged**: 2026-06-10T01:34:16.290Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec sshpass -p '209312' ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o [redacted]=password BIT-015@192.168.18.13 'whoami && hostname && systeminfo | findstr /B /C:"OS Name" /C:"Total Physical Memory" /C:"Processor"' 2>&1 [redacted] [redacted] completed 1 8369
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-020] tool-timeout
+
+**Logged**: 2026-06-10T01:34:30.037Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec sshpass -p '209312' ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o [redacted]=password BIT-015@192.168.18.13 'whoami && hostname && wmic os get Caption,TotalVisibleMemorySize /format:list && wmic cpu get Name,NumberOfCores /format:list' 2>&1 [redacted] [redacted] completed 0 6688
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-021] tool-explicit-error
+
+**Logged**: 2026-06-10T01:40:25.441Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll neat-bloom 30000 [redacted] [redacted] failed 75 5821
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-022] tool-timeout
+
+**Logged**: 2026-06-10T01:46:23.735Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 杀掉慢的下载 kill %1 2>/dev/null pkill -f "curl.*python-3.12.8" 2>/dev/null # 换个更快的镜像源 echo "用中科大镜像试试..." curl -L --connect-timeout 5 -o /dev/null -w "%{http_code} %{time_total}s %{size_download}bytes" "[url] 2>&1 20 [redacted] [redacted] failed 4870
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-023] tool-timeout
+
+**Logged**: 2026-06-10T01:46:42.073Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 测几个镜像源的速度 for url in \ "[url] \ "[url] \ "[url] do echo -n "$(echo $url | cut -d/ -f3 | cut -c1-15): " curl -L --connect-timeout 5 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "$url" 2>&1 done 30 [redacted] [redacted] completed 0 12651
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-024] tool-timeout
+
+**Logged**: 2026-06-10T01:47:05.265Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # 下载 Python 嵌入版（11MB，快） echo "Python embed..." curl -L -# -o python-3.12.8-embed-amd64.zip "[url] 2>&1 | tail -2 ls -lh python-3.12.8-embed-amd64.zip echo "" echo "Miniconda (slim, 带 Python + CUDA 依赖)..." # 用 miniforge 或 micromamba，更小更快 curl -L --connect-timeout 10 -o /dev/null -w "%{http_code} %{size_downl…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-025] tool-timeout
+
+**Logged**: 2026-06-10T01:47:26.053Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # Miniconda 94MB 太大了，而且它会在 C 盘写东西。 # 更好的方案：用 micromamba（~5MB，纯命令行，全装 E 盘） echo "下载 micromamba (轻量包管理器，替代 Miniconda)..." curl -L --connect-timeout 10 -o /dev/null -w "%{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 20 [redacted] [redacted] running 14797
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-026] tool-timeout
+
+**Logged**: 2026-06-10T01:50:10.130Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # 用清华镜像下载 Git 便携版 7z（小，解压直接用） echo "Git portable..." curl -L --connect-timeout 10 -o /dev/null -w "%{http_code} %{size_download}bytes\n" "[url] 2>&1 20 [redacted] [redacted] completed 0 6488
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-027] tool-timeout
+
+**Logged**: 2026-06-10T01:50:32.596Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # GitHub Release 镜像没命中。直接测原始 GitHub 下载速度 echo "GitHub 直接下载..." curl -L --connect-timeout 15 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 30 [redacted] [redacted] completed 56 14983
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-028] tool-timeout
+
+**Logged**: 2026-06-10T01:50:43.969Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # GitHub 被墙。试试 jsDelivr CDN 镜像 echo "jsDelivr..." curl -L --connect-timeout 10 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 15 [redacted] [redacted] completed 0 7200
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-029] tool-timeout
+
+**Logged**: 2026-06-10T01:50:53.373Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 试试 git-scm.com 官方源（这个在国内通常能通） curl -L --connect-timeout 15 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 20 [redacted] [redacted] completed 0 6213
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-030] tool-timeout
+
+**Logged**: 2026-06-10T01:51:13.061Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # 国内 Git 镜像：阿里云 OSS 镜像 for url in \ "[url] \ "[url] \ "[url] do echo -n "$(echo $url | cut -d/ -f3 | cut -c1-20): " curl -L --connect-timeout 8 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "$url" 2>&1 done 30 [redacted] [redacted] running 14563
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-031] tool-timeout
+
+**Logged**: 2026-06-10T01:51:59.103Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # FFmpeg - 压缩包不到 40MB echo "FFmpeg..." curl -L --connect-timeout 10 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 # CUDA toolkit 太大了（2.9GB），不适合下载再传。 # 更好的方案：用 pip 安装 PyTorch 的 CUDA 版本，不需要完整 CUDA toolkit echo "" echo "CUDA方案：不装完整toolkit，只通过 pip 装 cuda-python + pytorch…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-032] tool-timeout
+
+**Logged**: 2026-06-10T01:52:39.218Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # FFmpeg 官方 gyan.dev 编译版 echo "FFmpeg gyan..." curl -L --connect-timeout 10 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 15 [redacted] [redacted] running 15107
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-033] tool-explicit-error
+
+**Logged**: 2026-06-10T01:52:48.946Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process cool-willow 15000 poll [redacted] [redacted] failed 0 7201
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-034] tool-explicit-error
+
+**Logged**: 2026-06-10T01:54:34.391Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 停掉正在传的 scp kill %1 2>/dev/null; pkill -f "scp.*PortableGit" 2>/dev/null echo "已停" [redacted] [redacted] failed 4443
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-035] tool-explicit-error
+
+**Logged**: 2026-06-10T01:59:00.668Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill mild-bison [redacted] [redacted] failed 4454
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-036] tool-explicit-error
+
+**Logged**: 2026-06-10T02:01:11.912Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill swift-nexus [redacted] [redacted] failed 4475
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-037] tool-explicit-error
+
+**Logged**: 2026-06-10T02:02:04.781Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process kill delta-nudibranch [redacted] [redacted] failed 5672
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-038] tool-explicit-error
+
+**Logged**: 2026-06-10T02:04:11.604Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process 60000 clear-kelp poll [redacted] [redacted] failed 1 17730
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-039] tool-timeout
+
+**Logged**: 2026-06-10T02:05:13.753Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc # npmmirror PyTorch 镜像，国内 CDN 稳 echo "npmmirror torch 2.6.0 CUDA 12.4..." curl -L --connect-timeout 10 -o /dev/null -w "HTTP %{http_code} %{size_download}bytes %{time_total}s\n" "[url] 2>&1 15 [redacted] [redacted] completed 0 8773
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-040] tool-timeout
+
+**Logged**: 2026-06-10T02:05:42.962Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec # npmmirror 没有这个精确版本。换策略： # 1. 在 VM 上用更强的连接下载 # 2. 断点续传 cd /mnt/data/openclaw/downloads/old-pc rm -f torch-*.whl # 用 wget 下载（支持断点续传 + 长超时） echo "wget 尝试..." wget --tries=3 --timeout=30 --continue -O torch-2.6.0+cu124-win_amd64.whl "[url] 2>&1 | tail -5 600 [redacted] [redacted] running 15823
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-041] tool-explicit-error
+
+**Logged**: 2026-06-10T02:06:06.728Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 杀掉残余进程 kill %1 %2 2>/dev/null; pkill -f "wget.*torch" 2>/dev/null # 最简单的验证：nvidia-smi 已经确认驱动OK(472.84)，GPU 空闲(7502MB) # 现在直接看老电脑 E 盘有无现有 Python/CUDA 环境 sshpass -p '209312' ssh old-pc 'dir /s /b C:\*python*.exe 2>nul & dir /s /b C:\Program Files\NVIDIA GPU Computing Toolkit\*nvcc.exe 2>nul & dir /s /b E:\*.py 2>nul & dir E:\tools\python\Lib\sit…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-042] tool-explicit-error
+
+**Logged**: 2026-06-10T02:06:35.283Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cat > /tmp/test_cuda_simple.py << 'PYEOF' """最小 CUDA 可用性验证 —— 不依赖 PyTorch/CuPy，直接调 nvcuda.dll""" import ctypes, sys print("=== 老电脑 CUDA 就绪检查 ===") # 1. 加载 nvcuda.dll（GPU 驱动自带，已装 nvidia-smi 就一定有） try: cuda = ctypes.windll.nvcuda # type: ignore print("✅ nvcuda.dll 已加载") except Exception as e: print(f"❌ 无法加载 nvcuda.dll: {e}") sys.exit(1) # 2. 枚举 GP…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-043] tool-explicit-error
+
+**Logged**: 2026-06-10T02:06:58.727Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cat > /tmp/test_cuda_simple.py << 'PYEOF' """Minimal CUDA readiness check - no PyTorch needed, directly calls nvcuda.dll""" import ctypes, sys print("=== Old PC CUDA Check ===") try: cuda = ctypes.windll.nvcuda print("[OK] nvcuda.dll loaded") except Exception as e: print(f"[FAIL] Cannot load nvcuda.dll: {e}") sys.exit(1) CUresult = ctypes.c_int …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-044] tool-explicit-error
+
+**Logged**: 2026-06-10T02:45:44.546Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec kill %1 2>/dev/null; pkill -f "scp.*torch" 2>/dev/null; echo "已停" [redacted] [redacted] failed 5700
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-045] tool-explicit-error
+
+**Logged**: 2026-06-10T02:45:53.313Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec pkill -9 -f "scp.*torch" 2>/dev/null; sleep 1; ps aux | grep scp | grep -v grep || echo "无残留SCP进程" [redacted] [redacted] failed 5567
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-046] tool-explicit-error
+
+**Logged**: 2026-06-10T03:06:38.429Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process salty-mist kill [redacted] [redacted] failed 1313
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-047] tool-explicit-error
+
+**Logged**: 2026-06-10T03:22:16.004Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll young-falcon 120000 [redacted] [redacted] failed 1 31307
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-048] tool-explicit-error
+
+**Logged**: 2026-06-10T03:24:10.121Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec # 用 Python ctypes 直接加载 shm.dll 看具体报哪个依赖缺失 sshpass -p '209312' ssh old-pc 'E:\tools\python\python.exe -c " import ctypes, ctypes.wintypes, os, subprocess # 找到 shm.dll dll = r\"E:\tools\python\Lib\site-packages\torch\lib\shm.dll\" # 用 dependents.py 方式查缺失 import struct try: ctypes.windll.kernel32.SetDllDirectoryW(r\"E:\tools\python\Lib\site-package…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-049] tool-explicit-error
+
+**Logged**: 2026-06-10T03:24:20.925Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cat > /tmp/check_dll.py << 'PYEOF' import ctypes, os dll_dir = r"E:\tools\python\Lib\site-packages\torch\lib" os.add_dll_directory(dll_dir) for name in ["shm.dll", "c10.dll", "torch_cpu.dll", "fbgemm.dll", "asmjit.dll"]: try: ctypes.CDLL(os.path.join(dll_dir, name)) print(f"[OK] {name}") except Exception as e: print(f"[FAIL] {name}: {e}") PYEOF …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-050] tool-timeout
+
+**Logged**: 2026-06-10T03:25:00.681Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cat > /tmp/check_dll2.py << 'PYEOF' import ctypes, os, sys dll_dir = r"E:\tools\python\Lib\site-packages\torch\lib" os.add_dll_directory(dll_dir) # 也把 System32 加入搜索 os.add_dll_directory(r"C:\Windows\System32") # 直接找 shm.dll 的缺失依赖 # 用 kernel32 LoadLibraryEx + GetLastError kernel32 = ctypes.windll.kernel32 kernel32.[redacted](0x00001000) # [redact…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-051] tool-timeout
+
+**Logged**: 2026-06-10T03:30:42.702Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /mnt/data/openclaw/downloads/old-pc echo "清华镜像下载 Python 3.12.8 完整版..." curl -L --connect-timeout 30 -o python-3.12.8-amd64.exe "[url] 2>&1 ls -lh python-3.12.8-amd64.exe 120 [redacted] [redacted] completed 0 10501
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-052] tool-explicit-error
+
+**Logged**: 2026-06-10T03:37:34.904Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll fresh-haven 600000 [redacted] [redacted] failed 0 30142
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-053] tool-explicit-error
+
+**Logged**: 2026-06-10T03:39:01.096Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool process returned an explicit error state.
+
+### Error
+```text
+[process] process poll grand-mist 60000 [redacted] [redacted] failed 0 11564
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: process
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
