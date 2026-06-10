@@ -1277,3 +1277,31 @@
 - 语法检查通过，逻辑干跑验证负载判断正确
 - 相关文件：
 - `scripts/openclaw-health-collector.py`
+
+## 2026-06-10 07:49:51 CST (+08:00) — resume-watch 死循环修复：阈值 180→600
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- openclaw-resume-watch.sh THRESHOLD_SECONDS 从 180 改成 600。根因：timer 每 5 分钟触发，阈值 180 秒 < 300 秒，每次都误判为睡眠并重启 Gateway，近 24h 重启 29 次。修复后 300 < 600，不再误触发；真睡眠 >10min 仍可检测
+- 验收 / 验证：
+- timer 07:49 触发后无重启，对比修复前 07:44 即重启
+- 相关文件：
+- `scripts/openclaw-resume-watch.sh`
+
+## 2026-06-10 07:57:32 CST (+08:00) — resume-watch 加活跃连接检测：在线时永不重启
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- scripts/openclaw-resume-watch.sh 增加 has_active_connections()：用 ss 检查 Gateway :18789 ESTABLISHED 连接。gap>600s 但用户在线 → 跳过重启仅更新 last_ts。只在 gap>600 且无活跃连接时才执行重启，彻底消除误杀
+- 验收 / 验证：
+- 语法 OK，四场景模拟全过：聊天中、跳过一次 timer、真睡眠、醒来已重连均正确
+- 相关文件：
+- `scripts/openclaw-resume-watch.sh`

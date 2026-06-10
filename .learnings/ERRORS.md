@@ -17946,3 +17946,333 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260610-001] tool-timeout
+
+**Logged**: 2026-06-10T00:14:32.734Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && grep -n '[redacted]\|DEFAULT_IMAGE_PRESET\|DEFAULT_AUDIO_PRESET\|DEFAULT_OUTPUT_ROOT\|DEFAULT_BROKER_ROOT\|BROKER_SCRIPT\|FRONTSTAGE_HELPER\|DEFAULT_*_PATH\|WORKSPACE' scripts/core/main.py | head -20 [redacted] [redacted] completed 0 5267
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-002] tool-timeout
+
+**Logged**: 2026-06-10T00:14:41.497Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && grep -n '[redacted]\|DEFAULT_IMAGE_PRESET' scripts/core/catalog.py [redacted] [redacted] completed 0 5824
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-003] tool-timeout
+
+**Logged**: 2026-06-10T00:14:57.488Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && grep -rn '[redacted]' scripts/core/ [redacted] [redacted] completed 0 5749
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-004] tool-timeout
+
+**Logged**: 2026-06-10T00:15:13.414Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && grep -n '[redacted]' scripts/openclaw-infos-handle.py.bak [redacted] [redacted] completed 0 5608
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-005] tool-timeout
+
+**Logged**: 2026-06-10T00:15:32.145Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -n "[redacted]" /home/missyouangeled/.openclaw/workspace/scripts/core/main.py [redacted] [redacted] completed 0 42
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:1767c299-a23b-4dd0-8598-882072e8df73
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-006] tool-timeout
+
+**Logged**: 2026-06-10T00:15:33.291Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -n "[redacted]" /home/missyouangeled/.openclaw/workspace/scripts/core/catalog.py [redacted] [redacted] completed 1 29
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:1767c299-a23b-4dd0-8598-882072e8df73
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-007] tool-timeout
+
+**Logged**: 2026-06-10T00:15:38.895Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec grep -rn "[redacted]" /home/missyouangeled/.openclaw/workspace/scripts/ [redacted] [redacted] completed 0 713
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:1767c299-a23b-4dd0-8598-882072e8df73
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-008] tool-timeout
+
+**Logged**: 2026-06-10T00:15:45.733Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] exec find /home/missyouangeled/.openclaw/workspace/scripts/core/__pycache__ -name "*.pyc" -delete && python3 -c "from core.catalog import [redacted]; print('ok:', [redacted])" 2>&1 /home/missyouangeled/.openclaw/workspace/scripts [redacted] [redacted] completed 0 271
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:1767c299-a23b-4dd0-8598-882072e8df73
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-009] tool-timeout
+
+**Logged**: 2026-06-10T00:16:06.792Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec timed out.
+
+### Error
+```text
+[exec] Operation aborted exec process action=poll session=glow-coral timeout=10000 [redacted] [redacted] 4225
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b:run:1767c299-a23b-4dd0-8598-882072e8df73
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-010] tool-explicit-error
+
+**Logged**: 2026-06-10T00:16:51.781Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && python3 -c " import ast, sys # 找出每个模块实际定义了哪些公开符号 exports = {} for m in ['catalog', 'snapshot', 'query', 'image', 'audio', 'main']: try: tree = ast.parse(open(f'scripts/core/{m}.py').read()) names = set() for node in ast.walk(tree): if isinstance(node, ast.FunctionDef): names.add(node.name) elif isin…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260610-011] tool-explicit-error
+
+**Logged**: 2026-06-10T00:18:38.562Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec cd /home/missyouangeled/.openclaw/workspace && echo "=== 完整测试报错 ===" && python3 scripts/[redacted].py 2>&1 | grep -E 'AssertionError|Traceback|error|failed' | head -10 && echo "=== 第二测试 ===" && python3 scripts/[redacted].py 2>&1 | head -20 120 [redacted] [redacted] completed 0 6093
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
