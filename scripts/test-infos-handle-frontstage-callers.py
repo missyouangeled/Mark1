@@ -348,6 +348,9 @@ def main() -> int:
         print("PASS contract_helper_invoke_query")
 
     infos_handle = load_module("openclaw-infos-handle.py", "infos_handle_query_compat")
+    # 拆分后 handle_request 在 core.main 里，monkey-patch 需打到 core.main 上
+    sys.path.insert(0, str(WORKSPACE / "scripts"))
+    import core.main as core_main
     query_shell_calls: dict[str, object] = {}
 
     def query_shell_handle_request(request, *, request_input_mode="flags", response_output_mode="stdout"):
@@ -392,7 +395,7 @@ def main() -> int:
             },
         }
 
-    infos_handle.handle_request = query_shell_handle_request
+    core_main.handle_request = query_shell_handle_request
     original_argv = sys.argv[:]
     query_stdout = io.StringIO()
     with tempfile.TemporaryDirectory(prefix="infos-handle-query-shell-") as tmp:

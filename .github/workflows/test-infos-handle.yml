@@ -1,0 +1,40 @@
+name: infos-handle 测试
+
+on:
+  push:
+    paths:
+      - scripts/openclaw-infos-handle.py
+      - scripts/core/**
+      - scripts/test-openclaw-infos-handle.py
+      - scripts/test-infos-handle-frontstage-callers.py
+      - scripts/openclaw_infos_handle_contract.py
+      - scripts/openclaw-infos-handle-sidecar.py
+      - .github/workflows/test-infos-handle.yml
+  pull_request:
+    paths:
+      - scripts/openclaw-infos-handle.py
+      - scripts/core/**
+      - scripts/test-openclaw-infos-handle.py
+      - scripts/test-infos-handle-frontstage-callers.py
+      - scripts/openclaw_infos_handle_contract.py
+      - scripts/openclaw-infos-handle-sidecar.py
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 完整功能测试
+        run: python3 scripts/test-openclaw-infos-handle.py
+
+      - name: Contract 契约 + 消费者测试
+        run: python3 scripts/test-infos-handle-frontstage-callers.py
