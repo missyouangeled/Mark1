@@ -1222,3 +1222,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
 
 ---
+
+## [LRN-20260611-001] correction
+
+**Logged**: 2026-06-11T02:58:42.872Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Thu 2026-06-11 10:58 GMT+8] 然后我打算升级OpenClaw 你先看看最新版本都更新了什么。应该是有更新说明吧，然后统计一下咱这个系统的逻辑，层级，工具，补丁，等，准备升级方案，包括升级完了以后如何修复，更新什么，重启什么。能理解吗 开始做吧。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+---
