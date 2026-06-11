@@ -637,7 +637,8 @@ def main():
                 print(json.dumps(report, ensure_ascii=False, indent=2))
             elif args.print_human:
                 print("idle - fast skip")
-            conn.close()
+            if conn is not None:
+                conn.close()
             return 0
 
     # ── 全量扫描 ──

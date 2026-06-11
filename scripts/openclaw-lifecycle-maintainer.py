@@ -196,11 +196,7 @@ def main():
             [sys.executable, str(SCRIPTS / "memory-index-builder.py")],
             timeout=30,
         ))
-        checks.append(run_sub_check(
-            "qmd-reindex",
-            ["qmd", "reindex"],
-            timeout=60,
-        ))
+        # qmd reindex removed upstream (v2026.6.5+); qmd auto-indexes on queries
         append_log(f"daily backup & scratch cleanup triggered (date={today_str})")
 
     # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
