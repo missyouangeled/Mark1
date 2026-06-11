@@ -249,29 +249,133 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 
 ## 2026-06-11: 2026.5.22 → 2026.6.5
 
-### 升级过程
-- npm update -g openclaw: 新增2包，删除72包，变更283包
-- 升级前 git checkpoint 已提交
-- 新 gateway 排水重启（老进程 drain 300s），重启用 `systemctl --user restart`
+### 基本参数
 
-### 上游变化
-- 安全边界收紧：exec 审批超时 fail-close、沙箱 bind/环境继承/MCP stdio 加固
-- Plugin/Skill 安装改用 operator install policy
-- Agent/Codex runtime 恢复更稳健
-- 新增 `data-chat-model-select` 内建模型选择器（不再需要我们的补丁）
-- 新增 `hasActiveRun` 内建聊天运行指示器
-- SQLite 状态迁移（cron、tasks、memory）
+| 项目 | 内容 |
+|------|------|
+| 升级日期 | 2026-06-11 |
+| 旧版本 | 2026.5.22 (a374c3a) |
+| 新版本 | 2026.6.5 (5181e4f) |
+| 触发方式 | 用户手动 `npm update -g openclaw` |
+| 升级前 git | checkpoint 已提交并 push |
+| 所在机器 | 公司（Linux）— `missyouangeled-VMware-Virtual-Platform` |
+| npm 变化 | +2 包，-72 包，~283 包 |
 
-### 补丁适配
-- **品牌补丁**: 函数名更新（fj/OD→OA, ek→w, bx→Ag, Il→gh, Uc→Cg, Gl/Tx→qg），新增 v2026.6.5 检测路径
-- **INVALID_FINAL_RELOAD**: 函数名 Gl→qg，模式已更新
-- **模型选择器补丁**: 上游已内建，跳过
-- **Chat running 补丁**: 上游 hasActiveRun 已内建，跳过
-- **Resume-watch**: 保持关闭（升级后未重新激活）
-- **Unified proxy / infos-handle**: 无需更新，直接复用
+### 预检
 
-### 验证
-- Gateway v2026.6.5 正常运行
-- Control UI 可访问 (200)
-- 品牌注入生效（贾维斯 Control）
-- 4 个 watcher timer 全部 active
+从 5.22 到 6.5 跨 4 个正式版 + 多个 beta，上游主要变动：
+
+1. **安全边界收紧**：exec 审批超时 fail-close、沙箱 bind / 环境继承 / MCP stdio 加固
+2. **Control UI 重构**：前端 bundle 函数名全部更换（OD→OA, ek→w, bx→Ag, Il→gh, Uc→Cg 等），对应我们的所有 JS 补丁需要重映射
+3. **内建能力**：`data-chat-model-select`（模型选择器）和 `hasActiveRun`（聊天运行指示器）已由上游原生实现
+4. **Plugin/Skill**：安装改用 operator install policy
+5. **SQLite 迁移**：cron、tasks、memory 自动迁移到 SQLite 状态
+6. **Gateway 排水**：restart 时老进程 drain 300s 排水
+
+### 已知风险
+
+| 风险项 | 可能性 | 原因 | 实际结果 |
+|--------|--------|------|----------|
+| PATH 被重置 | 中 | systemd 环境隔离 | ❌ 未发生（本次 PATH 完好） |
+| 品牌补丁失效 | 高 | 函数名全部更换 | ✅ 已修复（新检测路径） |
+| 模型选择器失效 | 高 | 函数名全部更换 | ✅ 已内建，无需补丁 |
+| 运行指示器失效 | 高 | 函数名全部更换 | ✅ 已内建，无需补丁 |
+| INVALID_FINAL_RELOAD | 高 | Gl→qg | ✅ 已修复 |
+| yielded 历史回放 | 高 | 15+ 函数名更换 | ❌ 未适配（后续单补） |
+| resume-watch 被重新激活 | 低 | 升级触发 | ❌ 未发生（保持关闭） |
+| infos-handle / 统一代理 | 低 | 不依赖前端 | ✅ 直接复用 |
+
+### 补丁状态明细
+
+#### ✅ 品牌补丁（`apply-openclaw-control-ui-branding.py`）
+
+**变化**：新增 v2026.6.5 检测路径，关键映射：
+
+| v5.22 函数 | v6.5 函数 | 用途 |
+|------------|-----------|------|
+| OD / fj | OA | 内容 trim + 空内容检查 |
+| ek | w | role normalize（改为外部导入） |
+| ij / MT | uf | message content 提取 |
+| bx / Bl | Ag | history merge |
+| Il | gh | 隐藏/不可见消息过滤 |
+| Uc / gx | Cg | 另一种消息过滤 |
+| Bc / Wb | nI | NO_REPLY / 可视内容检查 |
+| Gl / Tx / xl | qg | INVALID_FINAL_RELOAD 调用 |
+
+**检测逻辑**：`function OA(e){` 存在 + `function fj(` 不存在 + `function OD(e){` 不存在 → 判定为 v2026.6.5
+
+**本次应用**：INVALID_FINAL_RELOAD 修复（`{qg(e);return}` → `return;`），品牌 HTML/manifest/sw.js 正常
+
+#### ✅ 模型选择器补丁 → 已废弃
+
+- `apply-openclaw-session-model-selector-fix.py`：执行失败（函数名变更），**但无需修复**
+- 原因：v2026.6.5 上游内建 `data-chat-model-select`（1 处）+ `sessions.patch` with model（2 处）
+- 作用：Control UI 聊天页模型下拉选择后，自动调用 `sessions.patch {key, model}`，并用后端 `resolved.modelProvider/model` 回填 UI
+- systemd ExecStartPre 已无内容，不影响 Gateway 启动
+
+#### ✅ Chat running 补丁 → 已废弃
+
+- `hasActiveRun===!0` 已内建（2 处出现），上游原生支持运行中状态的会话指示
+- 不再需要手动注入 `CHAT_RUNNING_PATCH` 模式
+
+#### ✅ Unified proxy / infos-handle
+
+- 无需更新：`apply-openclaw-infos-handle-gateway-proxy.py` 正常返回
+- 继续监听 127.0.0.1:18790（sidecar）+ 0.0.0.0:18788（Caddy 代理）
+
+#### ✅ Watcher 体系
+
+- 4 个 watcher timer 全活（guardian / task-scheduler / health-collector / lifecycle-maintainer）
+- systemd PATH 在 5.26 升级时已修复，本次无需再改
+
+#### ❌ yielded 历史回放补丁（未适配）
+
+**作用**：子任务（subagent）yield 返回结果后，聊天页 history 自动补 assistant 消息
+
+**阻塞原因**：
+- 该补丁注入 5 个辅助函数 + 2 处修改点
+- 函数内部引用了 15+ 个已更名的旧函数（`g`, `MT`, `yT`, `OD`, `Il`, `Uc`, `Bc`, `wD`, `ED`, `AD`, `Rl`, `zl`, `JT`, `LT`, `Rk` 等）
+- 需要对每个引用做完整重映射 + 验证才能正确注入
+
+**影响**：子任务 yield 返回后，聊天页 history 不会自动显示 "仍在处理…" 状态文本，history 看起来像断档。**不影响子任务实际执行和后续消息投递。**
+
+**计划**：后续单独开修补任务，完整重映射后重新打上
+
+### 升级执行流程
+
+```
+1. git status → 仅 .learnings/ERRORS.md 有修改
+2. git commit → push → remote 冲突 → git pull --rebase → push 成功
+3. npm update -g openclaw → 37s 完成
+4. openclaw --version → 2026.6.5 ✅
+5. 重打补丁：
+   - 品牌补丁 → 失败（函数名变更，die at line 290）
+   - 模型选择器补丁 → 失败（函数名变更）
+   - infos-handle 代理 → 正常
+6. 分析新版 bundle 函数映射 → 定位 OA/w/Ag/gh/Cg/qg
+7. 修改 branding 脚本 → 新增 v2026.6.5 检测 + INVALID_FINAL_RELOAD 模式
+8. 品牌补丁重跑 → 成功
+9. Gateway 已自动重启（systemctl restart）
+10. 验证：Gateway 200、品牌注入、4 watcher 全活
+11. Git commit + push
+```
+
+### 升级后运行状态（2026-06-11 11:50 CST）
+
+| 组件 | 状态 |
+|------|------|
+| OpenClaw Gateway | ✅ 运行中 (2026.6.5, port 18789) |
+| 默认模型 | deepseek/deepseek-v4-pro |
+| 当前模型 | deepseek-company/deepseek-v4-pro |
+| frontstage-guardian | ✅ timer active |
+| task-scheduler | ✅ timer active |
+| health-collector | ✅ timer active |
+| lifecycle-maintainer | ✅ timer active |
+| resume-watch | ⏸️ 保持关闭（用户要求） |
+| infos-handle sidecar | ✅ active, port 18790 |
+| 统一代理 (Caddy) | ✅ active, port 18788 |
+| 品牌注入 | ✅ 贾维斯 Control |
+| 模型选择器 | ✅ 上游内建 |
+| 运行指示器 | ✅ 上游内建 |
+| INVALID_FINAL_RELOAD | ✅ 已修复 |
+| yielded 历史回放 | ❌ 未适配 |

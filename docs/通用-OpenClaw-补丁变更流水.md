@@ -1347,3 +1347,17 @@
 - Gateway v2026.6.5 运行正常，Control UI 品牌生效，watcher 全活
 - 相关文件：
 - `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-06-11 12:11:06 CST (+08:00) — OpenClaw 2026.6.5 升级适配：品牌补丁 + INVALID_FINAL_RELOAD 重映射
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已通过
+- 结果摘要：
+- 升级 5.22→6.5；品牌补丁新增 v2026.6.5 检测路径(OA/w/Ag/gh/Cg/qg)；模型选择器和运行指示器上游内建后废弃；yielded 历史回放未适配(待后续单补)
+- 验收 / 验证：
+- Gateway 200，品牌生效，4 watcher 全活，hasActiveRun 原生集成
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`

@@ -250,6 +250,11 @@ def patch_control_ui_model_selector(package_root: Path) -> list[Path]:
         content = asset.read_text(encoding="utf-8")
         if 'data-chat-model-select="true"' not in content:
             continue
+        # v2026.6.5+: data-chat-model-select 已内建，sessions.patch(model) 原生工作，无需补丁
+        if 'sessions.patch' in content:
+            print("Model selector built-in detected; patch not needed.")
+            patched.append(asset)
+            continue
         updated = content
         changed_any = False
         updated, changed = patch_any_once(updated, [LEGACY_CHAT_MODEL_SWITCH, CURRENT_CHAT_MODEL_SWITCH, PREVIOUS_TARGET_CHAT_MODEL_SWITCH], TARGET_CHAT_MODEL_SWITCH, "chat model dropdown switch handler")
