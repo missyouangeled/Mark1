@@ -67,7 +67,7 @@ synonyms:
 # ── 概念桥接（用户口语 → 系统关键词/文件） ──
 concept_bridges:
   空间清理:
-    query_terms: ["清理", "释放", "空间", "磁盘", "缓存", "容量", "空间不", "满了", "不够"]
+    query_terms: ["清理", "释放", "空间", "磁盘", "缓存", "容量", "空间不", "满了", "不够", "清"]
     expand_keywords: ["session", "watcher", "scratch", "cleanup", "清理", "空间", "缓存", "磁盘", "释放", "系统", "文件"]
     prefer_files: [memory/rules/work-prefs.md]
     description: "清理/释放磁盘空间 → session-size-watcher + scratch-cleanup"
