@@ -8,6 +8,38 @@
 
 ---
 
+## 🔥 根因发现（2026-06-11 17:15）
+
+**Control UI 黑屏根因**：品牌脚本 `JARVIS_FUNCTIONS_V2026_6_5` 中 `JarvisShouldShowPendingReadingIndicator` 函数，同一个 `for` 循环块内有两处 `let i` 声明：
+
+```javascript
+let i=uf(t);if(!i||!i.role)continue;...  // 第一次
+let i=typeof t.timestamp=='number'?...   // 第二次 — SyntaxError!
+```
+
+→ 导致整个 JS bundle 解析失败 → Control UI 黑屏。
+
+**修复**：第二个改名为 `let ti`，已提交 `b7231be`。
+
+---
+
+## 执行进度
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| 阶段0 checkpoint | ✅ | Git commit `04a22b1` |
+| 阶段1 npm 升级 | ✅ | v2026.5.22 → v2026.6.5 |
+| 阶段2 Gateway 重启 | ✅ | 排水卡住→kill -9 强杀后重启 |
+| 阶段3 品牌补丁 | ✅ | 修复 `let i` → `let ti`，`node --check` 通过 |
+| 阶段3 去重问题 | ✅ | 初次打补丁时去重检测跳过了修复→重新 npm install → 重打补丁 |
+| 阶段4 Gateway 再次重启 | ✅ | active, healthz 200 |
+| 阶段5 浏览器实操验收 | ⏳ 待执行 | agent-browser 打开 Control UI + 硬刷新 |
+| 阶段6 全量烟测 | ⏳ 待执行 | |
+
+**关键修复 commit**：`b7231be` — `fix: 修复 v6.5 品牌补丁 let i 重声明导致 Control UI 黑屏`
+
+---
+
 ## 上午失败根因分析
 
 升级记录（#2，2026-06-11）里列了哪些已修，但 **遗漏了 Ctrl+Shift+R 后黑屏这个致命问题**。当时补丁打好后看 HTTP 200 和品牌注入就收工了，没有：
