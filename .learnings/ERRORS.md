@@ -21696,3 +21696,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260611-030] user-reported-error
+
+**Logged**: 2026-06-11T03:21:51.813Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-06-11 11:21 GMT+8] 我刚才想让你升级OpenClaw的 提前做好预检跟方案，但是升级时还是出错误了。截图也给你了，刚才又重启了。先检查一下这个Gateway相关的东西吧。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
