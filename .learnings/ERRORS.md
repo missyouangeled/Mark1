@@ -21756,3 +21756,63 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260611-032] tool-timeout
+
+**Logged**: 2026-06-11T09:06:12.529Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool write timed out.
+
+### Error
+```text
+[write] write # OpenClaw 升级方案 v2：2026.5.22 → 2026.6.5 > 起草时间：2026-06-11 17:05 CST > 起草原因：上午 5.22→6.5 升级后 Control UI 多次黑屏，用户已恢复 VM 快照 3 次。 > 本次升级将吸取上午失败教训，在升级记录基础上补充 Control UI 逐步验证 + 每步回退策略。 > > ⚠️ 前置条件：当前系统已是 5.22 快照状态，npm 版本 5.22，品牌补丁在位，watcher 全活。 --- ## 上午失败根因分析 升级记录（#2，2026-06-11）里列了哪些已修，但 **遗漏了 Ctrl+Shift+R 后黑屏这个致命问题**。当时补丁打好后看 HTTP 200 和品牌注入就收工了，没有： …
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: write
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
+
+## [ERR-20260611-033] user-reported-error
+
+**Logged**: 2026-06-11T09:07:32.431Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Thu 2026-06-11 17:07 GMT+8] 问题一个是 这个 TypeError: can't access property"role", iis null 另一个是 Uncaught SyntaxError: redeclaration of let i [Learn Morel. note: Previously declared at line 751, column 4986A [jarvis-brandingl infos-handle summary fetch failed, falling back to snapsho…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
