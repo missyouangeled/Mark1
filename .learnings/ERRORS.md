@@ -21816,3 +21816,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260611-034] tool-explicit-error
+
+**Logged**: 2026-06-11T09:12:25.108Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec echo "=== 阶段2: Gateway 重启 ===" && openclaw gateway restart 2>&1 && sleep 5 && echo "---" && echo "healthz:" && curl -s -o /dev/null -w "HTTP %{http_code}" [url] && echo "" && echo "proxy:" && curl -s -o /dev/null -w "HTTP %{http_code}" [url] && echo "" && echo "=== 确认版本 ===" && openclaw --version 30 [redacted] [redacted] failed 8593
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---

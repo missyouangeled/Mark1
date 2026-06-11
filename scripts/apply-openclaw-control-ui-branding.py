@@ -89,7 +89,7 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "for(let e=a+1;e<r.length;e++){let t=r[e];if(!t||typeof t!='object')continue;"
     + "if(JarvisAssistantHasVisibleContent(t)){o=!0;break}"
     + "let i=uf(t);if(!i||!i.role)continue;let n=w(i.role).toLowerCase();(n==='assistant'||n==='tool')&&(s=!0);"
-    + "let i=typeof t.timestamp=='number'?t.timestamp:0;i>c&&(c=i)}"
+    + "let ti=typeof t.timestamp=='number'?t.timestamp:0;ti>c&&(c=ti)}"
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
 
