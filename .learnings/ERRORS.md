@@ -21726,3 +21726,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260611-031] tool-explicit-error
+
+**Logged**: 2026-06-11T03:39:24.547Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+Tool exec returned an explicit error state.
+
+### Error
+```text
+[exec] exec sed -i 's/[redacted]=2026.5.22/[redacted]=2026.6.5/' ~/.config/systemd/user/openclaw-gateway.service && grep SERVICE_VERSION ~/.config/systemd/user/openclaw-gateway.service && systemctl --user disable --now openclaw-resume-watch.timer 2>/dev/null; echo "timer done" && systemctl --user daemon-reload && openclaw gateway restart 30 [redacted] [reda…
+```
+
+### Context
+- Hook source: plugin:after_tool_call
+- Tool: exec
+- Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
+
+### Suggested Fix
+Confirm the failure is real and recurring, then resolve it or downgrade it to inbox if it was a one-off environmental hiccup.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: openclaw-env/plugins/self-improvement-tool-errors
+
+---
