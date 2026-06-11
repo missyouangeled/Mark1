@@ -29,8 +29,13 @@ STATE_DIR = Path(
 ) / "openclaw" / "frontstage-guardian"
 REPORT_PATH = STATE_DIR / "last-report.json"
 LOG_PATH = STATE_DIR / "guardian.log"
+BACKOFF_PATH = STATE_DIR / "backoff.json"
 LOG_ROTATE_MAX_BYTES = 512 * 1024
 LOG_ROTATE_KEEP_BYTES = 128 * 1024
+
+# 退避参数
+BACKOFF_ERROR_THRESHOLD = 3   # 连续 ≥3 次 ERROR 进入降频
+BACKOFF_SKIP_COUNT = 4        # 降频后每 4 次跳过 1 次（60s→300s）
 
 # broker dirty flag — 发现异常时置脏，触发 health-collector 下一次立即重建
 BROKER_DIRTY_PATH = Path(
@@ -63,6 +68,25 @@ def save_text(path: Path, content: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(content, encoding="utf-8")
     tmp.replace(path)
+
+
+def load_backoff_state() -> dict[str, Any]:
+    """读取退避状态文件。"""
+    if not BACKOFF_PATH.exists():
+        return {"consecutiveErrors": 0, "skipsRemaining": 0}
+    try:
+        return json.loads(BACKOFF_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"consecutiveErrors": 0, "skipsRemaining": 0}
+
+
+def save_backoff_state(state: dict[str, Any]) -> None:
+    """写入退避状态文件。"""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state["updatedAt"] = now_iso()
+    tmp = BACKOFF_PATH.with_suffix(".backoff.tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(BACKOFF_PATH)
 
 
 def append_log(line: str) -> None:
@@ -114,6 +138,20 @@ def main():
     parser.add_argument("--no-notify", action="store_true", help="Skip frontstage notification")
     args = parser.parse_args()
 
+    # ── 退避逻辑 ──
+    # 若上次连续错误 ≥ 3 次，则降频：每 BACKOFF_SKIP_COUNT 次检查跳过 1 次（60s → 300s 等效）
+    bo = load_backoff_state()
+    if bo.get("skipsRemaining", 0) > 0:
+        bo["skipsRemaining"] -= 1
+        save_backoff_state(bo)
+        msg = f"SKIPPED (backoff after {bo.get('consecutiveErrors', '?')} consecutive errors, {bo['skipsRemaining']} skips remaining)"
+        append_log(msg)
+        if args.print_human:
+            print(msg)
+        elif args.print_json:
+            print(json.dumps({"checkedAt": now_iso(), "ok": True, "overall": "SKIPPED", "summary": msg, "checks": []}, ensure_ascii=False))
+        return 0
+
     checks = []
 
     # 1. 前台恢复观察
@@ -139,7 +177,16 @@ def main():
     }
     save_text(REPORT_PATH, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
 
-    if not all_ok:
+    # ── 退避状态更新 ──
+    if all_ok:
+        # 健康恢复 → 重置退避
+        bo = {"consecutiveErrors": 0, "skipsRemaining": 0}
+        save_backoff_state(bo)
+    else:
+        bo["consecutiveErrors"] = bo.get("consecutiveErrors", 0) + 1
+        if bo["consecutiveErrors"] >= BACKOFF_ERROR_THRESHOLD:
+            bo["skipsRemaining"] = BACKOFF_SKIP_COUNT
+        save_backoff_state(bo)
         failed = [c["label"] for c in checks if not c.get("ok")]
         append_log(f"ANOMALY overall={overall} failed={','.join(failed)}")
         _mark_broker_dirty(reason=f"guardian detection: {','.join(failed)}")

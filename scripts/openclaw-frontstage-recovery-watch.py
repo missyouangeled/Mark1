@@ -95,7 +95,135 @@ def resolve_frontstage(session_key: str) -> dict[str, Any]:
     ])
 
 
+def _load_session_store() -> dict[str, Any]:
+    """加载 sessions.json 索引。"""
+    store_path = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
+    if not store_path.exists():
+        return {}
+    with store_path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def fetch_chat_history_local(session_key: str, limit: int, session_file: Path) -> dict[str, Any]:
+    """直接读 JSONL transcript 替代 gateway call chat.history。
+
+    速度: ~0.05s（原 7s）。完全解耦 gateway 事件循环。
+    """
+    store = _load_session_store()
+    row = store.get(session_key, {})
+    session_id = row.get("sessionId") if isinstance(row, dict) else None
+    if not session_id:
+        session_id = session_file.stem
+
+    if not session_file.exists():
+        return {"messages": [], "sessionId": str(session_id)}
+
+    messages: list[dict[str, Any]] = []
+    with session_file.open("r", encoding="utf-8", errors="ignore") as fh:
+        lines = fh.readlines()
+
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        if obj.get("type") != "message":
+            continue
+
+        inner_raw = obj.get("message")
+        msg: dict[str, Any] = {}
+
+        if isinstance(inner_raw, str):
+            try:
+                inner = json.loads(inner_raw)
+            except (json.JSONDecodeError, TypeError):
+                inner = None
+            if isinstance(inner, dict):
+                msg = dict(inner)
+        elif isinstance(inner_raw, dict):
+            msg = dict(inner_raw)
+
+        if not msg:
+            continue
+
+        # 补 timestamp：优先用 inner，fallback 到 outer
+        if "timestamp" not in msg and "timestamp" in obj:
+            msg["timestamp"] = obj["timestamp"]
+
+        messages.append(msg)
+
+        if len(messages) >= limit:
+            break
+
+    messages.reverse()  # 按时间正序返回
+    return {"messages": messages, "sessionId": str(session_id)}
+
+
+def fetch_session_snapshot_local(session_key: str, session_file: Path) -> dict[str, Any]:
+    """从 sessions.json 直接读取 session 状态（不走 gateway API）。
+
+    sessions.json 已存储 status、endedAt、hasActiveRun 等运行时字段。
+    hasActiveRun 通过 status=="running" + 最后一条 user 消息距今 < 120s 近似。
+    """
+    store = _load_session_store()
+    row = store.get(session_key, {}) if isinstance(store, dict) else {}
+    if not isinstance(row, dict):
+        row = {}
+
+    session_status = row.get("status", "idle")
+    has_active_run = bool(row.get("hasActiveRun", False))
+
+    # 若 sessions.json 里未标记 hasActiveRun，从 transcript + status 近似判断
+    if not has_active_run and session_status == "running":
+        # 最后一条 user 消息距今 < 120s → 可能正在等模型回复
+        if session_file.exists():
+            try:
+                with session_file.open("r", encoding="utf-8", errors="ignore") as fh:
+                    transcript_lines = fh.readlines()
+                for line in reversed(transcript_lines[-30:]):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if obj.get("type") != "message":
+                        continue
+                    inner_raw = obj.get("message")
+                    inner = None
+                    if isinstance(inner_raw, str):
+                        try:
+                            inner = json.loads(inner_raw)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    if isinstance(inner, dict) and str(inner.get("role", "")) == "user":
+                        ts = inner.get("timestamp") or obj.get("timestamp")
+                        msg_epoch = timestamp_to_ms(ts)
+                        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                        if msg_epoch and (now_ms - msg_epoch) < 120_000:
+                            has_active_run = True
+                        break
+            except Exception:
+                pass
+
+    return {
+        "key": session_key,
+        "hasActiveRun": has_active_run,
+        "status": session_status,
+        "endedAt": row.get("endedAt"),
+        "updatedAt": row.get("updatedAt"),
+        "startedAt": row.get("sessionStartedAt"),
+        "sessionId": row.get("sessionId"),
+    }
+
+
 def fetch_chat_history(session_key: str, limit: int) -> dict[str, Any]:
+    """[已弃用] 原 gateway call 路径，保留兼容。"""
     return run_json_command([
         "openclaw",
         "gateway",
@@ -108,6 +236,7 @@ def fetch_chat_history(session_key: str, limit: int) -> dict[str, Any]:
 
 
 def fetch_session_snapshot(session_key: str) -> dict[str, Any]:
+    """[已弃用] 原 gateway call 路径，保留兼容。"""
     payload = run_json_command([
         "openclaw",
         "gateway",
@@ -599,9 +728,9 @@ def main() -> int:
     target_session_key = str(binding.get("targetSessionKey") or args.session_key)
     session_file = session_file_for_key(target_session_key)
     transcript_messages = load_recent_transcript_messages(session_file)
-    history_payload = fetch_chat_history(target_session_key, args.limit)
+    history_payload = fetch_chat_history_local(target_session_key, args.limit, session_file)
     history_messages = history_payload.get("messages") if isinstance(history_payload.get("messages"), list) else []
-    session_snapshot = fetch_session_snapshot(target_session_key)
+    session_snapshot = fetch_session_snapshot_local(target_session_key, session_file)
     analysis = analyze_projection(transcript_messages, history_messages, session_snapshot)
 
     report = {

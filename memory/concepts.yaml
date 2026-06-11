@@ -1,6 +1,12 @@
 # 语义概念映射 — Layer S
 # 桥接"用户日常用语 → 系统关键词"，不依赖 embedding
 # 手工维护 + 自动种子（从 MEMORY_INDEX.json metadata 生成）
+#
+# query_terms 规则：尽量用单字/短词做子串匹配
+#   ✅ ["画","图","绘图"]  → '帮我画个图'、'画一张'、'绘图' 全部触发
+#   ❌ ["画图"]            → 只有 '画图' 连写才触发
+# expand_keywords 规则：列索引中实际存在的关键词 + 新增的 TOOLS/docs 域词
+# prefer_files 规则：优先列出 memory/rules/ 下特定文件，而非泛用 work-prefs
 
 # ── 意图分类模式 ──
 intent_patterns:
@@ -10,6 +16,7 @@ intent_patterns:
     weight_files:
       memory/rules/work-prefs.md: 1.5
       memory/rules/tech-prefs.md: 1.3
+      TOOLS.md: 1.2
   rule_lookup:
     patterns: ["规则", "规定", "偏好", "怎么规定的", "应该", "必须", "不要", "禁止"]
     description: "规则/偏好查找"
@@ -27,15 +34,17 @@ intent_patterns:
     description: "安全/隐私/风险查询"
     weight_files:
       memory/rules/safety-prefs.md: 2.0
+      docs/对系统操作必须要参考的崩坏案例.md: 1.8
   recall:
     patterns: ["上次", "之前", "那个", "还记得", "以前", "那次", "说过"]
     description: "回忆/上下文查询"
   memory_lookup:
-    patterns: ["记忆", "档案", "人物", "故事", "回忆", "过去"]
+    patterns: ["记忆", "档案", "人物", "故事", "回忆", "过去", "生日"]
     description: "记忆库查询"
     weight_files:
       memory/stories.md: 1.5
       memory/people.md: 1.5
+      MEMORY.md: 1.2
 
 # ── 同义词映射 ──
 synonyms:
@@ -51,54 +60,69 @@ synonyms:
   修复: ["修补", "patch", "fix", "修理"]
   下载: ["获取", "抓取", "保存视频", "download"]
   安装前: ["安装前审查", "安全审查", "预检"]
-  图像生成: ["画图", "生成图片", "AI绘画", "image generation"]
-  语音生成: ["TTS", "语音合成", "文字转语音", "配音", "tts"]
+  画图: ["生成图片", "AI绘画", "绘图", "生成图像", "image generation"]
+  语音: ["TTS", "语音合成", "文字转语音", "配音", "朗读"]
   凭据: ["密钥", "token", "密码", "API key", "credential"]
 
 # ── 概念桥接（用户口语 → 系统关键词/文件） ──
 concept_bridges:
   空间清理:
-    query_terms: ["清理", "释放", "空间", "磁盘", "缓存", "容量"]
-    expand_keywords: [session-size-watcher, scratch-cleanup, 清理, 空间, 缓存, 磁盘, 释放]
+    query_terms: ["清理", "释放", "空间", "磁盘", "缓存", "容量", "空间不", "满了", "不够"]
+    expand_keywords: ["session", "watcher", "scratch", "cleanup", "清理", "空间", "缓存", "磁盘", "释放", "系统", "文件"]
     prefer_files: [memory/rules/work-prefs.md]
     description: "清理/释放磁盘空间 → session-size-watcher + scratch-cleanup"
 
   前端配置:
-    query_terms: ["前端", "界面", "UI", "页面", "显示", "外观"]
-    expand_keywords: ["Control UI", branding, model-selector, session, 前端, 界面, 补丁, 品牌, 主题]
+    query_terms: ["前端", "界面", "UI", "页面", "显示", "外观", "webchat", "Control", "dashboard"]
+    expand_keywords: ["Control UI", "branding", "model", "selector", "session", "前端", "界面", "补丁", "品牌", "主题", "浏览器", "HTTP", "socket", "gateway"]
     prefer_files: [memory/rules/tech-prefs.md, memory/rules/work-prefs.md]
+    description: "前端界面/UI/Control UI → branding/model-selector 补丁"
 
   语音回复:
-    query_terms: ["语音", "回复", "说话", "声音", "TTS", "配音", "读", "念"]
-    expand_keywords: [ChatTTS, TTS, XTTS, 语音回复, 语音文件, 克隆, 音色, 语速, wav]
+    query_terms: ["语音", "回复", "说话", "声音", "TTS", "配音", "读", "念", "音色", "声", "朗读"]
+    expand_keywords: ["ChatTTS", "TTS", "XTTS", "语音回复", "语音文件", "克隆", "音色", "语速", "wav", "说话", "语音", "回复"]
     prefer_files: [memory/rules/chat-prefs.md, memory/rules/tech-prefs.md]
+    description: "语音回复/TTS/配音 → ChatTTS/TTS/XTTS"
 
   监工配置:
-    query_terms: ["监工", "supervisor", "watcher", "守护", "监控", "自动"]
-    expand_keywords: [监工规则, 监工服务, 监工状态, supervisor, 后台, 分身, 守护, force_on, force_off]
+    query_terms: ["监工", "supervisor", "watcher", "守护", "监控", "自动", "force"]
+    expand_keywords: ["监工规则", "监工服务", "监工状态", "supervisor", "后台", "分身", "守护", "force_on", "force_off", "taskActive", "监工", "状态", "系统"]
     prefer_files: [memory/rules/work-prefs.md]
+    description: "监工/supervisor → 监工规则/状态配置"
 
   视频下载:
-    query_terms: ["下载", "视频", "抖音", "douyin", "平台", "抓取"]
-    expand_keywords: [视频下载, 下载, 抖音, 平台, download-platform-video, 候选, ffprobe]
+    query_terms: ["下载", "视频", "抖音", "douyin", "平台", "抓取", "media"]
+    expand_keywords: ["视频下载", "下载", "抖音", "平台", "download", "platform", "video", "候选", "ffprobe", "媒体"]
     prefer_files: [memory/rules/work-prefs.md]
+    description: "视频/抖音下载 → download-platform-video"
 
   大工程操作:
-    query_terms: ["大量", "批量", "工程", "重命名", "scratch", "文件多"]
-    expand_keywords: [大工程, 批量改名, scratch, heavy-task, preflight, 文件量, 预检, 分批]
+    query_terms: ["大量", "批量", "工程", "重命名", "scratch", "文件多", "文件量"]
+    expand_keywords: ["大工程", "批量改名", "scratch", "heavy-task", "preflight", "文件量", "预检", "分批", "后台", "工程", "文件", "rename"]
     prefer_files: [memory/rules/work-prefs.md]
+    description: "大工程/批量操作 → heavy-task + scratch"
 
   安装安全审查:
-    query_terms: ["安装", "审查", "安全", "检查", "审计", "verify"]
-    expand_keywords: [安装前安全审查, 安装前, 审查, 崩坏案例, 凭据, 病毒, 木马, 白名单]
-    prefer_files: [memory/rules/safety-prefs.md, memory/rules/tech-prefs.md]
+    query_terms: ["安装", "审查", "安全", "检查", "审计", "verify", "审查", "预检", "装"]
+    expand_keywords: ["安装前安全审查", "安装前", "审查", "崩坏案例", "凭据", "病毒", "木马", "白名单", "安全", "安装", "registry", "install"]
+    prefer_files: [memory/rules/safety-prefs.md, memory/rules/tech-prefs.md, docs/install-registry.md]
+    description: "安装/审查 → safety + install-registry + 崩坏案例"
 
   数据盘备份:
-    query_terms: ["备份", "数据盘", "快照", "恢复", "丢失", "还原"]
-    expand_keywords: [session-backup, context-summary, 备份, 快照, 数据盘, 恢复, /mnt/data]
+    query_terms: ["备份", "数据盘", "快照", "恢复", "丢失", "还原", "恢复"]
+    expand_keywords: ["session", "backup", "context", "summary", "备份", "快照", "数据盘", "恢复", "mnt", "data", "openclaw", "磁盘"]
     prefer_files: [memory/rules/work-prefs.md]
+    description: "数据盘/备份/恢复 → session-backup"
 
   模型切换:
-    query_terms: ["模型", "切换", "换模型", "model", "provider"]
-    expand_keywords: [model-selector, resolved, 模型, 切换, 主会话, 默认模型, provider]
+    query_terms: ["模型", "切换", "换模型", "model", "provider", "哪个模型"]
+    expand_keywords: ["model", "selector", "resolved", "模型", "切换", "主会话", "默认模型", "provider", "litellm", "github", "copilot", "deepseek"]
     prefer_files: [memory/rules/tech-prefs.md, memory/rules/work-prefs.md]
+    description: "模型/切换/provider → model-selector + 主会话配置"
+
+  图像生成:
+    query_terms: ["画", "图", "绘图", "绘画", "生成图", "AI画", "画个", "画张", "画一张", "image", "生成图片"]
+    expand_keywords: ["图像生成", "画图", "AI绘画", "image generation",
+                      "Agnes", "litellm", "agnes", "image", "generate", "画图", "图片", "生成的"]
+    prefer_files: [memory/rules/tech-prefs.md, MEMORY.md]
+    description: "图像/绘画/画图 → image generation / Agnes API"

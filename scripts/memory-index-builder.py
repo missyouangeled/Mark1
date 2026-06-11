@@ -30,7 +30,8 @@ MEMORY_MD = WORKSPACE / "MEMORY.md"
 SCRATCH_DIR = Path("/mnt/data/openclaw/scratch/memory-index")
 INDEX_PATH = SCRATCH_DIR / "MEMORY_INDEX.yaml"
 
-# 需要建索引的源文件
+# 索引源文件：仅 memory 文件（L1 + LS 高速层）
+# TOOLS/docs 通过 L2 QMD fallback 覆盖，不纳入关键词倒排索引
 SOURCE_FILES = [MEMORY_MD] + (
     sorted(RULES_DIR.glob("*.md")) if RULES_DIR.exists() else []
 )
@@ -139,34 +140,34 @@ def build_index() -> dict[str, list[dict]]:
 def classify_keyword(kw: str, entries: list[dict], doc_freq: int, total_occ: int) -> list[str]:
     """对关键词做语义标签分类。
 
-    标签体系：
-      rule_title  — ## 标题行提取的关键词（权重最高）
-      concept     — 3-6字、只在1个文件出现、出现 2-5 次（高区分度）
-      device      — 设备名/环境标识
-      path        — 文件路径/代码路径碎片
-      common      — 2字词跨≥3文件 或 单文件≥8次（低区分度噪声）
-      general     — 其他普通词
+    标签体系（乘数）：
+      rule_title (2.0) — 来自 ##/### 标题行的关键词
+      concept    (1.4) — 3-8字、≤2个文件、3-10次（高区分度概念词）
+      device     (0.8) — 设备名/环境标识
+      path       (0.2) — 文件路径/代码路径碎片
+      common     (0.3) — 2字、跨≥3文件 或 ≥10次（噪声）
+      general    (1.0) — 其他
     """
     tags: list[str] = []
 
-    # rule_title: 来自 ## 标题行，≥4字
-    if any(e["snippet"].strip().startswith("## ") for e in entries) and len(kw) >= 4:
+    # rule_title: 来自 ##/### 标题行
+    if any(e["snippet"].strip().startswith(("## ", "### ")) for e in entries):
         tags.append("rule_title")
 
-    # path: 含路径特征
-    if "/" in kw or (len(kw) > 10 and bool(re.search(r"[\\/._-]{2,}", kw))):
+    # path: 含路径特征或长代码片段
+    if "/" in kw or (len(kw) > 12 and bool(re.search(r"[\\/._-]{3,}", kw))) or (".py" in kw or ".md" in kw or ".sh" in kw):
         tags.append("path")
 
-    # device: 设备名
-    if bool(re.match(r"(TABLET|DESKTOP|missyouangeled)[-_]", kw)) or kw in {"公司", "掌机", "老电脑"}:
+    # device: 设备名/环境标识
+    if bool(re.match(r"(TABLET|DESKTOP|missyouangeled|VMware|Virtual)[-_]", kw, re.I)) or kw in {"公司", "掌机", "老电脑", "Linux", "Windows"}:
         tags.append("device")
 
-    # concept: 高区分度概念词
-    if 3 <= len(kw) <= 6 and doc_freq == 1 and 2 <= total_occ <= 5:
+    # concept: 高区分度概念词（3-8字、≤2个文件、2-15次出现）
+    if 3 <= len(kw) <= 8 and doc_freq <= 2 and 2 <= total_occ <= 15 and "path" not in tags:
         tags.append("concept")
 
-    # common: 2字高频噪声
-    if (len(kw) <= 2 and doc_freq >= 3) or (len(kw) <= 2 and total_occ >= 8):
+    # common: 2字高频噪声（跨≥3文件 或 单文件≥10次）
+    if (len(kw) <= 2 and doc_freq >= 3) or (len(kw) <= 2 and total_occ >= 10):
         tags.append("common")
 
     if not tags:

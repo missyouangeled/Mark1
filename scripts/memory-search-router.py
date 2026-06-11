@@ -35,8 +35,8 @@ SESSION_BACKUP_DIR = Path("/mnt/data/openclaw/session-backup")
 CONTEXT_SUMMARY = "context-summary.md"
 
 # 各层阈值
-L1_CONFIDENCE_THRESHOLD = 0.8
-L2_CONFIDENCE_THRESHOLD = 0.7
+L1_CONFIDENCE_THRESHOLD = 0.73
+L2_CONFIDENCE_THRESHOLD = 0.65
 LAYER_TIMEOUT_S = 5
 
 
@@ -109,8 +109,8 @@ def search_l1_index(query: str) -> dict | None:
 
     # 标签乘数
     TAG_MULTIPLIER = {
-        "rule_title": 2.0,
-        "concept": 1.2,
+        "rule_title": 2.5,
+        "concept": 1.4,
         "general": 1.0,
         "device": 0.8,
         "common": 0.3,
@@ -158,13 +158,17 @@ def search_l1_index(query: str) -> dict | None:
     best_file = max(file_scores, key=file_scores.get) if file_scores else None
     best_score = file_scores.get(best_file, 0.0)
 
-    # max_possible_score：所有 token 的 IDF × max 乘数
-    max_possible = sum(token_score(t) for t in tokens)
+    # max_possible_score：仅计算最佳文件中实际命中的 token 理论满分
+    # （防止跨文件散词拉高分母、压低压实命中文件的置信度）
+    best_file_match_kws = file_best_kws.get(best_file, set())
+    max_possible = sum(token_score(t) for t in best_file_match_kws) or 0.1
     raw_conf = best_score / max(max_possible, 0.1)
 
-    # 匹配条目数因子
-    density = min(len(matches) / 5, 0.8)
-    confidence = round(min(raw_conf * 0.7 + density, 1.0), 3)
+    # 文件集中度：最佳文件得分占比（防止跨文件散开）
+    total_score = sum(file_scores.values())
+    concentration = best_score / max(total_score, 0.01)
+    # raw_conf 为主（0.7）+ 集中度（0.2），cap 0.95
+    confidence = round(min(raw_conf * 0.7 + concentration * 0.2, 0.95), 3)
 
     return {
         "layer": "L1",
@@ -255,7 +259,10 @@ def _search_l2_bm25_python(query: str) -> dict | None:
     best_file = max(file_scores, key=file_scores.get)
     best_score = file_scores[best_file]
     max_possible = sum(token_idfs.values())
-    confidence = round(min(best_score / max(max_possible, 0.1), 1.0), 3)
+    raw_conf = best_score / max(max_possible, 0.1)
+    file_count = len(file_scores)
+    concentration = best_score / sum(file_scores.values()) if sum(file_scores.values()) > 0 else 0
+    confidence = round(min(raw_conf * 0.65 + concentration * 0.2 - file_count * 0.03, 0.93), 3)
 
     matches_out: list[dict] = []
     seen_entries = set()
@@ -468,7 +475,10 @@ def search_semantic(query: str) -> dict | None:
     best_file = max(file_scores, key=file_scores.get)
     best_score = file_scores[best_file]
     max_possible = sum(token_idfs.values())
-    confidence = round(min(best_score / max(max_possible, 0.1), 1.0), 3)
+    raw_conf = best_score / max(max_possible, 0.1)
+    file_count = len(file_scores)
+    concentration = best_score / sum(file_scores.values()) if sum(file_scores.values()) > 0 else 0
+    confidence = round(min(raw_conf * 0.65 + concentration * 0.2 - file_count * 0.03, 0.93), 3)
 
     # 构建匹配结果
     matches_out: list[dict] = []
@@ -548,7 +558,7 @@ def search_l4_backup(query: str) -> dict:
 
 def route_search(query: str, max_layer: str = "L4") -> dict:
     """执行完整的 L1→L4 路由搜索。"""
-    layers = ["L1", "L2", "LS", "L3", "L4"]
+    layers = ["L1", "LS", "L2", "L3", "L4"]
     start_idx = layers.index(max_layer) if max_layer in layers else 4
 
     results: list[dict] = []
