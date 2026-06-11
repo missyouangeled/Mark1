@@ -4,8 +4,9 @@ memory-search-router.py — 统一记忆搜索路由（L1→L2→L3→L4）
 
 实现四层搜索路由，逐层尝试，找到置信度足够的结果就短路返回。
 
-L1: MEMORY_INDEX.yaml 关键词匹配（置信度 ≥0.8 → 返回，<0.05s）
-L2: QMD BM25 全文检索（置信度 ≥0.7 → 返回，0.2-0.5s）
+L1: MEMORY_INDEX.json 关键词 IDF+标签（置信度 ≥0.8 → 返回，~30ms）
+L2: Python BM25 + QMD fallback（置信度 ≥0.7 → 返回，30-600ms）
+LS: 语义概念层（意图+同义词+桥接，置信度 ≥0.7 → 返回）
 L3: 返回提示走云端 memory_search（不在脚本内调云端 API）
 L4: 读取 session-backup context-summary
 
@@ -29,6 +30,7 @@ from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 INDEX_PATH = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.json")  # JSON 0.03s vs YAML 5s
+CONCEPTS_PATH = WORKSPACE / "memory" / "concepts.yaml"
 SESSION_BACKUP_DIR = Path("/mnt/data/openclaw/session-backup")
 CONTEXT_SUMMARY = "context-summary.md"
 
@@ -327,6 +329,175 @@ def _search_l2_qmd_fallback(query: str) -> dict | None:
     }
 
 
+import yaml as _yaml
+
+
+def _load_concepts() -> dict | None:
+    """加载语义概念映射（缺失时静默跳过）。"""
+    if not CONCEPTS_PATH.exists():
+        return None
+    try:
+        with open(CONCEPTS_PATH, "r", encoding="utf-8") as f:
+            return _yaml.safe_load(f)
+    except Exception:
+        return None
+
+
+def search_semantic(query: str) -> dict | None:
+    """Layer S: 语义概念层 — 意图分类 + 同义词扩展 + 概念桥接。
+
+    完全独立于其他层：依赖 memory/concepts.yaml，缺失则跳过。
+    不做 embedding——用概念映射桥接"用户用语 → 系统关键词"。
+
+    处理流程：
+      1. 意图分类：匹配 query 中的意图模式 → 加权重排文件
+      2. 同义词扩展：展开用户用语的同义词 → 追加搜索词
+      3. 概念桥接：触发特定概念桥 → 注入系统关键词
+      4. 用扩展后的查询 + 加权的文件优先级搜索引 → 返回结果
+    """
+    concepts = _load_concepts()
+    if not concepts:
+        return None
+
+    if not INDEX_PATH.exists():
+        return None
+
+    try:
+        with open(INDEX_PATH, "r", encoding="utf-8") as f:
+            idx = json.load(f)
+    except Exception:
+        return None
+
+    if not idx or "index" not in idx:
+        return None
+
+    index = idx["index"]
+    n_docs = idx.get("n_docs", 5)
+    query_lower = query.lower()
+
+    # ── 步骤 1: 意图分类 ──
+    intent_scores: dict[str, float] = {}
+    intent_patterns = concepts.get("intent_patterns", {})
+    for intent_name, cfg in intent_patterns.items():
+        for pat in cfg.get("patterns", []):
+            if pat in query or pat.lower() in query_lower:
+                intent_scores[intent_name] = intent_scores.get(intent_name, 0) + 1
+
+    # 文件加权：匹配的意图给对应文件加分
+    file_intent_bonus: dict[str, float] = {}
+    for intent_name, score in intent_scores.items():
+        weight_files = intent_patterns[intent_name].get("weight_files", {})
+        for f, w in weight_files.items():
+            file_intent_bonus[f] = file_intent_bonus.get(f, 0) + score * w
+
+    detected_intents = sorted(intent_scores, key=intent_scores.get, reverse=True)
+
+    # ── 步骤 2: 同义词扩展 ──
+    synonyms = concepts.get("synonyms", {})
+    expanded_terms: list[str] = []
+    for term, syns in synonyms.items():
+        if term in query_lower:
+            expanded_terms.extend(syns[:3])  # 最多取3个同义词
+
+    # ── 步骤 3: 概念桥接 ──
+    bridges = concepts.get("concept_bridges", {})
+    triggered_bridges: list[dict] = []
+    for bridge_name, cfg in bridges.items():
+        query_terms = cfg.get("query_terms", [])
+        # 如果有任意一个 query_term 出现在 query 中，触发桥接
+        hits = [t for t in query_terms if t in query_lower]
+        if hits:
+            triggered_bridges.append({
+                "name": bridge_name,
+                "hits": hits,
+                "expand": cfg.get("expand_keywords", []),
+                "prefer": cfg.get("prefer_files", []),
+            })
+
+    if not triggered_bridges and not expanded_terms and not file_intent_bonus:
+        return None  # 语义层无增强，静默退回
+
+    # ── 步骤 4: 扩展查询 + BM25 搜索 ──
+    # 把扩展词追加到 query token
+    enriched_tokens = list(dict.fromkeys(
+        tokenize_for_index(query) + expanded_terms +
+        [kw for br in triggered_bridges for kw in br.get("expand", [])]
+    ))
+
+    if not enriched_tokens:
+        return None
+
+    valid_tokens = [t for t in enriched_tokens if t in index]
+    if not valid_tokens:
+        return None
+
+    K1 = 1.2
+    token_idfs: dict[str, float] = {}
+    token_files: dict[str, dict[str, int]] = {}
+
+    for token in valid_tokens:
+        entries = index[token]
+        df = len({e["file"] for e in entries})
+        idf = math.log(max((n_docs - df + 0.5) / (df + 0.5), 0.5) + 1)
+        token_idfs[token] = idf
+
+        file_tf: dict[str, int] = {}
+        for e in entries:
+            f = e["file"]
+            file_tf[f] = file_tf.get(f, 0) + 1
+        token_files[token] = file_tf
+
+    file_scores: dict[str, float] = {}
+    for token in valid_tokens:
+        idf = token_idfs[token]
+        for f, tf in token_files[token].items():
+            bm25_tf = (tf * (K1 + 1)) / (tf + K1)
+            score = idf * bm25_tf
+            # 意图加权
+            if f in file_intent_bonus:
+                score *= (1.0 + file_intent_bonus[f] * 0.15)
+            # 概念桥接优先文件
+            for br in triggered_bridges:
+                if f in br.get("prefer", []):
+                    score *= 1.3
+            file_scores[f] = file_scores.get(f, 0.0) + score
+
+    if not file_scores:
+        return None
+
+    best_file = max(file_scores, key=file_scores.get)
+    best_score = file_scores[best_file]
+    max_possible = sum(token_idfs.values())
+    confidence = round(min(best_score / max(max_possible, 0.1), 1.0), 3)
+
+    # 构建匹配结果
+    matches_out: list[dict] = []
+    seen_entries = set()
+    for token in valid_tokens:
+        for entry in index.get(token, []):
+            dedup = (entry["file"], entry["line"])
+            if dedup not in seen_entries:
+                seen_entries.add(dedup)
+                matches_out.append({
+                    "file": entry["file"],
+                    "line": entry["line"],
+                    "snippet": entry.get("snippet", ""),
+                    "keyword": token,
+                })
+
+    return {
+        "layer": "LS",
+        "confidence": confidence,
+        "matches": sorted(matches_out, key=lambda x: token_idfs.get(x["keyword"], 0), reverse=True)[:10],
+        "best_file": best_file,
+        "best_score": round(best_score, 3),
+        "intents": detected_intents,
+        "bridges_triggered": [b["name"] for b in triggered_bridges],
+        "expanded_terms": expanded_terms,
+        "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
+    }
+
+
 def search_l3_cloud(query: str) -> dict:
     """L3: 返回提示走云端 memory_search（不在脚本内调 API）。"""
     return {
@@ -377,8 +548,8 @@ def search_l4_backup(query: str) -> dict:
 
 def route_search(query: str, max_layer: str = "L4") -> dict:
     """执行完整的 L1→L4 路由搜索。"""
-    layers = ["L1", "L2", "L3", "L4"]
-    start_idx = layers.index(max_layer) if max_layer in layers else 3
+    layers = ["L1", "L2", "LS", "L3", "L4"]
+    start_idx = layers.index(max_layer) if max_layer in layers else 4
 
     results: list[dict] = []
     route_taken = None
@@ -393,6 +564,8 @@ def route_search(query: str, max_layer: str = "L4") -> dict:
             l_result = search_l1_index(query)
         elif layer_name == "L2":
             l_result = search_l2_bm25(query)
+        elif layer_name == "LS":
+            l_result = search_semantic(query)
         elif layer_name == "L3":
             l_result = search_l3_cloud(query)
         elif layer_name == "L4":
@@ -410,7 +583,7 @@ def route_search(query: str, max_layer: str = "L4") -> dict:
 
     return {
         "query": query,
-        "route_taken": route_taken or layers[min(start_idx, 3)],
+        "route_taken": route_taken or layers[min(start_idx, 4)],
         "layers_searched": [r["layer"] for r in results],
         "layers": results,
         "recommendation": results[-1] if results else None,
@@ -420,7 +593,7 @@ def route_search(query: str, max_layer: str = "L4") -> dict:
 def main():
     parser = argparse.ArgumentParser(description="统一记忆搜索路由")
     parser.add_argument("query", nargs="+", help="搜索词")
-    parser.add_argument("--layer", choices=["l1", "l2", "l3", "l4"],
+    parser.add_argument("--layer", choices=["l1", "l2", "ls", "l3", "l4"],
                         help="指定单层搜索（跳过其他层）")
     parser.add_argument("--json", action="store_true", default=True,
                         help="JSON 输出（默认）")
@@ -434,6 +607,7 @@ def main():
     if args.layer:
         # 单层模式
         layer_map = {"l1": search_l1_index, "l2": search_l2_bm25,
+                     "ls": search_semantic,
                      "l3": search_l3_cloud, "l4": search_l4_backup}
         fn = layer_map[args.layer]
         result = fn(query)
@@ -444,7 +618,7 @@ def main():
     result = route_search(query)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
-    if result["route_taken"] in ("L1", "L2"):
+    if result["route_taken"] in ("L1", "L2", "LS"):
         return 0
     return 1
 
