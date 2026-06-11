@@ -56,24 +56,26 @@ STREAM_INDICATOR_V2026_6_5_OLD = "if(e.stream!==null){let n=`stream:${e.sessionK
 STREAM_INDICATOR_V2026_6_5_NEW = "let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||pendingIndicator){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=_h(e.stream!==null?OA(e.stream):'',f),i=NA(t,e.streamStartedAt??Date.now());r.length>0?ph(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):t.push({kind:`reading-indicator`,key:n})}"
 JARVIS_FUNCTIONS_V2026_6_5 = (
     "function JarvisReadYieldedToolResultText(e){"
+    + "if(!e||typeof e!='object')return null;"
     + "let t=typeof e?.role=='string'?e.role.toLowerCase():'';"
     + "if(t!=='toolresult'&&t!=='tool_result'&&t!=='tool'&&t!=='function')return null;"
     + "let n=typeof e?.content=='string'?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text=='string'?e.text:'').join('\\n'):typeof e?.text=='string'?e.text:'';"
     + "if(!n.trim())return null;"
     + "try{let r=JSON.parse(n),i=typeof r?.message=='string'?r.message.trim():'';"
-    + "return r?.status==='yielded'&&i&&!/^\\\\s*NO_REPLY\\\\s*$/.test(i)?i:null}catch{return null}}"
+    + "return r?.status==='yielded'&&i&&!/^\\s*NO_REPLY\\s*$/.test(i)?i:null}catch{return null}}"
     + "function JarvisProjectYieldedHistoryReply(e){"
     + "if(!Array.isArray(e)||e.length===0)return[];"
     + "let t=e.filter(e=>!Cg(e)),n=-1;"
-    + "for(let t=e.length-1;t>=0;t--){let r=typeof e[t]?.role=='string'?e[t].role.toLowerCase():'';if(r==='user'){n=t;break}}"
+    + "for(let t=e.length-1;t>=0;t--){if(!e[t])continue;let r=typeof e[t]?.role=='string'?e[t].role.toLowerCase():'';if(r==='user'){n=t;break}}"
     + "if(n<0)return t;"
-    + "for(let r=e.length-1;r>n;r--){let i=uf(e[r]),a=w(i.role).toLowerCase();if(a==='assistant'&&i.content.length>0)return t}"
+    + "for(let r=e.length-1;r>n;r--){if(!e[r])continue;let i=uf(e[r]),a=w(i.role).toLowerCase();if(a==='assistant'&&i.content.length>0)return t}"
     + "for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;"
     + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof e[r]?.timestamp=='number'?e[r].timestamp:Date.now()};return[...t,a]}return t}"
     + "function JarvisAssistantHasVisibleContent(e){"
+    + "if(!e||typeof e!='object')return!1;"
     + "let t=uf(e),n=w(t.role).toLowerCase();if(n!=='assistant')return!1;"
     + "for(let r of t.content){if(!r||typeof r!='object')continue;"
-    + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\\\s*NO_REPLY\\\\s*$/.test(e))return!0}"
+    + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\s*NO_REPLY\\s*$/.test(e))return!0}"
     + "if(r.type==='attachment'||r.type==='canvas')return!0}return!1}"
     + "function JarvisShouldShowPendingReadingIndicator(e){"
     + "if(!e||typeof e!='object')return!1;"
@@ -90,6 +92,7 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "let i=typeof t.timestamp=='number'?t.timestamp:0;i>c&&(c=i)}"
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
+
 # ── v2026.5.22 适配 — 函数映射: fj→OD, ij→MT, ek→yT, bx→Bl, gx→Uc/Il, Wb→Bc, Tx→Gl/xl ──
 CHAT_RUNNING_PATCH_V22 = "let t=e.connected,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),n=e.loading||e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0||a?.hasActiveRun===!0||a?.status===`running`,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,"
 INVALID_FINAL_RELOAD_V22_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){Tx(e);return}f&&!o&&Tx(e)}"
@@ -269,15 +272,29 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
                 updated = updated.replace(INVALID_FINAL_RELOAD_V2026_6_5_OLD, INVALID_FINAL_RELOAD_V2026_6_5_NEW, 1)
                 changed = True
             # Inject Jarvis yielded-history helpers (before WA / chat render)
-            if "JarvisReadYieldedToolResultText" not in updated:
-                anchor = "return a}function WA(e){"
-                if anchor in updated:
-                    updated = updated.replace(
-                        anchor,
-                        "return a}" + JARVIS_FUNCTIONS_V2026_6_5 + "function WA(e){",
-                        1,
-                    )
-                    changed = True
+            # Check if injection needed: helpers absent OR old non-guarded version present
+            _has_jarvis = "JarvisReadYieldedToolResultText" in updated
+            _has_nullguard = "if(!e||typeof e!='object')return null" in updated
+            if not _has_jarvis or not _has_nullguard:
+                # Re-inject: strip old helpers between "return a}" and "function WA(e){"
+                _pre = "return a}"
+                _post = "function WA(e){"
+                if _has_jarvis and _pre in updated and _post in updated:
+                    # Find "return a}" before the Jarvis functions
+                    _jarvis_pos = updated.index("function JarvisReadYieldedToolResultText(")
+                    _pre_idx = updated.rfind(_pre, 0, _jarvis_pos)
+                    _post_idx = updated.index(_post, _jarvis_pos)
+                    if _pre_idx >= 0 and _post_idx >= 0:
+                        updated = updated[:_pre_idx + len(_pre)] + updated[_post_idx:]
+                        changed = True
+                if _pre in updated and _post in updated:
+                    _pre_idx = updated.rfind(_pre, 0, updated.index(_post) + len(_post))
+                    _post_idx = updated.index(_post, _pre_idx)
+                    if _pre_idx >= 0 and _post_idx >= 0:
+                        _between = updated[_pre_idx + len(_pre):_post_idx]
+                        if "Jarvis" not in _between:
+                            updated = updated[:_pre_idx + len(_pre)] + JARVIS_FUNCTIONS_V2026_6_5 + updated[_post_idx:]
+                            changed = True
             if HISTORY_MERGE_V2026_6_5_OLD in updated and HISTORY_MERGE_V2026_6_5_NEW not in updated:
                 updated = updated.replace(HISTORY_MERGE_V2026_6_5_OLD, HISTORY_MERGE_V2026_6_5_NEW, 1)
                 changed = True
