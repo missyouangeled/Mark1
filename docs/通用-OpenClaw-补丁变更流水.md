@@ -1333,3 +1333,17 @@
 - 6项验收全部通过：文件就位、MEMORY.md 69行、INDEX 1127关键词、Router四层不报错、context-summary含昨日内容、git push成功
 - 相关文件：
 - `AGENTS.md`
+
+## 2026-06-11 11:50:07 CST (+08:00) — OpenClaw 2026.5.22→2026.6.5 升级 + 补丁适配
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已通过
+- 结果摘要：
+- 升级成功；品牌补丁适配新版函数名(OA/w/Ag/gh/Cg/qg)；模型选择器和运行指示器内建后跳过；INVALID_FINAL_RELOAD 已更新
+- 验收 / 验证：
+- Gateway v2026.6.5 运行正常，Control UI 品牌生效，watcher 全活
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`

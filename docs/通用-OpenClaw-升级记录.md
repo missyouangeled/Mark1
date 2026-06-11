@@ -244,3 +244,34 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 ---
 
 > 文档维护规则：每次 OpenClaw 升级后，在此文件上方追加新的升级记录条目（从 #2 开始）。如果升级由用户手动触发，在"触发方式"中注明。如果升级由自动更新触发，注明触发时间和触发机制。
+
+---
+
+## 2026-06-11: 2026.5.22 → 2026.6.5
+
+### 升级过程
+- npm update -g openclaw: 新增2包，删除72包，变更283包
+- 升级前 git checkpoint 已提交
+- 新 gateway 排水重启（老进程 drain 300s），重启用 `systemctl --user restart`
+
+### 上游变化
+- 安全边界收紧：exec 审批超时 fail-close、沙箱 bind/环境继承/MCP stdio 加固
+- Plugin/Skill 安装改用 operator install policy
+- Agent/Codex runtime 恢复更稳健
+- 新增 `data-chat-model-select` 内建模型选择器（不再需要我们的补丁）
+- 新增 `hasActiveRun` 内建聊天运行指示器
+- SQLite 状态迁移（cron、tasks、memory）
+
+### 补丁适配
+- **品牌补丁**: 函数名更新（fj/OD→OA, ek→w, bx→Ag, Il→gh, Uc→Cg, Gl/Tx→qg），新增 v2026.6.5 检测路径
+- **INVALID_FINAL_RELOAD**: 函数名 Gl→qg，模式已更新
+- **模型选择器补丁**: 上游已内建，跳过
+- **Chat running 补丁**: 上游 hasActiveRun 已内建，跳过
+- **Resume-watch**: 保持关闭（升级后未重新激活）
+- **Unified proxy / infos-handle**: 无需更新，直接复用
+
+### 验证
+- Gateway v2026.6.5 正常运行
+- Control UI 可访问 (200)
+- 品牌注入生效（贾维斯 Control）
+- 4 个 watcher timer 全部 active
