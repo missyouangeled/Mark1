@@ -57,9 +57,13 @@ def extract_keywords_from_line(line: str) -> list[str]:
     if stripped.startswith("|") or stripped.startswith(":"):
         return keywords
 
-    # 提取中文词、英文词作为关键词
-    # 从行中提取 2-4 字的中文短语和 3+ 字符的英文词
-    cn_words = re.findall(r"[\u4e00-\u9fff]{2,4}", stripped)
+    # 提取中文词（滑动窗口 2/3/4 字，与 router 一致）
+    cn_segments = re.findall(r"[\u4e00-\u9fff]+", stripped)
+    cn_words: list[str] = []
+    for seg in cn_segments:
+        for window in (2, 3, 4):
+            for i in range(len(seg) - window + 1):
+                cn_words.append(seg[i:i + window])
     en_words = re.findall(r"[a-zA-Z][a-zA-Z0-9_/-]{2,}", stripped)
 
     # 过滤太泛的词

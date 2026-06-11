@@ -41,8 +41,8 @@ LAYER_TIMEOUT_S = 5
 def tokenize_for_index(query: str) -> list[str]:
     """与 memory-index-builder.py 一致的 tokenize 逻辑。
     
-    使用滑动窗口提取中文关键词（2/3/4字），避免非重叠匹配丢失子词。
-    例如 "监工规则" → ["监工", "规则", "监工规", "工规则", "监工规则"]
+    使用滑动窗口提取中文关键词（2/3/4字）+ 完整中文段作为长关键词，
+    以匹配索引中的标题型长词（如"硬件适配性审查""安装前安全审查"）。
     """
     tokens: list[str] = []
 
@@ -54,10 +54,14 @@ def tokenize_for_index(query: str) -> list[str]:
         "全部", "所有", "每个", "任何", "还",
     }
 
-    # 提取中文段 → 滑动窗口生成 2/3/4 字子词
+    # 提取中文段 → 滑动窗口生成 2/3/4 字子词 + 完整段做长关键词
     cn_segments = re.findall(r"[\u4e00-\u9fff]+", query)
     seen_cn: set[str] = set()
     for seg in cn_segments:
+        # 完整段作为关键词（匹配标题型长词，权重最高）
+        if len(seg) >= 4 and seg not in stopwords and seg not in seen_cn:
+            seen_cn.add(seg)
+            tokens.append(seg)
         for window in (2, 3, 4):
             for i in range(len(seg) - window + 1):
                 sub = seg[i:i + window]
@@ -110,21 +114,46 @@ def search_l1_index(query: str) -> dict | None:
     if not matches:
         return None
 
-    # 滤波：只保留索引中实际存在的 token 参与比值计算，
-    # 避免滑动窗口产生的 phantom token（如"工规""工规则"）稀释命中率
+    # 过滤：只保留索引中存在的 token
     indexed_tokens = [t for t in tokens if t in index]
     effective_tokens = indexed_tokens if indexed_tokens else tokens
 
-    # 置信度 = min(1.0, 命中唯一关键词数/有效token数)
-    kw_hit_ratio = len({m["keyword"] for m in matches}) / max(len(effective_tokens), 1)
-    # 匹配条目数因子（越多越确信）
-    density = min(len(matches) / 3, 1.0)
-    confidence = min(kw_hit_ratio * 0.6 + density * 0.4, 1.0)
+    # IDF-like 加权：关键词出现在越少文件中，权重越高
+    kw_files: dict[str, int] = {}
+    for token_val in {m["keyword"] for m in matches}:
+        if token_val in index:
+            kw_files[token_val] = len({e["file"] for e in index[token_val]})
+        else:
+            kw_files[token_val] = 1
 
-    # 额外加权：如果最佳匹配是 ## 标题行，+0.15（Bug4修复）
+    def kw_weight(t: str) -> float:
+        n = kw_files.get(t, 1)
+        if n <= 1: return 1.0
+        if n == 2: return 0.75
+        if n <= 4: return 0.5
+        return 0.25
+
+    # 按文件分组，取最佳文件的 IDF 加权浓度
+    file_keywords: dict[str, set[str]] = {}
+    for m in matches:
+        file_keywords.setdefault(m["file"], set()).add(m["keyword"])
+
+    best_kws = max(file_keywords.values(), key=lambda kws: sum(kw_weight(k) for k in kws)) if file_keywords else set()
+    best_score = sum(kw_weight(k) for k in best_kws)
+    total_eff_weight = sum(kw_weight(t) for t in effective_tokens if t in kw_files) or 1.0
+    concentration = best_score / total_eff_weight
+
+    density = min(len(matches) / 3, 1.0)
+    confidence = min(concentration * 0.65 + density * 0.20, 0.85)
+
+    # 标题行加权 +0.15
     best_match = min(matches, key=lambda m: m["line"])
     if best_match["snippet"].startswith("## "):
         confidence = min(confidence + 0.15, 1.0)
+
+    # 如果最佳文件命中 ≥3 个独特关键词 → 再加 0.05
+    if len(best_kws) >= 3:
+        confidence = min(confidence + 0.05, 1.0)
 
     return {
         "layer": "L1",
