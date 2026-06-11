@@ -47,9 +47,49 @@ PENDING_READING_INDICATOR_APPLY_NEW = "let o=e.streamSegments??[],s=Math.max(o.l
 PENDING_READING_INDICATOR_APPLY_OLD_V2 = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++){if(i<o.length){let n=OD(o[i].text);n.length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:n,startedAt:o[i].ts})}i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]})}if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=OD(e.stream);r.length>0?Bc(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}return wD(ED(t))}"
 PENDING_READING_INDICATOR_APPLY_NEW_V2 = "let o=e.streamSegments??[],s=Math.max(o.length,r.length);for(let i=0;i<s;i++){if(i<o.length){let n=OD(o[i].text);n.length>0&&t.push({kind:`stream`,key:`stream-seg:${e.sessionKey}:${i}`,text:n,startedAt:o[i].ts})}i<r.length&&e.showToolCalls&&t.push({kind:`message`,key:AD(r[i],i+n.length),message:r[i]})}let c=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||c){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=e.stream!==null?OD(e.stream):``;r.length>0?Bc(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:`reading-indicator`,key:n})}return wD(ED(t))}"
 
-# ── v2026.6.5 适配 — 函数映射: OD/fj→OA, ek/g→w, ij/MT→uf, bx/Bl→Ag, Il→gh, Uc/gx→Cg, Bc/Wb→nI, Gl/Tx→qg ──
+# ── v2026.6.5 适配 — 函数映射: OD/fj→OA, ek/g→w, ij/MT→uf, bx/Bl→Ag, Il→gh, Uc/gx→Cg, Bc/Wb→nI/ph, Gl/Tx→qg, kD→WA, wD→wA, ED→EA, AD→GA ──
 INVALID_FINAL_RELOAD_V2026_6_5_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){qg(e);return}f&&!o&&qg(e)}"
 INVALID_FINAL_RELOAD_V2026_6_5_NEW = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a)return;f&&!o&&qg(e)}"
+HISTORY_MERGE_V2026_6_5_OLD = "e.chatMessages=Ag(f,c)"
+HISTORY_MERGE_V2026_6_5_NEW = "e.chatMessages=Ag(JarvisProjectYieldedHistoryReply(f),c)"
+STREAM_INDICATOR_V2026_6_5_OLD = "if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=_h(OA(e.stream),f),i=NA(t,e.streamStartedAt??Date.now());r.length>0?ph(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}"
+STREAM_INDICATOR_V2026_6_5_NEW = "let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||pendingIndicator){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=_h(e.stream!==null?OA(e.stream):'',f),i=NA(t,e.streamStartedAt??Date.now());r.length>0?ph(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):t.push({kind:`reading-indicator`,key:n})}"
+JARVIS_FUNCTIONS_V2026_6_5 = (
+    "function JarvisReadYieldedToolResultText(e){"
+    + "let t=typeof e?.role=='string'?e.role.toLowerCase():'';"
+    + "if(t!=='toolresult'&&t!=='tool_result'&&t!=='tool'&&t!=='function')return null;"
+    + "let n=typeof e?.content=='string'?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text=='string'?e.text:'').join('\\n'):typeof e?.text=='string'?e.text:'';"
+    + "if(!n.trim())return null;"
+    + "try{let r=JSON.parse(n),i=typeof r?.message=='string'?r.message.trim():'';"
+    + "return r?.status==='yielded'&&i&&!/^\\\\s*NO_REPLY\\\\s*$/.test(i)?i:null}catch{return null}}"
+    + "function JarvisProjectYieldedHistoryReply(e){"
+    + "if(!Array.isArray(e)||e.length===0)return[];"
+    + "let t=e.filter(e=>!Cg(e)),n=-1;"
+    + "for(let t=e.length-1;t>=0;t--){let r=typeof e[t]?.role=='string'?e[t].role.toLowerCase():'';if(r==='user'){n=t;break}}"
+    + "if(n<0)return t;"
+    + "for(let r=e.length-1;r>n;r--){let i=uf(e[r]),a=w(i.role).toLowerCase();if(a==='assistant'&&i.content.length>0)return t}"
+    + "for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;"
+    + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof e[r]?.timestamp=='number'?e[r].timestamp:Date.now()};return[...t,a]}return t}"
+    + "function JarvisAssistantHasVisibleContent(e){"
+    + "let t=uf(e),n=w(t.role).toLowerCase();if(n!=='assistant')return!1;"
+    + "for(let r of t.content){if(!r||typeof r!='object')continue;"
+    + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\\\s*NO_REPLY\\\\s*$/.test(e))return!0}"
+    + "if(r.type==='attachment'||r.type==='canvas')return!0}return!1}"
+    + "function JarvisShouldShowPendingReadingIndicator(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "let t=e.sessionHasActiveRun===!0||e.sessionStatus==='running',"
+    + "n=typeof e.sessionEndedAt=='number'&&Date.now()-e.sessionEndedAt<=2e4;"
+    + "if(!t&&!n)return!1;"
+    + "let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;"
+    + "for(let e=r.length-1;e>=0;e--){let t=typeof r[e]?.role=='string'?r[e].role.toLowerCase():'';if(t==='user'){a=e;break}}"
+    + "if(a<0)return!1;"
+    + "let o=!1,s=!1,c=0;"
+    + "for(let e=a+1;e<r.length;e++){let t=r[e];if(!t||typeof t!='object')continue;"
+    + "if(JarvisAssistantHasVisibleContent(t)){o=!0;break}"
+    + "let n=w(uf(t).role).toLowerCase();(n==='assistant'||n==='tool')&&(s=!0);"
+    + "let i=typeof t.timestamp=='number'?t.timestamp:0;i>c&&(c=i)}"
+    + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
+)
 # ── v2026.5.22 适配 — 函数映射: fj→OD, ij→MT, ek→yT, bx→Bl, gx→Uc/Il, Wb→Bc, Tx→Gl/xl ──
 CHAT_RUNNING_PATCH_V22 = "let t=e.connected,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),n=e.loading||e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0||a?.hasActiveRun===!0||a?.status===`running`,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,"
 INVALID_FINAL_RELOAD_V22_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){Tx(e);return}f&&!o&&Tx(e)}"
@@ -227,6 +267,22 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
         if is_v2026_6_5:
             if INVALID_FINAL_RELOAD_V2026_6_5_OLD in updated:
                 updated = updated.replace(INVALID_FINAL_RELOAD_V2026_6_5_OLD, INVALID_FINAL_RELOAD_V2026_6_5_NEW, 1)
+                changed = True
+            # Inject Jarvis yielded-history helpers (before WA / chat render)
+            if "JarvisReadYieldedToolResultText" not in updated:
+                anchor = "return a}function WA(e){"
+                if anchor in updated:
+                    updated = updated.replace(
+                        anchor,
+                        "return a}" + JARVIS_FUNCTIONS_V2026_6_5 + "function WA(e){",
+                        1,
+                    )
+                    changed = True
+            if HISTORY_MERGE_V2026_6_5_OLD in updated and HISTORY_MERGE_V2026_6_5_NEW not in updated:
+                updated = updated.replace(HISTORY_MERGE_V2026_6_5_OLD, HISTORY_MERGE_V2026_6_5_NEW, 1)
+                changed = True
+            if STREAM_INDICATOR_V2026_6_5_OLD in updated and STREAM_INDICATOR_V2026_6_5_NEW not in updated:
+                updated = updated.replace(STREAM_INDICATOR_V2026_6_5_OLD, STREAM_INDICATOR_V2026_6_5_NEW, 1)
                 changed = True
             if changed:
                 asset_path.write_text(updated, encoding="utf-8")
