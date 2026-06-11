@@ -19,16 +19,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 import time
-import yaml
 from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parent.parent
-INDEX_PATH = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.yaml")
+INDEX_PATH = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.json")  # JSON 0.03s vs YAML 5s
 SESSION_BACKUP_DIR = Path("/mnt/data/openclaw/session-backup")
 CONTEXT_SUMMARY = "context-summary.md"
 
@@ -78,13 +78,21 @@ def tokenize_for_index(query: str) -> list[str]:
 
 
 def search_l1_index(query: str) -> dict | None:
-    """L1: 在 MEMORY_INDEX.yaml 中做关键词匹配。"""
+    """L1: MEMORY_INDEX.yaml 关键词匹配 + IDF + 标签加权。
+
+    评分公式：
+      raw_score = Σ(token_idf × tag_multiplier)
+      confidence = raw_score / max_possible_score
+
+    标签乘数：rule_title=2.0, concept=1.2, general=1.0, device=0.8,
+              common=0.3, path=0.2
+    """
     if not INDEX_PATH.exists():
         return None
 
     try:
         with open(INDEX_PATH, "r", encoding="utf-8") as f:
-            idx = yaml.safe_load(f)
+            idx = json.load(f)
     except Exception:
         return None
 
@@ -92,9 +100,31 @@ def search_l1_index(query: str) -> dict | None:
         return None
 
     index = idx["index"]
+    metadata: dict[str, dict] = idx.get("metadata", {})
     tokens = tokenize_for_index(query)
     if not tokens:
         return None
+
+    # 标签乘数
+    TAG_MULTIPLIER = {
+        "rule_title": 2.0,
+        "concept": 1.2,
+        "general": 1.0,
+        "device": 0.8,
+        "common": 0.3,
+        "path": 0.2,
+    }
+
+    def token_score(t: str) -> float:
+        """计算单个 token 的得分：idf × 标签乘数。"""
+        if t not in index:
+            return 0.0
+        m = metadata.get(t, {})
+        idf = m.get("idf", 0.8)
+        # 取最高权重的标签
+        tags = m.get("tags", ["general"])
+        best_mult = max((TAG_MULTIPLIER.get(tag, 1.0) for tag in tags), default=1.0)
+        return idf * best_mult
 
     matches: list[dict] = []
     seen = set()
@@ -109,135 +139,189 @@ def search_l1_index(query: str) -> dict | None:
                         "line": entry["line"],
                         "snippet": entry.get("snippet", ""),
                         "keyword": token,
+                        "score": round(token_score(token), 3),
                     })
 
     if not matches:
         return None
 
-    # 过滤：只保留索引中存在的 token
-    indexed_tokens = [t for t in tokens if t in index]
-    effective_tokens = indexed_tokens if indexed_tokens else tokens
-
-    # IDF-like 加权：关键词出现在越少文件中，权重越高
-    kw_files: dict[str, int] = {}
-    for token_val in {m["keyword"] for m in matches}:
-        if token_val in index:
-            kw_files[token_val] = len({e["file"] for e in index[token_val]})
-        else:
-            kw_files[token_val] = 1
-
-    def kw_weight(t: str) -> float:
-        n = kw_files.get(t, 1)
-        if n <= 1: return 1.0
-        if n == 2: return 0.75
-        if n <= 4: return 0.5
-        return 0.25
-
-    # 按文件分组，取最佳文件的 IDF 加权浓度
-    file_keywords: dict[str, set[str]] = {}
+    # 按文件分组，累加 token_score
+    file_scores: dict[str, float] = {}
+    file_best_kws: dict[str, set[str]] = {}
     for m in matches:
-        file_keywords.setdefault(m["file"], set()).add(m["keyword"])
+        f = m["file"]
+        file_scores[f] = file_scores.get(f, 0.0) + m["score"]
+        file_best_kws.setdefault(f, set()).add(m["keyword"])
 
-    best_kws = max(file_keywords.values(), key=lambda kws: sum(kw_weight(k) for k in kws)) if file_keywords else set()
-    best_score = sum(kw_weight(k) for k in best_kws)
-    total_eff_weight = sum(kw_weight(t) for t in effective_tokens if t in kw_files) or 1.0
-    concentration = best_score / total_eff_weight
+    best_file = max(file_scores, key=file_scores.get) if file_scores else None
+    best_score = file_scores.get(best_file, 0.0)
 
-    density = min(len(matches) / 3, 1.0)
-    confidence = min(concentration * 0.65 + density * 0.20, 0.85)
+    # max_possible_score：所有 token 的 IDF × max 乘数
+    max_possible = sum(token_score(t) for t in tokens)
+    raw_conf = best_score / max(max_possible, 0.1)
 
-    # 标题行加权 +0.15
-    best_match = min(matches, key=lambda m: m["line"])
-    if best_match["snippet"].startswith("## "):
-        confidence = min(confidence + 0.15, 1.0)
-
-    # 如果最佳文件命中 ≥3 个独特关键词 → 再加 0.05
-    if len(best_kws) >= 3:
-        confidence = min(confidence + 0.05, 1.0)
+    # 匹配条目数因子
+    density = min(len(matches) / 5, 0.8)
+    confidence = round(min(raw_conf * 0.7 + density, 1.0), 3)
 
     return {
         "layer": "L1",
-        "confidence": round(confidence, 3),
-        "matches": matches[:10],
+        "confidence": confidence,
+        "matches": sorted(matches, key=lambda x: -x["score"])[:10],
+        "best_file": best_file,
+        "best_score": round(best_score, 3),
         "short_circuit": confidence >= L1_CONFIDENCE_THRESHOLD,
     }
 
 
-def search_l2_qmd(query: str) -> dict | None:
-    """L2: QMD BM25 全文检索。
-    
-    先 tokenize query，再用空格分隔的"索引真实关键词"传给 QMD，
-    过滤滑动窗口产生的 phantom token（如"工规""工规则"），
-    避免 QMD 因噪音词返回空结果。
+def search_l2_bm25(query: str) -> dict | None:
+    """L2: Python BM25（memory 文件）+ QMD fallback（全工作区）。
+
+    先试用 Python BM25 在 5 个 memory 文件内搜索（快，中文友好），
+    如果找不到匹配（如英文词/脚本路径），fallback 到 QMD 全量搜索。
     """
-    # Tokenize query，用 INDEX 中真实存在的 token 过滤 phantom
-    tokens = tokenize_for_index(query)
-    valid_tokens: list[str] = []
-    if INDEX_PATH.exists():
-        try:
-            with open(INDEX_PATH, "r", encoding="utf-8") as f:
-                idx = yaml.safe_load(f)
-            index_keys = set(idx.get("index", {}).keys()) if idx else set()
-            valid_tokens = [t for t in tokens if t in index_keys and len(t) <= 3]
-        except Exception:
-            pass
-    # fallback：如果过滤后为空，用空格分词或原 query
-    if not valid_tokens:
-        manual_tokens = query.replace("，", " ").replace(" ", " ").strip().split()
-        valid_tokens = [t for t in manual_tokens if len(t) >= 2] or [query]
-    search_query = " ".join(valid_tokens[:6])
+
+    # ── 阶段 1: Python BM25 ──
+    result = _search_l2_bm25_python(query)
+    if result and result.get("matches"):
+        return result
+
+    # ── 阶段 2: QMD fallback ──
+    return _search_l2_qmd_fallback(query)
+
+
+def _search_l2_bm25_python(query: str) -> dict | None:
+    """纯 Python BM25 评分器（基于关键词倒排索引）。
+
+    利用已有的 MEMORY_INDEX.json 做 IDF-weighted 文档评分。
+    不需要外部进程，中文/英文/混合查询通吃。
+
+    BM25 简化公式（k1=1.2）：
+      score(d, q) = Σ IDF(t) × (tf(t,d)×(k1+1)) / (tf(t,d)+k1)
+      IDF(t) = ln((N-df+0.5)/(df+0.5)+1)
+    """
+
+    if not INDEX_PATH.exists():
+        return None
 
     try:
+        with open(INDEX_PATH, "r", encoding="utf-8") as f:
+            idx = json.load(f)
+    except Exception:
+        return None
+
+    if not idx or "index" not in idx:
+        return None
+
+    index = idx["index"]
+    n_docs = idx.get("n_docs", 5)
+
+    tokens = tokenize_for_index(query)
+    if not tokens:
+        return None
+
+    valid_tokens = [t for t in tokens if t in index]
+    if not valid_tokens:
+        return None
+
+    K1 = 1.2
+    token_idfs: dict[str, float] = {}
+    token_files: dict[str, dict[str, int]] = {}
+
+    for token in valid_tokens:
+        entries = index[token]
+        df = len({e["file"] for e in entries})
+        idf = math.log(max((n_docs - df + 0.5) / (df + 0.5), 0.5) + 1)
+        token_idfs[token] = idf
+
+        file_tf: dict[str, int] = {}
+        for e in entries:
+            f = e["file"]
+            file_tf[f] = file_tf.get(f, 0) + 1
+        token_files[token] = file_tf
+
+    file_scores: dict[str, float] = {}
+    for token in valid_tokens:
+        idf = token_idfs[token]
+        for f, tf in token_files[token].items():
+            bm25_tf = (tf * (K1 + 1)) / (tf + K1)
+            file_scores[f] = file_scores.get(f, 0.0) + idf * bm25_tf
+
+    if not file_scores:
+        return None
+
+    best_file = max(file_scores, key=file_scores.get)
+    best_score = file_scores[best_file]
+    max_possible = sum(token_idfs.values())
+    confidence = round(min(best_score / max(max_possible, 0.1), 1.0), 3)
+
+    matches_out: list[dict] = []
+    seen_entries = set()
+    for token in valid_tokens:
+        for entry in index.get(token, []):
+            dedup = (entry["file"], entry["line"])
+            if dedup not in seen_entries:
+                seen_entries.add(dedup)
+                matches_out.append({
+                    "file": entry["file"],
+                    "line": entry["line"],
+                    "snippet": entry.get("snippet", ""),
+                    "keyword": token,
+                })
+
+    return {
+        "layer": "L2",
+        "confidence": confidence,
+        "matches": sorted(matches_out, key=lambda x: token_idfs.get(x["keyword"], 0), reverse=True)[:10],
+        "best_file": best_file,
+        "best_score": round(best_score, 3),
+        "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
+    }
+
+
+def _search_l2_qmd_fallback(query: str) -> dict | None:
+    """QMD BM25 全工作区搜索（fallback，用于英文词/脚本路径等不在 memory 文件中的查询）。"""
+    import subprocess
+    try:
         result = subprocess.run(
-            ["qmd", "search", search_query, "--top", "5"],
+            ["qmd", "search", query, "--top", "5"],
             capture_output=True, text=True,
             timeout=LAYER_TIMEOUT_S,
             cwd=str(WORKSPACE),
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return {"layer": "L2", "confidence": 0.0, "matches": [],
-                "reason": "qmd not available or timed out", "short_circuit": False}
+                "reason": "qmd unavailable", "short_circuit": False}
 
     if result.returncode != 0 or not result.stdout.strip():
         return {"layer": "L2", "confidence": 0.0, "matches": [],
-                "reason": "no BM25 matches from QMD", "short_circuit": False}
+                "reason": "no QMD matches", "short_circuit": False}
 
-    # 解析 QMD 输出
     lines = result.stdout.strip().split("\n")
     matches: list[dict] = []
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        # 格式: qmd://path:lineno #hash 或 Title: ...
         m = re.match(r"qmd://(.+?):(\d+)\s+#\w+", line)
         if m:
-            matches.append({
-                "file": m.group(1),
-                "line": int(m.group(2)),
-                "raw": line,
-            })
+            matches.append({"file": m.group(1), "line": int(m.group(2)), "raw": line})
             continue
-        m_title = re.match(r"Title:\s*(.+)", line)
-        if m_title and matches:
-            matches[-1]["title"] = m_title.group(1)
-            continue
-        m_score = re.match(r"Score:\s*(\d+)%", line)
-        if m_score and matches:
-            matches[-1]["score"] = int(m_score.group(1)) / 100.0
+        m_s = re.match(r"Score:\s*(\d+)%", line)
+        if m_s and matches:
+            matches[-1]["score"] = int(m_s.group(1)) / 100.0
 
     if not matches:
         return {"layer": "L2", "confidence": 0.0, "matches": [],
-                "reason": "no parsed matches from QMD output", "short_circuit": False}
+                "reason": "no parsed QMD matches", "short_circuit": False}
 
-    # 用最高分和命中数计算置信度
     top_score = max((m.get("score", 0) for m in matches), default=0)
     density = min(len(matches) / 3, 1.0)
-    confidence = min(top_score * 0.7 + density * 0.3, 1.0)
+    confidence = round(min(top_score * 0.7 + density * 0.3, 1.0), 3)
 
     return {
         "layer": "L2",
-        "confidence": round(confidence, 3),
+        "confidence": confidence,
         "matches": matches,
         "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
     }
@@ -308,7 +392,7 @@ def route_search(query: str, max_layer: str = "L4") -> dict:
         if layer_name == "L1":
             l_result = search_l1_index(query)
         elif layer_name == "L2":
-            l_result = search_l2_qmd(query)
+            l_result = search_l2_bm25(query)
         elif layer_name == "L3":
             l_result = search_l3_cloud(query)
         elif layer_name == "L4":
@@ -349,7 +433,7 @@ def main():
 
     if args.layer:
         # 单层模式
-        layer_map = {"l1": search_l1_index, "l2": search_l2_qmd,
+        layer_map = {"l1": search_l1_index, "l2": search_l2_bm25,
                      "l3": search_l3_cloud, "l4": search_l4_backup}
         fn = layer_map[args.layer]
         result = fn(query)

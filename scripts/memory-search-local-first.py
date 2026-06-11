@@ -152,12 +152,12 @@ def search_qmd(query: str) -> dict:
     # Tokenize query，用 QMD 实际索引中的 token 过滤 phantom
     tokens = tokenize_query(query)
     valid_tokens: list[str] = []
-    index_path = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.yaml")
+    index_path = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.json")
     if index_path.exists():
         try:
-            import yaml
+            import json
             with open(index_path, "r", encoding="utf-8") as f:
-                idx = yaml.safe_load(f)
+                idx = json.load(f)
             index_keys = set(idx.get("index", {}).keys()) if idx else set()
             valid_tokens = [t for t in tokens if t in index_keys and len(t) <= 3]
         except Exception:
