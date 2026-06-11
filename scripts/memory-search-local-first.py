@@ -144,10 +144,32 @@ def search_local(query: str) -> dict:
 
 
 def search_qmd(query: str) -> dict:
-    """L2: QMD BM25 全文检索 memory/ 目录。"""
+    """L2: QMD BM25 全文检索 memory/ 目录。
+    
+    先 tokenize query，再用空格分隔的"索引真实关键词"传给 QMD，
+    过滤滑动窗口产生的 phantom token（如"工规""工规则"）。
+    """
+    # Tokenize query，用 QMD 实际索引中的 token 过滤 phantom
+    tokens = tokenize_query(query)
+    valid_tokens: list[str] = []
+    index_path = Path("/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.yaml")
+    if index_path.exists():
+        try:
+            import yaml
+            with open(index_path, "r", encoding="utf-8") as f:
+                idx = yaml.safe_load(f)
+            index_keys = set(idx.get("index", {}).keys()) if idx else set()
+            valid_tokens = [t for t in tokens if t in index_keys and len(t) <= 3]
+        except Exception:
+            pass
+    if not valid_tokens:
+        manual_tokens = query.replace("，", " ").replace(" ", " ").strip().split()
+        valid_tokens = [t for t in manual_tokens if len(t) >= 2] or [query]
+    search_query = " ".join(valid_tokens[:6])
+
     try:
         result = subprocess.run(
-            ["qmd", "search", query, "--top", "5"],
+            ["qmd", "search", search_query, "--top", "5"],
             capture_output=True, text=True,
             timeout=5,
             cwd=str(WORKSPACE),

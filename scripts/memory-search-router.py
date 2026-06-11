@@ -39,11 +39,12 @@ LAYER_TIMEOUT_S = 5
 
 
 def tokenize_for_index(query: str) -> list[str]:
-    """与 memory-index-builder.py 一致的 tokenize 逻辑。"""
+    """与 memory-index-builder.py 一致的 tokenize 逻辑。
+    
+    使用滑动窗口提取中文关键词（2/3/4字），避免非重叠匹配丢失子词。
+    例如 "监工规则" → ["监工", "规则", "监工规", "工规则", "监工规则"]
+    """
     tokens: list[str] = []
-    # 提取中文 2-4 字短语
-    cn_words = re.findall(r"[\u4e00-\u9fff]{2,4}", query)
-    en_words = re.findall(r"[a-zA-Z][a-zA-Z0-9_/-]{2,}", query.lower())
 
     stopwords = {
         "用户", "希望", "新增", "确认", "强调", "补充", "进一步",
@@ -52,9 +53,20 @@ def tokenize_for_index(query: str) -> list[str]:
         "这一", "这些", "这类", "这种", "但是", "因为", "所以",
         "全部", "所有", "每个", "任何", "还",
     }
-    for w in cn_words:
-        if w not in stopwords:
-            tokens.append(w)
+
+    # 提取中文段 → 滑动窗口生成 2/3/4 字子词
+    cn_segments = re.findall(r"[\u4e00-\u9fff]+", query)
+    seen_cn: set[str] = set()
+    for seg in cn_segments:
+        for window in (2, 3, 4):
+            for i in range(len(seg) - window + 1):
+                sub = seg[i:i + window]
+                if sub not in stopwords and sub not in seen_cn:
+                    seen_cn.add(sub)
+                    tokens.append(sub)
+
+    # 提取英文词
+    en_words = re.findall(r"[a-zA-Z][a-zA-Z0-9_/-]{2,}", query.lower())
     for w in en_words:
         tokens.append(w)
 
@@ -98,11 +110,21 @@ def search_l1_index(query: str) -> dict | None:
     if not matches:
         return None
 
-    # 置信度 = min(1.0, 命中关键词数/总token数 × 1.0)
-    kw_hit_ratio = len({m["keyword"] for m in matches}) / max(len(tokens), 1)
+    # 滤波：只保留索引中实际存在的 token 参与比值计算，
+    # 避免滑动窗口产生的 phantom token（如"工规""工规则"）稀释命中率
+    indexed_tokens = [t for t in tokens if t in index]
+    effective_tokens = indexed_tokens if indexed_tokens else tokens
+
+    # 置信度 = min(1.0, 命中唯一关键词数/有效token数)
+    kw_hit_ratio = len({m["keyword"] for m in matches}) / max(len(effective_tokens), 1)
     # 匹配条目数因子（越多越确信）
     density = min(len(matches) / 3, 1.0)
     confidence = min(kw_hit_ratio * 0.6 + density * 0.4, 1.0)
+
+    # 额外加权：如果最佳匹配是 ## 标题行，+0.15（Bug4修复）
+    best_match = min(matches, key=lambda m: m["line"])
+    if best_match["snippet"].startswith("## "):
+        confidence = min(confidence + 0.15, 1.0)
 
     return {
         "layer": "L1",
@@ -113,19 +135,43 @@ def search_l1_index(query: str) -> dict | None:
 
 
 def search_l2_qmd(query: str) -> dict | None:
-    """L2: QMD BM25 全文检索。"""
+    """L2: QMD BM25 全文检索。
+    
+    先 tokenize query，再用空格分隔的"索引真实关键词"传给 QMD，
+    过滤滑动窗口产生的 phantom token（如"工规""工规则"），
+    避免 QMD 因噪音词返回空结果。
+    """
+    # Tokenize query，用 INDEX 中真实存在的 token 过滤 phantom
+    tokens = tokenize_for_index(query)
+    valid_tokens: list[str] = []
+    if INDEX_PATH.exists():
+        try:
+            with open(INDEX_PATH, "r", encoding="utf-8") as f:
+                idx = yaml.safe_load(f)
+            index_keys = set(idx.get("index", {}).keys()) if idx else set()
+            valid_tokens = [t for t in tokens if t in index_keys and len(t) <= 3]
+        except Exception:
+            pass
+    # fallback：如果过滤后为空，用空格分词或原 query
+    if not valid_tokens:
+        manual_tokens = query.replace("，", " ").replace(" ", " ").strip().split()
+        valid_tokens = [t for t in manual_tokens if len(t) >= 2] or [query]
+    search_query = " ".join(valid_tokens[:6])
+
     try:
         result = subprocess.run(
-            ["qmd", "search", query, "--top", "5"],
+            ["qmd", "search", search_query, "--top", "5"],
             capture_output=True, text=True,
             timeout=LAYER_TIMEOUT_S,
             cwd=str(WORKSPACE),
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        return None
+        return {"layer": "L2", "confidence": 0.0, "matches": [],
+                "reason": "qmd not available or timed out", "short_circuit": False}
 
     if result.returncode != 0 or not result.stdout.strip():
-        return None
+        return {"layer": "L2", "confidence": 0.0, "matches": [],
+                "reason": "no BM25 matches from QMD", "short_circuit": False}
 
     # 解析 QMD 输出
     lines = result.stdout.strip().split("\n")
@@ -152,7 +198,8 @@ def search_l2_qmd(query: str) -> dict | None:
             matches[-1]["score"] = int(m_score.group(1)) / 100.0
 
     if not matches:
-        return None
+        return {"layer": "L2", "confidence": 0.0, "matches": [],
+                "reason": "no parsed matches from QMD output", "short_circuit": False}
 
     # 用最高分和命中数计算置信度
     top_score = max((m.get("score", 0) for m in matches), default=0)

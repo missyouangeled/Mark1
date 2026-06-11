@@ -1319,3 +1319,17 @@
 - context-summary成功包含daily正文摘要+200行transcript尾部，lifecycle-maintainer日期判断四场景全过
 - 相关文件：
 - `scripts/openclaw-session-backup.py`
+
+## 2026-06-11 08:41:18 CST (+08:00) — Phase 4: 统一记忆系统改造完成 — AGENTS.md更新 + 全链路验证 + Git推送
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- AGENTS.md搜索策略更新为L1→L2→L3→L4四层路由；全链路烟测通过（L1监工0.867、L2语音0.755、L3云提示、L4备份10条命中）；git commit & push完成
+- 验收 / 验证：
+- 6项验收全部通过：文件就位、MEMORY.md 69行、INDEX 1127关键词、Router四层不报错、context-summary含昨日内容、git push成功
+- 相关文件：
+- `AGENTS.md`

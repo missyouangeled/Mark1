@@ -190,6 +190,17 @@ def main():
             [sys.executable, str(SCRIPTS / "openclaw-scratch-cleanup.py"), "--days", "7"],
             timeout=60,
         ))
+        # 每日重建记忆关键词索引 + QMD BM25 reindex（Bug6修复：防止索引变僵尸）
+        checks.append(run_sub_check(
+            "memory-index-rebuild",
+            [sys.executable, str(SCRIPTS / "memory-index-builder.py")],
+            timeout=30,
+        ))
+        checks.append(run_sub_check(
+            "qmd-reindex",
+            ["qmd", "reindex"],
+            timeout=60,
+        ))
         append_log(f"daily backup & scratch cleanup triggered (date={today_str})")
 
     # 2. 临时文件清理 + ChatTTS 过期音频清理（统一入口，每 2 次一次 = 30min）
