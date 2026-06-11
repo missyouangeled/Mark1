@@ -68,12 +68,12 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "let t=e.filter(e=>!Cg(e)),n=-1;"
     + "for(let t=e.length-1;t>=0;t--){if(!e[t])continue;let r=typeof e[t]?.role=='string'?e[t].role.toLowerCase():'';if(r==='user'){n=t;break}}"
     + "if(n<0)return t;"
-    + "for(let r=e.length-1;r>n;r--){if(!e[r])continue;let i=uf(e[r]),a=w(i.role).toLowerCase();if(a==='assistant'&&i.content.length>0)return t}"
+    + "for(let r=e.length-1;r>n;r--){if(!e[r])continue;let i=uf(e[r]);if(!i||!i.role)continue;let a=w(i.role).toLowerCase();if(a==='assistant'&&i.content.length>0)return t}"
     + "for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;"
     + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof e[r]?.timestamp=='number'?e[r].timestamp:Date.now()};return[...t,a]}return t}"
     + "function JarvisAssistantHasVisibleContent(e){"
     + "if(!e||typeof e!='object')return!1;"
-    + "let t=uf(e),n=w(t.role).toLowerCase();if(n!=='assistant')return!1;"
+    + "let t=uf(e);if(!t||!t.role)return!1;let n=w(t.role).toLowerCase();if(n!=='assistant')return!1;"
     + "for(let r of t.content){if(!r||typeof r!='object')continue;"
     + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\s*NO_REPLY\\s*$/.test(e))return!0}"
     + "if(r.type==='attachment'||r.type==='canvas')return!0}return!1}"
@@ -88,7 +88,7 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "let o=!1,s=!1,c=0;"
     + "for(let e=a+1;e<r.length;e++){let t=r[e];if(!t||typeof t!='object')continue;"
     + "if(JarvisAssistantHasVisibleContent(t)){o=!0;break}"
-    + "let n=w(uf(t).role).toLowerCase();(n==='assistant'||n==='tool')&&(s=!0);"
+    + "let i=uf(t);if(!i||!i.role)continue;let n=w(i.role).toLowerCase();(n==='assistant'||n==='tool')&&(s=!0);"
     + "let i=typeof t.timestamp=='number'?t.timestamp:0;i>c&&(c=i)}"
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
@@ -274,7 +274,7 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
             # Inject Jarvis yielded-history helpers (before WA / chat render)
             # Check if injection needed: helpers absent OR old non-guarded version present
             _has_jarvis = "JarvisReadYieldedToolResultText" in updated
-            _has_nullguard = "if(!e||typeof e!='object')return null" in updated
+            _has_nullguard = "if(!e||typeof e!='object')return null" in updated and "if(!i||!i.role)" in updated
             if not _has_jarvis or not _has_nullguard:
                 # Re-inject: strip old helpers between "return a}" and "function WA(e){"
                 _pre = "return a}"
