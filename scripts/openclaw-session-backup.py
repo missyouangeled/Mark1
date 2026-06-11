@@ -168,14 +168,18 @@ def create_snapshot() -> dict:
             shutil.copy2(src, dst)
             result["files"].append(str(dst))
 
-    # 1b. Transcript 文件
-    for day_offset in [0, 1]:
+    # 1b. Transcript 文件：最近 2 天完整复制，2～7 天仅保留 daily.md 摘要
+    for day_offset in range(7):  # 检查过去 7 天
         day = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
         src = MEMORY_DIR / f"{day}-transcript.md"
-        if src.exists():
+        if not src.exists():
+            continue
+        if day_offset <= 1:
+            # 最近 2 天：完整复制
             dst = snapshot_dir / f"daily-{day}-transcript.md"
             shutil.copy2(src, dst)
             result["files"].append(str(dst))
+        # 2~7 天：不额外复制 transcript（已有 daily.md 摘要，且会被清理逻辑处理）
 
     # 2. MEMORY.md
     if MEMORY_FILE.exists():
@@ -226,8 +230,18 @@ def create_snapshot() -> dict:
 
 
 def build_context_summary() -> str:
-    """从现有文件构建当前会话上下文摘要 — AI 可读的恢复指南"""
+    """从现有文件构建当前会话上下文摘要 — AI 可读的恢复指南
+
+    包含：
+    - 今日摘要（daily.md）
+    - 今日 transcript 尾巴（最后 200 行）
+    - 昨日摘要（daily.md 的「重要事项」段）
+    - 昨日 transcript 尾巴（最后 300 行）
+    """
     now = datetime.now()
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    today = now.strftime("%Y-%m-%d")
+
     summary = f"""# 🔄 会话上下文快照 — AI 恢复指南
 
 ## ⚠️ 如果你是刚醒来的 AI 模型，请先读这里
@@ -235,8 +249,9 @@ def build_context_summary() -> str:
 在你开始回复点点之前：
 1. 先读完本文件的全部内容（特别是「最近规则」和「今日摘要」）
 2. 然后读本目录下的 `MEMORY.md`（备份副本）
-3. 然后读 `daily-{now.strftime('%Y-%m-%d')}.md`（今日记录）和 `daily-{now.strftime('%Y-%m-%d')}-transcript.md`（今日对话记录）
-4. 然后再开始回复——不要一张嘴就说"早上好"如果今天已经聊了很久
+3. 然后读 `daily-{today}.md`（今日记录）和 `daily-{today}-transcript.md`（今日对话记录）
+4. 然后读「昨日摘要」和「昨日对话尾巴」了解跨天断层内容
+5. 然后再开始回复——不要一张嘴就说"早上好"如果今天已经聊了很久
 
 ## 生成时间
 {now.strftime('%Y-%m-%d %H:%M:%S %Z')}
@@ -264,21 +279,19 @@ def build_context_summary() -> str:
         pass
 
     # 今日工作记录
-    today_file = MEMORY_DIR / f"{get_date_str()}.md"
+    today_file = MEMORY_DIR / f"{today}.md"
     if today_file.exists():
-        summary += f"## 今日记录\n摘要已备份至 `daily-{get_date_str()}.md`\n\n"
+        summary += f"## 今日记录\n摘要已备份至 `daily-{today}.md`\n\n"
 
     # 从 daily.md 提取今日摘要正文（含「今日摘要」+「重要事项」区块）
-    today_md = MEMORY_DIR / f"{get_date_str()}.md"
+    today_md = MEMORY_DIR / f"{today}.md"
     if today_md.exists():
         try:
             md_full = today_md.read_text(encoding="utf-8")
-            # 提取从「## 今日摘要」到下一个同级标题或文件末尾
             import re
             m = re.search(r'(## 今日摘要.*?)(?=\n## |\Z)', md_full, re.DOTALL)
             if m:
                 excerpt = m.group(1).strip()
-                # 限制 800 字符防止过长
                 if len(excerpt) > 800:
                     excerpt = excerpt[:800] + "\n...(已截断)"
                 summary += "## 今日摘要（来自 daily.md）\n"
@@ -287,7 +300,7 @@ def build_context_summary() -> str:
             pass
 
     # 从 transcript 提取最后 200 行（覆盖约最近 1 小时）
-    transcript_file = MEMORY_DIR / f"{get_date_str()}-transcript.md"
+    transcript_file = MEMORY_DIR / f"{today}-transcript.md"
     if transcript_file.exists():
         try:
             full = transcript_file.read_text(encoding="utf-8")
@@ -302,10 +315,51 @@ def build_context_summary() -> str:
         except Exception:
             pass
 
+    # ── 🆕 昨日摘要（daily.md 的「重要事项」段）──
+    yesterday_md = MEMORY_DIR / f"{yesterday}.md"
+    if yesterday_md.exists():
+        try:
+            yd_full = yesterday_md.read_text(encoding="utf-8")
+            import re
+            # 提取「重要事项」区块（如果存在）
+            m = re.search(r'(## 重要事项.*?)(?=\n## |\Z)', yd_full, re.DOTALL)
+            if m:
+                excerpt = m.group(1).strip()
+                if len(excerpt) > 600:
+                    excerpt = excerpt[:600] + "\n...(已截断)"
+                summary += "## 昨日重要事项（跨天恢复用）\n"
+                summary += excerpt + "\n\n"
+            else:
+                # 若无「重要事项」段，取昨日全文的前 500 字符作为摘要
+                preview = yd_full[:500].strip()
+                if len(yd_full) > 500:
+                    preview += "\n...(已截断)"
+                summary += f"## 昨日记录（{yesterday}）\n"
+                summary += preview + "\n\n"
+        except Exception:
+            pass
+
+    # ── 🆕 昨日 transcript 尾巴（最后 300 行）──
+    yesterday_transcript = MEMORY_DIR / f"{yesterday}-transcript.md"
+    if yesterday_transcript.exists():
+        try:
+            full = yesterday_transcript.read_text(encoding="utf-8")
+            lines = full.split("\n")
+            total = len(lines)
+            tail_count = 300 if total >= 300 else total
+            tail_lines = lines[-tail_count:] if total >= tail_count else lines
+            summary += f"## 昨日对话尾巴（第 {total - tail_count + 1}-{total} 行 / 共 {total} 行）\n"
+            summary += "```\n"
+            summary += "\n".join(tail_lines)
+            summary += "\n```\n\n"
+        except Exception:
+            pass
+
     summary += "## 恢复提示\n"
     summary += "- 主会话中断后，先读取本文件的「最近规则」部分\n"
     summary += "- 再读 MEMORY.md 的最新备份了解偏好\n"
     summary += "- 最后读今日和昨日的 daily 文件了解最近对话\n"
+    summary += "- 「昨日重要事项」和「昨日对话尾巴」帮助你在跨天醒来时无缝接上\n"
 
     return summary
 

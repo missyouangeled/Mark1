@@ -64,19 +64,28 @@ Don't ask permission. Just do it.
 - **每日记录** (`memory/daily/`): 每次对话结束后写当天的摘要。包含：聊了什么、谁说了什么重要的话、当天的新设定/改进要求。
 - **Memory flush 事件**：OpenClaw 会话压缩时触发的 flush 只能写 `memory/YYYY-MM-DD.md`（扁平路径，不能带子目录）。写成后由 `lifecycle-maintainer` 的 `flush-memory-sync.sh` 每 15 分钟自动追加到 `memory/daily/YYYY-MM-DD.md`。日常主动归档仍直接写 `memory/daily/`。
 
-### memory_search 三级搜索策略
+### memory_search 统一搜索策略（L1→L2→L3→L4 路由）
 
-每次调用 `memory_search` 前，默认按以下顺序：
+每次调用 `memory_search` 前，默认按以下四层顺序：
 
-1. **本地关键词短路** → `memory-search-local-first.py`
+1. **L1: 本地关键词短路** → `memory-search-local-first.py`
    - 0.1s 内 grep MEMORY.md + memory/*.md
+   - 然后 QMD BM25 检索 memory/（L2 级）
    - 置信度 ≥ 0.7 → 直接短路，跳过云端 API
-   - 置信度 < 0.7 → 继续下一步
    - 结果有 60s TTL 缓存，重复查询零开销
 
-2. **云端语义搜索** → `memory_search` 工具
-   - 本地短路失败时才调用
-   - github-copilot 向量搜索，4-10s
+2. **L2: 规则关键词路由** → `memory-search-router.py`
+   - L1: MEMORY_INDEX.yaml 关键词匹配（≤0.05s，置信度 ≥0.8）
+   - L2: QMD BM25 全文检索（0.2-0.5s，置信度 ≥0.7）
+   - L3: 返回提示走云端 memory_search
+   - L4: 读取 session-backup context-summary
+
+3. **L3: 云端语义搜索** → `memory_search` 工具
+   - L1/L2 短路失败时才调用
+   - 向量语义搜索，4-10s
+
+4. **L4: Session 备份兜底** → 直接读取 `/mnt/data/openclaw/session-backup/` 最新 context-summary
+   - 含今日 + 昨日 transcript 尾巴，跨天醒来也能接上
 
 3. **搜索后的再次确认** → `memory_get`
    - 拿回精确内容，避免摘要偏差

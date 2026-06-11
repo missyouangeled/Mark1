@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-memory-search-local-first.py — 本地预搜短路器
+memory-search-local-first.py — 本地预搜短路器（L1 grep + L2 QMD BM25）
 
-在调用 memory_search（云端 github-copilot，4-10s）之前，先用本地关键词
-在 MEMORY.md + memory/*.md 中快速搜索。命中置信度 >= 0.7 则直接返回，
-避免无谓的云端 API 调用。
+在调用 memory_search（云端 github-copilot，4-10s）之前，先用本地搜索：
+  L1: grep MEMORY.md + memory/*.md（置信度 >=0.7 → 短路）
+  L2: QMD BM25 全文检索 memory/（置信度 >=0.7 → 短路）
+  L3: 返回 exit 1，走云端 memory_search
 
 用法：
   python3 scripts/memory-search-local-first.py "搜索词"
@@ -24,6 +25,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -133,9 +135,80 @@ def search_local(query: str) -> dict:
     return {
         "shortCircuited": True,
         "confidence": round(confidence, 3),
+        "layer": "L1-grep",
         "results": [
             {"file": f, "line": l, "lineno": n, "score": round(s, 3)}
             for s, f, l, n in top
+        ],
+    }
+
+
+def search_qmd(query: str) -> dict:
+    """L2: QMD BM25 全文检索 memory/ 目录。"""
+    try:
+        result = subprocess.run(
+            ["qmd", "search", query, "--top", "5"],
+            capture_output=True, text=True,
+            timeout=5,
+            cwd=str(WORKSPACE),
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {"shortCircuited": False, "results": [], "confidence": 0.0,
+                "layer": "L2-qmd", "reason": "qmd not available or timed out"}
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return {"shortCircuited": False, "results": [], "confidence": 0.0,
+                "layer": "L2-qmd", "reason": "no BM25 matches"}
+
+    # 解析 QMD 输出
+    lines = result.stdout.strip().split("\n")
+    matches: list[dict] = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"qmd://(.+?):(\d+)\s+#\w+", line)
+        if m:
+            matches.append({
+                "file": m.group(1),
+                "lineno": int(m.group(2)),
+                "raw": line,
+            })
+            continue
+        m_title = re.match(r"Title:\s*(.+)", line)
+        if m_title and matches:
+            matches[-1]["title"] = m_title.group(1)
+            continue
+        m_score = re.match(r"Score:\s*(\d+)%", line)
+        if m_score and matches:
+            matches[-1]["score"] = int(m_score.group(1)) / 100.0
+
+    if not matches:
+        return {"shortCircuited": False, "results": [], "confidence": 0.0,
+                "layer": "L2-qmd", "reason": "no parsed matches"}
+
+    # 用最高分和命中数计算置信度
+    top_score = max((m.get("score", 0) for m in matches), default=0)
+    density = min(len(matches) / 3, 1.0)
+    confidence = min(top_score * 0.7 + density * 0.3, 1.0)
+
+    if confidence < SHORT_CIRCUIT_THRESHOLD:
+        return {"shortCircuited": False, "results": [], "confidence": round(confidence, 3),
+                "layer": "L2-qmd", "reason": f"confidence {confidence:.2f} < {SHORT_CIRCUIT_THRESHOLD}"}
+
+    return {
+        "shortCircuited": True,
+        "confidence": round(confidence, 3),
+        "layer": "L2-qmd",
+        "results": [
+            {
+                "file": m.get("file", ""),
+                "lineno": m.get("lineno", 0),
+                "score": round(m.get("score", 0), 3),
+                "title": m.get("title", ""),
+                "snippet": m.get("raw", "")[:200],
+            }
+            for m in matches
         ],
     }
 
@@ -220,6 +293,13 @@ def main():
                 pass
 
     result = search_local(query)
+
+    # L1 grep 未短路 → 尝试 L2 QMD BM25
+    if not result["shortCircuited"]:
+        qmd_result = search_qmd(query)
+        if qmd_result["shortCircuited"]:
+            result = qmd_result
+
     result_str = json.dumps(result, ensure_ascii=False)
 
     # 写缓存
