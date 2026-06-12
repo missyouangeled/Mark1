@@ -245,3 +245,15 @@
 - **systemd**: `systemctl --user enable openclaw-embed-sidecar`
 - **内存**: ~1.3GB RSS（模型 + 索引常驻）
 - **效果**: L2.5 搜索从 12s → 250ms（48x 提升）
+
+### BaiduPCS-Go
+
+- **时间**：2026-06-12 13:42
+- **来源**：https://github.com/qjfoidnh/BaiduPCS-Go/releases/download/v4.0.1/BaiduPCS-Go-v4.0.1-linux-amd64.zip
+- **安装方式**：下载预编译二进制 → 解压 → `sudo cp` 到 `/usr/local/bin/BaiduPCS-Go`
+- **版本**：v4.0.1
+- **路径**：`/usr/local/bin/BaiduPCS-Go`
+- **配置**：`~/.config/BaiduPCS-Go/`
+- **依赖**：无（Go 静态编译）
+- **用途**：百度网盘命令行客户端，支持登录分享下载，主要用于绕过百度网盘客户端限速
+- **备注**：登录需 BDUSS + STOKEN（从 pan.baidu.com cookie 获取）
