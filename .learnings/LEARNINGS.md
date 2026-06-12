@@ -1246,3 +1246,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:dashboard:2cc18ce9-4219-4805-9a0b-e790de1a49c7
 
 ---
+
+## [LRN-20260612-001] correction
+
+**Logged**: 2026-06-12T06:15:54.413Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: Agnes-Image-2.0-Flash 模型 应该是可以生图的，你联网搜索看看。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270
+
+---

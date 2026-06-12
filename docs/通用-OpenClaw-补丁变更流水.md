@@ -1445,3 +1445,73 @@
 - 转存成功 / 下载任务已启动 / 目标目录已创建
 - 相关文件：
 - `/usr/local/bin/BaiduPCS-Go`
+
+## 2026-06-12 17:29:38 CST (+08:00) — 建立模型使用说明文档 + 纳入启动链
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 新建 docs/模型使用说明.md，记录 deepseek-company/deepseek-v4-pro、Agnes 图生（含 LiteLLM 管道异常绕过方案）、Agnes 视觉理解、GLM-5.1 不稳定、ollama 本地等模型的正确用法和已知坑点；同步更新 BOOT_INDEX.md 第 2 步，纳入每次启动自动加载
+- 验收 / 验证：
+- 文档路径存在且 BOOT_INDEX.md 已含引用
+- 相关文件：
+- `docs/模型使用说明.md,BOOT_INDEX.md`
+
+## 2026-06-12 17:40:12 CST (+08:00) — 修复切模型启动提示注入回归
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 兼容新版 Control UI 内建 sessions.patch 的模型切换逻辑，恢复切模型时的启动提示与系统引导注入。
+- 验收 / 验证：
+- 重新运行 apply-openclaw-session-model-selector-fix.py 成功；live asset 已包含 正在加载系统 / 系统指令 / OK 已经读取完成 / relaxed busy guard / cache bust。
+- 相关文件：
+- `scripts/apply-openclaw-session-model-selector-fix.py`
+
+## 2026-06-12 17:45:33 CST (+08:00) — 启用 resume-watch.timer（升级后自动 disabled）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：已更新
+- 结果摘要：
+- 升级 2026.6.5 后 openclaw-resume-watch.timer 被自动重置为 disabled，已手动 enable 恢复自动休眠检测。
+- 验收 / 验证：
+- systemctl --user is-enabled openclaw-resume-watch.timer 返回 enabled；post-upgrade-self-check 全部 PASS。
+- 相关文件：
+- `/home/missyouangeled/.config/systemd/user/openclaw-resume-watch.timer`
+
+## 2026-06-12 17:51:29 CST (+08:00) — ACTIVE_RULES.md 加入启动链全覆盖
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- ACTIVE_RULES.md 原来只在 AGENTS.md 步骤 0 中提到，但 BOOT_INDEX.md 加载流程和切模型的 chat.inject 系统指令都没有它，切模型时有几率遗漏。现已加到三处：AGENTS.md Step 0、BOOT_INDEX.md Step -1、chat.inject 注入文件清单。
+- 验收 / 验证：
+- live asset 验证：has_active_rules=True；BOOT_INDEX.md 含 Step -1 ACTIVE_RULES。
+- 相关文件：
+- `BOOT_INDEX.md`
+
+## 2026-06-12 17:54:29 CST (+08:00) — 修复 lifecycle-maintainer 每次 exit 1
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 根因：memory-embed-index.py 依赖 numpy，但 system python3 没有装。改动 2 处：1) embed-index 改用 voice-venv311/bin/python3（有 numpy）；2) embed-index 失败不阻塞 all_ok 判断（它是辅助优化，不该拖垮 exit code）。
+- 验收 / 验证：
+- openclaw-lifecycle-maintainer.py --print-human 返回 EXIT=0；systemctl start 后 journal 显示 Finished（非 Failed）。验证脚本 10/12 passed(+1)。
+- 相关文件：
+- `scripts/openclaw-lifecycle-maintainer.py`

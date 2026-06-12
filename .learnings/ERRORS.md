@@ -21876,3 +21876,63 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260612-002] user-reported-error
+
+**Logged**: 2026-06-12T09:16:09.669Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Failed to set thinking level: GatewayRequestError: thinkingLevel "high" is not supported for nvidia/z-ai/glm-5.1 (use off) 为啥我切过去 就提示这个。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260612-003] user-reported-error
+
+**Logged**: 2026-06-12T09:20:33.115Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+刚才不是没问题吗 这回怎么异常了。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

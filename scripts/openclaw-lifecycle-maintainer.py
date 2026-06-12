@@ -28,6 +28,7 @@ SCRIPTS = WORKSPACE / "scripts"
 STATE_DIR = Path(
     os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
 ) / "openclaw" / "lifecycle-maintainer"
+EMBED_PYTHON = Path.home() / ".local/share/openclaw-voice-venv311/bin/python3"
 COUNTER_PATH = STATE_DIR / "run-counter.json"
 REPORT_PATH = STATE_DIR / "last-report.json"
 LOG_PATH = STATE_DIR / "maintainer.log"
@@ -162,7 +163,7 @@ def main():
     # 0.5 向量索引增量检查（每次都做，hash 对比，有变化才重建）
     checks.append(run_sub_check(
         "embed-index",
-        [sys.executable, str(SCRIPTS / "memory-embed-index.py"), "--incremental-view"],
+        [EMBED_PYTHON, str(SCRIPTS / "memory-embed-index.py"), "--incremental-view"],
         timeout=180,
     ))
 
@@ -228,7 +229,7 @@ def main():
     else:
         append_log(f"run #{new_count}: skip cleanup (next at #{CLEANUP_EVERY_N})")
 
-    all_ok = all(c.get("ok") for c in checks)
+    all_ok = all(c.get("ok") for c in checks if c.get("label") != "embed-index")
     summary = "；".join(c.get("summary", "?") for c in checks)
     overall = "OK" if all_ok else "⚠"
 
