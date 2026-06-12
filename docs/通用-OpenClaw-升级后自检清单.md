@@ -22,7 +22,7 @@
 
 ## 最短结论
 
-升级后只要下面 8 条都通过，就可以把这次更新视为"基本正常"：
+升级后只要下面 12 条都通过，就可以把这次更新视为"基本正常"：
 
 1. **Control UI 品牌/聊天补丁仍在**
 2. **snapshot-first 入口仍在**
@@ -35,6 +35,7 @@
 9. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
 10. **耗时基线验证通过**：所有子检查含 elapsedMs
 11. **boot-health-check 通过**：核心服务/定时器/磁盘/内存/端口扫描无异常
+12. **模型配置检测通过**：所有 provider 的 apiKey 是否到位、models 数组格式（id/name/input）是否正确、imageModel 指向的模型是否 supports image input
 
 ---
 
@@ -237,3 +238,55 @@ python3 scripts/apply-openclaw-infos-handle-gateway-proxy.py --verify --print-js
 
 - **升级后自检清单**:回答"现在还能不能正常用"
 - **补丁重建清单**:回答"如果坏了,按什么顺序重建回来"
+
+---
+
+## 第 12 条：模型配置检测（新增 2026-06-12）
+
+### 来源
+
+v2026.6.5 升级后出现两个模型配置相关故障：
+1. `litellm.models` 格式错误导致 Gateway 拒绝启动（`expected array` / `expected string`）
+2. `deepseek` provider 缺少 `apiKey` 导致主模型偶发报错
+
+此后模型配置检测被纳入升级后自检固定项目。
+
+### 检测内容
+
+```bash
+python3 -c "
+import json
+with open('\$HOME/.openclaw/openclaw.json') as f:
+    cfg = json.load(f)
+
+# 1. 检查所有 provider 的 apiKey
+for pid, pdata in cfg['models']['providers'].items():
+    has_key = bool(pdata.get('apiKey'))
+    if not has_key and pid not in ('ollama','litellm','openrouter'):
+        print(f'WARN: {pid} provider 缺少 apiKey')
+
+# 2. 检查 litellm models 数组格式
+lm = cfg['models']['providers'].get('litellm')
+if lm and 'models' in lm:
+    models = lm['models']
+    assert isinstance(models, list), 'litellm.models 必须是数组'
+    for m in models:
+        assert 'id' in m and 'name' in m and 'input' in m
+        print(f'OK: litellm model id={m[\"id\"]} input={m[\"input\"]}')
+
+# 3. 检查 imageModel 指向的模型是否存在
+im = cfg['agents']['defaults']['imageModel']['primary']
+provider, model_id = im.split('/', 1)
+assert provider in cfg['models']['providers']
+print(f'OK: imageModel={im}')
+"
+```
+
+### 常见问题
+
+| 检测项 | 错误信息 | 修复 |
+|--------|----------|------|
+| provider 缺 apiKey | `WARN: xxx provider 缺少 apiKey` | 从 SQLite auth store 恢复或手动补写 `apiKey` |
+| litellm.models 格式 | `expected array, received object` | 改为数组，每项含 `id`/`name`/`input` |
+| litellm model 缺字段 | `expected string, received undefined` | 确保每个 model 条目含 `name` 字段 |
+| imageModel 未注册 | `Unknown model: xxx` | provider 中声明 models 并包含 `input: ["image"]` |
