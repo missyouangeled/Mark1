@@ -379,3 +379,156 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 | 运行指示器 | ✅ 上游内建 |
 | INVALID_FINAL_RELOAD | ✅ 已修复 |
 | yielded 历史回放 | ❌ 未适配 |
+
+---
+
+## 升级 #2：2026.5.22 → 2026.6.5
+
+### 基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 升级日期 | 2026-06-11 |
+| 旧版本 | 2026.5.22 |
+| 新版本 | 2026.6.5 (5181e4f) |
+| 触发方式 | 用户手动 `npm update -g openclaw` |
+| 所在机器 | 公司（Linux）— `missyouangeled-VMware-Virtual-Platform` |
+
+### 升级后遇到的问题及修复
+
+#### 问题 1：Control UI 黑屏（品牌注入变量冲突）
+
+**现象**：升级后打开 Control UI 页面完全空白，`openclaw-app` 组件未注册。
+
+**根因**：`jarvis-branding-override.js` 中用了 `let i` 作为循环变量，而 v6.5 上游的 branding 注入也在同作用域用了 `let i`，导致重复声明冲突→整个脚本报错→Control UI 组件注册失败。
+
+**修复**：将品牌脚本中的 `let i` 改为 `let ji`（唯一变量名），`scripts/apply-openclaw-controlui-branding.py` 同步更新。
+
+**验证**：`python3 scripts/apply-openclaw-controlui-branding.py --check` 通过，Control UI 恢复正常。
+
+#### 问题 2：infos-handle 路由错误
+
+**现象**：Control UI 中 infos-handle 契约、任务、恢复数据显示异常（可能为空或 404）。
+
+**根因**：品牌脚本中硬编码了直连 `127.0.0.1:18790`（sidecar 端口），而 v6.6.5 的正确入口是统一代理 `127.0.0.1:18788`。
+
+**修复**：将所有 infos-handle 端点 URL 从 `127.0.0.1:18790` 改为 `127.0.0.1:18788`。
+
+**验证**：检查 `/v1/query/contract.catalog`、`/v1/query/tasks.summary`、`/v1/query/recovery.*` 均可正确返回数据。
+
+#### 问题 3：litellm provider models 格式错误（两轮）
+
+**背景**：用户要求将图片识别模型从 `nvidia/google/gemma-4-31b-it` 换为 `litellm/agnes-2.0-flash`（基于 Agnes API）。需在 openclaw.json 中同时配置 `imageModel.primary` 和 litellm provider 的 models 声明。
+
+**第一轮错误（`expected array, received object`）**：
+
+```json
+// ❌ 错误格式（对象）
+"litellm": {
+  "models": {
+    "agnes-2.0-flash": {"input": ["text", "image"]}
+  }
+}
+```
+
+**根因**：v6.6.5 的 schema 要求 `models.providers.<id>.models` 必须是 **数组**，不能用对象。
+
+**修复**：由 `openclaw doctor --fix` 清掉错误配置后恢复。
+
+**第二轮错误（`expected string, received undefined`）**：
+
+```json
+// ❌ 数组格式但缺少必填字段
+"litellm": {
+  "models": [
+    {"id": "agnes-2.0-flash", "input": ["text", "image"]}
+  ]
+}
+```
+
+**根因**：v6.6.5 的 litellm models 数组中每个条目必须包含三个必填字段：`id`、`name`、`input`。漏了 `name` 字段。
+
+**正确格式**：
+
+```json
+// ✅ 正确格式
+"litellm": {
+  "baseUrl": "https://apihub.agnes-ai.com/v1",
+  "apiKey": "sk-xxx",
+  "api": "openai-completions",
+  "models": [
+    {
+      "id": "agnes-2.0-flash",
+      "name": "Agnes 2.0 Flash",
+      "input": ["text", "image"]
+    }
+  ]
+}
+```
+
+**最终验证**：
+- `python3` 检查 openclaw.json JSON 语法 ✅
+- 检查 litellm.models 是数组、含 id/name/input ✅
+- 独立端口（18799）烟测：`gateway ready, 7 plugins, no config error` ✅
+- 正式重启：`systemctl --user restart openclaw-gateway` → `active` + `gateway ready` ✅
+
+#### 问题 4：deepseek provider 缺少 apiKey
+
+**现象**：升级后主模型 `deepseek/deepseek-v4-pro` 偶发报 `DeepSeek API key not found`，然后自动 fallback 到 deepseek-company provider 才恢复。
+
+**根因**：`openclaw.json` 中 `models.providers.deepseek` 只配置了 `baseUrl` + `api` + `models`，**没有 `apiKey` 字段**。而 `deepseek-company` provider 有独立的 apiKey，所以 `deepseek-company/deepseek-v4-pro` 能正常工作。主模型走的是 `deepseek` provider，缺 key 就报错。
+
+证据：
+- `openclaw.json` deepseek provider keys: `['baseUrl', 'api', 'models']` — apiKey 不存在
+- 系统环境变量 `DEEPSEEK_API_KEY` 也未设置
+- SQLite auth store (`openclaw-agent.sqlite`) 中存在 `deepseek:default` 的 key：`sk-da15916e63ba...`（这是旧版 auth store 的迁移残留）
+- Gateway 启动时读 openclaw.json，不读 SQLite auth store → 拿不到 key
+
+**修复**：从 SQLite auth store 恢复 deepseek key，写入 openclaw.json：
+
+```json
+"deepseek": {
+  "baseUrl": "https://api.deepseek.com",
+  "api": "openai-completions",
+  "apiKey": "sk-da15916e63ba400197745888173a912e",
+  "models": [...]
+}
+```
+
+**验证**：烟测通过（独立端口 gateway ready）→ 正式重启 → 正常。
+
+### 升级期间执行的系统清理
+
+升级完成后，同步执行了系统垃圾清理：
+
+| 清理项 | 清理量 | 说明 |
+|--------|--------|------|
+| `.exec-approvals` 临时文件 | 42 个 → 0 | ~/.openclaw/ 下残留的审批临时文件 |
+| stability bundle 日志 | 20 → 5 个 | 保留最新 5 个 |
+| gateway 日志 | 保留当天 1 个 | 旧日志删除 |
+| npm cache | 全部 | `npm cache clean --force` |
+| SQLite subagent_runs | 17 → 0 | 所有已完成的子 agent 运行记录 |
+| SQLite task_runs | 61 → 0 | 所有已完成/失败/超时的任务记录 |
+| sessions 目录旧文件 | 11 个 .jsonl + 5 个 .deleted | 仅保留当前会话 transcript（890KB） |
+| sessions 目录体积 | 14.7MB → 1.5MB | 释放 13.2MB |
+
+### 升级后的配置快照
+
+```json
+{
+  "agents.defaults.model.primary": "deepseek/deepseek-v4-pro",
+  "agents.defaults.imageModel.primary": "litellm/agnes-2.0-flash",
+  "models.providers.deepseek.apiKey": "已配置 (35 chars)",
+  "models.providers.deepseek-company.apiKey": "已配置 (35 chars)",
+  "models.providers.litellm.models": [{"id":"agnes-2.0-flash","name":"Agnes 2.0 Flash","input":["text","image"]}],
+  "models.providers.litellm.baseUrl": "https://apihub.agnes-ai.com/v1"
+}
+```
+
+### 经验教训
+
+1. **v6.6.5 schema 更严格**：`models.providers.<id>.models` 必须是数组，数组元素必须有 `id`/`name`/`input`。升级后修改 provider 配置时必须先读文档确认 schema。
+2. **apiKey 不能假设从旧版继承**：v6.6.5 的 Gateway 从 openclaw.json 读 apiKey，旧版的 SQLite auth store 不再被 provider 初始化时读取。升级后务必检查所有 provider 的 apiKey 是否到位。
+3. **烟测流程已固化**：修改 openclaw.json 后 → 先独立端口烟测（`--port 18799`）→ 通过后再正式重启。绕过了多次 `doctor --fix` → 重启失败的死循环。
+4. **品牌注入与上游变量冲突风险**：自定义 branding JS 中应避免使用 `let i` 等常见短变量名，防止与上游注入代码冲突。
+5. **infos-handle 入口不直连 sidecar**：应统一走代理（18788），以便 sidecar 端口或监听地址变化时无需改客户端。
