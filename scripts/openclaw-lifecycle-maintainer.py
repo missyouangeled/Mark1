@@ -159,6 +159,13 @@ def main():
 
     checks = []
 
+    # 0.5 向量索引增量检查（每次都做，hash 对比，有变化才重建）
+    checks.append(run_sub_check(
+        "embed-index",
+        [sys.executable, str(SCRIPTS / "memory-embed-index.py"), "--incremental-view"],
+        timeout=180,
+    ))
+
     # 1. 每日转录聚合（每次都做）
     checks.append(run_sub_check(
         "transcript-aggregate",

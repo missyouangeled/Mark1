@@ -85,14 +85,38 @@ def compute_file_hash(files: list[Path]) -> str:
     return h.hexdigest()
 
 
-def load_model():
-    """延迟加载模型（只在需要重建时）"""
-    os.environ.setdefault("HF_HOME", "/mnt/data/openclaw/huggingface")
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+def compute_per_file_hashes(files: list[Path]) -> dict[str, str]:
+    """计算每个文件的独立哈希（用于增量更新：只重建变化的文件）"""
+    result = {}
+    for fp in sorted(files):
+        rel = str(fp.relative_to(MEMORY_DIR))
+        result[rel] = hashlib.sha256(fp.read_bytes()).hexdigest()
+    return result
 
-    from sentence_transformers import SentenceTransformer
-    return SentenceTransformer(MODEL_PATH, device="cpu")
+
+def _embed_via_sidecar(texts: list[str], batch_size: int = 100) -> np.ndarray:
+    """通过 embed-sidecar HTTP 接口做向量化（分批发送，不加载第二个模型副本）。"""
+    import urllib.request
+    SIDECAR_URL = "http://127.0.0.1:18792"
+
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        try:
+            req = urllib.request.Request(
+                f"{SIDECAR_URL}/encode",
+                data=json.dumps({"texts": batch}).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = urllib.request.urlopen(req, timeout=120)
+            data = json.loads(resp.read().decode())
+            if data.get("ok"):
+                all_embeddings.append(np.array(data["embeddings"], dtype=np.float32))
+            else:
+                raise RuntimeError(f"sidecar encode failed: {data.get('error')}")
+        except Exception as e:
+            raise RuntimeError(f"sidecar unavailable: {e}")
+    return np.vstack(all_embeddings) if len(all_embeddings) > 1 else all_embeddings[0]
 
 
 def build_index(force: bool = False) -> dict:
@@ -117,11 +141,152 @@ def build_index(force: bool = False) -> dict:
         except Exception:
             pass
 
+    # 全量重建
+    return _rebuild_full(md_files, current_hash)
+
+
+def build_incremental() -> dict:
+    """增量索引：只重建变化的文件，保留未变文件的数据。
+    
+    — 用于 lifecycle-maintainer 每 5 分钟自动调用，
+      每次只处理新增/修改的文件，不重新做 5379 段。
+    """
+    md_files = sorted(MEMORY_DIR.rglob("*.md"))
+    if not md_files:
+        return {"ok": False, "error": "没有找到 memory 文件"}
+
+    # 如果没有现有索引 → 全量重建
+    if not EMBEDDINGS_FILE.exists() or not SEGMENTS_FILE.exists() or not MANIFEST_FILE.exists():
+        return _rebuild_full(md_files, compute_file_hash(md_files))
+
+    try:
+        manifest = json.loads(MANIFEST_FILE.read_text())
+        segments_data = json.loads(SEGMENTS_FILE.read_text())
+        existing_segments: list[dict] = segments_data.get("segments", [])
+        existing_embeddings = np.load(str(EMBEDDINGS_FILE))
+    except Exception:
+        return _rebuild_full(md_files, compute_file_hash(md_files))
+
+    # 逐文件 hash 对比：找出变化的文件
+    current_hashes = compute_per_file_hashes(md_files)
+    old_per_file = manifest.get("per_file_hash", {})
+
+    changed_files = set()
+    new_files = set()
+    for rel, h in current_hashes.items():
+        if rel not in old_per_file:
+            new_files.add(rel)
+        elif old_per_file[rel] != h:
+            changed_files.add(rel)
+
+    # 找出删除的文件
+    removed_files = set(old_per_file) - set(current_hashes)
+
+    all_changed = changed_files | new_files | removed_files
+    if not all_changed:
+        return {
+            "ok": True,
+            "rebuilt": False,
+            "reason": "增量检查：无文件变化",
+            "segments": manifest.get("n_segments", 0),
+            "files_checked": len(md_files),
+        }
+
+    print(f"增量更新: 新增 {len(new_files)}, 修改 {len(changed_files)}, 删除 {len(removed_files)}", flush=True)
+    t0 = time.time()
+
+    # 删除已移除/修改的文件的旧段落和向量
+    affected = changed_files | removed_files
+    keep_indices = [
+        i for i, s in enumerate(existing_segments)
+        if s["file"] not in affected
+    ]
+    old_segments_kept = [existing_segments[i] for i in keep_indices]
+    old_embeddings_kept = existing_embeddings[keep_indices] if len(keep_indices) > 0 else np.empty((0, existing_embeddings.shape[1]), dtype=np.float32)
+
+    # 对新文件/修改文件重新切分 + 向量化
+    rebuild_files = changed_files | new_files
+    new_segments = []
+    for fp in md_files:
+        rel = str(fp.relative_to(MEMORY_DIR))
+        if rel not in rebuild_files:
+            continue
+        try:
+            text = fp.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        segs = segment_markdown(text, rel)
+        new_segments.extend(segs)
+
+    all_segments = old_segments_kept + new_segments
+    if not all_segments:
+        return {"ok": False, "error": "增量后无有效段落"}
+
+    new_embeddings = np.empty((0, existing_embeddings.shape[1]), dtype=np.float32)
+    if new_segments:
+        new_texts = [s["content"] for s in new_segments]
+        print(f"通过 sidecar 向量化 {len(new_segments)} 个新段落...", flush=True)
+        new_embeddings = _embed_via_sidecar(new_texts)
+        new_embeddings = np.asarray(new_embeddings, dtype=np.float32)
+
+    merged_embeddings = np.vstack([old_embeddings_kept, new_embeddings]) if len(old_embeddings_kept) > 0 else new_embeddings
+
+    # 保存
+    np.save(str(EMBEDDINGS_FILE), merged_embeddings)
+    segments_data = {
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "n_segments": len(all_segments),
+        "dim": int(merged_embeddings.shape[1]),
+        "segments": all_segments,
+    }
+    SEGMENTS_FILE.write_text(json.dumps(segments_data, ensure_ascii=False, indent=2))
+
+    new_manifest = {
+        "content_hash": compute_file_hash(md_files),
+        "per_file_hash": current_hashes,
+        "n_segments": len(all_segments),
+        "dim": int(merged_embeddings.shape[1]),
+        "model": "paraphrase-multilingual-MiniLM-L12-v2",
+        "files_indexed": len(md_files),
+        "last_built": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "build_time_s": round(time.time() - t0, 1),
+        "incremental": True,
+        "changed": len(changed_files),
+        "new": len(new_files),
+        "removed": len(removed_files),
+        "segments_changed": len(new_segments),
+        "segments_kept": len(old_segments_kept),
+    }
+    MANIFEST_FILE.write_text(json.dumps(new_manifest, ensure_ascii=False, indent=2))
+
+    elapsed = time.time() - t0
+    print(f"增量索引完成: {len(all_segments)} 段 ({len(old_segments_kept)} 保留 + {len(new_segments)} 新), 耗时 {elapsed:.1f}s", flush=True)
+
+    return {
+        "ok": True,
+        "rebuilt": True,
+        "incremental": True,
+        "n_segments": len(all_segments),
+        "segments_kept": len(old_segments_kept),
+        "segments_changed": len(new_segments),
+        "build_time_s": round(elapsed, 1),
+    }
+
+
+def _rebuild_full(md_files: list[Path], current_hash: str | None = None) -> dict:
+    """全量重建索引"""
+    if current_hash is None:
+        current_hash = compute_file_hash(md_files)
+
     t0 = time.time()
 
     # 加载模型
     print("加载模型...", flush=True)
-    model = load_model()
+    os.environ.setdefault("HF_HOME", "/mnt/data/openclaw/huggingface")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(MODEL_PATH, device="cpu")
 
     # 切分段落
     all_segments = []
@@ -183,8 +348,15 @@ def main():
     parser = argparse.ArgumentParser(description="记忆向量索引构建")
     parser.add_argument("--force", action="store_true", help="强制重建索引")
     parser.add_argument("--check", action="store_true", help="仅检查是否需要重建")
+    parser.add_argument("--incremental-view", action="store_true",
+                        help="增量索引模式（lifecycle-maintainer 调用）：逐文件 hash 对比，只重建变化的文件")
     parser.add_argument("--json", action="store_true", default=True)
     args = parser.parse_args()
+
+    if args.incremental_view:
+        result = build_incremental()
+        print(json.dumps(result, ensure_ascii=False))
+        return 0 if result.get("ok") else 1
 
     if args.check:
         md_files = sorted(MEMORY_DIR.rglob("*.md"))

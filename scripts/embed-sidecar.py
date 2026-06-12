@@ -26,10 +26,7 @@ import signal
 import sys
 import threading
 import time
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
 import numpy as np
 
 os.environ.setdefault("HF_HOME", "/mnt/data/openclaw/huggingface")
@@ -135,71 +132,131 @@ def do_search(query: str, top_k: int = 5) -> dict:
         return {"ok": False, "error": str(e)}
 
 
-class EmbedHandler(BaseHTTPRequestHandler):
-    server_version = "embed-sidecar/1.0"
+def _handle_client(conn, handler_cls):
+    """在独立线程中处理单个 HTTP 连接（原生 socket）"""
+    try:
+        rfile = conn.makefile('rb', buffering=0)
+        wfile = conn.makefile('wb', buffering=0)
 
-    def log_message(self, fmt, *args):
-        pass  # 静默访问日志
-
-    def _json(self, code: int, data: dict):
-        payload = json.dumps(data, ensure_ascii=False).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def do_GET(self):
-        if self.path == "/healthz":
-            self._json(200, {"ok": True, "model_loaded": _model is not None})
-        elif self.path == "/stats":
-            uptime = time.time() - _started_at if _started_at > 0 else 0
-            self._json(200, {
-                "ok": True,
-                "model": "paraphrase-multilingual-MiniLM-L12-v2",
-                "model_loaded": _model is not None,
-                "index_segments": len(_segments) if _segments else 0,
-                "uptime_seconds": round(uptime, 1),
-                "total_queries": _total_queries,
-                "total_errors": _total_errors,
-            })
-        else:
-            self._json(404, {"ok": False, "error": "not found"})
-
-    def do_POST(self):
-        content_len = int(self.headers.get("Content-Length", 0))
-        if content_len == 0:
-            self._json(400, {"ok": False, "error": "empty body"})
-            return
-        if content_len > 65536:
-            self._json(413, {"ok": False, "error": "body too large"})
+        # 解析请求行
+        request_line = rfile.readline().decode('utf-8', errors='replace').strip()
+        if not request_line:
+            conn.close()
             return
 
+        parts = request_line.split()
+        if len(parts) < 2:
+            conn.sendall(b'HTTP/1.1 400 Bad Request\r\n\r\n')
+            conn.close()
+            return
+
+        method, path = parts[0].upper(), parts[1]
+
+        # 读 headers
+        headers = {}
+        while True:
+            line = rfile.readline().decode('utf-8', errors='replace').strip()
+            if not line:
+                break
+            if ':' in line:
+                k, v = line.split(':', 1)
+                headers[k.strip().lower()] = v.strip()
+
+        content_len = int(headers.get('content-length', 0))
+        body = rfile.read(content_len) if content_len > 0 else b''
+
+        # 创建 handler 实例并处理
+        handler = handler_cls(method, path, headers, body)
+        status_code, resp_headers, resp_body = handler.handle()
+
+        # 发送响应
+        status_text = {200: 'OK', 400: 'Bad Request', 404: 'Not Found', 413: 'Payload Too Large',
+                       500: 'Internal Server Error', 503: 'Service Unavailable'}.get(status_code, 'Error')
+        resp = f'HTTP/1.1 {status_code} {status_text}\r\n'
+        for k, v in resp_headers.items():
+            resp += f'{k}: {v}\r\n'
+        resp += '\r\n'
+        wfile.write(resp.encode())
+        wfile.write(resp_body)
+        wfile.flush()
+    except Exception:
+        pass
+    finally:
         try:
-            body = json.loads(self.rfile.read(content_len))
+            conn.close()
+        except Exception:
+            pass
+
+
+class SimpleEmbedHandler:
+    """原生 HTTP handler（不依赖 BaseHTTPRequestHandler/selectors）"""
+    def __init__(self, method, path, headers, body):
+        self.method = method
+        self.path = path
+        self.headers = headers
+        self.body = body
+
+    def handle(self):
+        if self.method == 'GET':
+            return self._get()
+        elif self.method == 'POST':
+            return self._post()
+        return 405, {}, b'{"ok":false,"error":"method not allowed"}'
+
+    def _json_resp(self, data, code=200):
+        body = json.dumps(data, ensure_ascii=False).encode()
+        return code, {'Content-Type': 'application/json; charset=utf-8', 'Content-Length': str(len(body))}, body
+
+    def _get(self):
+        if self.path == '/healthz':
+            return self._json_resp({'ok': True, 'model_loaded': _model is not None})
+        if self.path == '/stats':
+            uptime = time.time() - _started_at if _started_at > 0 else 0
+            return self._json_resp({
+                'ok': True, 'model': 'paraphrase-multilingual-MiniLM-L12-v2',
+                'model_loaded': _model is not None,
+                'index_segments': len(_segments) if _segments else 0,
+                'uptime_seconds': round(uptime, 1),
+                'total_queries': _total_queries, 'total_errors': _total_errors,
+            })
+        return self._json_resp({'ok': False, 'error': 'not found'}, 404)
+
+    def _post(self):
+        try:
+            data = json.loads(self.body)
         except json.JSONDecodeError:
-            self._json(400, {"ok": False, "error": "invalid JSON"})
-            return
+            return self._json_resp({'ok': False, 'error': 'invalid JSON'}, 400)
 
-        if self.path == "/search":
-            query = body.get("query", "").strip()
+        if self.path == '/search':
+            query = data.get('query', '').strip()
             if not query:
-                self._json(400, {"ok": False, "error": "missing 'query'"})
-                return
-            top_k = int(body.get("top", 5))
-            result = do_search(query, top_k=top_k)
-            self._json(200, result)
+                return self._json_resp({'ok': False, 'error': "missing 'query'"}, 400)
+            top_k = int(data.get('top', 5))
+            return self._json_resp(do_search(query, top_k=top_k))
 
-        elif self.path == "/search/batch":
-            queries = body.get("queries", [])
+        if self.path == '/encode':
+            texts = data.get('texts', [])
+            if not texts or not isinstance(texts, list):
+                return self._json_resp({'ok': False, 'error': "missing 'texts' array"}, 400)
+            if len(texts) > 200:
+                return self._json_resp({'ok': False, 'error': 'max 500 texts per request'}, 413)
+            if _model is None:
+                return self._json_resp({'ok': False, 'error': 'model not loaded'}, 503)
+            try:
+                vecs = _model.encode(texts, show_progress_bar=False, batch_size=32)
+                return self._json_resp({'ok': True, 'embeddings': vecs.tolist(),
+                                        'dim': int(vecs.shape[1]), 'count': len(texts)})
+            except Exception as e:
+                return self._json_resp({'ok': False, 'error': str(e)}, 500)
+
+        if self.path == '/search/batch':
+            queries = data.get('queries', [])
             if not queries or not isinstance(queries, list):
-                self._json(400, {"ok": False, "error": "missing 'queries' array"})
-                return
+                return self._json_resp({'ok': False, 'error': "missing 'queries' array"}, 400)
             results = [do_search(q) for q in queries[:20]]
-            self._json(200, {"ok": True, "results": results})
+            return self._json_resp({'ok': True, 'results': results})
 
-        else:
-            self._json(404, {"ok": False, "error": "not found"})
+        return self._json_resp({'ok': False, 'error': 'not found'}, 404)
 
 
 def main():
@@ -208,28 +265,38 @@ def main():
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
 
-    # 预热
-    t0 = time.time()
     load_resources()
 
-    server = ThreadingHTTPServer((args.host, args.port), EmbedHandler)
-    server.daemon_threads = True
-    server.allow_reuse_address = True
-
-    def _shutdown(sig, frame):
-        sys.stderr.write(f"\n[embed-sidecar] shutting down ({_total_queries} queries, {_total_errors} errors)\n")
-        server.shutdown()
-    server.server_close()
-
-    signal.signal(signal.SIGINT, _shutdown)
-    signal.signal(signal.SIGTERM, _shutdown)
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((args.host, args.port))
+    sock.listen(128)
+    sock.settimeout(1.0)
 
     sys.stderr.write(f"[embed-sidecar] listening on {args.host}:{args.port}\n")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        server.shutdown()
-    server.server_close()
+
+    running = True
+    def _stop(sig, frame):
+        nonlocal running
+        running = False
+        sys.stderr.write(f"\n[embed-sidecar] shutting down ({_total_queries} queries, {_total_errors} errors)\n")
+    signal.signal(signal.SIGINT, _stop)
+    signal.signal(signal.SIGTERM, _stop)
+
+    while running:
+        try:
+            conn, addr = sock.accept()
+            threading.Thread(target=_handle_client, args=(conn, SimpleEmbedHandler), daemon=True).start()
+        except socket.timeout:
+            continue
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            sys.stderr.write(f"[embed-sidecar] accept error: {e}\n")
+            time.sleep(0.5)
+
+    sock.close()
 
 
 if __name__ == "__main__":
