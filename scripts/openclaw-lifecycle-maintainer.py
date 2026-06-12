@@ -218,7 +218,13 @@ def main():
             ["/bin/bash", str(WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"), "--quiet"],
             timeout=120,
         ))
-        append_log(f"run #{new_count}: triggering cleanup (temp + chattts)")
+        # 清理 flat memory 文件（压缩 flush 产生的扁平 2026-0X-XX.md，内容已在 daily/）
+        checks.append(run_sub_check(
+            "flat-memory-cleanup",
+            ["/bin/bash", "-c", "find /home/missyouangeled/.openclaw/workspace/memory -maxdepth 1 -name '202?-??-??*.md' -not -name 'MEMORY.md' -delete && echo ok || true"],
+            timeout=10,
+        ))
+        append_log(f"run #{new_count}: triggering cleanup (temp + chattts + flat-memory)")
     else:
         append_log(f"run #{new_count}: skip cleanup (next at #{CLEANUP_EVERY_N})")
 
