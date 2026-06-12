@@ -6,6 +6,7 @@ memory-search-router.py — 统一记忆搜索路由（L1→L2→L3→L4）
 
 L1: MEMORY_INDEX.json 关键词 IDF+标签（置信度 ≥0.8 → 返回，~30ms）
 L2: Python BM25 + QMD fallback（置信度 ≥0.7 → 返回，30-600ms）
+L2: BM25 + embedding RRF 双通道融合搜索（置信度 ≥0.65 → 返回，~300ms）
 LS: 语义概念层（意图+同义词+桥接，置信度 ≥0.7 → 返回）
 L3: 返回提示走云端 memory_search（不在脚本内调云端 API）
 L4: 读取 session-backup context-summary
@@ -181,19 +182,114 @@ def search_l1_index(query: str) -> dict | None:
 
 
 def search_l2_bm25(query: str) -> dict | None:
-    """L2: Python BM25（memory 文件）+ QMD fallback（全工作区）。
-
-    先试用 Python BM25 在 5 个 memory 文件内搜索（快，中文友好），
-    如果找不到匹配（如英文词/脚本路径），fallback 到 QMD 全量搜索。
+    """L2: BM25 + embedding RRF 双通道融合搜索。
+    
+    两个独立通道各自跑 top-5，然后用 Reciprocal Rank Fusion（RRF）
+    合并排序。结果同时具备关键词精度 和 语义理解。
     """
 
-    # ── 阶段 1: Python BM25 ──
-    result = _search_l2_bm25_python(query)
-    if result and result.get("matches"):
-        return result
+    # ── 通道 1: Python BM25 ──
+    bm25_result = _search_l2_bm25_python(query)
 
-    # ── 阶段 2: QMD fallback ──
-    return _search_l2_qmd_fallback(query)
+    # ── 通道 2: embedding 语义 ──
+    embed_result = _search_l2_embed_channel(query)
+
+    # 如果两个通道都没结果
+    if (not bm25_result or not bm25_result.get("matches")) and (not embed_result):
+        return _search_l2_qmd_fallback(query)
+
+    # RRF 融合
+    k = 60
+    rrf_scores: dict[str, float] = {}  # key: "file::line"
+    entry_map: dict[str, dict] = {}
+
+    # 通道 1: BM25
+    if bm25_result and bm25_result.get("matches"):
+        for rank, m in enumerate(bm25_result["matches"]):
+            key = f"{m['file']}::{m['line']}"
+            rrf_scores[key] = rrf_scores.get(key, 0) + 1.0 / (k + rank + 1)
+            entry_map[key] = {**m, "source": "bm25", "bm25_rank": rank + 1}
+
+    # 通道 2: embedding
+    if embed_result and embed_result.get("matches"):
+        for rank, m in enumerate(embed_result["matches"]):
+            key = f"{m['file']}::{m['line']}"
+            rrf_scores[key] = rrf_scores.get(key, 0) + 1.0 / (k + rank + 1)
+            if key in entry_map:
+                entry_map[key]["source"] = "both"
+                entry_map[key]["embed_rank"] = rank + 1
+            else:
+                entry_map[key] = {**m, "source": "embed", "embed_rank": rank + 1}
+
+    # 按 RRF 排序
+    sorted_keys = sorted(rrf_scores, key=rrf_scores.get, reverse=True)[:10]
+    bm25_best = bm25_result.get("confidence", 0) if bm25_result else 0
+    embed_best = embed_result.get("confidence", 0) if embed_result else 0
+
+    # 置信度：取两个通道的高值 + RRF 加成
+    raw_confidence = max(bm25_best, embed_best)
+    n_both = sum(1 for k in sorted_keys if entry_map.get(k, {}).get("source") == "both")
+    confidence = round(min(raw_confidence + n_both * 0.05, 0.95), 3)
+
+    return {
+        "layer": "L2",
+        "confidence": confidence,
+        "matches": [
+            {
+                **entry_map[k],
+                "rrf_score": round(rrf_scores[k], 5),
+            }
+            for k in sorted_keys
+        ],
+        "top_score": round(max(rrf_scores.values()), 5) if rrf_scores else 0,
+        "channels": {
+            "bm25_confidence": round(bm25_best, 3),
+            "embed_confidence": round(embed_best, 3),
+            "both_hits": n_both,
+        },
+        "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
+    }
+
+
+def _search_l2_embed_channel(query: str) -> dict | None:
+    """L2 embedding 通道：通过 embed-sidecar HTTP 常驻服务获取语义搜索结果。"""
+    import urllib.request
+
+    EMBED_SIDECAR_URL = "http://127.0.0.1:18792"
+
+    try:
+        req = urllib.request.Request(
+            f"{EMBED_SIDECAR_URL}/search",
+            data=json.dumps({"query": query, "top": 5}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = urllib.request.urlopen(req, timeout=LAYER_TIMEOUT_S)
+        data = json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+    if not data.get("ok"):
+        return None
+
+    results = data.get("results", [])
+    confidence = data.get("confidence", 0.0)
+
+    return {
+        "layer": "embed",
+        "confidence": confidence,
+        "matches": [
+            {
+                "file": r["file"],
+                "line": r["line"],
+                "snippet": r["content"],
+                "score": r["score"],
+            }
+            for r in results
+        ],
+        "top_score": data.get("top_score", 0),
+        "timing_ms": data.get("timing_ms", 0),
+        "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
+    }
 
 
 def _search_l2_bm25_python(query: str) -> dict | None:
@@ -334,9 +430,6 @@ def _search_l2_qmd_fallback(query: str) -> dict | None:
         "matches": matches,
         "short_circuit": confidence >= L2_CONFIDENCE_THRESHOLD,
     }
-
-
-import yaml as _yaml
 
 
 def _load_concepts() -> dict | None:

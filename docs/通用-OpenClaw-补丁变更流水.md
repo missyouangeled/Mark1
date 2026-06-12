@@ -1389,3 +1389,45 @@
 - 烟测通过: gateway ready, 无 config error; deepseek apiKey 已写入
 - 相关文件：
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-06-12 10:22:30 CST (+08:00) — 新增本地向量语义搜索（L2.5 层）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 安装 paraphrase-multilingual-MiniLM-L12-v2，在 memory-search-router.py 新增 L2.5 层向量语义搜索
+- 验收 / 验证：
+- 模型加载验证通过：哭了 vs 流泪了 = 0.947
+- 相关文件：
+- `scripts/memory-embed-index.py`
+
+## 2026-06-12 10:40:43 CST (+08:00) — embed-sidecar 常驻服务（向量模型 HTTP sidecar）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 embed-sidecar.py HTTP 常驻服务 + systemd，L2.5 搜索从 12s 降到 250ms
+- 验收 / 验证：
+- curl POST 测试：250ms 语义搜索结果正确，自动重启 + 开机自启已配置
+- 相关文件：
+- `scripts/embed-sidecar.py`
+
+## 2026-06-12 10:45:34 CST (+08:00) — L2 层去重 + BM25/embedding RRF 加权融合
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 搜索结果去重，BM25+embedding 双通道 RRF 融合为 L2 层
+- 验收 / 验证：
+- 去重✅ RRF 融合 ✅ 置信度 0.848
+- 相关文件：
+- `scripts/embed-sidecar.py`

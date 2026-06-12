@@ -222,3 +222,26 @@
   - 需要掌机 Unity 项目安装 openclaw-unity-plugin 才能连通
   - 连接模式：HTTP（Unity Editor 侧运行 plugin HTTP server）
   - LobeHub Client 凭据保存在 `~/.lobehub-market/credentials.json`
+
+### 本地向量语义搜索 (sentence-transformers)
+- **日期**: 2026-06-12
+- **来源**: HuggingFace Hub (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`)
+- **模型**: paraphrase-multilingual-MiniLM-L12-v2 (118M 参数, 458MB, 384 维向量, 50+ 语言)
+- **安装命令**: `uv venv --python 3.11 ~/.local/share/openclaw-embed-venv311 && uv pip install sentence-transformers torch numpy`
+- **版本**: sentence-transformers 5.5.1, torch 2.12.0+cpu, numpy 2.4.6
+- **路径**: 
+  - venv: `~/.local/share/openclaw-embed-venv311`
+  - 模型: `/mnt/data/openclaw/huggingface/hub/models--sentence-transformers--paraphrase-multilingual-MiniLM-L12-v2/snapshots/main/`
+  - 索引: `/mnt/data/openclaw/scratch/memory-embed-index/`
+  - 脚本: `scripts/memory-embed-index.py`, `scripts/memory-embed-search.py`
+- **依赖**: Python 3.11+, sentence-transformers, torch (CPU), numpy
+- **是否成功**: ✅ 模型加载验证通过
+- **备注**: 国内 HuggingFace 被墙，模型需手动下载后放入对应路径；镜像站可用于小文件下载
+
+### embed-sidecar 常驻服务
+- **日期**: 2026-06-12
+- **路径**: `scripts/embed-sidecar.py`, `tools/embed-sidecar/openclaw-embed-sidecar.service`
+- **端口**: 127.0.0.1:18792
+- **systemd**: `systemctl --user enable openclaw-embed-sidecar`
+- **内存**: ~1.3GB RSS（模型 + 索引常驻）
+- **效果**: L2.5 搜索从 12s → 250ms（48x 提升）
