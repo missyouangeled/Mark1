@@ -257,3 +257,15 @@
 - **依赖**：无（Go 静态编译）
 - **用途**：百度网盘命令行客户端，支持登录分享下载，主要用于绕过百度网盘客户端限速
 - **备注**：登录需 BDUSS + STOKEN（从 pan.baidu.com cookie 获取）
+
+### Gopeed（够快下载器）
+
+- **时间**：2026-06-12 16:01
+- **来源**：https://github.com/GopeedLab/gopeed/releases/tag/v1.9.3
+- **安装方式**：下载 gopeed-web-v1.9.3-linux-amd64.zip → 解压到 `/opt/gopeed/` → symlink 到 `/usr/local/bin/gopeed`
+- **版本**：v1.9.3
+- **路径**：`/usr/local/bin/gopeed`（实际 `/opt/gopeed/gopeed-web-v1.9.3-linux-amd64/gopeed`）
+- **配置**：systemd 用户服务 `~/.config/systemd/user/gopeed.service`
+- **依赖**：Go 静态编译，无系统依赖
+- **用途**：免费全平台下载器，支持 HTTP/BT/Magnet/ED2K，Web UI 管理
+- **备注**：Web UI 地址 http://192.168.79.128:9999，下载到 /mnt/data/gopeed/downloads，16 线程并发，实测 30MB/s+
