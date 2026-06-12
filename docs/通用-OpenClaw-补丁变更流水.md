@@ -1375,3 +1375,17 @@
 - 烟测通过: gateway ready, 7 plugins, 无 config error
 - 相关文件：
 - `/home/missyouangeled/.openclaw/openclaw.json`
+
+## 2026-06-12 08:11:33 CST (+08:00) — 补全 deepseek provider apiKey + 系统清理
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- deepseek provider 缺少 apiKey（仅 deepseek-company 有），导致主模型 deepseek/deepseek-v4-pro 偶发报找不到 key。从 sqlite auth store 恢复 key 写入 openclaw.json。同时清理了 42 个 exec-approvals 临时文件、15 个过期 stability 日志、npm cache。
+- 验收 / 验证：
+- 烟测通过: gateway ready, 无 config error; deepseek apiKey 已写入
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`

@@ -21846,3 +21846,33 @@ Confirm the failure is real and recurring, then resolve it or downgrade it to in
 - See Also: openclaw-env/plugins/self-improvement-tool-errors
 
 ---
+
+## [ERR-20260612-001] user-reported-error
+
+**Logged**: 2026-06-12T00:08:17.431Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: 这是今天早上在之前的对话上 发了一句在吗 给我回复的。你查查看这个问题。顺便修复和解决一下。 Description: The image is a dark-mode chat interface showing an error message from an AI agent. A user sends “在吗” (“Are you there?”). The bot, labeled “贾维斯” (J.A.R.V.I.S.), replies with a yellow-warned error: the …
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
