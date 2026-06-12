@@ -1361,3 +1361,17 @@
 - Gateway 200，品牌生效，4 watcher 全活，hasActiveRun 原生集成
 - 相关文件：
 - `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-06-12 08:06:39 CST (+08:00) — Agnes 2.0 Flash 替换图片识别模型
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- imageModel 从 nvidia/google/gemma-4-31b-it 换成 litellm/agnes-2.0-flash（支持视觉理解）; litellm provider 新增 models 数组声明（id/name/input）。历经两次格式错误（对象→缺name），最终用独立端口烟测验证通过后重启成功。
+- 验收 / 验证：
+- 烟测通过: gateway ready, 7 plugins, 无 config error
+- 相关文件：
+- `/home/missyouangeled/.openclaw/openclaw.json`
