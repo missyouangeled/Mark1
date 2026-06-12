@@ -12,9 +12,10 @@ Before doing anything else:
 
 - **Model handoff detection**：如果当前运行模型 identity（例如 `github-copilot/gpt-5.4`）与当前会话最近一条 assistant 消息的 provider/model 不同，说明这是**同一会话内刚切模型**，也必须视为一次新的启动接管，完整执行下面的启动流程；不要因为 session 没变就跳过。
 
-0. **Read `BOOT_INDEX.md` first** — this is the AI startup entry point (≤50 lines). It contains the complete tiered loading plan. Follow it exactly, including the 「正在加载系统」reply after Tier 1. All startup file paths and loading order are maintained in BOOT_INDEX.md — do not replicate them elsewhere.
+0. **Read `ACTIVE_RULES.md` first** — active behavior protocol (视觉判断/联网搜索/兜底方案/深度总结/主观判断). This is how I take initiative, not just wait for orders. Always read this before anything else.
+0.1 **Read `BOOT_INDEX.md`** — this is the AI startup entry point (≤50 lines). It contains the complete tiered loading plan. Follow it exactly, including the 「正在加载系统」reply after Tier 1. All startup file paths and loading order are maintained in BOOT_INDEX.md — do not replicate them elsewhere.
    **⚠️ 如果 BOOT_INDEX.md 不存在或无法读取**：不要停，直接按本文件步骤 1-8 顺序逐条读取全部文件，用「正在加载系统」作为第一条回复。这保证换模型/重启后永远不会因索引丢失而卡死。
-0.1 **Read `RULES_INDEX.md`** — compact domain rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.
+0.2 **Read `RULES_INDEX.md`** — compact domain rule gateway (≤30 lines). After reading it, you'll know which domain rules to load.
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `HOST_CONTEXT.md` if it exists — determine the current machine/location context from runtime host metadata first, then hostname/computer name, then a stable local IP fallback; if the machine is unknown, register it in `HOST_CONTEXT.md` with a provisional device name and environment tag
@@ -24,7 +25,6 @@ Before doing anything else:
 6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 7. Read `SKILL_CATALOG.md` — this is a categorized directory of all your skills, what each one does, and when to use it
 8. Read `WORKSPACE_INDEX.md` — this is the global navigation map for memory, tools, projects, credential pointers, and plans; use it to find the right file fast instead of guessing
-9. Read `ACTIVE_RULES.md` — active behavior protocol (视觉判断/联网搜索/兜底方案/深度总结/主观判断). This is how I take initiative, not just wait for orders.
 
 Don't ask permission. Just do it.
 
