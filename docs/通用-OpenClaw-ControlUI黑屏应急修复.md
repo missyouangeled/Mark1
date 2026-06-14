@@ -18,6 +18,18 @@ python3 scripts/openclaw-control-ui-emergency.py --check --print-human
 python3 scripts/openclaw-system-summary.py --print-human
 ```
 
+## ⚠️ 预防规则
+
+**推送到 GitHub 后不要立刻刷新 Control UI。**
+
+原因：推送可能会触发 Gateway 自动重启（工作区变更 → hook/watcher 检测 → 重启）。在重启中间按 F5，页面加载到一半 Gateway 还没就绪，就会黑屏。
+
+- **等 5-10 秒**再刷新，等 Gateway 完全就绪
+- **习惯做法**：推送 → 等几秒 → 再 F5
+- 如果已经黑了，按下面的诊断/修复流程走
+
+---
+
 ## 三种模式
 
 ### 1. 只诊断，不修改

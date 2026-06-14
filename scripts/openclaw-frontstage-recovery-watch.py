@@ -267,6 +267,8 @@ def session_file_for_key(session_key: str) -> Path:
 
 def load_recent_transcript_messages(path: Path) -> list[dict[str, Any]]:
     items: deque[dict[str, Any]] = deque(maxlen=MAX_TRANSCRIPT_MESSAGES)
+    if not path.exists():
+        return list(items)
     with path.open("r", encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             line = line.strip()

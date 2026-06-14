@@ -25,6 +25,7 @@ from typing import Any
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 SCRIPTS = WORKSPACE / "scripts"
+VENV_PYTHON = str(Path.home() / ".local" / "share" / "openclaw-voice-venv311" / "bin" / "python3")
 STATE_DIR = Path(
     os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
 ) / "openclaw" / "lifecycle-maintainer"
@@ -163,7 +164,7 @@ def main():
     # 0.5 向量索引增量检查（每次都做，hash 对比，有变化才重建）
     checks.append(run_sub_check(
         "embed-index",
-        [EMBED_PYTHON, str(SCRIPTS / "memory-embed-index.py"), "--incremental-view"],
+        [VENV_PYTHON, str(SCRIPTS / "memory-embed-index.py"), "--incremental-view"],
         timeout=180,
     ))
 

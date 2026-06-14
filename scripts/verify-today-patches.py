@@ -74,8 +74,8 @@ def main():
     # ── 2. Timer 数量 ──
     ok, out, _ = run(["systemctl", "--user", "list-timers", "--no-pager", "openclaw-*", "--no-legend"])
     timer_count = len([l for l in out.split("\n") if l.strip()]) if ok else 0
-    checks.append(check("timer-count-5", timer_count == 5,
-                        f"found {timer_count} timers (expected 5)"))
+    checks.append(check("timer-count-6", timer_count == 6,
+                        f"found {timer_count} timers (expected 6)"))
 
     # ── 3. 搜索短路（跳过缓存验证原始搜索）──
     ok, out, _ = run([PY, str(SCRIPTS / "memory-search-local-first.py"), "--no-cache", "贾维斯"])
@@ -175,7 +175,7 @@ def main():
     rule_ok = False
     if agents.exists():
         content = agents.read_text()
-        rule_ok = "memory-search-local-first" in content and "三级搜索策略" in content
+        rule_ok = "memory-search-local-first" in content and ("memory_search 统一搜索策略" in content or "L1→L2→L3→L4 路由" in content)
     checks.append(check("agents-search-rule", rule_ok, "AGENTS.md contains search strategy"))
 
     # ── 11. boot-health-check ──
