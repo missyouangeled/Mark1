@@ -56,7 +56,6 @@
       "workspace": "/home/missyouangeled/.openclaw/workspace",
       "compaction": {
         "mode": "safeguard",
-        "model": "litellm/agnes-2.0-flash",
         "truncateAfterCompaction": true,
         "keepRecentTokens": 25000,
         "notifyUser": true,
