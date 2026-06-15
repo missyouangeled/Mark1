@@ -325,7 +325,7 @@ soffice --headless --version
 | 12 | code-server | install.sh | Web IDE | 迁移方案步骤 5 |
 | 13 | Python 3 + pip3 | apt | TTS 推理 + 文档库 | 安装完 |
 | 14 | docker-socket-proxy | Docker pull | Docker API 权限隔离 | 迁移方案步骤 6 |
-| 15 | Python 文档库 | pip3 | Word/Excel/PPT/PDF 生成 | 安装完 |
+| 15 | Python 文档库 | pip3 | Word/Excel/PPT/PDF 生成与读取（含 pdfplumber/markitdown） | 安装完 |
 | 16 | .NET SDK 8.0 | apt (MS repo) | minimax-docx 专业文档 | 需要时 |
 | 17 | pptxgenjs | npm -g | PPT 生成 skill | 需要时 |
 | 18 | LibreOffice headless | apt | 格式转换桥（≈500MB） | 按需装 |
@@ -515,26 +515,26 @@ curl -fsSL https://tailscale.com/install.sh | sh
 echo "=== 第 8 层: code-server ==="
 curl -fsSL https://code-server.dev/install.sh | sh
 
-echo "=== 第 9 层: docker-socket-proxy 镜像预拉 ==="
+echo "=== 第 10 层: docker-socket-proxy 镜像预拉 ==="
 docker pull tecnativa/docker-socket-proxy
 
-echo "=== 第 10 层: Python 文档库 ==="
+echo "=== 第 11 层: Python 文档库 ==="
 pip3 install --break-system-packages \
   python-docx openpyxl pandas python-pptx \
   weasyprint reportlab pikepdf pdfplumber \
   "markitdown[pptx]"
 
-echo "=== 第 11 层: .NET SDK 8.0（minimax-docx） ==="
+echo "=== 第 12 层: .NET SDK 8.0（minimax-docx） ==="
 wget https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb \
   -O /tmp/packages-microsoft-prod.deb
 sudo dpkg -i /tmp/packages-microsoft-prod.deb
 sudo apt update
 sudo apt install -y dotnet-sdk-8.0
 
-echo "=== 第 12 层: pptxgenjs（PPT 生成） ==="
+echo "=== 第 13 层: pptxgenjs（PPT 生成） ==="
 sudo npm install -g pptxgenjs
 
-echo "=== 第 13 层: LibreOffice headless（格式转换，≈500MB，按需） ==="
+echo "=== 第 14 层: LibreOffice headless（格式转换，≈500MB，按需） ==="
 sudo apt install -y libreoffice-impress libreoffice-calc
 
 echo ""
@@ -576,8 +576,10 @@ echo "如果版本都正常 → 进迁移方案 v3"
 ├─ 第 4 层：网关层      ← Caddy + CF Tunnel + 子域名路由
 │   (迁移方案步骤 3-4)
 │
-├─ 第 5 层：开发工作台  ← code-server + 插件 + 文档处理依赖 + 远程驱动 + 外部预览
-│   (独立设计: docs/贾维斯中枢-Mark2-开发工作台设计.md v2.1)
+├─ 第 5 层：开发工作台  ← code-server + 插件 + 文档处理依赖 + 产出物目录 + 远程驱动 + 外部预览
+│   (独立设计: docs/贾维斯中枢-Mark2-开发工作台设计.md v2.2)
+│   产出物目录: /srv/projects/{docs,image}/outputs/ + /mnt/data/video-outputs/
+│   模板目录: /srv/templates/
 │
 ├─ 第 6 层：Docker 服务 ← Portainer + Nextcloud + Syncthing + 其他
 │   (迁移方案步骤 6 + 8)
@@ -595,8 +597,9 @@ echo "如果版本都正常 → 进迁移方案 v3"
 ├─ 第 10 层：验证       ← 安全体检 + 服务冒烟 + 全量自检
 │   (迁移方案步骤 16)
 │
-├─ 第 11 层：回收机制    ← 强制回收定时注册 + 七层智能回收脚本部署
-│   (回收机制设计 六)
+├─ 第 11 层：回收机制    ← 预防层配置 + 强制回收 + 七层智能回收脚本部署
+│   (回收机制设计 v2.0 八：部署位置)
+│   含开发工作台产出物保留 (L3-A): 图片500MB/视频2GB/文档200MB + 7天TTL
 │
 ├─ 第 12 层：割接       ← 并行运行 → 主切换 → 旧机观察
 │   (迁移方案步骤 17)
@@ -629,6 +632,6 @@ echo "如果版本都正常 → 进迁移方案 v3"
 | 服务器能力推演 | `docs/plans/2026-06-15-8核32G服务器能力推演.md` |
 | 🛡️ 安全体系设计（独立成册） | `docs/贾维斯中枢安全体系设计.md` |
 | 🧹 回收机制设计 v2.0（独立成册） | `docs/贾维斯中枢-Mark2-回收机制设计.md` |
-| 🖥️ 开发工作台设计 v2.1（独立成册） | `docs/贾维斯中枢-Mark2-开发工作台设计.md` |
+| 🖥️ 开发工作台设计 v2.2（独立成册） | `docs/贾维斯中枢-Mark2-开发工作台设计.md` |
 | 迁移方案 v3（部署指引） | `docs/plans/2026-06-15-服务器迁移方案-v3.md` |
 | 本手册（部署启动） | `docs/贾维斯中枢-Mark2-部署启动手册.md` |

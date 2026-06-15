@@ -1,7 +1,7 @@
 # 🖥️ Mark2 — 开发工作台与环境设计 v1.0
 
 > 创建：2026-06-15
-> 状态：v2.1（+ 文档处理：Word/Excel/PPT/PDF 全链路设计 + 自查修复）
+> 状态：v2.2（全文档一致性审查修复）
 > 适用范围：中枢服务器（Ubuntu 24.04）
 > 原则：环境隔离 → 直接可用 → 远程驱动 → 外部可验
 
@@ -764,7 +764,10 @@ image_generate(
   2. 超 500MB → 按 created 升序删最老的批次文件夹，直到回到 400MB 以下
   3. 未超 → 遍历 batch.metadata.json，created 距今 ≥7 天 → 删除该批次
   4. 被网页项目引用的图片（在 public/images/ 中）不受影响（不在此目录）
+  🛡️ 标记保留: 用户说「保留这个」→ 移入 /srv/projects/archives/（永久保留，不受清理）
 ```
+
+> 📌 回收实现：以上保留策略统一由回收机制 mark2-recycle.py L3-A 层执行。定期触发（深度扫描每 6h + 每日 04:00 全量）。
 
 ### 5.8 视频处理详细设计
 
@@ -917,7 +920,7 @@ AI 视频生成       特殊处理：
   容量优先:  /mnt/data/video-outputs/ 超 2GB → 自动删最旧的批次
   时间兜底:  未超过容量上限的批次 → 下载 7 天后自动删除
 
-  🛡️ 标记保留: 用户说「保留这个视频」→ 移入 archives/ → 不受清理影响
+  🛡️ 标记保留: 用户说「保留这个视频」→ 移入 /srv/projects/archives/（永久保留，不受清理）
 
 清理流程（每日由 lifecycle-maintainer 触发）：
   1. du -sb downloads/ processed/ frames/ → 总和
@@ -1283,6 +1286,7 @@ soffice --headless --convert-to pdf report.docx
 │   │   └── report.pdf
 │   └── ...
 ├── templates/              # 可复用模板（永久保留）
+│   ├── archives/              # 用户标记永久保留的文件（不受清理）
 │   ├── reference.docx      # Pandoc 参考样式文件
 │   ├── invoice-template.xlsx
 │   └── company-theme.json  # PPT 配色主题
@@ -1291,7 +1295,7 @@ soffice --headless --convert-to pdf report.docx
 保留策略（与图片/视频一致）：
   容量优先: /srv/projects/docs/outputs/ 超 200MB → 删最旧批次
   时间兜底: 未超 → 7 天后自动删除
-  标记保留: 用户说「保留这个文件」→ 移入 archives/ 不受清理
+  标记保留: 用户说「保留这个文件」→ 移入 /srv/projects/archives/（永久保留，不受清理）
   ⚠️ LibreOffice/Pandoc 生成的临时文件 → 生成后立即删
 ```
 

@@ -329,6 +329,59 @@ done
 
 ---
 
+### L3-A — 开发工作台产出物（图片/视频/文档）
+
+**① 发现**
+```
+组件:
+  图片产出    /srv/projects/image/outputs/
+  视频产出    /mnt/data/video-outputs/
+  文档产出    /srv/projects/docs/outputs/
+  标记保留    /srv/projects/archives/
+```
+
+**② 分析**
+
+| 子组件 | 产出物 | 增长模式 |
+|--------|--------|---------|
+| image/outputs | *.png, *.webp, *.jpg | 每批 1-50MB |
+| video-outputs | *.mp4 | 每批 50-500MB |
+| docs/outputs | *.docx, *.xlsx, *.pptx, *.pdf | 每批 1-20MB |
+
+**③ 判定规则（来自开发工作台设计 v2.1）**
+
+| 目标 | 条件 | 动作 |
+|------|------|------|
+| 图片批次 | /srv/projects/image/outputs/ 总大小 >500MB | 删最旧批次直到 ≤500MB |
+| 图片批次 | 未超 500MB 但批次 >7 天 | 删除该批次 |
+| 视频批次 | /mnt/data/video-outputs/ 总大小 >2GB | 删最旧批次直到 ≤2GB |
+| 视频批次 | 未超 2GB 但批次 >7 天 | 删除该批次 |
+| 文档批次 | /srv/projects/docs/outputs/ 总大小 >200MB | 删最旧批次直到 ≤200MB |
+| 文档批次 | 未超 200MB 但批次 >7 天 | 删除该批次 |
+| 标记保留 | 用户说"保留这个文件/这批" | 移入 /srv/projects/archives/，不受清理 |
+
+**④ 回收**
+```bash
+# 通用容量检查+清理函数
+clean_by_age_and_size() {
+  local DIR=$1 MAX_MB=$2 MAX_DAYS=$3
+  # 按修改时间排序，从最旧开始删直到低于阈值
+  while [ "$(du -sm "$DIR" 2>/dev/null | cut -f1)" -gt "$MAX_MB" ]; do
+    OLDEST=$(find "$DIR" -mindepth 1 -maxdepth 1 -type d | sort | head -1)
+    [ -z "$OLDEST" ] && break
+    rm -rf "$OLDEST"
+  done
+  # 时间兜底：删除超过 MAX_DAYS 天的批次
+  find "$DIR" -mindepth 1 -maxdepth 1 -type d -mtime +"$MAX_DAYS" -exec rm -rf {} \;
+}
+
+clean_by_age_and_size /srv/projects/image/outputs/ 500 7
+clean_by_age_and_size /mnt/data/video-outputs/ 2048 7
+clean_by_age_and_size /srv/projects/docs/outputs/ 200 7
+```
+
+---
+
 ### L4 — 自部署服务 (Docker + Portainer + 容器)
 
 **① 发现**
@@ -450,10 +503,10 @@ find /var/lib/tailscale/ -name "*.log" -size +10M -exec truncate -s 0 {} \; 2>/d
 **① 发现**
 ```
 组件：
-  每日配置备份    /srv/backups/configs/
-  每日数据备份    /srv/backups/data/
-  audit 归档     /srv/backups/audit/
-  Git 镜像        /srv/backups/git-mirrors/
+  每日配置备份    /mnt/data/backups/configs/
+  每日数据备份    /mnt/data/backups/data/
+  audit 归档     /mnt/data/backups/audit/
+  Git 镜像        /mnt/data/backups/git-mirrors/
   session backup  /mnt/data/openclaw/session-backup/
 ```
 
@@ -482,27 +535,27 @@ find /var/lib/tailscale/ -name "*.log" -size +10M -exec truncate -s 0 {} \; 2>/d
 
 | 备份总容量预警 | 条件 | 动作 |
 |--------------|------|------|
-| /srv/backups | >80% 分区容量 | 🔴 告警 + 日报高亮 |
-| /srv/backups | >50% 分区容量 | 🟡 日报提醒 |
+| /mnt/data/backups | >80% 分区容量 | 🔴 告警 + 日报高亮 |
+| /mnt/data/backups | >50% 分区容量 | 🟡 日报提醒 |
 
 **④ 回收**
 ```bash
 # configs 分层保留——保留最近 7 天全部 + 8-30 天中每周一那份
-find /srv/backups/configs/ -name "*.tar.gz" -mtime +7 ! -name "*Mon*" ! -name "*Monday*" -delete 2>/dev/null
-find /srv/backups/configs/ -name "*.tar.gz" -mtime +30 -delete 2>/dev/null
+find /mnt/data/backups/configs/ -name "*.tar.gz" -mtime +7 ! -name "*Mon*" ! -name "*Monday*" -delete 2>/dev/null
+find /mnt/data/backups/configs/ -name "*.tar.gz" -mtime +30 -delete 2>/dev/null
 
 # data 分层保留
-find /srv/backups/data/ -name "*.tar.gz" -mtime +3 ! -name "*Sun*" ! -name "*Sunday*" -delete 2>/dev/null
-find /srv/backups/data/ -name "*.tar.gz" -mtime +14 -delete 2>/dev/null
+find /mnt/data/backups/data/ -name "*.tar.gz" -mtime +3 ! -name "*Sun*" ! -name "*Sunday*" -delete 2>/dev/null
+find /mnt/data/backups/data/ -name "*.tar.gz" -mtime +14 -delete 2>/dev/null
 
 # audit 归档——由 L7 写入，这里只做过期清理
-find /srv/backups/audit/ -name "audit.log.*" -mtime +90 -delete 2>/dev/null
+find /mnt/data/backups/audit/ -name "audit.log.*" -mtime +90 -delete 2>/dev/null
 
 # git gc
-find /srv/backups/git-mirrors/ -mindepth 1 -maxdepth 1 -type d -exec git -C {} gc --auto --quiet \; 2>/dev/null
+find /mnt/data/backups/git-mirrors/ -mindepth 1 -maxdepth 1 -type d -exec git -C {} gc --auto --quiet \; 2>/dev/null
 
 # 容量预检
-USAGE=$(df /srv/backups 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%')
+USAGE=$(df /mnt/data/backups 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%')
 if [ -n "$USAGE" ] && [ "$USAGE" -gt 80 ]; then
     echo "CRITICAL: /srv/backups at ${USAGE}%"
 fi
@@ -558,8 +611,8 @@ fi
 # auditd 归档
 AUDIT_USAGE=$(du -sm /var/log/audit/ 2>/dev/null | cut -f1)
 if [ -n "$AUDIT_USAGE" ] && [ "$AUDIT_USAGE" -gt 1024 ]; then
-    mkdir -p /srv/backups/audit/
-    cp /var/log/audit/audit.log.* /srv/backups/audit/ 2>/dev/null || true
+    mkdir -p /mnt/data/backups/audit/
+    cp /var/log/audit/audit.log.* /mnt/data/backups/audit/ 2>/dev/null || true
     find /var/log/audit/ -name "audit.log.*" -mtime +30 -delete 2>/dev/null
 fi
 
@@ -642,6 +695,7 @@ mark2-recycle.py
 - **脚本入口**：`scripts/mark2-recycle.py`（待开发）
 - **预防层配置**：随各层部署步骤写入（`/etc/docker/daemon.json`、`/etc/systemd/journald.conf`、Caddyfile 等）
 - **日报输出**：`~/.local/state/openclaw/recycle/reports/`
+- **产出物保留接入回收**: 开发工作台图片/视频/文档保留策略统一由 mark2-recycle.py L3-A 执行
 - **触发注册**：
   - 事件驱动 hook → `ACTIVE_RULES.md` 事件钩子
   - 定时轻量 → systemd timer（`mark2-recycle-light.timer`，每 15min）
