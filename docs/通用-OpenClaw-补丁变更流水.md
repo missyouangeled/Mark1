@@ -1432,6 +1432,20 @@
 - 相关文件：
 - `scripts/embed-sidecar.py`
 
+## 2026-06-15 07:49:30 CST (+08:00) — 修复 3 个补丁失败 + BOOT_INDEX 补 ACTIVE_RULES + 黑屏预防规则
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 12/12 补丁全部通过：timer-count 5→6、agents-search-rule 匹配 L1→L2→L3→L4、lifecycle-maintainer embed-index 切 venv Python、frontstage-recovery 容错缺失 session 文件
+- 验收 / 验证：
+- verify-today-patches.py 12/12 passed
+- 相关文件：
+- `BOOT_INDEX.md,scripts/verify-today-patches.py,scripts/openclaw-lifecycle-maintainer.py,scripts/openclaw-frontstage-recovery-watch.py,docs/通用-OpenClaw-ControlUI黑屏应急修复.md`
+
 ## 2026-06-12 13:50:04 CST (+08:00) — 安装 BaiduPCS-Go 并开始下载地平线DLC
 
 - 类型：patch
