@@ -1,7 +1,7 @@
 # 🖥️ Mark2 — 开发工作台与环境设计 v1.0
 
 > 创建：2026-06-15
-> 状态：v1.1（Linux 小程序方案确认 + 审查修订）
+> 状态：v1.2（三大领域工作流补全：网页/图片/视频）
 > 适用范围：中枢服务器（Ubuntu 24.04）
 > 原则：环境隔离 → 直接可用 → 远程驱动 → 外部可验
 
@@ -94,13 +94,17 @@
 │   ├── venv/           # 项目自有 venv
 │   └── src/
 │
-├── image/             # 图片处理
-│   ├── pyproject.toml
-│   └── venv/
+├── image/             # 图片生成与处理
+│   ├── prompts/       # 提示词存档（可复用）
+│   ├── outputs/       # AI 生成的图片
+│   ├── sources/       # 原始素材（图生图的原图）
+│   └── README.md      # 记录图片用途和生成参数
 │
 └── video/             # 视频处理
-    ├── pyproject.toml
-    └── venv/
+    ├── downloads/     # 下载的原始视频
+    ├── outputs/       # 处理后的输出
+    ├── frames/        # 帧提取输出
+    └── README.md      # 记录常用命令
 ```
 
 ### 3.2 隔离策略（分级）
@@ -384,6 +388,183 @@ sessions_spawn(task=task, taskName=f"dev-{project_name}", mode="run")
 端口表写入 /srv/projects/.ports.json，重启后清理。
 ```
 
+### 5.6 网页开发专用流
+
+> **定位**：从用户一句话到网站上线，全流程自动化。
+
+```
+触发示例：
+  "帮我做一个公司官网，蓝色系，有首页/产品/联系"
+  "把 portfolio 页面改成暗色模式"
+  "基于这个设计稿，做一个落地页"
+
+      │
+      ▼
+┌──────────────────────────────────────────────────────┐
+│ 子 Agent 自动执行                                       │
+│                                                        │
+│  1. 初始化                                              │
+│     npm create vite@latest → Vue3 + TS 或 React + TS   │
+│     cd /srv/projects/web/<project>                      │
+│                                                        │
+│  2. 装依赖                                              │
+│     npm install                                         │
+│     npm i -D tailwindcss @tailwindcss/vite              │
+│     （Tailwind 默认配色体系，快速出视觉）                  │
+│                                                        │
+│  3. 写代码                                              │
+│     - 目录结构: src/{pages,components,assets,utils}/     │
+│     - 路由: vue-router / react-router                   │
+│     - 样式: Tailwind 原子类 + 自定义主题色                │
+│     - 组件: 贾维斯自动生成 Vue SFC / React JSX           │
+│                                                        │
+│  4. 自检                                                │
+│     npm run build（零错误才继续）                         │
+│     npm run lint（如有配置）                              │
+│                                                        │
+│  5. 预览                                                │
+│     npx vite preview --host 0.0.0.0 --port <port>       │
+│     cloudflared tunnel → 临时 URL                        │
+│                                                        │
+│  6. 回报                                                │
+│     "✅ <项目名> 已上线预览 → https://xxx.trycloudflare.com" │
+│     "共 N 个页面 / M 个组件 / 构建体积 X KB"              │
+└──────────────────────────────────────────────────────┘
+```
+
+**技术栈选择规则**：
+
+| 场景 | 技术栈 | 理由 |
+|------|-------|------|
+| 通用网站/落地页 | Vue3 + Vite + Tailwind | 轻量、快、贾维斯最熟 |
+| 复杂交互/后台 | React + Vite + Tailwind | 生态丰富 |
+| 静态内容站 | 纯 HTML + Tailwind（零 JS 框架） | 极致轻量 |
+| 公司官网/展示 | Vue3 + Vite + Tailwind | 默认首选 |
+
+**前端设计能力**：贾维斯有 `frontend-design` skill，可生成高质量 UI。子 Agent 任务中可指定使用。
+
+### 5.7 图片生成专用流（AI 文生图 / 图生图）
+
+> **定位**：直接调用 `image_generate` 工具生成图片，不走外部 API 或第三方服务。
+>
+> **当前管线**：`litellm/agnes-image-2.1-flash`（通过 LiteLLM 通道 → Agnes API 网关 `apihub.agnes-ai.com/v1`）
+> **可用模型**：`agnes-image-2.0-flash`、`agnes-image-2.1-flash`、`agnes-video-v2.0`、`agnes-1.5-flash`、`agnes-2.0-flash`
+
+```
+触发示例：
+  "帮我生成一张赛博朋克风格的猫"
+  "把这张照片的色调改成电影质感"
+  "给首页做一个 16:9 的 Hero 横幅图"
+
+      │
+      ▼
+┌──────────────────────────────────────────────────────┐
+│ 贾维斯主会话 / 子 Agent（轻量，不开分身）               │
+│                                                        │
+│  文生图：                                               │
+│    image_generate(                                      │
+│      prompt="赛博朋克风格的黑猫，霓虹灯，雨夜，4K",       │
+│      size="1024x1024",         或 aspectRatio="16:9",   │
+│      outputFormat="png"                                 │
+│    )                                                    │
+│    → 返回图片路径 → MEDIA 发给你                         │
+│                                                        │
+│  图生图：                                               │
+│    image_generate(                                      │
+│      prompt="保留人物和构图，色调改为电影级暖色",         │
+│      image="path/to/photo.jpg"                          │
+│    )                                                    │
+│    → 基于原图修改 → 返回新图                             │
+│                                                        │
+│  批量生成（多张）：                                      │
+│    image_generate(                                      │
+│      prompt="同一个角色 8 种情绪表情包",                 │
+│      count=4                                            │
+│    )                                                    │
+│    → 一次出 4 张                                        │
+└──────────────────────────────────────────────────────┘
+```
+
+**尺寸速查**：
+
+| 用途 | 参数 |
+|------|------|
+| 头像/Avatar | `size="1024x1024"` |
+| Hero 横幅 | `aspectRatio="16:9"` |
+| 手机海报 | `aspectRatio="9:16"` |
+| 宽屏壁纸 | `aspectRatio="21:9"` |
+| 方形贴纸 | `aspectRatio="1:1"` |
+
+**生成后的落地**：
+- 图片默认存入项目 `public/images/` 或 `assets/`
+- 贾维斯自动在代码中引用（`<img src="/images/hero.webp">`）
+- 如需透明背景：`background="transparent"` + `outputFormat="png"`
+
+> 📌 图片生成是轻量操作（几秒到十几秒），**不走分身**，主会话直接调 `image_generate`
+> 然后 MEDIA 贴给你。不像网页开发那样需要开子 Agent。
+
+### 5.8 视频处理专用流
+
+> **定位**：视频下载、剪辑、转码、帧提取。工具链已在 Mark1 验证，迁移到 Mark2。
+
+```
+触发示例：
+  "帮我把这个视频转成 MP4 1080p"
+  "从这个视频里提取每 10 秒一帧"
+  "下这个抖音视频然后截取封面"
+
+      │
+      ▼
+┌──────────────────────────────────────────────────────┐
+│ 贾维斯 / 子 Agent（大文件走分身）                       │
+│                                                        │
+│  工具链（系统级已安装）：                                │
+│    ffmpeg    → 转码、剪辑、合并、提取音频               │
+│    ffprobe   → 查看视频元信息（分辨率/码率/时长）        │
+│    yt-dlp    → 下载 YouTube/B站/其他平台               │
+│    scripts/download-platform-video.py → 抖音等短视频   │
+│                                                        │
+│  典型工作流：                                           │
+│    1. ffprobe input.mp4         → 了解源格式           │
+│    2. ffmpeg -i input.mp4 ...   → 转码/剪辑            │
+│    3. ffprobe output.mp4        → 验证输出             │
+│    4. 回报结果 + 文件路径                              │
+│                                                        │
+│  帧提取：                                               │
+│    ffmpeg -i video.mp4 -vf fps=1/10 frames/%04d.png    │
+│    → 每 10 秒一帧，输出到 frames/ 目录                  │
+│                                                        │
+│  下载抖音视频（Mark1 已验证管线）：                      │
+│    python3 scripts/download-platform-video.py \        │
+│      --pick=first '<视频URL>'                          │
+│    → 下载 + ffprobe 校验                                │
+│                                                        │
+│  AI 视频生成（实验性）：                                │
+│    image_generate(                                      │
+│      prompt="...",                                      │
+│      model="litellm/agnes-video-v2.0"                  │
+│    )                                                    │
+│    → 注：视频模型较慢，显式告知用户等待                   │
+└──────────────────────────────────────────────────────┘
+```
+
+**视频项目目录结构**：
+
+```
+/srv/projects/video/
+├── downloads/       # 下载的原始视频
+├── outputs/         # 处理后的输出
+├── frames/          # 帧提取输出
+├── scripts/         # 视频处理脚本
+└── README.md        # 记录常用命令
+```
+
+**边界规则**：
+- 大视频（>500MB）操作必须走 `sessions_spawn` 后台分身
+- 下载前检查数据盘剩余空间
+- 不自动删除原始文件（用户确认后删）
+- 视频输出写入 `/mnt/data/video-outputs/`，不占系统盘
+
 ---
 
 ## 六、外部预览与测试访问
@@ -568,7 +749,7 @@ dev.yourdomain.com {
     { "name": "Web 项目",     "path": "/srv/projects/web" },
     { "name": "小程序(uni-app)", "path": "/srv/projects/miniapp" },
     { "name": "API 服务",     "path": "/srv/projects/api" },
-    { "name": "图片处理",     "path": "/srv/projects/image" },
+    { "name": "图片生成",     "path": "/srv/projects/image" },
     { "name": "视频处理",     "path": "/srv/projects/video" }
   ],
   "settings": {
@@ -640,6 +821,10 @@ dev.yourdomain.com {
 | 5 | 终端不做容器化隔离 | 你唯一用户，jarvis 用户级隔离足够；容器化增加复杂度 | 用户需求「简单」 |
 | 6 | 部署预装插件（不动态安装） | 因为你在外面手机发消息时不能等插件下载 | 核心诉求「手机驱动」 |
 | 7 | 端口表集中管理 | 避免端口冲突；重启服务器后自动清理 | 多项目并行需求 |
+| 8 | 网页默认 Vue3+Vite+Tailwind | 贾维斯最熟、生态最轻、出活最快 | 前端 skill 经验 |
+| 9 | 图片生成不走分身 | image_generate 几秒到十几秒，开分身反而增加延迟 | 操作轻量 |
+| 10 | 视频下载输出放数据盘 | 视频文件大，不占系统盘；/mnt/data/video-outputs/ | 磁盘规划 |
+| 11 | 大视频操作后台分身 | >500MB 的转码/下载可能跑很久，不阻塞主会话 | 异步卸载协议 |
 
 ---
 
