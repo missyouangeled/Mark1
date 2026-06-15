@@ -55,7 +55,12 @@
       },
       "workspace": "/home/missyouangeled/.openclaw/workspace",
       "compaction": {
-        "mode": "safeguard"
+        "mode": "safeguard",
+        "model": "litellm/agnes-2.0-flash",
+        "truncateAfterCompaction": true,
+        "keepRecentTokens": 25000,
+        "notifyUser": true,
+        "maxActiveTranscriptBytes": 600000
       },
       "maxConcurrent": 4,
       "subagents": {

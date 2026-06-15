@@ -1,0 +1,13 @@
+[Unit]
+Description=上下文溢出监控器（每 5 分钟检查一次）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/scripts/openclaw-context-monitor.py --check
+Environment=XDG_STATE_HOME=%h/.local/state
+Environment=XDG_RUNTIME_DIR=%t
+StandardOutput=journal
+StandardError=journal
+Restart=no

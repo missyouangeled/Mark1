@@ -1,0 +1,11 @@
+[Unit]
+Description=上下文溢出监控器 定时触发（每 5 分钟）
+After=network-online.target
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target
