@@ -1529,3 +1529,31 @@
 - openclaw-lifecycle-maintainer.py --print-human 返回 EXIT=0；systemctl start 后 journal 显示 Finished（非 Failed）。验证脚本 10/12 passed(+1)。
 - 相关文件：
 - `scripts/openclaw-lifecycle-maintainer.py`
+
+## 2026-06-15 08:48:42 CST (+08:00) — 服务器迁移方案 v3 终版发布
+
+- 类型：plan
+- 适用范围：通用
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- Mark1 对照审查 14 处修正：6层架构（入口→核心→开发→服务→远程→备份），17步迁移，双Caddy合并为单Caddy，微信方案明确为两步现实路线，Docker监控接入health-collector
+- 验收 / 验证：
+- 桌面存有 v3 终版，GitHub 已推送 commit 3bcc1d2
+- 相关文件：
+- `docs/plans/2026-06-15-服务器迁移方案-v3.md`
+
+## 2026-06-15 09:02:25 CST (+08:00) — 安全体系设计 + v3 安全层整合
+
+- 类型：plan
+- 适用范围：通用
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 七层纵深防御：CF边缘→ufw防火墙→传输加密→身份认证(CF Access)→应用加固(SSH/Docker)→数据保护→监控响应(fail2ban/auditd/trivy)。v3整合：新增安全步骤10/15，Mark1对照表7项，架构图扩展至L7层
+- 验收 / 验证：
+- 桌面3份文档 + GitHub已推送 commit 0fca8a8
+- 相关文件：
+- `docs/贾维斯中枢安全体系设计.md`
