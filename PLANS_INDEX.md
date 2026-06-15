@@ -43,6 +43,7 @@
 | 2026-05-26 | 任务调度器（Task Scheduler）详细设计 | `reference` | 调度器, watcher | 查调度器细节时 |
 | 2026-06-08 | wechat-cli 微信命令行工具调研 | `reference` | 微信, CLI, 掌机 | 探索掌机微信接入时 |
 | 2026-05-29 | QMD 语义搜索排查结论 | `done` | memory_search, QMD | 查 memory_search / QMD 路线时 |
+| 2026-06-15 | Mark42 模块化智能铠甲系统 — 初步设计 | `active` | Mark42, 上下文管理, Loop, 大工程 | 启动 Mark42 开发时；商业渠道调研完成后 |
 
 ## 使用提醒
 
