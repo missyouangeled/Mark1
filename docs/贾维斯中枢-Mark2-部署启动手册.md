@@ -1,8 +1,23 @@
-# 贾维斯中枢 Mark2 — 部署启动手册
+# 贾维斯中枢 Mark2 — 部署启动手册 v2.2
 
 > 定位：部署的总入口。本文档是第一份要读的东西。
 > 设计日期：2026-06-15
+> 最后修订：2026-06-15（外部审查建议整合，v2.1→v2.2）
 > 适用范围：中枢服务器（Ubuntu 24.04）
+
+---
+
+## ⚠️ 部署前重要声明
+
+**本手册是设计蓝图，不是一成不变的教条。**
+
+正式开始项目部署时，必须以以下原则为准：
+
+1. **以实际硬件为准**：服务器到手后先跑预检脚本，确认 CPU/内存/磁盘/带宽与预期一致；如有偏差，根据实际情况调整 Docker 资源限制和服务数量
+2. **以实际网络环境为准**：国内云厂商的网络策略、镜像拉取速度、出站限制各不相同；如遇镜像拉取超时，优先配置厂商提供的镜像加速器
+3. **以当时软件版本为准**：Docker/Caddy/code-server/cloudflared 等组件在部署时可能已有新版本；本手册中写死的最低版本号是**安全基线**，实际部署时应使用当时的最新稳定版
+4. **持续优化**：Mark2 上线不是终点——上线后根据监控数据（资源占用、告警频率、响应延迟）持续调整资源分配、回收策略和安全规则
+5. **文档随动**：部署过程中发现的任何与手册不符的情况，记录下来并同步更新本手册，确保下一次部署或回滚时有据可查
 
 ---
 
@@ -95,6 +110,16 @@ echo "=== SELinux ===" && sestatus 2>/dev/null || echo "SELinux 未启用（Ubun
 /mnt/data     数据盘 (ext4/XFS)    — Docker volumes + session-backup + scratch + 备份
 ```
 
+**文件系统选择建议**：
+
+| 场景 | 推荐 | 原因 |
+|------|------|------|
+| 单盘（当前方案） | ext4 / XFS | 最简单、最稳定、Ubuntu 原生支持 |
+| 多盘 RAID | ZFS | 快照、checksum、透明压缩、去重 |
+| 根分区 | ext4（默认） | Ubuntu 原生、启动快、内核内建 |
+
+> 当前单盘云服务器保持 ext4/XFS 即可。未来如果加挂多块数据盘做 RAID，考虑 ZFS。
+
 如果数据盘没挂载，先做：
 
 ```bash
@@ -163,6 +188,24 @@ sudo apt install -y \
   unattended-upgrades
 ```
 
+#### 第 2-A 层：Ubuntu CIS 安全审计（可选但强烈推荐）
+
+Ubuntu 24.04 提供官方 CIS Benchmark 硬化工具 `usg`（Ubuntu Security Guide），可自动化 200+ 项安全检查。需要 Ubuntu Pro（个人免费 5 台）。
+
+```bash
+# 安装审计工具
+sudo apt install ubuntu-security-guide
+
+# 仅审计（不自动修复，避免破坏现有配置）
+sudo usg audit cis_level1_server
+
+# 手动审查报告后逐项修复
+# 注意：某些 CIS 规则可能与 self-hosted 场景冲突（如某些内核参数），
+# 不要盲目 apply，逐条判断后再修
+```
+
+> 如果未启用 Ubuntu Pro，可手动参考 CIS Benchmark PDF 逐项检查。
+
 ### 第 3 层：Node.js（OpenClaw Gateway 运行时）
 
 ```bash
@@ -193,6 +236,22 @@ docker version --format '{{.Server.Version}}'
 # 如果版本 <29.3.0，等安全更新步骤时会处理
 ```
 
+#### 第 4-A 层：Diun（Docker 镜像更新通知）
+
+> ⚠️ 2025-2026 社区共识：containrrr/watchtower 已归档停止维护。不再推荐自动更新容器。
+> 替代方案：Diun（只通知不自动更新）——比 Watchtower 更安全，避免半夜自动升级把服务搞挂。
+
+```bash
+# 预拉 Diun 镜像
+docker pull crazymax/diun:latest
+
+# Diun 容器的启动在迁移方案步骤 6 中与 docker-socket-proxy 一起做
+# 配置要点：
+#   - 通过 docker-socket-proxy 访问 Docker API（安全）
+#   - 每周日检查一次镜像更新
+#   - 通知接入 Gotify/ntfy/broker → Control UI 显示「有 N 个容器可更新」
+```
+
 ### 第 5 层：Caddy（统一网关）
 
 ```bash
@@ -207,6 +266,17 @@ sudo apt install -y caddy
 caddy version
 # 预期: v2.8+
 ```
+
+> ⚠️ **Caddy v2.8+ Host 头行为变更**：新版 Caddy 修改了 HTTPS 后端的默认 Host 头转发行为。
+> 为确保 code-server、Portainer 等后端正确识别请求来源，在 Caddyfile 中每个反代块都需要显式声明：
+> ```caddy
+> code.yourdomain.com {
+>     reverse_proxy localhost:8080 {
+>         header_up Host {host}
+>     }
+> }
+> ```
+> 详细配置见迁移方案步骤 4 的 Caddyfile。
 
 ### 第 6 层：Cloudflare Tunnel（cloudflared）
 
@@ -325,12 +395,13 @@ soffice --headless --version
 | 12 | code-server | install.sh | Web IDE | 迁移方案步骤 5 |
 | 13 | Python 3 + pip3 | apt | TTS 推理 + 文档库 | 安装完 |
 | 14 | docker-socket-proxy | Docker pull | Docker API 权限隔离 | 迁移方案步骤 6 |
-| 15 | Python 文档库 | pip3 | Word/Excel/PPT/PDF 生成与读取（含 pdfplumber/markitdown） | 安装完 |
-| 16 | .NET SDK 8.0 | apt (MS repo) | minimax-docx 专业文档 | 需要时 |
-| 17 | pptxgenjs | npm -g | PPT 生成 skill | 需要时 |
-| 18 | LibreOffice headless | apt | 格式转换桥（≈500MB） | 按需装 |
+| 15 | Diun | Docker pull | Docker 镜像更新通知（替代已归档的 Watchtower） | 迁移方案步骤 6 |
+| 16 | Python 文档库 | pip3 | Word/Excel/PPT/PDF 生成与读取（含 pdfplumber/markitdown） | 安装完 |
+| 17 | .NET SDK 8.0 | apt (MS repo) | minimax-docx 专业文档 | 需要时 |
+| 18 | pptxgenjs | npm -g | PPT 生成 skill | 需要时 |
+| 19 | LibreOffice headless | apt | 格式转换桥（≈500MB） | 按需装 |
 
-**注意**：1-14 层属于「预检阶段」就要装好的——系统基础 + 安全 + 容器运行时。15-18 层可按需补装（Python 文档库建议预装，很小）。
+**注意**：1-14 层属于「预检阶段」就要装好的——系统基础 + 安全 + 容器运行时。15-19 层可按需补装（Python 文档库 + Diun 建议预装，很小）。
 
 ---
 
@@ -409,6 +480,18 @@ check "8b. WeasyPrint 系统库"
 for lib in libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0; do
     dpkg -l "$lib" 2>/dev/null | grep -q "^ii" && green "$lib" || warn "$lib 未安装"
 done
+
+check "8c. 容器非 root 运行检查"
+if command -v docker >/dev/null 2>&1; then
+    ROOT_CONTAINERS=$(docker ps -q 2>/dev/null | xargs docker inspect --format '{{.Name}}: User={{.Config.User}}' 2>/dev/null | grep -E 'User=$|User=root|User=0' || true)
+    if [ -z "$ROOT_CONTAINERS" ]; then
+        green "所有容器指定了非 root 用户"
+    else
+        warn "以下容器以 root 运行: $ROOT_CONTAINERS"
+    fi
+else
+    warn "Docker 未安装（跳过容器安全检查）"
+fi
 
 check "9. 运行时依赖"
 command -v node >/dev/null 2>&1 && green "Node.js $(node -v)" || red "Node.js 未安装"
@@ -518,6 +601,9 @@ curl -fsSL https://code-server.dev/install.sh | sh
 echo "=== 第 10 层: docker-socket-proxy 镜像预拉 ==="
 docker pull tecnativa/docker-socket-proxy
 
+echo "=== 第 10-A 层: Diun 镜像预拉（替代已归档的 Watchtower） ==="
+docker pull crazymax/diun:latest
+
 echo "=== 第 11 层: Python 文档库 ==="
 pip3 install --break-system-packages \
   python-docx openpyxl pandas python-pptx \
@@ -621,10 +707,82 @@ echo "如果版本都正常 → 进迁移方案 v3"
 | code-server 版本 <4.99.4 | install.sh 拉的不是最新 | 手动下载 deb 包安装 |
 | Docker socket 权限拒绝 | jarvis 不在 docker 组 | `sudo usermod -aG docker jarvis && newgrp docker` |
 | fail2ban 不封 IP | sshd filter 不匹配 | `sudo fail2ban-client status sshd` 看日志 |
+| 容器更新后服务挂了 | 自动更新未加防护 | Diun 只通知不更新（本手册第4-A层）——手动确认后再更新 |
 
 ---
 
-## 九、文档索引
+## 九、Tailscale + Cloudflare Tunnel 分工对照
+
+两种通道**互补而非竞争**，部署后按以下规则使用：
+
+| 场景 | 走哪条 | 原因 |
+|------|--------|------|
+| 公网访问 Control UI / WebChat | CF Tunnel (`jarvis.xxx.com`) | 自动 SSL + CF Access 保护 |
+| 公网访问 code-server / Portainer | CF Tunnel (`code.xxx.com`) | CF Access 做 SSO 认证层 |
+| 公网访问 Nextcloud / Lsky Pro | CF Tunnel (`drive.xxx.com`) | CF WAF + 速率限制 |
+| SSH 远程管理服务器 | **Tailscale** (`100.x.x.x`) | 低延迟、密钥认证、不暴露公网 |
+| 数据库直连（调试时） | **Tailscale** | 不走公网、不经过反代 |
+| Syncthing 设备配对 | **Tailscale** | 比 CF Tunnel 更快更安全 |
+| 文件传输（scp/rsync） | **Tailscale** | 大文件直传不走 CF 带宽 |
+| Docker 管理 API | **Tailscale** | Portainer 通过 Caddy 走公网也行，但管理操作走私网更安全 |
+
+> **原则**：Web 服务走 CF Tunnel（用户友好），管理操作走 Tailscale（安全私密）。
+> 不要用 Tailscale IP 裸端口访问 Web 服务——统一入口，避免「A 路径能用 B 路径不行」的诡异问题。
+
+## 十、自部署服务选型备注
+
+### Immich（图片/视频管理）
+
+> 2025 社区共识：Immich 已成为自托管照片管理的绝对主流（Google Photos 替代第一名）。
+> Nextcloud Photos/Memories 体验差距明显。
+
+**建议**：
+- 如果手机照片/视频备份是刚需 → 部署 **Immich**（AI 人脸识别、对象检测、地图视图、移动端 App）
+- 如果只是文档同步 + 偶尔看图 → Nextcloud 足够
+- 两者可以共存，Immich 内存占用约 800MB（含 ML），8核32G 完全无压力
+
+```bash
+# Immich 快速安装（详见 https://immich.app/docs/install/docker-compose）
+# 通过 Docker Compose 部署，与现有服务无冲突
+# 数据目录: /mnt/data/docker-volumes/immich/
+```
+
+### Syncthing 配对建议
+
+首次设备配对**通过 Tailscale IP 进行**（不走 CF Tunnel，比公网更快更安全）：
+
+```bash
+# 1. 确认两台设备都在 Tailscale 网络中
+# 2. 在服务器端获取设备 ID
+syncthing --device-id
+# 3. 在客户端添加远程设备时使用 Tailscale IP（如 100.x.x.x），而非公网域名
+```
+
+## 十一、镜像安全建议
+
+### 锁定镜像 Digest
+
+所有 `docker-compose.yml` 中的镜像应固定 digest 而非使用 `:latest` 标签：
+
+```yaml
+# ❌ 不推荐（每次 pull 可能拉不同版本）
+image: portainer/portainer-ce:latest
+
+# ✅ 推荐（锁定精确版本）
+image: portainer/portainer-ce:2.27.1@sha256:abc123...
+```
+
+获取 digest：
+```bash
+docker pull portainer/portainer-ce:2.27.1
+docker inspect portainer/portainer-ce:2.27.1 --format '{{.RepoDigests}}'
+```
+
+> 定期用 trivy 扫描（安全体系 L7）确保锁定版本无已知漏洞，配合 Diun 通知有新版本可用时手动升级。
+
+---
+
+## 十二、文档索引
 
 | 你要找 | 路径 |
 |--------|------|
@@ -634,4 +792,5 @@ echo "如果版本都正常 → 进迁移方案 v3"
 | 🧹 回收机制设计 v2.0（独立成册） | `docs/贾维斯中枢-Mark2-回收机制设计.md` |
 | 🖥️ 开发工作台设计 v2.2（独立成册） | `docs/贾维斯中枢-Mark2-开发工作台设计.md` |
 | 迁移方案 v3（部署指引） | `docs/plans/2026-06-15-服务器迁移方案-v3.md` |
-| 本手册（部署启动） | `docs/贾维斯中枢-Mark2-部署启动手册.md` |
+| 📋 外部审查建议（本次修订依据） | `docs/plans/2026-06-15-Mark2外部审查建议.md` |
+| 本手册（部署启动 v2.2） | `docs/贾维斯中枢-Mark2-部署启动手册.md` |
