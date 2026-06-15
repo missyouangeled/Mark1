@@ -7,6 +7,204 @@
 
 ---
 
+## 零、实际部署第一步：目标设备摸底扫描
+
+> ⚠️ **本章是整个部署流程的真正起点。任何跳过本章的部署都是盲飞。**
+
+正式开始部署之前，必须先对目标设备做一次完整的摸底扫描。不要假设「8核32G 就是 8核32G」——实际到手可能是虚拟化缩水的 vCPU、磁盘 IOPS 不如预期、系统预装了奇怪的服务。**先看再动。**
+
+### 扫描目标（五项必须拿到）
+
+| 类别 | 要搞清楚什么 | 为什么重要 |
+|------|-------------|-----------|
+| **设备性能** | CPU 型号/核心数/频率、内存总量/可用、磁盘容量/类型/IOPS、网卡带宽 | 决定 Docker 资源上限、服务数量、ZFS 是否可行 |
+| **操作系统** | 发行版+版本号、内核版本、架构（x86_64/arm64）、已运行时间 | 决定包管理方式、内核特性可用性（如 eBPF/AppArmor） |
+| **已有服务** | 哪些端口被占用、哪些服务在跑、哪些用户存在 | 避免端口冲突、清理不需要的预装服务 |
+| **依赖现状** | curl/wget/git/docker 等是否已装、版本是否达标 | 决定从哪一层开始安装，省掉重复劳动 |
+| **网络环境** | 出站是否通畅、DNS 是否正常、镜像拉取速度、IPv4/IPv6 | 国内云厂商差异巨大，提前知道免得后面卡住 |
+
+### 一键摸底脚本
+
+把以下脚本保存为 `scan-target.sh`，上传到目标设备，`bash scan-target.sh` 一次性跑完。
+
+```bash
+#!/bin/bash
+# Mark2 目标设备摸底扫描脚本
+# 用途：在任何部署动作之前，先搞清楚这台机器到底是什么情况
+
+OUT="target-scan-$(date +%Y%m%d-%H%M%S).txt"
+exec > >(tee "$OUT") 2>&1
+
+echo "========================================="
+echo "  Mark2 目标设备摸底扫描"
+echo "  时间: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+echo "========================================="
+
+# ── 1. 设备性能 ──
+echo ""
+echo "========== 1. 设备性能 =========="
+echo "--- CPU ---"
+nproc
+echo "CPU 型号:"
+lscpu | grep "Model name" | sed 's/Model name:[[:space:]]*//'
+lscpu | grep -E "^CPU\(s\)|Thread|Core|Socket|MHz"
+echo "虚拟化类型:"
+systemd-detect-virt 2>/dev/null || cat /sys/hypervisor/type 2>/dev/null || echo "未知"
+
+echo ""
+echo "--- 内存 ---"
+free -h
+
+echo ""
+echo "--- 磁盘 ---"
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,ROTA
+# ROTA=1=机械盘, ROTA=0=SSD
+df -h
+echo "磁盘 IOPS 粗略测试（100MB dd）:"
+dd if=/dev/zero of=/tmp/mark2-scan-test bs=1M count=100 oflag=dsync 2>&1 | grep -E "copied|MB/s"
+rm -f /tmp/mark2-scan-test
+
+echo ""
+echo "--- 网卡 ---"
+ip -br addr 2>/dev/null || ip addr | grep -E "^[0-9]:"
+echo "带宽探测（如有 speedtest-cli）:"
+speedtest-cli --simple 2>/dev/null || echo "speedtest-cli 未安装，跳过"
+
+# ── 2. 操作系统 ──
+echo ""
+echo "========== 2. 操作系统 =========="
+echo "--- 发行版 ---"
+cat /etc/os-release 2>/dev/null || cat /etc/*release 2>/dev/null | head -10
+echo ""
+echo "--- 内核 ---"
+uname -a
+echo "--- 架构 ---"
+uname -m
+echo "--- 已运行时间 ---"
+uptime
+
+# ── 3. 已有服务 ──
+echo ""
+echo "========== 3. 已有服务与端口 =========="
+echo "--- 监听端口 ---"
+ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null
+echo ""
+echo "--- 运行中的 systemd 服务（非系统级） ---"
+systemctl list-units --type=service --state=running | grep -vE "systemd|dbus|polkit|cron|journal|logind|networkd|resolved|timesyncd" | head -20
+echo ""
+echo "--- 现有用户 ---"
+awk -F: '$3>=1000 && $3<65534 {print $1, "UID="$3, "HOME="$6}' /etc/passwd
+
+# ── 4. 依赖现状 ──
+echo ""
+echo "========== 4. 依赖现状 =========="
+check_cmd() {
+    if command -v "$1" &>/dev/null; then
+        ver=$("$@" --version 2>/dev/null | head -1)
+        echo "✅ $1: 已安装 → $ver"
+    else
+        echo "❌ $1: 未安装"
+    fi
+}
+check_cmd curl
+check_cmd wget
+check_cmd git
+check_cmd node
+check_cmd npm
+check_cmd python3
+check_cmd pip3
+check_cmd docker
+check_cmd caddy
+check_cmd cloudflared
+check_cmd fail2ban-server
+check_cmd ss
+check_cmd nft
+check_cmd ufw
+
+# Docker 详情（如有）
+if command -v docker &>/dev/null; then
+    echo ""
+    echo "Docker 详细信息:"
+    docker version --format '{{.Server.Version}}' 2>/dev/null || echo "Docker daemon 未运行"
+    docker info --format 'Docker Root: {{.DockerRootDir}}, Storage: {{.Driver}}' 2>/dev/null
+fi
+
+# ── 5. 网络环境 ──
+echo ""
+echo "========== 5. 网络环境 =========="
+echo "--- DNS ---"
+cat /etc/resolv.conf | grep -v "^#"
+echo ""
+echo "--- 出站连通性 ---"
+for target in "google.com" "github.com" "registry-1.docker.io" "hub.docker.com"; do
+    if timeout 5 curl -sI "https://$target" >/dev/null 2>&1; then
+        echo "✅ $target 可达"
+    else
+        echo "❌ $target 不可达"
+    fi
+done
+echo ""
+echo "--- Docker 镜像拉取速度测试 ---"
+timeout 30 docker pull alpine:latest 2>&1 | tail -3 || echo "Docker 未安装或拉取超时"
+echo ""
+echo "--- 公网 IP ---"
+curl -s4 ifconfig.me 2>/dev/null && echo " (IPv4)" || echo "IPv4 获取失败"
+curl -s6 ifconfig.me 2>/dev/null && echo " (IPv6)" || echo "IPv6 不可用或未配置"
+
+# ── 6. 安全现状 ──
+echo ""
+echo "========== 6. 安全现状 =========="
+echo "--- 防火墙 ---"
+sudo ufw status 2>/dev/null || echo "ufw 未安装或未启用"
+echo ""
+echo "--- AppArmor ---"
+sudo aa-status 2>/dev/null | head -5 || echo "AppArmor 未安装"
+echo ""
+echo "--- SSH 配置摘要 ---"
+grep -E "^(PermitRootLogin|PasswordAuthentication|PubkeyAuthentication|AllowUsers|Port)" /etc/ssh/sshd_config 2>/dev/null || echo "sshd_config 未找到"
+echo ""
+echo "--- 已安装的安全更新 ---"
+apt list --installed 2>/dev/null | grep -i security | head -5 || echo "无法获取"
+
+echo ""
+echo "========================================="
+echo "  扫描完成。结果已保存到: $OUT"
+echo "========================================="
+
+# 生成摘要 JSON（可选，方便脚本解析）
+cat > "target-scan-summary.json" << JSONEOF
+{
+  "scan_time": "$(date -Iseconds)",
+  "hostname": "$(hostname)",
+  "cpu_cores": $(nproc),
+  "cpu_model": "$(lscpu | grep 'Model name' | sed 's/Model name:[[:space:]]*//')",
+  "memory_total_gb": "$(free -g | awk '/^Mem/{print $2}')",
+  "disk_root_gb": "$(df -BG / | awk 'NR==2{print $2}' | tr -d 'G')",
+  "arch": "$(uname -m)",
+  "os": "$(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)",
+  "kernel": "$(uname -r)",
+  "virt": "$(systemd-detect-virt 2>/dev/null || echo 'unknown')",
+  "public_ipv4": "$(curl -s4 ifconfig.me 2>/dev/null || echo 'N/A')"
+}
+JSONEOF
+echo "JSON 摘要已保存到: target-scan-summary.json"
+```
+
+### 扫描后做什么
+
+1. **对照本手册第二节「环境预检清单」**，逐项确认扫描结果是否符合预期
+2. **如有偏差**：
+   - CPU/内存缩水 → 调整 Docker Compose 中的资源限制（`cpus`/`mem_limit`）
+   - 磁盘是机械盘（ROTA=1）→ 放弃 ZFS，用 ext4；调整 IO 密集型服务
+   - 出站不通 GitHub/Docker Hub → 先配镜像加速器，再继续
+   - 端口被占用 → `sudo ss -tlnp` 查是谁，确认能否关掉
+   - 已有 Docker 旧版本 → 先 `sudo apt purge` 干净再装新版
+3. **确认全部满足后**，才进入下一节「前置确认」和「环境预检清单」
+
+> 📋 扫描结果文件 `target-scan-*.txt` 和 `target-scan-summary.json` 应随部署日志一起归档到 `/mnt/data/backups/deploy-logs/`
+
+---
+
 ## ⚠️ 部署前重要声明
 
 **本手册是设计蓝图，不是一成不变的教条。**
@@ -26,6 +224,8 @@
 ```
 你在这里  →  📋 本手册（预检 + 依赖）
                 │
+                ├─ 0. 先跑目标设备摸底扫描（零章）
+                ├─ 1. 前置确认通过
                 ├─ 2. 环境预检全通过
                 │
                 ▼
