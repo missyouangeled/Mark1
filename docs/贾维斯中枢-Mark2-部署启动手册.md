@@ -22,6 +22,10 @@
             docs/贾维斯中枢安全体系设计.md
                 │
                 ▼
+            🧹 贾维斯中枢回收机制设计 v2.0（七层智能回收）
+            docs/贾维斯中枢-Mark2-回收机制设计.md
+                │
+                ▼
             🚀 Mark2 上线
 ```
 
@@ -147,7 +151,8 @@ sudo apt install -y \
   ca-certificates gnupg lsb-release \
   software-properties-common apt-transport-https \
   build-essential pkg-config \
-  libssl-dev ffmpeg
+  libssl-dev ffmpeg pandoc \
+  libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
 ```
 
 ### 第 2 层：安全包
@@ -260,13 +265,53 @@ docker pull tecnativa/docker-socket-proxy
 # 容器的启动在迁移方案步骤 6 中做
 ```
 
+### 第 11 层：Python 文档库（Web→PDF / Word / Excel / PPT）
+
+```bash
+# 文档生成三件套 + PDF 三件套 + 文档读取
+pip3 install --break-system-packages \
+  python-docx openpyxl pandas python-pptx \
+  weasyprint reportlab pikepdf pdfplumber \
+  "markitdown[pptx]"
+```
+
+### 第 12 层：.NET SDK 8.0（minimax-docx 专业文档 skill）
+
+```bash
+# 来自 Microsoft 官方仓库
+wget https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
+sudo dpkg -i /tmp/packages-microsoft-prod.deb
+sudo apt update
+sudo apt install -y dotnet-sdk-8.0
+
+dotnet --version
+# 预期: 8.0.x
+```
+
+### 第 13 层：pptxgenjs（PPT 生成 skill）
+
+```bash
+# Node.js 22 已装，直接全局安装
+sudo npm install -g pptxgenjs
+```
+
+### 第 14 层：LibreOffice headless（格式转换桥，按需装）
+
+```bash
+# ≈500MB，按需装。不装也能用 WeasyPrint + Pandoc 覆盖 90% 场景
+sudo apt install -y libreoffice-impress libreoffice-calc
+
+# 验证
+soffice --headless --version
+```
+
 ---
 
 ## 四、依赖安装总结表
 
 | 序号 | 组件 | 安装方式 | 用途 | 启动时机 |
 |------|------|---------|------|---------|
-| 1 | 系统基础 | apt | curl/wget/git/vim/build-essential/ffmpeg | 立即 |
+| 1 | 系统基础 | apt | curl/wget/git/vim/build-essential/ffmpeg/pandoc/weasyprint-devs | 立即 |
 | 2 | ufw | apt | 防火墙 | 安装后启用 |
 | 3 | fail2ban | apt | SSH 防爆破 | 安装后启用 |
 | 4 | auditd | apt | 关键文件变更监控 | 安装后启用 |
@@ -278,10 +323,14 @@ docker pull tecnativa/docker-socket-proxy
 | 10 | cloudflared | apt (CF repo) | CF Tunnel | 迁移方案步骤 4 |
 | 11 | Tailscale | install.sh | Mesh VPN | 安装后登录 |
 | 12 | code-server | install.sh | Web IDE | 迁移方案步骤 5 |
-| 13 | Python 3 | apt | TTS 推理 | 安装完 |
+| 13 | Python 3 + pip3 | apt | TTS 推理 + 文档库 | 安装完 |
 | 14 | docker-socket-proxy | Docker pull | Docker API 权限隔离 | 迁移方案步骤 6 |
+| 15 | Python 文档库 | pip3 | Word/Excel/PPT/PDF 生成 | 安装完 |
+| 16 | .NET SDK 8.0 | apt (MS repo) | minimax-docx 专业文档 | 需要时 |
+| 17 | pptxgenjs | npm -g | PPT 生成 skill | 需要时 |
+| 18 | LibreOffice headless | apt | 格式转换桥（≈500MB） | 按需装 |
 
-**注意**：1-8 层属于「预检阶段」就要装好的——系统基础 + 安全 + 容器运行时。9-14 层可以等预检全绿后再装，也可以一起装。
+**注意**：1-14 层属于「预检阶段」就要装好的——系统基础 + 安全 + 容器运行时。15-18 层可按需补装（Python 文档库建议预装，很小）。
 
 ---
 
@@ -349,11 +398,16 @@ echo "  当前用户: $(whoami)"
 id | grep -q "sudo" && green "sudo 权限正常" || red "无 sudo 权限"
 
 check "8. 已安装依赖"
-for cmd in curl wget git vim htop ffmpeg; do
+for cmd in curl wget git vim htop ffmpeg pandoc; do
     command -v $cmd >/dev/null 2>&1 && green "$cmd" || red "$cmd 未安装"
 done
 for cmd in ufw fail2ban-client auditctl; do
     command -v $cmd >/dev/null 2>&1 && green "$cmd" || warn "$cmd 未安装（等依赖安装阶段补）"
+done
+
+check "8b. WeasyPrint 系统库"
+for lib in libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0; do
+    dpkg -l "$lib" 2>/dev/null | grep -q "^ii" && green "$lib" || warn "$lib 未安装"
 done
 
 check "9. 运行时依赖"
@@ -365,6 +419,14 @@ command -v tailscale >/dev/null 2>&1 && green "Tailscale 已安装" || warn "Tai
 command -v code-server >/dev/null 2>&1 && \
   green "code-server $(code-server --version | head -1)" || warn "code-server 未安装"
 command -v python3 >/dev/null 2>&1 && green "Python $(python3 --version)" || warn "Python3 未安装"
+
+check "9b. 文档处理依赖"
+command -v dotnet >/dev/null 2>&1 && green "dotnet $(dotnet --version 2>/dev/null)" || warn ".NET SDK 未安装（minimax-docx skill 需要时补）"
+command -v npx >/dev/null 2>&1 && npx pptxgenjs --version 2>/dev/null && green "pptxgenjs" || warn "pptxgenjs 未安装（按需补）"
+python3 -c "import weasyprint" 2>/dev/null && green "weasyprint" || warn "weasyprint 未安装"
+python3 -c "import openpyxl" 2>/dev/null && green "openpyxl" || warn "openpyxl 未安装"
+python3 -c "import docx" 2>/dev/null && green "python-docx" || warn "python-docx 未安装"
+command -v soffice >/dev/null 2>&1 && green "LibreOffice headless" || warn "LibreOffice 未安装（按需补，≈500MB）"
 
 check "10. Docker Engine 版本（CVE 检查）"
 if command -v docker >/dev/null 2>&1; then
@@ -413,7 +475,8 @@ echo "=== 第 1 层: 系统基础 ==="
 sudo apt update
 sudo apt install -y curl wget git vim htop ca-certificates gnupg lsb-release \
   software-properties-common apt-transport-https build-essential pkg-config \
-  libssl-dev ffmpeg python3 python3-pip python3-venv
+  libssl-dev ffmpeg pandoc python3 python3-pip python3-venv \
+  libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
 
 echo "=== 第 2 层: 安全包 ==="
 sudo apt install -y ufw fail2ban auditd unattended-upgrades
@@ -455,6 +518,25 @@ curl -fsSL https://code-server.dev/install.sh | sh
 echo "=== 第 9 层: docker-socket-proxy 镜像预拉 ==="
 docker pull tecnativa/docker-socket-proxy
 
+echo "=== 第 10 层: Python 文档库 ==="
+pip3 install --break-system-packages \
+  python-docx openpyxl pandas python-pptx \
+  weasyprint reportlab pikepdf pdfplumber \
+  "markitdown[pptx]"
+
+echo "=== 第 11 层: .NET SDK 8.0（minimax-docx） ==="
+wget https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb \
+  -O /tmp/packages-microsoft-prod.deb
+sudo dpkg -i /tmp/packages-microsoft-prod.deb
+sudo apt update
+sudo apt install -y dotnet-sdk-8.0
+
+echo "=== 第 12 层: pptxgenjs（PPT 生成） ==="
+sudo npm install -g pptxgenjs
+
+echo "=== 第 13 层: LibreOffice headless（格式转换，≈500MB，按需） ==="
+sudo apt install -y libreoffice-impress libreoffice-calc
+
 echo ""
 echo "=========================================="
 echo "依赖全装完。验证一下版本："
@@ -465,6 +547,9 @@ caddy version
 cloudflared --version
 code-server --version | head -1
 python3 --version
+dotnet --version 2>/dev/null || echo "dotnet 未装（如需后补）"
+pandoc --version | head -1
+soffice --headless --version 2>/dev/null || echo "LibreOffice 未装（按需补）"
 echo ""
 echo "如果版本都正常 → 进迁移方案 v3"
 ```
@@ -491,8 +576,8 @@ echo "如果版本都正常 → 进迁移方案 v3"
 ├─ 第 4 层：网关层      ← Caddy + CF Tunnel + 子域名路由
 │   (迁移方案步骤 3-4)
 │
-├─ 第 5 层：开发工作台  ← code-server + 插件 + 远程驱动 + 外部预览
-│   (独立设计: docs/贾维斯中枢-Mark2-开发工作台设计.md)
+├─ 第 5 层：开发工作台  ← code-server + 插件 + 文档处理依赖 + 远程驱动 + 外部预览
+│   (独立设计: docs/贾维斯中枢-Mark2-开发工作台设计.md v2.1)
 │
 ├─ 第 6 层：Docker 服务 ← Portainer + Nextcloud + Syncthing + 其他
 │   (迁移方案步骤 6 + 8)
@@ -544,6 +629,6 @@ echo "如果版本都正常 → 进迁移方案 v3"
 | 服务器能力推演 | `docs/plans/2026-06-15-8核32G服务器能力推演.md` |
 | 🛡️ 安全体系设计（独立成册） | `docs/贾维斯中枢安全体系设计.md` |
 | 🧹 回收机制设计 v2.0（独立成册） | `docs/贾维斯中枢-Mark2-回收机制设计.md` |
-| 🖥️ 开发工作台设计 v1.0（独立成册） | `docs/贾维斯中枢-Mark2-开发工作台设计.md` |
+| 🖥️ 开发工作台设计 v2.1（独立成册） | `docs/贾维斯中枢-Mark2-开发工作台设计.md` |
 | 迁移方案 v3（部署指引） | `docs/plans/2026-06-15-服务器迁移方案-v3.md` |
 | 本手册（部署启动） | `docs/贾维斯中枢-Mark2-部署启动手册.md` |
