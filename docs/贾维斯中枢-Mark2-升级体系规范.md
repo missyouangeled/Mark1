@@ -19,6 +19,141 @@
 
 ---
 
+## 第〇章：故障处理五步闭环流程（Troubleshooting SOP）
+
+> ⚠️ **这是所有故障处理的铁律，不得跳步。**
+> 升级后**任何**失效、异常、报错、回归问题，一律按此流程执行。
+
+### 流程总览
+
+```
+Step 1: 联网搜索 → Step 2: 审查问题 → Step 3: 修复 → Step 4: 烟测 → Step 5: 审查结果
+                                                                        ↑                    ↓
+                                                                        └── 有问题就回到 Step 1 ──┘
+```
+
+循环终止条件：**Step 5 确认完全没问题**。只要还有任何残留问题，就继续循环。
+
+### Step 1：联网搜索相关信息
+
+**做什么**：
+- 用版本号 + 错误关键词搜索（如"OpenClaw 2026.6.6 static files 404"）
+- 搜索 OpenClaw GitHub Issues / Changelog / Release Notes
+- 搜索上游构建工具（Rolldown/Vite）相关变更
+- 搜索同类用户的报障帖子
+
+**为什么先搜索**：
+- 很多问题是已知的，别人可能已经修过
+- 避免在错误方向浪费时间
+- 可能发现官方有 breaking change 说明
+
+**搜索优先级**：
+1. OpenClaw GitHub Releases（查看版本 changelog）
+2. OpenClaw GitHub Issues（搜索相同报错）
+3. 搜索引擎（版本号 + 错误信息）
+4. dist 目录 diff（对比新旧版本的文件结构变化）
+
+### Step 2：审查问题
+
+**做什么**：
+- 确认问题的**准确范围**：是什么坏了、什么还正常
+- 确认问题的**根因**：是配置错误、代码变化、还是依赖问题
+- 区分**新问题** vs **历史回归**：对比升级记录看是否旧病复发
+- 对比新旧版本的 **dist/ 目录结构 diff**：文件是否增减、改名、拆分
+- 检查 **HTTP 可达性**：哪些路径 200、哪些 404
+- 检查 **服务状态**：所有 systemd unit 的 LoadState/ActiveState/UnitFileState
+
+**输出物**：
+- 一句话根因描述
+- 受影响范围清单（哪些功能坏了）
+- 未受影响范围清单（哪些还正常，避免过度修复）
+
+### Step 3：修复
+
+**做什么**：
+- 针对根因做最小化修复（不要顺便改不相关的东西）
+- 如果涉及路径/配置变化，必须同步更新所有引用该路径的脚本
+- 如果上游 API/结构有 breaking change，优先对齐上游新规范，不做 hack
+
+**修复原则**：
+- 先修 Critical（核心功能不可用），再修 High（用户体验受损），最后修 Medium/Low
+- 每个修复都应该是可回滚的（改什么记什么）
+- 修复代码后立即执行 `node --check` 或 Python 语法检查
+
+### Step 4：烟测（Smoke Test）
+
+**做什么**：
+- 对修复的每一项做最小验证：能跑了、不报错了、功能正常了
+- 运行完整自检：`python3 scripts/openclaw-post-upgrade-self-check.py --force --print-human`
+- 如果涉及 Control UI：浏览器实际打开页面，确认能加载、品牌正常、模型可选
+- 历史回归点专项验证：对比升级记录中的旧问题是否也被重新触发
+
+### Step 5：审查结果
+
+**做什么**：
+- 自检是否**全部 PASS**（除已知限制外）
+- 有没有引入**新问题**（修复一个问题同时制造另一个）
+- 用户实际使用场景是否正常
+
+**判断标准**：
+- 全部 required 项 PASS → 闭环结束
+- 还有 FAIL → 回到 Step 1，重新搜索、审查、修复
+- 不确定某项是否正常 → 先验证，再判断
+
+### 循环案例：升级 #3 中的实际应用
+
+```
+[问题] 升级后自检发现 live_control_ui_markers FAIL
+  → Step 1: 搜索 "OpenClaw 2026.6.6 Rolldown module splitting"
+  → Step 2: 审查发现 dist/ 结构从单体 bundle 变为多 chunk，chatRunning 不再在 index-*.js 中
+  → Step 3: （此轮判定为 Medium 优先级，先修 Critical 的静态文件 404）
+  → Step 4: 静态文件修复后验证 HTTP 200，自检 25/26 PASS
+  → Step 5: 审查确认 chatRunning marker 失效是架构级变化导致，不是配置错误
+             需单独设计模块级注入方案（新建子任务）
+             核心功能全部正常 → 此轮闭环，chatRunning 标记为已知限制
+```
+
+---
+
+## 补丁注入项说明
+
+升级过程中涉及的几个自定义前端补丁的功能说明：
+
+### JarvisProjectYieldedHistoryReply
+
+**作用**：当后台分身（sub-agent / sessions_spawn）返回结果时，把 yield 状态的 tool result 消息**投影为正常聊天回复气泡**。
+
+**工作方式**：
+1. 扫描消息历史中最后一条用户消息之后的所有消息
+2. 如果用户消息后面没有正常的 assistant 回复
+3. 则检查 tool result 消息是否包含 `{"status":"yielded","message":"..."}` 格式的 payload
+4. 如果找到，提取 message 内容，生成一个假的 assistant 消息气泡嵌入聊天流
+
+**失效影响**：
+- 分身产出的「已移交」结果**不会自动显示为聊天回复气泡**
+- 用户可能在聊天界面看不到分身已完成的工作
+- 核心消息**不会丢失**——tool result 本身仍在消息流中，只是不渲染为格式化的 assistant 回复
+- 属于**UX 增强层**，不影响系统核心功能
+
+### JarvisShouldShowPendingReadingIndicator
+
+**作用**：判断是否需要显示「等待阅读」指示器。当 session 有 active run 或刚结束，且最后一条用户消息后面只有 tool 消息而没有 assistant 可见回复时，显示一个视觉提示。
+
+**失效影响**：
+- 失去「还有内容在处理中 / 等待阅读」的视觉提示
+- 消息仍然正常流式传输，只是不显示 pending 指示器
+- 属于**UX 增强层**，不影响消息投递和显示
+
+### 总结
+
+| 补丁项 | 类型 | 失效影响 | 严重级别 |
+|---|---|---|---|
+| JarvisProjectYieldedHistoryReply | 分身产出投影 | 分身结果不自动渲染为聊天气泡 | 🟡 Medium |
+| JarvisShouldShowPendingReadingIndicator | 等待阅读指示器 | 失去 pending 视觉提示 | 🟢 Low |
+| Branding 覆写（标题/logo/infos-handle） | 品牌 + 健康状态 | 页面标题恢复默认，健康面板打不开 | 🟠 High |
+
+---
+
 ## 第一章：升级前必做（Pre-Upgrade）
 
 ### 1.1 版本信息收集
@@ -167,7 +302,7 @@ python3 scripts/test-infos-handle-frontstage-callers.py
 | openclaw-health-collector.timer | enabled + active |
 | openclaw-task-scheduler.timer | enabled + active |
 | openclaw-lifecycle-maintainer.timer | enabled + active |
-| openclaw-resume-watch.timer | enabled + active |
+| openclaw-resume-watch.timer | disabled（用户明确要求不启用，见 2026-06-15） |
 | openclaw-infos-handle-sidecar.service | active + running |
 | openclaw-unified-proxy.service | active + running |
 

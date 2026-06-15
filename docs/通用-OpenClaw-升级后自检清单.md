@@ -32,7 +32,7 @@
 4. **infos-handle sidecar live 链仍正常**
 5. **统一入口 proxy verify 仍正常**
 6. **frontstage-guardian 测试通过**（替代旧 recovery-watch）
-7. **5 个 watcher timer 处于 enabled+active**：health-collector(60s) / task-scheduler(60s) / guardian(20s) / lifecycle-maintainer(5min) / resume-watch(60s)
+7. **4 个 watcher timer 处于 enabled+active**：health-collector(60s) / task-scheduler(60s) / guardian(20s) / lifecycle-maintainer(5min)（resume-watch 用户明确要求不启用）
 8. **sidecar / unified proxy service 仍 active**
 9. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
 10. **耗时基线验证通过**：所有子检查含 elapsedMs

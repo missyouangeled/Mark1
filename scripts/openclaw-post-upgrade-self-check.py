@@ -441,7 +441,8 @@ def build_report(force: bool = False) -> dict[str, Any]:
         checks.append(check_timer("openclaw-health-collector.timer"))
         checks.append(check_timer("openclaw-task-scheduler.timer"))
         checks.append(check_lifecycle_maintainer())
-        checks.append(check_timer("openclaw-resume-watch.timer"))
+        # resume-watch 用户明确要求不启用（2026-06-15）
+        checks.append(make_check("openclaw-resume-watch.timer", True, "用户要求不启用，跳过", required=False))
     ok = all(item.get("ok") for item in checks if item.get("required", True)) if checks else True
 
     summary = "未检测到版本变化，本轮跳过升级后自检。"

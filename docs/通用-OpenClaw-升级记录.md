@@ -584,6 +584,8 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 
 **修复**：`systemctl --user enable openclaw-resume-watch.timer`
 
+**更正（2026-06-15）**：用户明确指示 resume-watch timer **不要启用**。已 `systemctl --user disable --now openclaw-resume-watch.timer`。该 timer 的作用是检测休眠恢复自动重启 Gateway，用户判断不需要此自动行为。
+
 #### 问题 3：chatRunning marker 注入失效（待解决）
 
 **根因**：2026.6.6 采用了 Rolldown 模块拆分架构，原先的单体 `index-*.js` bundle 不再包含 `chatRunning` 字符串。chat 相关逻辑可能已分散到 `gateway-runtime`、`config-runtime` 等模块 chunk 中。
