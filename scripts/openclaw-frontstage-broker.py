@@ -1089,9 +1089,9 @@ def publish_frontstage_status(payload: dict[str, Any]) -> dict[str, Any]:
 
     control_ui_dist_root = resolve_control_ui_dist_root()
     if control_ui_dist_root:
-        public_html = control_ui_dist_root / PUBLIC_STATUS_HTML_NAME
-        public_status_json = control_ui_dist_root / PUBLIC_STATUS_JSON_NAME
-        public_snapshot_json = control_ui_dist_root / PUBLIC_SNAPSHOT_JSON_NAME
+        public_html = control_ui_dist_root / "assets" / PUBLIC_STATUS_HTML_NAME
+        public_status_json = control_ui_dist_root / "assets" / PUBLIC_STATUS_JSON_NAME
+        public_snapshot_json = control_ui_dist_root / "assets" / PUBLIC_SNAPSHOT_JSON_NAME
         record_publication_result(published, warnings, "frontstageStatusHtml", public_html, lambda: save_text(public_html, html))
         record_publication_result(published, warnings, "frontstageStatusJson", public_status_json, lambda: save_json(public_status_json, payload))
         record_publication_result(published, warnings, "frontstageSnapshotJson", public_snapshot_json, lambda: save_json(public_snapshot_json, payload))

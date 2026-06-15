@@ -24,7 +24,7 @@ REPORT_PATH = STATE_DIR / "last-report.json"
 DEFAULT_PACKAGE_JSON = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "package.json"
 BRANDING_CONF = Path.home() / ".config" / "systemd" / "user" / "openclaw-gateway.service.d" / "branding.conf"
 CONTROL_UI_DIST = Path.home() / ".npm-global" / "lib" / "node_modules" / "openclaw" / "dist" / "control-ui"
-CONTROL_UI_OVERRIDE = CONTROL_UI_DIST / "jarvis-branding-override.js"
+CONTROL_UI_OVERRIDE = CONTROL_UI_DIST / "assets" / "jarvis-branding-override.js"
 INFOS_HANDLE_SCRIPT = WORKSPACE / "scripts" / "openclaw-infos-handle.py"
 INFOS_HANDLE_TEST = WORKSPACE / "scripts" / "test-openclaw-infos-handle.py"
 INFOS_HANDLE_CALLERS_TEST = WORKSPACE / "scripts" / "test-infos-handle-frontstage-callers.py"
@@ -128,7 +128,7 @@ def check_live_control_ui_markers() -> dict[str, Any]:
     ok = (
         "JarvisProjectYieldedHistoryReply" in asset_text
         and "JarvisShouldShowPendingReadingIndicator" in asset_text
-        and '"snapshotJsonHref": "/jarvis-frontstage-snapshot.json"' in override_text
+        and '"snapshotJsonHref": "/__openclaw__/control-ui/assets/jarvis-frontstage-snapshot.json"' in override_text
     )
     detail = (
         f"关键前端补丁标记齐全：{asset_path.name}"

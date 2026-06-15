@@ -205,7 +205,7 @@ def replace_once(text: str, pattern: str, replacement: str, *, flags: int = 0, d
 def inject_head_block(html: str, version: str) -> str:
     block = (
         f"{INJECT_MARKER_START}\n"
-        f'    <script src="./{SCRIPT_NAME}?v={version}"></script>\n'
+        f'    <script src="./assets/{SCRIPT_NAME}?v={version}"></script>\n'
         f"    {INJECT_MARKER_END}"
     )
     existing = re.compile(
@@ -431,10 +431,10 @@ def write_override_script(
             "label": "前台状态",
             "title": "前台状态总览",
             "description": "查看 broker / 监工 / 恢复观察 / 本地健康",
-            "href": "/jarvis-frontstage-status.html",
-            "snapshotJsonHref": "/jarvis-frontstage-snapshot.json",
-            "legacyStatusJsonHref": "/jarvis-frontstage-status.json",
-            "statusJsonHref": "/jarvis-frontstage-status.json",
+            "href": "/__openclaw__/control-ui/assets/jarvis-frontstage-status.html",
+            "snapshotJsonHref": "/__openclaw__/control-ui/assets/jarvis-frontstage-snapshot.json",
+            "legacyStatusJsonHref": "/__openclaw__/control-ui/assets/jarvis-frontstage-status.json",
+            "statusJsonHref": "/__openclaw__/control-ui/assets/jarvis-frontstage-status.json",
             "infosHandleBaseUrl": infos_handle_base_url,
             "infosHandleSummaryHref": infos_handle_summary_href,
             "infosHandleContractHref": infos_handle_contract_href,
@@ -1389,7 +1389,7 @@ def main() -> int:
     html = inject_head_block(html, version)
     index_html_path.write_text(html, encoding="utf-8")
 
-    override_script_path = dist_root / SCRIPT_NAME
+    override_script_path = dist_root / "assets" / SCRIPT_NAME
     write_override_script(
         override_script_path,
         brand_title=brand_title,

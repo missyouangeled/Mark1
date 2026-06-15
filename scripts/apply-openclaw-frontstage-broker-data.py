@@ -129,10 +129,10 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     payload["infosHandleRecoveryHref"] = infos_handle_recovery_href
     payload["effectiveJsonHref"] = effective_json_href
     payload["statusPageHref"] = status_page_href
-    payload["snapshotFirst"] = effective_json_href == "/jarvis-frontstage-snapshot.json"
+    payload["snapshotFirst"] = "/assets/jarvis-frontstage-snapshot.json" in (effective_json_href or "")
     payload["infosHandleDirectReady"] = bool(infos_handle_summary_href and infos_handle_contract_href)
-    payload["legacyStatusAliasMarked"] = legacy_status_json_href == "/jarvis-frontstage-status.json" or (
-        bool(snapshot_json_href) and status_json_href == "/jarvis-frontstage-status.json"
+    payload["legacyStatusAliasMarked"] = "/assets/jarvis-frontstage-status.json" in (legacy_status_json_href or "") or (
+        bool(snapshot_json_href) and "/assets/jarvis-frontstage-status.json" in (status_json_href or "")
     )
     payload["usesNormalizeFrontstageSnapshot"] = "function normalizeFrontstageSnapshot" in script_text
     payload["usesInfosHandleSse"] = "function connectHealthDockSse" in script_text and "new EventSource(href)" in script_text
@@ -158,8 +158,8 @@ def inspect_live_frontstage_publication() -> dict[str, object]:
     if not dist_root:
         return payload
 
-    snapshot_path = dist_root / "jarvis-frontstage-snapshot.json"
-    legacy_status_path = dist_root / "jarvis-frontstage-status.json"
+    snapshot_path = dist_root / "assets" / "jarvis-frontstage-snapshot.json"
+    legacy_status_path = dist_root / "assets" / "jarvis-frontstage-status.json"
     payload["snapshotJsonPath"] = str(snapshot_path)
     payload["legacyStatusJsonPath"] = str(legacy_status_path)
     payload["snapshotJsonExists"] = snapshot_path.exists()
