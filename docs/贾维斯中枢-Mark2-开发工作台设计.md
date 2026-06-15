@@ -1,7 +1,7 @@
 # 🖥️ Mark2 — 开发工作台与环境设计 v1.0
 
 > 创建：2026-06-15
-> 状态：v1.2（三大领域工作流补全：网页/图片/视频）
+> 状态：v2.0（架构交叉审查 + 三领域详细设计）
 > 适用范围：中枢服务器（Ubuntu 24.04）
 > 原则：环境隔离 → 直接可用 → 远程驱动 → 外部可验
 
@@ -388,182 +388,546 @@ sessions_spawn(task=task, taskName=f"dev-{project_name}", mode="run")
 端口表写入 /srv/projects/.ports.json，重启后清理。
 ```
 
-### 5.6 网页开发专用流
+---
 
-> **定位**：从用户一句话到网站上线，全流程自动化。
+## 五-A、架构交叉审查（v2.0 新增）
+
+> **审查方法**：将 L3 开发工作台放到 Mark2 七层架构中，逐一交叉检查依赖、冲突、缺口。
+
+### 审查矩阵
 
 ```
-触发示例：
-  "帮我做一个公司官网，蓝色系，有首页/产品/联系"
-  "把 portfolio 页面改成暗色模式"
-  "基于这个设计稿，做一个落地页"
+  L1 — Caddy 网关
+  L2 — 贾维斯核心 (OpenClaw Gateway)
+  L3 — 开发工作台 ★ 本层
+  L4 — Docker 服务 (Nextcloud / Syncthing / DB)
+  L5 — Merge VPN (Tailscale)
+  L6 — 数据备份
+  L7 — 安全防护
+  🧹 — 回收机制 (横向)
+```
+
+| 交叉层 | 审查项 | 状态 | 分析 |
+|--------|--------|------|------|
+| L3 ↔ L1 | code-server 反代路由 | ✅ | Caddy → `code.xxx.com` → :8080，已在迁移方案 v3 步骤 4 配置 |
+| L3 ↔ L1 | 开发预览路由 | ✅ | Caddy → `dev.xxx.com/*` → 各项目端口，6.4 节已设计 |
+| L3 ↔ L1 | Vite HMR WebSocket | ✅ | Caddy 默认支持 WebSocket 升级，HMR 经反代可直通 |
+| L3 ↔ L1 | cloudflared 隧道 | ✅ | 零配置临时隧道，5.6 节网页自检链路已对接 |
+| L3 ↔ L2 | `sessions_spawn` 开分身 | ✅ | 网页大工程走后台分身；图片走主会话轻量调 |
+| L3 ↔ L2 | 监工回报 | ✅ | `auto + taskActive=true`，子 Agent 卡住/完成自动回报前台 |
+| L3 ↔ L2 | `image_generate` 工具调用 | ✅ | 主会话直接调，LiteLLM → Agnes API，已在 5.7 节设计 |
+| L3 ↔ L2 | `exec` 调用 ffmpeg/构建 | ✅ | 构建命令通过 exec 跑，大视频 >500MB 走后台分身 |
+| L3 ↔ L4 | 数据库服务 | ⚠️ | 如项目需要 PostgreSQL/Redis，走 Docker Compose 部署（L4 层），不在 L3 裸机装 |
+| L3 ↔ L4 | 图床存储 | ⚠️ | 生成的图片如需长期托管，对接 Lsky Pro（L4 Docker）而不是留在 `/srv/projects/` |
+| L3 ↔ L5 | Tailscale 内网预览 | ✅ | 方案 C：`npm run preview --host 0.0.0.0` → 另一台设备 `http://100.x.x.1:5173` |
+| L3 ↔ L6 | `/srv/projects/` Git 备份 | ✅ | 每个项目独立 Git，push 到 GitHub 私有仓库 |
+| L3 ↔ L6 | 图片输出备份 | ⚠️ 缺口 | 生成的图片暂存在 `outputs/`，需纳入备份策略或定期清理 |
+| L3 ↔ L6 | 视频下载持久化 | ⚠️ 缺口 | 下载的视频放 `/mnt/data/video-outputs/`，需明确保留/清理策略 |
+| L3 ↔ L7 | code-server 认证 | ✅ | 强密码 + CF Access 双重保护，8.4 节已设计 |
+| L3 ↔ L7 | 终端权限 | ✅ | jarvis 用户运行，sudo 需密码，/srv/projects/ 被 auditd 监控 |
+| L3 ↔ L7 | 对外暴露的项目安全 | ⚠️ 缺口 | 若项目含 API/表单/XSS 漏洞，经 CF Tunnel 暴露后会被利用 → 默认只开预览，不做长期生产部署 |
+| L3 ↔ 🧹 | 构建产物清理 | ✅ | node_modules/dist 膨胀 → 回收机制 L3 负责 |
+| L3 ↔ 🧹 | 图片生成累积 | ⚠️ 缺口 | image/outputs/ 无限增长 → 回收机制需增加「超过 N 天未引用的图片自动清理」| 
+| L3 ↔ 🧹 | 视频下载累积 | ⚠️ 缺口 | downloads/ + outputs/ 持续增长 → 回收机制需增加「`cleanup-old-video.sh`」规则 |
+| L3 ↔ 🧹 | node_modules bloat | ⚠️ 缺口 | 多个项目各自 `node_modules/`，累计可达 GB → 回收机制 L3 应增加「`node_modules` 超过阈值告警」|
+
+### 审查结论
+
+```
+✅ 无阻塞缺口 — 可进入详细设计
+⚠️ 4 个待补：DB 对接 / 图床对接 / 安全暴露面 / 文件累积回收
+📋 三领域详细设计 → 5.6 / 5.7 / 5.8
+```
+
+---
+
+### 5.6 网页开发详细设计
+
+> **搜索确认（2025-2026）**：TailwindCSS v4 于 2025-01 发布，改用 CSS-first 配置（`@import "tailwindcss"`），不再需要 `tailwind.config.js`。Vue3 + Vite + Tailwind v4 是当前主流轻量栈。VS Code 1.121（2026-05）内置远程 Agent 支持，验证了远程开发的行业方向。
+
+#### 技术栈固化
+
+| 组件 | 版本要求 | 用途 |
+|------|---------|------|
+| Vue 3 | ≥3.5 | 组件框架（Composition API + `<script setup>`） |
+| Vite | ≥6 | 构建工具 + 开发服务器 |
+| TailwindCSS | ≥4 | 原子化 CSS 框架（CSS-first 配置） |
+| TypeScript | ≥5.5 | 类型安全（可选，默认不强制） |
+| vue-router | ≥4 | SPA 路由 |
+| Pinia | ≥2 | 状态管理（按需引入） |
+
+#### TailwindCSS v4 适配（关键）
+
+```bash
+# v4 安装方式（不需要 tailwind.config.js）
+npm install tailwindcss @tailwindcss/vite
+
+# vite.config.ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [vue(), tailwindcss()]
+})
+```
+
+```css
+/* src/style.css — v4 用 CSS 导入替代 JS 配置文件 */
+@import "tailwindcss";
+
+/* 自定义主题色（v4 语法） */
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+}
+```
+
+#### 标准项目搭建命令（子 Agent 自动执行）
+
+```bash
+# Step 1: 脚手架
+npm create vite@latest my-project -- --template vue-ts
+cd /srv/projects/web/my-project
+
+# Step 2: 核心依赖
+npm install
+npm install vue-router pinia
+npm install tailwindcss @tailwindcss/vite
+
+# Step 3: 开发工具
+npm install -D eslint prettier eslint-plugin-vue
+
+# Step 4: 启动开发
+npm run dev -- --host 0.0.0.0
+```
+
+#### 目录结构规范
+
+```
+/srv/projects/web/<project>/
+├── index.html              # 入口 HTML
+├── vite.config.ts          # Vite 配置（含 tailwindcss 插件）
+├── tsconfig.json           # TS 配置
+├── package.json             # 依赖声明
+│
+├── public/                  # 静态资源（不经过构建）
+│   ├── favicon.svg
+│   └── images/              # AI 生成的图片落地处
+│       └── hero.webp
+│
+└── src/
+    ├── main.ts              # 应用入口
+    ├── App.vue               # 根组件
+    ├── style.css             # 全局样式（@import "tailwindcss"）
+    ├── router/
+    │   └── index.ts          # 路由配置
+    ├── pages/                # 页面组件
+    │   ├── Home.vue
+    │   ├── About.vue
+    │   └── Contact.vue
+    ├── components/           # 复用组件
+    │   ├── Header.vue
+    │   ├── Footer.vue
+    │   ├── HeroSection.vue
+    │   └── Card.vue
+    ├── composables/          # 组合式函数（hooks）
+    │   └── useTheme.ts
+    └── assets/               # 需要构建处理的资源
+        └── logo.svg
+```
+
+#### 子 Agent 工作流（完整版）
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ Step 1: 需求解析                                                   │
+│   ├─ 项目名: company-site                                         │
+│   ├─ 页面: Home / About / Products / Contact                     │
+│   ├─ 配色: blue-600 主色 / slate-800 深色 / white 背景           │
+│   └─ 特性: 响应式 / SEO 友好 / 暗色模式                           │
+│                                                                   │
+│ Step 2: 脚手架搭建                                                 │
+│   npm create vite@latest → vue-ts 模板                            │
+│   装依赖 → 改 vite.config.ts 加 Tailwind v4 插件                  │
+│   建目录结构 → 配路由                                              │
+│                                                                   │
+│ Step 3: 逐组件生成（每个组件分步验证）                              │
+│   写 Header.vue → npm run dev → web_fetch 截图验证                │
+│   写 HeroSection.vue → 同上                                       │
+│   写页面组件 → Card → Footer                                     │
+│   ⚠️ 每完成一个页面截图验证，不全写完才发现问题                     │
+│                                                                   │
+│ Step 4: 集成 & 自查                                                │
+│   npm run build（必须零错误）                                      │
+│   vite preview → 本地自检 URL 可达                                │
+│   检查 404 页面是否存在                                            │
+│                                                                   │
+│ Step 5: 预览管道                                                   │
+│   cloudflared tunnel --url http://localhost:5173                  │
+│   → https://xxx.trycloudflare.com → 回报用户                      │
+│   web_fetch + image → 贾维斯远程截图确认                           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### 前端设计集成
+
+贾维斯已有 `frontend-design` skill（`~/.openclaw/workspace/skills/frontend-design-3/`），子 Agent 任务中启用：
+
+```bash
+# 子 Agent 写组件时调用 frontend-design skill 生成高质量 UI
+# 产出物直接落到 src/components/ 和 src/pages/
+# 风格参考: 现代简约 / 玻璃拟态 / 暗色模式 / 粗野主义
+```
+
+#### 质量门禁
+
+| 门禁 | 标准 | 工具 |
+|------|------|------|
+| 构建 | `npm run build` 零错误 | Vite build |
+| 类型 | `vue-tsc --noEmit` 通过 | TypeScript |
+| Lint | `eslint .` 无 error | ESLint + plugin-vue |
+| 预览可达 | `web_fetch(url)` 返回 200 | 贾维斯工具 |
+| 视觉检查 | `image(url)` 截图确认渲染 | 贾维斯工具 |
+
+#### 常见网页需求模板
+
+| 需求类型 | 模板代码位置 | 预估量 |
+|---------|-------------|--------|
+| 公司官网 | 4 页 SPA（Home/About/Products/Contact） | ~800 行 |
+| 落地页 | 单页长滚动，Hero + Features + CTA | ~300 行 |
+| 个人主页 | 单页卡片式，头像 + 技能 + 项目 | ~200 行 |
+| 产品展示 | 列表 + 详情页，筛选/搜索 | ~600 行 |
+| 暗色模式 | 所有页面自动支持，CSS 变量切换 | ~50 行额外 |
+
+### 5.7 图片生成详细设计（AI 文生图 / 图生图）
+
+> **搜索确认**：LiteLLM 的 `image_generation()` 支持多 provider 统一调用（OpenAI DALL-E、RunwayML、ModelsLab、Agnes 等），通过 OpenAI 兼容格式路由。Mark2 当前管线 `litellm/agnes-image-2.1-flash` 符合行业主流通用网关模式。
+
+#### 当前管线详情
+
+```
+调用链：
+  image_generate(prompt, model, size, ...)
+    → OpenClaw 工具层
+      → LiteLLM 通道 (provider=litellm)
+        → Agnes API 网关 (apihub.agnes-ai.com/v1)
+          → agnes-image-2.1-flash 模型
+            → 返回图片 URL/路径
+
+关键配置（openclaw.json → models.providers.litellm）：
+  api_base: https://apihub.agnes-ai.com/v1
+  api_key: 已写入 litellm provider
+
+可用模型：
+  agnes-image-2.0-flash   → 速度优先
+  agnes-image-2.1-flash   → 质量优先（当前默认）
+  agnes-1.5-flash         → 快速原型
+  agnes-2.0-flash         → 平衡版
+  agnes-video-v2.0        → 视频生成
+```
+
+#### 工作流决策树
+
+```
+你的消息
+│
+├─ "生成一张 X 风格的 Y"
+│   → 文生图
+│   → image_generate(prompt, size/aspectRatio, outputFormat)
+│   → 几秒出图 → MEDIA 发你
+│
+├─ "把这张图改成 Z 效果"（附带图片）
+│   → 图生图
+│   → image_generate(prompt, image="path/to/photo.jpg")
+│   → 基于原图编辑 → MEDIA 发你
+│
+├─ "给网站生成 Hero 图 / 首页横幅 / 图标"
+│   → 文生图 + 落地集成
+│   → image_generate → 存入 public/images/
+│   → 自动在代码中写 <img> 引用
+│   → npm run build → 预览网址包含新图
+│
+├─ "批量生成同一主题 N 张变体"
+│   → count=4 → 一次调 4 张
+│   → 或 for 循环 4 次（每次微调 prompt）
+│
+└─ "这张图不符合预期，调整 XXX"
+    → 修改 prompt → 重新生成
+    → 原图保存到 outputs/ 备查
+```
+
+#### Prompt 工程规则
+
+```yaml
+# 贾维斯自动注入的质量增强规则（Mark2 内部策略，用户无感）
+
+文生图 prompt 结构:
+  subject: "一只黑猫"                              # 📍 主体
+  style: "赛博朋克风格，霓虹灯，雨夜城市背景"        # 🎨 风格
+  quality: "高细节，4K，电影级光照"                 # 📐 质量
+  technical: "居中构图，f/2.8"                      # 🔧 技术
+
+图生图 prompt 约束:
+  - 必须说明"保留主体和构图"
+  - 只描述要修改的部分，不要说主体特征
+  - 例：✅ "色调改为暖金色电影风格"
+        ❌ "一只黑猫，暖色调"（会改变主体）
+```
+
+#### 图片落地与引用
+
+```
+生成后自动执行的收尾流程：
+
+  1. 命名规范
+     生成时间戳 → 2026-06-15-hero-banner.png
+     语义化           → website-hero-cyberpunk-v1.png
+
+  2. 存放位置
+     网站项目  → /srv/projects/web/<project>/public/images/
+     独立图片  → /srv/projects/image/outputs/
+
+  3. 代码引用（网站项目）
+     <img src="/images/hero-banner.webp" alt="Hero Banner" />
+     贾维斯自动写 lazy loading + width/height
+
+  4. 格式转换（如需）
+     # PNG → WebP（网页用，体积小 70%）
+     ffmpeg -i out.png -quality 85 out.webp
+
+  5. 透明背景
+     background="transparent" + outputFormat="png"
+     用于 logo / 贴纸 / 叠加素材
+```
+
+#### 批量生成策略
+
+```python
+# 场景 1: 同一个角色 N 种表情（一次性批量）
+image_generate(
+    prompt="...8张不同表情的同一个角色，网格排列",
+    count=4  # 一次出 4 张，两次出完
+)
+
+# 场景 2: 同一页面 N 个不同位置的图（逐个生成）
+# Hero 横幅 → aspectRatio="16:9"
+# 卡片配图 → size="1024x1024"
+# 背景纹理 → aspectRatio="1:1"
+# 每一张 prompt 不同，尺寸不同，逐个调
+
+# 场景 3: 迭代优化（不满意 → 改 prompt → 重新生成）
+# 保留原图到 outputs/archive/
+# 新图覆盖原位置
+# 文件名加 v2/v3 后缀区分
+```
+
+#### 质量验收流程
+
+```
+生成后贾维斯自动检查：
+  1. 图片文件存在 + 大小 > 0
+  2. 格式正确（png/webp/jpeg）
+  3. 加载验证（web_fetch 图片 URL 返回 200）
+  4. 如果是网站项目：build 后确认 img 标签引用正确
+  5. 回报用户：「生成完成，共 N 张 → 预览地址 xxx」
+```
+
+### 5.8 视频处理详细设计
+
+> **搜索确认**：FFmpeg 自动化最佳实践 → 队列化处理、CPU 核心数匹配进程数、文件 I/O 与转码分离。单用户场景不需要分布式队列，直接调用即可。大文件转码建议限制 CPU 使用（`-threads` 参数）。
+
+#### 工具链版本锁定
+
+| 工具 | 安装方式 | 验证命令 |
+|------|---------|---------|
+| FFmpeg | `sudo apt install ffmpeg` | `ffmpeg -version` |
+| FFprobe | （随 FFmpeg 安装） | `ffprobe -version` |
+| yt-dlp | `pip install yt-dlp` 或 `sudo apt install yt-dlp` | `yt-dlp --version` |
+| download-platform-video.py | Mark1 脚本，同步到 Mark2 `scripts/` | `python3 scripts/download-platform-video.py --help` |
+
+#### 常用操作完整命令集
+
+```bash
+# ===== 信息查看 =====
+ffprobe -v quiet -print_format json -show_format -show_streams input.mp4
+# 提取关键字段: duration / bit_rate / width / height / codec_name
+
+# ===== 转码 (H.264 兼容性最好) =====
+# 1080p 高质量
+ffmpeg -i input.mp4 -c:v libx264 -crf 23 -preset medium \
+  -c:a aac -b:a 128k -movflags +faststart output.mp4
+
+# 720p 小体积
+ffmpeg -i input.mp4 -c:v libx264 -crf 28 -preset fast \
+  -vf scale=-1:720 -c:a aac -b:a 96k output.mp4
+
+# 极致压缩（Web 优化）
+ffmpeg -i input.mp4 -c:v libx264 -crf 32 -preset veryslow \
+  -c:a aac -b:a 64k -movflags +faststart output.mp4
+
+# ===== 剪辑 =====
+# 截取片段（从 30s 开始，取 10s）
+ffmpeg -ss 00:00:30 -i input.mp4 -t 00:00:10 -c copy output.mp4
+
+# 精确剪辑（重新编码，无关键帧漂移）
+ffmpeg -ss 00:00:30 -i input.mp4 -t 00:00:10 \
+  -c:v libx264 -crf 23 -c:a aac output.mp4
+
+# ===== 帧提取 =====
+# 每 N 秒一帧
+ffmpeg -i input.mp4 -vf "fps=1/10" frames/frame_%04d.png
+
+# 缩略图网格（NxM）
+ffmpeg -i input.mp4 -vf "fps=1/10,scale=320:-1,tile=5x4" thumbnails.jpg
+
+# 提取封面帧（第 5 秒）
+ffmpeg -ss 5 -i input.mp4 -vframes 1 -q:v 2 cover.jpg
+
+# ===== 合并 =====
+# 先创建文件列表 filelist.txt（每行: file 'xxx.mp4'）
+ffmpeg -f concat -safe 0 -i filelist.txt -c copy merged.mp4
+
+# ===== 音频 =====
+# 提取音频
+ffmpeg -i input.mp4 -vn -c:a aac -b:a 192k audio.aac
+
+# 替换音频
+ffmpeg -i video.mp4 -i audio.aac -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output.mp4
+
+# ===== 格式转换 =====
+# WebM（VP9）→ 网页最优
+ffmpeg -i input.mp4 -c:v libvpx-vp9 -crf 30 -b:v 0 -c:a libopus output.webm
+
+# GIF 动图（短视频片段）
+ffmpeg -ss 10 -i input.mp4 -t 3 \
+  -vf "fps=10,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+  output.gif
+
+# ===== 硬字幕 =====
+ffmpeg -i input.mp4 -vf "subtitles=subtitle.srt" output.mp4
+```
+
+#### 转码参数速查
+
+| 参数 | 含义 | 推荐值 |
+|------|------|--------|
+| `-crf` | 质量系数（越小越好） | 23（高清）/ 28（小体积）/ 18（近乎无损） |
+| `-preset` | 编码速度 | medium / fast / veryslow |
+| `-threads` | CPU 线程数 | 服务器 CPU 核心数的 75%（8核→6线程）|
+| `-movflags +faststart` | Web 渐进式加载 | 网页视频一律加 |
+| `-c copy` | 无损复制流 | 不需重编码时优先用（秒级完成）|
+
+#### 下载平台视频
+
+```bash
+# YouTube / B站 / 通用平台
+cd /mnt/data/video-outputs/downloads/
+yt-dlp -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]" '<URL>'
+
+# 抖音（Mark1 已验管线）
+python3 ~/.openclaw/workspace/scripts/download-platform-video.py \
+  --pick=first '<分享文案或视频URL>'
+
+# 只列候选、不下（先确认）
+python3 ~/.openclaw/workspace/scripts/download-platform-video.py \
+  --list-only '搜索关键词'
+
+# 批量下载（从候选文件）
+python3 ~/.openclaw/workspace/scripts/download-platform-video.py \
+  --input-file tmp/candidates.txt --pick=first
+```
+
+#### 大文件处理策略
+
+```
+视频大小         策略
+────────────────────────────────────────
+<100MB           主会话 exec 直接跑
+100MB-500MB      主会话跑，告知用户等待
+>500MB           sessions_spawn 后台分身跑
+                 
+                 子 Agent 启动时：
+                 1. 先 free -h + df -h 检查资源
+                 2. 输出写入 /mnt/data/video-outputs/
+                 3. 每 30s 刷新监工状态（进度）
+                 4. 完成后回报：「处理完成，文件在 xxx」
+
+AI 视频生成       特殊处理：
+                 image_generate(model="litellm/agnes-video-v2.0")
+                 预期 1-3 分钟，显式告知：「视频生成中，约 2 分钟...」
+                 走后台分身，不阻塞主会话
+```
+
+#### 输出规范
+
+```
+/mnt/data/video-outputs/
+├── downloads/           # 原始下载（保留至用户确认删除）
+│   └── douyin_xxx.mp4
+├── processed/            # 转码/剪辑后的输出
+│   ├── company-intro-1080p.mp4
+│   └── company-intro-720p.webm
+├── frames/               # 帧提取输出
+│   └── video_thumbnails.jpg
+├── archives/             # 处理完成的原始文件归档
+└── README.md             # 记录各文件用途和命令
+
+命名规范：
+  <来源>-<描述>-<规格>.<格式>
+  例: douyin-产品介绍-1080p-h264.mp4
+      bilibili-教程-帧提取-00.png
+```
+
+---
+
+### 5.9 跨领域集成：一次完整的「帮我做」
+
+> 一个真实场景：网页 + 图片 + 视频 三领域联动。
+
+```
+你说：
+"帮我做一个产品介绍落地页。产品是一款智能猫砂盆。
+ 需要 Hero 横幅图、产品配图 3 张、
+ 还有一个产品介绍视频（30 秒的已有素材在我发的链接里）。
+ 配色用暖白+橙色。"
 
       │
       ▼
-┌──────────────────────────────────────────────────────┐
-│ 子 Agent 自动执行                                       │
-│                                                        │
-│  1. 初始化                                              │
-│     npm create vite@latest → Vue3 + TS 或 React + TS   │
-│     cd /srv/projects/web/<project>                      │
-│                                                        │
-│  2. 装依赖                                              │
-│     npm install                                         │
-│     npm i -D tailwindcss @tailwindcss/vite              │
-│     （Tailwind 默认配色体系，快速出视觉）                  │
-│                                                        │
-│  3. 写代码                                              │
-│     - 目录结构: src/{pages,components,assets,utils}/     │
-│     - 路由: vue-router / react-router                   │
-│     - 样式: Tailwind 原子类 + 自定义主题色                │
-│     - 组件: 贾维斯自动生成 Vue SFC / React JSX           │
-│                                                        │
-│  4. 自检                                                │
-│     npm run build（零错误才继续）                         │
-│     npm run lint（如有配置）                              │
-│                                                        │
-│  5. 预览                                                │
-│     npx vite preview --host 0.0.0.0 --port <port>       │
-│     cloudflared tunnel → 临时 URL                        │
-│                                                        │
-│  6. 回报                                                │
-│     "✅ <项目名> 已上线预览 → https://xxx.trycloudflare.com" │
-│     "共 N 个页面 / M 个组件 / 构建体积 X KB"              │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ 贾维斯主会话 → 拆解为 4 个子任务                                │
+│                                                                │
+│  ╔══════════════════════════════════════════════════════════╗ │
+│  ║ 子Agent A: 网页主体                                       ║ │
+│  ║  npm create vite → Vue3 + Tailwind v4 + 暖橙主题        ║ │
+│  ║  写 Home.vue（Hero区 + 产品特点区 + 视频区 + CTA区）     ║ │
+│  ║  占位图片来源: /images/ 目录（等图片子Agent产出后替换）    ║ │
+│  ╚══════════════════════════════════════════════════════════╝ │
+│                                                                │
+│  ╔══════════════════════════════════════════════════════════╗ │
+│  ║ 主会话: 图片生成（轻量，不开分身）                         ║ │
+│  ║  [1] Hero横幅: image_generate(                           ║ │
+│  ║        "智能猫砂盆产品Hero横幅，暖白+橙色，-16:9")        ║ │
+│  ║  [2] 配图×3: image_generate(count=3,                     ║ │
+│  ║        "智能猫砂盆产品展示图，不同角度")                   ║ │
+│  ║  → 全部落地到 public/images/                             ║ │
+│  ╚══════════════════════════════════════════════════════════╝ │
+│                                                                │
+│  ╔══════════════════════════════════════════════════════════╗ │
+│  ║ 子Agent B: 视频处理                                       ║ │
+│  ║  下载视频 → ffprobe 检查 → 截取30s精华 →                 ║ │
+│  ║  转码 1080p h264 + WebP 缩略图 → 输出到                 ║ │
+│  ║  public/videos/  → 视频嵌入网页                          ║ │
+│  ╚══════════════════════════════════════════════════════════╝ │
+│                                                                │
+│  ╔══════════════════════════════════════════════════════════╗ │
+│  ║ 收尾: 贾维斯主会话                                        ║ │
+│  ║  所有子完成 → npm run build → vite preview               ║ │
+│  ║  → cloudflared tunnel → 验证图片+视频都正常              ║ │
+│  ║  → 回报: "✅ 落地页已完成 → https://xxx.trycloudflare.com" ║ │
+│  ╚══════════════════════════════════════════════════════════╝ │
+└──────────────────────────────────────────────────────────────┘
 ```
-
-**技术栈选择规则**：
-
-| 场景 | 技术栈 | 理由 |
-|------|-------|------|
-| 通用网站/落地页 | Vue3 + Vite + Tailwind | 轻量、快、贾维斯最熟 |
-| 复杂交互/后台 | React + Vite + Tailwind | 生态丰富 |
-| 静态内容站 | 纯 HTML + Tailwind（零 JS 框架） | 极致轻量 |
-| 公司官网/展示 | Vue3 + Vite + Tailwind | 默认首选 |
-
-**前端设计能力**：贾维斯有 `frontend-design` skill，可生成高质量 UI。子 Agent 任务中可指定使用。
-
-### 5.7 图片生成专用流（AI 文生图 / 图生图）
-
-> **定位**：直接调用 `image_generate` 工具生成图片，不走外部 API 或第三方服务。
->
-> **当前管线**：`litellm/agnes-image-2.1-flash`（通过 LiteLLM 通道 → Agnes API 网关 `apihub.agnes-ai.com/v1`）
-> **可用模型**：`agnes-image-2.0-flash`、`agnes-image-2.1-flash`、`agnes-video-v2.0`、`agnes-1.5-flash`、`agnes-2.0-flash`
-
-```
-触发示例：
-  "帮我生成一张赛博朋克风格的猫"
-  "把这张照片的色调改成电影质感"
-  "给首页做一个 16:9 的 Hero 横幅图"
-
-      │
-      ▼
-┌──────────────────────────────────────────────────────┐
-│ 贾维斯主会话 / 子 Agent（轻量，不开分身）               │
-│                                                        │
-│  文生图：                                               │
-│    image_generate(                                      │
-│      prompt="赛博朋克风格的黑猫，霓虹灯，雨夜，4K",       │
-│      size="1024x1024",         或 aspectRatio="16:9",   │
-│      outputFormat="png"                                 │
-│    )                                                    │
-│    → 返回图片路径 → MEDIA 发给你                         │
-│                                                        │
-│  图生图：                                               │
-│    image_generate(                                      │
-│      prompt="保留人物和构图，色调改为电影级暖色",         │
-│      image="path/to/photo.jpg"                          │
-│    )                                                    │
-│    → 基于原图修改 → 返回新图                             │
-│                                                        │
-│  批量生成（多张）：                                      │
-│    image_generate(                                      │
-│      prompt="同一个角色 8 种情绪表情包",                 │
-│      count=4                                            │
-│    )                                                    │
-│    → 一次出 4 张                                        │
-└──────────────────────────────────────────────────────┘
-```
-
-**尺寸速查**：
-
-| 用途 | 参数 |
-|------|------|
-| 头像/Avatar | `size="1024x1024"` |
-| Hero 横幅 | `aspectRatio="16:9"` |
-| 手机海报 | `aspectRatio="9:16"` |
-| 宽屏壁纸 | `aspectRatio="21:9"` |
-| 方形贴纸 | `aspectRatio="1:1"` |
-
-**生成后的落地**：
-- 图片默认存入项目 `public/images/` 或 `assets/`
-- 贾维斯自动在代码中引用（`<img src="/images/hero.webp">`）
-- 如需透明背景：`background="transparent"` + `outputFormat="png"`
-
-> 📌 图片生成是轻量操作（几秒到十几秒），**不走分身**，主会话直接调 `image_generate`
-> 然后 MEDIA 贴给你。不像网页开发那样需要开子 Agent。
-
-### 5.8 视频处理专用流
-
-> **定位**：视频下载、剪辑、转码、帧提取。工具链已在 Mark1 验证，迁移到 Mark2。
-
-```
-触发示例：
-  "帮我把这个视频转成 MP4 1080p"
-  "从这个视频里提取每 10 秒一帧"
-  "下这个抖音视频然后截取封面"
-
-      │
-      ▼
-┌──────────────────────────────────────────────────────┐
-│ 贾维斯 / 子 Agent（大文件走分身）                       │
-│                                                        │
-│  工具链（系统级已安装）：                                │
-│    ffmpeg    → 转码、剪辑、合并、提取音频               │
-│    ffprobe   → 查看视频元信息（分辨率/码率/时长）        │
-│    yt-dlp    → 下载 YouTube/B站/其他平台               │
-│    scripts/download-platform-video.py → 抖音等短视频   │
-│                                                        │
-│  典型工作流：                                           │
-│    1. ffprobe input.mp4         → 了解源格式           │
-│    2. ffmpeg -i input.mp4 ...   → 转码/剪辑            │
-│    3. ffprobe output.mp4        → 验证输出             │
-│    4. 回报结果 + 文件路径                              │
-│                                                        │
-│  帧提取：                                               │
-│    ffmpeg -i video.mp4 -vf fps=1/10 frames/%04d.png    │
-│    → 每 10 秒一帧，输出到 frames/ 目录                  │
-│                                                        │
-│  下载抖音视频（Mark1 已验证管线）：                      │
-│    python3 scripts/download-platform-video.py \        │
-│      --pick=first '<视频URL>'                          │
-│    → 下载 + ffprobe 校验                                │
-│                                                        │
-│  AI 视频生成（实验性）：                                │
-│    image_generate(                                      │
-│      prompt="...",                                      │
-│      model="litellm/agnes-video-v2.0"                  │
-│    )                                                    │
-│    → 注：视频模型较慢，显式告知用户等待                   │
-└──────────────────────────────────────────────────────┘
-```
-
-**视频项目目录结构**：
-
-```
-/srv/projects/video/
-├── downloads/       # 下载的原始视频
-├── outputs/         # 处理后的输出
-├── frames/          # 帧提取输出
-├── scripts/         # 视频处理脚本
-└── README.md        # 记录常用命令
-```
-
-**边界规则**：
-- 大视频（>500MB）操作必须走 `sessions_spawn` 后台分身
-- 下载前检查数据盘剩余空间
-- 不自动删除原始文件（用户确认后删）
-- 视频输出写入 `/mnt/data/video-outputs/`，不占系统盘
 
 ---
 
@@ -825,6 +1189,11 @@ dev.yourdomain.com {
 | 9 | 图片生成不走分身 | image_generate 几秒到十几秒，开分身反而增加延迟 | 操作轻量 |
 | 10 | 视频下载输出放数据盘 | 视频文件大，不占系统盘；/mnt/data/video-outputs/ | 磁盘规划 |
 | 11 | 大视频操作后台分身 | >500MB 的转码/下载可能跑很久，不阻塞主会话 | 异步卸载协议 |
+| 12 | TailwindCSS v4 CSS-first 配置 | 2025-01 发布，不再需要 tailwind.config.js | 社区趋势 |
+| 13 | 网页组件逐页验证 | 每写完一个页面截图确认，不全写完才发现问题 | 质量闭环 |
+| 14 | Prompt 工程标准化 | 文生图4段结构（主体/风格/质量/技术） | 输出一致性 |
+| 15 | FFmpeg 限制 75% CPU 线程 | 避免转码把服务器打满影响其他服务 | 系统稳定性 |
+| 16 | 图片/视频累积 → 回收机制挂钩 | 见架构审查 ⚠️ 缺口，回收到 v2.1 时补 | 协同设计 |
 
 ---
 
@@ -848,6 +1217,9 @@ dev.yourdomain.com {
 | # | 问题 | 影响 |
 |---|------|------|
 | 1 | ~~需要装微信小程序开发工具吗？~~ → 已确认：uni-app CLI + H5 预览 + 手机扫码体验版 | ✅ 已写入 4.2.1 节 |
-| 2 | 是否需要 Playwright/Cypress 做 E2E 测试？ | 依赖体积较大 |
-| 3 | 项目是直接用 `npm create vite@latest`（每次都最新），还是固定模板？ | 开发一致性 |
-| 4 | 临时预览域名要不要绑到固定子域名（如 `preview.yourdomain.com`）？ | Caddy 配置 |
+| 2 | 是否需要 Playwright/Cypress 做 E2E 测试？当前默认只有构建+视觉自检 | 依赖体积 ~500MB，E2E 场景是否频繁？ |
+| 3 | 项目是直接用 `npm create vite@latest`（每次都最新），还是固定模板仓库？ | 开发一致性和可复现性 |
+| 4 | 临时预览域名要不要绑到固定子域名（如 `preview.yourdomain.com`）？ | Caddy 配置复杂度 |
+| 5 | 图片输出累积 → 回收机制需增加「超过 N 天未引用的图片自动清理」 | 🧹 回收机制 v2.1 补充 |
+| 6 | 视频下载累积 → 需明确视频保留策略（用户确认删 / 7天自动删 / 手动） | 🧹 回收机制 v2.1 补充 |
+| 7 | 项目如需 PostgreSQL/Redis：走 L4 Docker Compose 还是 SQLite 够用？ | 架构边界 L3↔L4 |
