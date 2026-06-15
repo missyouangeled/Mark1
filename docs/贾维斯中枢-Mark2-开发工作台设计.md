@@ -1,7 +1,7 @@
 # 🖥️ Mark2 — 开发工作台与环境设计 v1.0
 
 > 创建：2026-06-15
-> 状态：v2.0（架构交叉审查 + 三领域详细设计）
+> 状态：v2.1（+ 文档处理：Word/Excel/PPT/PDF 全链路设计 + 自查修复）
 > 适用范围：中枢服务器（Ubuntu 24.04）
 > 原则：环境隔离 → 直接可用 → 远程驱动 → 外部可验
 
@@ -430,13 +430,18 @@ sessions_spawn(task=task, taskName=f"dev-{project_name}", mode="run")
 | L3 ↔ 🧹 | 图片生成累积 | ✅ | 每批独立文件夹 + 容量阈值优先 + 7 天 TTL（5.7.1），回收到 v2.1 落脚本 |
 | L3 ↔ 🧹 | 视频下载累积 | ✅ | 同图片策略（5.8.1），回收到 v2.1 落脚本 |
 | L3 ↔ 🧹 | node_modules bloat | ⚠️ 缺口 | 多个项目各自 `node_modules/`，累计可达 GB → 回收机制 L3 应增加「`node_modules` 超过阈值告警」|
+| L3 ↔ L1 | 文档预览（PDF/图片） | ✅ | 生成的 PDF/图片经 Caddy 静态文件路由或 CF Tunnel 预览 |
+| L3 ↔ L4 | 文档长期归档 | ⚠️ | 合同/正式报告如需永久保留 → L4 Nextcloud；日常生成走 5.10.8 保留策略 |
+| L3 ↔ L7 | LibreOffice headless 安全 | ✅ | jarvis 用户运行，无网络端口暴露，攻击面极小 |
+| L3 ↔ L7 | 文档内容安全 | ✅ 已确认 | 生成的文档仅本地存储，经 CF Tunnel 预览后即弃；敏感文档不长期暴露 |
 
 ### 审查结论
 
 ```
-✅ 无阻塞缺口 — 7 项已确认解决
-⚠️ 1 项待补：node_modules 累计膨胀阈值告警 → 回收机制 v2.1 落脚本
-📋 三领域详细设计 → 5.6 / 5.7 / 5.8，已包含保留策略
+✅ 无阻塞缺口 — 11 项已确认解决
+⚠️ 2 项待补：node_modules 累计告警 + 文档长期归档（回收机制 v2.1 落脚本）
+📋 五领域详细设计 → 5.6 / 5.7 / 5.8 / 5.10，已包含保留策略
+📦 文档处理依赖分级 → 必装 ~200MB / 按需 ~700MB / 不建议 texlive
 ```
 
 ---
@@ -973,6 +978,361 @@ AI 视频生成       特殊处理：
 
 ---
 
+### 5.10 文档处理详细设计（Word / Excel / PPT / PDF）
+
+> **搜索确认（2025-2026）**：python-docx + openpyxl + python-pptx 是 Linux 服务端 Office 文档生成的 Python 三件套，生态成熟。PDF 路线以 WeasyPrint(HTML→PDF) + ReportLab(编程式) + pikepdf(操作) 为核心。LibreOffice headless 作为通用格式转换桥。Pandoc 是 Markdown → docx/pptx 最快的轻量通道。
+
+#### 5.10.1 技术选型矩阵
+
+| 文档类型 | 主力工具 | 语言/运行时 | 安装方式 | 适用场景 |
+|---------|---------|-----------|---------|---------|
+| **Word (DOCX)** | `minimax-docx` skill（已有） | C# / .NET 8 SDK | 部署手册需追加 .NET SDK | 专业排版、模板套用、公文/论文/合同 |
+| **Word (DOCX)** 快速 | `pandoc` + Markdown | Haskell (apt) | `sudo apt install pandoc` | 速写报告、笔记导出、不需要精细排版 |
+| **Word (DOCX)** 备选 | `python-docx` | Python 3.11 | `pip install python-docx` | 简单内容替换、数据填入表格 |
+| **Excel (XLSX)** | `openpyxl` | Python 3.11 | `pip install openpyxl` | 创建/修改/样式/图表 |
+| **Excel (XLSX)** 数据 | `pandas` | Python 3.11 | 已装 | 数据分析 + `df.to_excel()` 导出 |
+| **PPT (PPTX)** | `pptx-generator` skill（已有） | Node.js | 已装 Node | 从零创建、配色主题、专业幻灯片 |
+| **PPT (PPTX)** 备选 | `python-pptx` | Python 3.11 | `pip install python-pptx` | 模板编辑、批量替换 |
+| **PDF 生成** | `WeasyPrint` | Python 3.11 | `pip install weasyprint` + 系统库 | HTML/CSS → PDF，网页直接转 |
+| **PDF 编程** | `ReportLab` | Python 3.11 | `pip install reportlab` | 复杂布局、表格、条码、矢量图 |
+| **PDF 操作** | `pikepdf` | Python 3.11 | `pip install pikepdf` | 合并/拆分/旋转/提取/元数据 |
+| **格式转换桥** | `LibreOffice headless` | C++ (apt) | `sudo apt install libreoffice-impress libreoffice-calc` | docx↔pdf / pptx↔pdf / xlsx↔csv |
+| **Markdown 万能** | `pandoc` | Haskell (apt) | 同上 | md→docx/pptx，快速初稿 |
+| **文档读取** | `pdfplumber` | Python 3.11 | `pip install pdfplumber` | PDF 文本/表格提取 |
+| **文档读取** | `markitdown` | Python 3.11 | `pip install "markitdown[pptx]"` | PPTX/Word/Excel 文本提取 |
+
+#### 5.10.2 文档处理路由决策树
+
+```
+你的消息
+│
+├─ "帮我写一份Word报告/合同/公文"
+│   ├─ 专业排版（模板/固定格式/送去给别人的）
+│   │   → minimax-docx skill（已有）
+│   │   → 子 Agent 读 references/ → 选 AestheticRecipe → 写 C# → 验证 XSD → 输出
+│   │
+│   └─ 速写（笔记/草稿/自用）
+│       → Pandoc: Markdown → docx
+│       → 或 python-docx 填入内容
+│
+├─ "帮我做一份Excel报表/数据导出"
+│   ├─ 数据分析 + 图表 → pandas + openpyxl
+│   ├─ 纯数据表格 → openpyxl（合并单元格/条件格式/公式）
+│   └─ 超大文件(>100MB) → 子 Agent 后台跑
+│
+├─ "帮我做一个PPT/演示文稿"
+│   ├─ 从零创建（设计感要求高）
+│   │   → pptx-generator skill（已有）
+│   │   → 子 Agent 选配色 → 分 slide → 并发生成 → compile → QA
+│   │
+│   └─ 基于模板/编辑现有
+│       → python-pptx 读模板 → 替换文本/图片
+│
+├─ "帮我生成一个PDF"
+│   ├─ 从网页/HTML → WeasyPrint（CSS 精确控制）
+│   ├─ 复杂报表/发票 → ReportLab（编程式布局）
+│   └─ 从 docx/pptx 转 → LibreOffice headless --convert-to pdf
+│
+├─ "把这份 docx 转成 PDF/合并这几份 PDF"
+│   → LibreOffice headless（docx→pdf）
+│   → pikepdf（合并/拆分/旋转）
+│
+└─ "读一下这份文档的内容"
+    ├─ docx → python-docx 读段落/表格 / markitdown 提取全文
+    ├─ pptx → python-pptx 或 markitdown 提取文本
+    ├─ pdf  → pdfplumber 提取文本+表格（首选）/ pikepdf 读元数据
+    └─ xlsx → openpyxl 或 pandas 读取
+```
+
+#### 5.10.3 Word / DOCX 详细设计
+
+```
+两条子路由：
+
+  📋 子 Agent 自动选择规则：
+     │ 用户说「正式/合同/公文/论文/模板/排版」→ minimax-docx
+     │ 用户说「帮我写份报告」（无格式要求）→ Pandoc Markdown
+     │ 用户说「把这份 Word 里的 XXX 改成 YYY」→ python-docx
+     │ 子 Agent 不确定 → 默认走 Pandoc（最轻量，不装 .NET 也能用）
+
+ 🅰️ minimax-docx（专业管线，已有 skill）
+   适用：正式报告、合同、公文、论文、需要固定模板格式
+   
+   子 Agent 工作流：
+     1. bash scripts/env_check.sh                    → 确认 .NET SDK 就绪
+     2. 分析用户需求 → 选 Pipeline (A/B/C)
+     3. 读对应 references/scenario_*.md
+     4. 选 AestheticRecipe（如 ModernCorporate / ChineseGovernment）
+     5. 写 C# / CLI 命令生成 docx
+     6. 验证 XSD → 预览 → 修正 → 再验证
+     7. 输出到 /srv/projects/docs/outputs/
+   
+   部署依赖（需追加到部署手册 第5层）：
+     - .NET SDK 8.0（`sudo apt install dotnet-sdk-8.0`）
+     - skill 路径: ~/.agents/skills/minimax-docx/
+
+ 🅱️ Markdown 速写管线（轻量）
+   适用：快速草稿、笔记转文档、内部用
+   
+   pandoc draft.md -o output.docx --reference-doc=/srv/templates/reference.docx
+   或：贾维斯直接写 Markdown → pandoc → docx
+   优点：秒级生成，不需要 .NET
+   缺点：复杂排版（多栏/表格精细样式/页眉页脚）不如 A 路线
+```
+
+#### 5.10.4 Excel / XLSX 详细设计
+
+```python
+# 主力库: openpyxl（创建 + 样式 + 图表 + 公式，纯 Python 无系统依赖）
+
+# --- 场景 1: 创建报表 ---
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.chart import BarChart, Reference
+
+wb = Workbook()
+ws = wb.active
+ws.title = "月度销售"
+
+# 标题行
+headers = ["月份", "产品A", "产品B", "合计"]
+for col, h in enumerate(headers, 1):
+    cell = ws.cell(row=1, column=col, value=h)
+    cell.font = Font(bold=True, size=12)
+    cell.fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    cell.font = Font(bold=True, color="FFFFFF")
+
+# 数据行（贾维斯从自然语言自动提取）
+data = [["1月", 120, 90], ["2月", 145, 105], ["3月", 160, 130]]
+for row_idx, row_data in enumerate(data, 2):
+    for col_idx, val in enumerate(row_data, 1):
+        ws.cell(row=row_idx, column=col_idx, value=val)
+
+# 公式
+for row in range(2, 2 + len(data)):
+    ws.cell(row=row, column=4, value=f"=B{row}+C{row}")
+
+# 图表
+chart = BarChart()
+chart.title = "月度销售趋势"
+data_ref = Reference(ws, min_col=2, max_col=3, min_row=1, max_row=1+len(data))
+chart.add_data(data_ref, titles_from_data=True)
+ws.add_chart(chart, "F2")
+
+wb.save("/srv/projects/docs/outputs/report.xlsx")
+
+# --- 场景 2: 数据导出（pandas） ---
+import pandas as pd
+df = pd.DataFrame(data, columns=["月份", "产品A", "产品B"])
+df["合计"] = df["产品A"] + df["产品B"]
+# 带格式导出用 ExcelWriter
+with pd.ExcelWriter("output.xlsx", engine="openpyxl") as writer:
+    df.to_excel(writer, sheet_name="数据", index=False)
+
+# --- 场景 3: 读取分析 ---
+wb = openpyxl.load_workbook("input.xlsx")
+ws = wb.active
+# 贾维斯读表格内容 → 分析 → 回报用户摘要
+```
+
+**常见 Excel 需求映射**：
+
+| 你说 | 贾维斯做 |
+|------|---------|
+| "做个销售报表" | openpyxl 创建表格 + 加粗表头 + 蓝色主题 + 柱状图 |
+| "导出这份数据成 Excel" | pandas `df.to_excel()` — 秒出 |
+| "加上条件格式（大于100标红）" | `ConditionalFormatting` + `PatternFill` |
+| "合并前 3 行做标题" | `ws.merge_cells('A1:D3')` |
+| "按部门拆成多个 sheet" | `wb.create_sheet()` + 每个 sheet 写数据 |
+
+#### 5.10.5 PPT / PPTX 详细设计
+
+```
+两条子路由：
+
+ 🅰️ pptx-generator（创意管线，已有 skill）
+   适用：从零创建、高设计感、需要统一配色主题
+   
+   子 Agent 工作流：
+     1. 分析需求（主题/受众/页数）
+     2. 读 references/design-system.md → 选配色 + 风格
+     3. 读 references/slide-types.md → 规划每页类型
+     4. 分 slide 并发生成（sessions_spawn 多个子Agent）
+     5. compile.js 合并 → QA（检查 pitfalls.md）
+     6. 输出到 /srv/projects/docs/outputs/
+   
+   部署依赖（已满足）：
+     - Node.js 22 + npm（已有）
+     - `npm install -g pptxgenjs`
+     - skill 路径: ~/.agents/skills/pptx-generator/
+
+ 🅱️ python-pptx（编辑管线，备选）
+   适用：基于已有模板编辑、批量替换文字/图片
+   
+   pip install python-pptx
+   → 读模板 → 改文本/换图 → 保存
+```
+
+#### 5.10.6 PDF 详细设计
+
+```
+三条路线，按场景选：
+
+ 🅰️ WeasyPrint（HTML → PDF）★ 首选
+   适用：网页内容转PDF、CSS 精确控制版式、贾维斯最熟
+   
+   系统依赖（需追加到部署手册）：
+     sudo apt install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
+   
+   用法：
+     from weasyprint import HTML
+     HTML('https://example.com/report').write_pdf('output.pdf')
+     HTML(string='<h1>报告</h1><p>内容...</p>').write_pdf('output.pdf')
+   
+   优点：HTML/CSS 排版，贾维斯直接写 HTML 就能出精美 PDF
+   缺点：不如 ReportLab 能精细到像素级定位
+
+ 🅱️ ReportLab（编程式 PDF）
+   适用：发票/证书/条码/表格密集的精确布局
+   
+   用法：
+     from reportlab.lib.pagesizes import A4
+     from reportlab.pdfgen import canvas
+     c = canvas.Canvas("output.pdf", pagesize=A4)
+     c.drawString(100, 750, "INVOICE")
+     c.save()
+
+ 🅲️ pikepdf（PDF 操作）
+   适用：合并/拆分/旋转/提取页面/改元数据
+   
+   用法：
+     import pikepdf
+     pdf = pikepdf.open("input.pdf")
+     pdf.pages.extend(pikepdf.open("appendix.pdf").pages)  # 追加
+     pdf.save("merged.pdf")
+```
+
+#### 5.10.7 格式转换桥（LibreOffice headless + Pandoc）
+
+```bash
+# ===== LibreOffice headless — 万能转换 =====
+# 安装（约 500MB，按需装）
+sudo apt install libreoffice-impress libreoffice-calc
+
+# docx → PDF
+soffice --headless --convert-to pdf report.docx
+
+# pptx → PDF
+soffice --headless --convert-to pdf slides.pptx
+
+# xlsx → CSV  
+soffice --headless --convert-to csv data.xlsx
+
+# 批量转换
+for f in *.docx; do soffice --headless --convert-to pdf "$f"; done
+
+# ===== Pandoc — Markdown万能转换桥 =====
+# 安装
+sudo apt install pandoc
+
+# Markdown → docx（带参考样式）
+pandoc draft.md -o output.docx --reference-doc=/srv/templates/reference.docx
+
+# Markdown → pptx（幻灯片，逐页用 --- 或 # 分页）
+pandoc slides.md -o slides.pptx
+
+# Markdown → PDF（推荐：先转 docx 再走 LibreOffice，避免装 1GB+ texlive）
+pandoc report.md -o report.docx --reference-doc=/srv/templates/reference.docx
+soffice --headless --convert-to pdf report.docx
+# 备选（如需直出，装 texlive-xetex ~1GB）：
+# pandoc report.md -o report.pdf --pdf-engine=xelatex
+```
+
+#### 5.10.7-A 部署依赖分级
+
+```
+按优先级分三档，部署时按需装：
+
+ 🔴 必装（轻量，核心功能）：
+   pip install python-docx openpyxl pandas python-pptx
+   pip install weasyprint reportlab pikepdf pdfplumber
+   pip install "markitdown[pptx]"
+   sudo apt install pandoc libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
+   合计：~200MB
+
+ 🟡 按需装（专业文档管线）：
+   sudo apt install dotnet-sdk-8.0          # minimax-docx skill（~200MB）
+   npm install -g pptxgenjs                 # pptx-generator skill（~10MB）
+
+ 🟢 按需装（格式转换桥，较大）：
+   sudo apt install libreoffice-impress libreoffice-calc  # ~500MB
+   安全：以 jarvis 用户运行，不暴露网络端口，风险可控
+
+ ❌ 不建议装：
+   texlive-xetex（~1GB，仅用于 Pandoc 直出中文 PDF）
+   → 用 LibreOffice docx→PDF 或 WeasyPrint HTML→PDF 替代
+```
+
+#### 5.10.8 文档输出目录结构与保留策略
+
+```
+/srv/projects/docs/
+├── outputs/               # 生成的文档
+│   ├── 2026-06-15-report/ # 每批一个文件夹
+│   │   ├── report.docx
+│   │   └── report.pdf
+│   └── ...
+├── templates/              # 可复用模板（永久保留）
+│   ├── reference.docx      # Pandoc 参考样式文件
+│   ├── invoice-template.xlsx
+│   └── company-theme.json  # PPT 配色主题
+└── README.md
+
+保留策略（与图片/视频一致）：
+  容量优先: /srv/projects/docs/outputs/ 超 200MB → 删最旧批次
+  时间兜底: 未超 → 7 天后自动删除
+  标记保留: 用户说「保留这个文件」→ 移入 archives/ 不受清理
+  ⚠️ LibreOffice/Pandoc 生成的临时文件 → 生成后立即删
+```
+
+#### 5.10.9 跨文档类型联合作战
+
+```
+你说：
+"帮我做第一季度业绩汇报。
+ 需要：1份Word报告（正文+图表）、
+       1份Excel数据表（原始数据+透视表）、
+       1份PPT（10页，汇报用）、
+       全部导出PDF。"
+
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ 主会话拆解 → 4 个子任务并行                                    │
+│                                                                │
+│  子Agent A: Word报告（minimax-docx, Pipeline A）              │
+│    选 ModernCorporate 风格 → 写正文                          │
+│    图表嵌入：Agent B 的 openpyxl 图表 → 导出 PNG              │
+│    → minimax-docx 插入图片（ImageSamples.cs）                 │
+│    → 最终含图报告 .docx                                       │
+│                                                                │
+│  子Agent B: Excel数据表（openpyxl + pandas）                  │
+│    原始数据 sheet + 透视表 sheet + 图表 sheet                 │
+│                                                                │
+│  子Agent C: PPT（pptx-generator）                             │
+│    选商务蓝配色 → 10页（封面/TOC/6内容页/总结）               │
+│                                                                │
+│  收尾 Agent: PDF 导出                                          │
+│    soffice --headless --convert-to pdf report.docx            │
+│    soffice --headless --convert-to pdf slides.pptx            │
+│    → 4 份 PDF 全部回传                                         │
+│                                                                │
+│  主会话回报: "✅ Q1 汇报包完成 → 6 份文件，预览地址 xxx"      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 六、外部预览与测试访问
 
 ### 6.1 三种预览管道
@@ -1241,6 +1601,11 @@ dev.yourdomain.com {
 | 19 | E2E 测试暂不上 | 依赖 ~500MB；构建自检 + web_fetch 截图验证当前够用；需要时 `npx playwright install` 一条命令补 | 轻量优先 |
 | 20 | 数据库初期 SQLite | Mark2 初期 SQLite + 文件存储完全够用；真需要 PG/Redis 时走 L4 Docker Compose | 渐进架构 |
 | 21 | 图片/视频保留策略 | 每批独立文件夹 + 容量阈值优先 + 7 天 TTL + 用户可标记保留（archives/） | 用户决策 |
+| 22 | Word三工具分层路由 | minimax-docx(正式) / Pandoc(速写) / python-docx(编辑)，子Agent按关键词自动选 | 避免工具选择混乱 |
+| 23 | Pandoc中文PDF不走texlive | texlive-xetex ~1GB，改为 pandoc md→docx → LibreOffice docx→PDF，省 1GB | 磁盘优化 |
+| 24 | 文档读取用 pdfplumber + markitdown | pikepdf 侧重PDF操作（合并/拆分），文本提取用 pdfplumber 更准 | 工具分工 |
+| 25 | 文档依赖分三级部署 | 必装 ~200MB（Python 系）/ 按需 ~700MB（.NET+LibreOffice）/ 不建议 texlive | 渐进部署 |
+| 26 | 文档保留策略独立 200MB 阈值 | 文档比图片/视频轻，阈值设 200MB；与图片 500MB、视频 2GB 形成三级梯度 | 分级管理 |
 
 ---
 
@@ -1254,6 +1619,9 @@ dev.yourdomain.com {
 │          开发环境产生的临时构建文件、node_modules 缓存纳入回收
 ├─ 对接:   docs/贾维斯中枢安全体系设计.md
 │          code-server 认证 + 终端权限 + auditd 监控
+├─ 对接:   已有 skills
+│          minimax-docx（~/.agents/skills/minimax-docx/）
+│          pptx-generator（~/.agents/skills/pptx-generator/）
 └─ 独立:   本文件不内嵌到任何其他文档
 ```
 
