@@ -48,6 +48,7 @@ Things like:
 | 升级后自检 / 升级记录 | `OpenClaw automation` |
 | 大工程 / scratch / 批量改名 | `OpenClaw automation` |
 | 视频下载相关入口 | `视频平台下载默认工作流` / 相关下载脚本条目 |
+| OCR 文字识别 | `scripts/jarvis-ocr.py` / `tools/jarvis-ocr.sh` / Mark2 小模型清单 |
 | 本地语音 / ChatTTS / XTTS | `ChatTTS` / `Local free voice-cloning stack` |
 | SSH / 远端 GPU / API key 路径 | `Local-only credential pointers` |
 

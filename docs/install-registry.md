@@ -269,3 +269,23 @@
 - **依赖**：Go 静态编译，无系统依赖
 - **用途**：免费全平台下载器，支持 HTTP/BT/Magnet/ED2K，Web UI 管理
 - **备注**：Web UI 地址 http://192.168.79.128:9999，下载到 /mnt/data/gopeed/downloads，16 线程并发，实测 30MB/s+
+
+### openclaw-context-monitor (systemd timer)
+
+- **时间**: 2026-06-15 13:20
+- **来源**: 自建（上下文溢出主动防御方案 Layer 2）
+- **安装命令**:
+  ```bash
+  cp tools/openclaw-context-monitor/openclaw-context-monitor.service ~/.config/systemd/user/
+  cp tools/openclaw-context-monitor/openclaw-context-monitor.timer ~/.config/systemd/user/
+  systemctl --user daemon-reload
+  systemctl --user enable --now openclaw-context-monitor.timer
+  ```
+- **版本**: v1.0
+- **路径**: 
+  - 脚本: `scripts/openclaw-context-monitor.py`
+  - systemd: `tools/openclaw-context-monitor/`
+  - 状态: `~/.local/state/openclaw/context-monitor/status.json`
+- **依赖**: Python 3, systemd user session
+- **成功**: ✅ 烟测通过
+- **备注**: 每 5 分钟检查上下文使用率，70%/85%/95% 三级告警

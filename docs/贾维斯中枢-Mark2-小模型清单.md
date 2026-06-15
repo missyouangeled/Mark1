@@ -86,7 +86,8 @@
 
 ```bash
 # 1. 安装 PaddlePaddle CPU 版
-python3 -m pip install paddlepaddle  # CPU 版，约 400MB
+#    ⚠️ 重要：必须指定 ==3.2.2！3.3.x 有 CPU OneDNN bug（GitHub #77340）
+python3 -m pip install paddlepaddle==3.2.2
 
 # 2. 安装 PaddleOCR
 python3 -m pip install paddleocr
@@ -102,6 +103,11 @@ print(result)
 
 **优点**：完整的检测→方向分类→识别 pipeline，自动下载模型，API 最简洁。
 **缺点**：需装 PaddlePaddle 框架（~400MB），总安装体积约 1.5GB。
+
+> 🐛 **PaddlePaddle 3.3.x CPU OneDNN 回归**：3.3.0 / 3.3.1 在 CPU 推理时抛出
+> `NotImplementedError: ConvertPirAttribute2RuntimeAttribute not support [pir::ArrayAttribute<pir::DoubleAttribute>]`
+> 根因是新版 PIR 属性转换不兼容 OneDNN 后端。降级到 3.2.2 即可绕过。
+> 已验证：Mark1（Ubuntu 24.04, CPython 3.12.3, PaddlePaddle 3.2.2 + PaddleOCR 3.7.0）工作正常。
 
 #### 方案 B：ONNX 轻量版（零框架依赖）
 
@@ -144,7 +150,8 @@ docker run -it --rm \
   ├── 用户发图片/PDF → WebChat
   │
   ├── 贾维斯调用 OCR
-  │     ├── 方式1: exec python3 scripts/jarvis-ocr.py --input xxx.jpg
+  │     ├── 方式1: bash tools/jarvis-ocr.sh --input xxx.jpg
+  │     │         或 ./scripts/jarvis-ocr.py --input xxx.jpg
   │     └── 方式2: HTTP API（后续可封装为 sidecar 服务）
   │
   ├── 拿到结构化文本
@@ -158,6 +165,11 @@ docker run -it --rm \
         ├── PDF 文档 → OCR 提取全文 → RAG 入库
         └── 网页截图表格 → OCR 识别行列 → Markdown 表格输出
 ```
+
+**已落地的便捷入口**：
+- `scripts/jarvis-ocr.py` — Python 脚本（shebang 直指 venv Python）
+- `tools/jarvis-ocr.sh` — bash 包装器（自动找 venv，防 import 路径错误）
+- 常用命令：`bash tools/jarvis-ocr.sh --input image.png [--json] [--benchmark] [--list-models]`
 
 ### 1.8 已知限制
 
@@ -217,3 +229,4 @@ docker run -it --rm \
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-15 | v1.0 | 初版，收录 PP-OCRv6，建立模板和候选清单 |
+| 2026-06-15 | v1.1 | PaddlePaddle 3.2.2 降级说明（CPU OneDNN bug #77340）；落地 scripts/jarvis-ocr.py + tools/jarvis-ocr.sh 便捷入口 |

@@ -1599,3 +1599,17 @@
 - 所有非 HTML 文件从 assets/ 可正常访问（HTTP 200），自检 25/26 PASS
 - 相关文件：
 - `scripts/apply-openclaw-control-ui-branding.py,scripts/openclaw-frontstage-broker.py,scripts/apply-openclaw-frontstage-broker-data.py,scripts/openclaw-post-upgrade-self-check.py`
+
+## 2026-06-15 13:22:39 CST (+08:00) — 上下文溢出主动防御四层方案
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- Layer1:compaction配置调优 Layer2:context-monitor.py+systemd timer Layer3:Agent自律规则 Layer4:Gateway内置兜底
+- 验收 / 验证：
+- 烟测通过:script正常,broker事件写入,status文件更新,severity变化去重正确,timer active
+- 相关文件：
+- `scripts/openclaw-context-monitor.py`
