@@ -417,26 +417,26 @@ sessions_spawn(task=task, taskName=f"dev-{project_name}", mode="run")
 | L3 ↔ L2 | 监工回报 | ✅ | `auto + taskActive=true`，子 Agent 卡住/完成自动回报前台 |
 | L3 ↔ L2 | `image_generate` 工具调用 | ✅ | 主会话直接调，LiteLLM → Agnes API，已在 5.7 节设计 |
 | L3 ↔ L2 | `exec` 调用 ffmpeg/构建 | ✅ | 构建命令通过 exec 跑，大视频 >500MB 走后台分身 |
-| L3 ↔ L4 | 数据库服务 | ⚠️ | 如项目需要 PostgreSQL/Redis，走 Docker Compose 部署（L4 层），不在 L3 裸机装 |
-| L3 ↔ L4 | 图床存储 | ⚠️ | 生成的图片如需长期托管，对接 Lsky Pro（L4 Docker）而不是留在 `/srv/projects/` |
+| L3 ↔ L4 | 数据库服务 | ✅ | 初期 SQLite + 文件存储；真需要 PG/Redis 时走 L4 Docker Compose，不在 L3 裸机装 |
+| L3 ↔ L4 | 图床存储 | ✅ | 生成的图片如需长期托管，对接 Lsky Pro（L4 Docker）；日常生成按 5.7 节保留策略自动清理 |
 | L3 ↔ L5 | Tailscale 内网预览 | ✅ | 方案 C：`npm run preview --host 0.0.0.0` → 另一台设备 `http://100.x.x.1:5173` |
 | L3 ↔ L6 | `/srv/projects/` Git 备份 | ✅ | 每个项目独立 Git，push 到 GitHub 私有仓库 |
-| L3 ↔ L6 | 图片输出备份 | ⚠️ 缺口 | 生成的图片暂存在 `outputs/`，需纳入备份策略或定期清理 |
-| L3 ↔ L6 | 视频下载持久化 | ⚠️ 缺口 | 下载的视频放 `/mnt/data/video-outputs/`，需明确保留/清理策略 |
+| L3 ↔ L6 | 图片输出备份 | ✅ | 每批独立文件夹，超容量立即删，未超 7 天后自动清理（见 5.7.1） |
+| L3 ↔ L6 | 视频下载持久化 | ✅ | 同图片策略：每批独立文件夹，容量优先 + 7 天 TTL（见 5.8.1） |
 | L3 ↔ L7 | code-server 认证 | ✅ | 强密码 + CF Access 双重保护，8.4 节已设计 |
 | L3 ↔ L7 | 终端权限 | ✅ | jarvis 用户运行，sudo 需密码，/srv/projects/ 被 auditd 监控 |
-| L3 ↔ L7 | 对外暴露的项目安全 | ⚠️ 缺口 | 若项目含 API/表单/XSS 漏洞，经 CF Tunnel 暴露后会被利用 → 默认只开预览，不做长期生产部署 |
+| L3 ↔ L7 | 对外暴露的项目安全 | ✅ 已确认 | 仅开预览通道，不做长期生产部署；CF Tunnel 用完即弃 |
 | L3 ↔ 🧹 | 构建产物清理 | ✅ | node_modules/dist 膨胀 → 回收机制 L3 负责 |
-| L3 ↔ 🧹 | 图片生成累积 | ⚠️ 缺口 | image/outputs/ 无限增长 → 回收机制需增加「超过 N 天未引用的图片自动清理」| 
-| L3 ↔ 🧹 | 视频下载累积 | ⚠️ 缺口 | downloads/ + outputs/ 持续增长 → 回收机制需增加「`cleanup-old-video.sh`」规则 |
+| L3 ↔ 🧹 | 图片生成累积 | ✅ | 每批独立文件夹 + 容量阈值优先 + 7 天 TTL（5.7.1），回收到 v2.1 落脚本 |
+| L3 ↔ 🧹 | 视频下载累积 | ✅ | 同图片策略（5.8.1），回收到 v2.1 落脚本 |
 | L3 ↔ 🧹 | node_modules bloat | ⚠️ 缺口 | 多个项目各自 `node_modules/`，累计可达 GB → 回收机制 L3 应增加「`node_modules` 超过阈值告警」|
 
 ### 审查结论
 
 ```
-✅ 无阻塞缺口 — 可进入详细设计
-⚠️ 4 个待补：DB 对接 / 图床对接 / 安全暴露面 / 文件累积回收
-📋 三领域详细设计 → 5.6 / 5.7 / 5.8
+✅ 无阻塞缺口 — 7 项已确认解决
+⚠️ 1 项待补：node_modules 累计膨胀阈值告警 → 回收机制 v2.1 落脚本
+📋 三领域详细设计 → 5.6 / 5.7 / 5.8，已包含保留策略
 ```
 
 ---
@@ -733,6 +733,34 @@ image_generate(
   5. 回报用户：「生成完成，共 N 张 → 预览地址 xxx」
 ```
 
+#### 5.7.1 图片保留策略
+
+```
+规则（两级优先级）：
+
+  容量优先:  /srv/projects/image/outputs/ 超 500MB → 自动删最旧的批次
+  时间兜底:  未超过容量上限的批次 → 生成 7 天后自动删除
+
+目录结构（按批次隔离）：
+  /srv/projects/image/outputs/
+  ├── 2026-06-15-hero-banner/      # 每批一个文件夹
+  │   ├── hero-v1.png
+  │   └── hero-v2.webp
+  ├── 2026-06-15-product-shots/     # 同一天另一批
+  │   ├── shot-01.png
+  │   └── shot-02.png
+  └── 2026-06-08-xxx/               # ≥7天 → 自动清理
+
+  batch.metadata.json（每个批次夹下）：
+    { created: "2026-06-15", count: 2, size_bytes: 524288 }
+
+清理流程（每日由 lifecycle-maintainer 触发）：
+  1. du -sb outputs/ → 总和
+  2. 超 500MB → 按 created 升序删最老的批次文件夹，直到回到 400MB 以下
+  3. 未超 → 遍历 batch.metadata.json，created 距今 ≥7 天 → 删除该批次
+  4. 被网页项目引用的图片（在 public/images/ 中）不受影响（不在此目录）
+```
+
 ### 5.8 视频处理详细设计
 
 > **搜索确认**：FFmpeg 自动化最佳实践 → 队列化处理、CPU 核心数匹配进程数、文件 I/O 与转码分离。单用户场景不需要分布式队列，直接调用即可。大文件转码建议限制 CPU 使用（`-threads` 参数）。
@@ -863,20 +891,34 @@ AI 视频生成       特殊处理：
 
 ```
 /mnt/data/video-outputs/
-├── downloads/           # 原始下载（保留至用户确认删除）
-│   └── douyin_xxx.mp4
+├── downloads/           # 原始下载
+│   └── 2026-06-15-douyin-xxx/    # 每批一个文件夹
 ├── processed/            # 转码/剪辑后的输出
-│   ├── company-intro-1080p.mp4
-│   └── company-intro-720p.webm
+│   └── 2026-06-15-company-intro/
 ├── frames/               # 帧提取输出
-│   └── video_thumbnails.jpg
-├── archives/             # 处理完成的原始文件归档
-└── README.md             # 记录各文件用途和命令
+├── archives/             # 用户标记保留的批次（不自动删）
+└── README.md
 
 命名规范：
   <来源>-<描述>-<规格>.<格式>
   例: douyin-产品介绍-1080p-h264.mp4
-      bilibili-教程-帧提取-00.png
+```
+
+#### 5.8.1 视频保留策略
+
+```
+规则（与图片一致）：
+
+  容量优先:  /mnt/data/video-outputs/ 超 2GB → 自动删最旧的批次
+  时间兜底:  未超过容量上限的批次 → 下载 7 天后自动删除
+
+  🛡️ 标记保留: 用户说「保留这个视频」→ 移入 archives/ → 不受清理影响
+
+清理流程（每日由 lifecycle-maintainer 触发）：
+  1. du -sb downloads/ processed/ frames/ → 总和
+  2. 超 2GB → 按 created 升序删最老的批次文件夹（跳过 archives/），回到 1.5GB 以下
+  3. 未超 → 遍历 batch.metadata.json，created 距今 ≥7 天且非 archives → 删除
+  4. 被网页项目引用的视频（在 public/videos/ 中）不受影响
 ```
 
 ---
@@ -1194,6 +1236,11 @@ dev.yourdomain.com {
 | 14 | Prompt 工程标准化 | 文生图4段结构（主体/风格/质量/技术） | 输出一致性 |
 | 15 | FFmpeg 限制 75% CPU 线程 | 避免转码把服务器打满影响其他服务 | 系统稳定性 |
 | 16 | 图片/视频累积 → 回收机制挂钩 | 见架构审查 ⚠️ 缺口，回收到 v2.1 时补 | 协同设计 |
+| 17 | 网页项目用 Git 模板仓库 | `/srv/templates/vue3-tailwind-starter/`，子 Agent 从模板 clone；避免 `npm create@latest` 版本漂移 | 可复现性 |
+| 18 | 预览双通道（cloudflared + Caddy） | 快速验→cloudflared；反复测→Caddy 固定路由 `dev.域名/web/<项目>` | 场景互补 |
+| 19 | E2E 测试暂不上 | 依赖 ~500MB；构建自检 + web_fetch 截图验证当前够用；需要时 `npx playwright install` 一条命令补 | 轻量优先 |
+| 20 | 数据库初期 SQLite | Mark2 初期 SQLite + 文件存储完全够用；真需要 PG/Redis 时走 L4 Docker Compose | 渐进架构 |
+| 21 | 图片/视频保留策略 | 每批独立文件夹 + 容量阈值优先 + 7 天 TTL + 用户可标记保留（archives/） | 用户决策 |
 
 ---
 
@@ -1212,14 +1259,16 @@ dev.yourdomain.com {
 
 ---
 
-## 十二、待确认项
+## 十二、已确认项（v2.0）
 
-| # | 问题 | 影响 |
-|---|------|------|
-| 1 | ~~需要装微信小程序开发工具吗？~~ → 已确认：uni-app CLI + H5 预览 + 手机扫码体验版 | ✅ 已写入 4.2.1 节 |
-| 2 | 是否需要 Playwright/Cypress 做 E2E 测试？当前默认只有构建+视觉自检 | 依赖体积 ~500MB，E2E 场景是否频繁？ |
-| 3 | 项目是直接用 `npm create vite@latest`（每次都最新），还是固定模板仓库？ | 开发一致性和可复现性 |
-| 4 | 临时预览域名要不要绑到固定子域名（如 `preview.yourdomain.com`）？ | Caddy 配置复杂度 |
-| 5 | 图片输出累积 → 回收机制需增加「超过 N 天未引用的图片自动清理」 | 🧹 回收机制 v2.1 补充 |
-| 6 | 视频下载累积 → 需明确视频保留策略（用户确认删 / 7天自动删 / 手动） | 🧹 回收机制 v2.1 补充 |
-| 7 | 项目如需 PostgreSQL/Redis：走 L4 Docker Compose 还是 SQLite 够用？ | 架构边界 L3↔L4 |
+| # | 问题 | 用户决策 | 落地位置 |
+|---|------|---------|---------|
+| 1 | 需要装微信小程序开发工具吗？ | uni-app CLI + H5 预览 + 手机扫码体验版 | ✅ 4.2.1 节 |
+| 2 | E2E 测试要不要？ | 暂不上。构建自检 + web_fetch 截图验证够用；需要时一条命令补 | ✅ 决策 #19 |
+| 3 | `npm create@latest` 还是固定模板？ | Git 模板仓库 `/srv/templates/vue3-tailwind-starter/`，子 Agent 从模板 clone | ✅ 决策 #17 |
+| 4 | 预览域名临时还是固定？ | 双通道：快速验→cloudflared 临时；反复测→Caddy 固定路由 `dev.域名/web/<项目>` | ✅ 决策 #18 |
+| 5 | 图片生成累积怎么清理？ | 每批独立文件夹；超 500MB 立即删最旧；未超 7 天后自动删 | ✅ 5.7.1 |
+| 6 | 视频下载累积怎么清理？ | 同图片：每批独立文件夹；超 2GB 立即删最旧；7 天 TTL；用户可标记保留到 archives/ | ✅ 5.8.1 |
+| 7 | 数据库用不用 PG/Redis？ | 初期 SQLite + 文件存储；真需要时走 L4 Docker Compose | ✅ 决策 #20 |
+
+> 📌 全部 7 项已确认。保留策略的具体清理脚本在回收机制 v2.1 中落代码。
