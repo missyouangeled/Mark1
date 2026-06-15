@@ -60,6 +60,13 @@
 - 最近执行记录：`memory/daily/2026-06-05.md`
 - 若找脚本/大工程规则：`TOOLS.md`（搜索 `Unity` / `大工程` / `rename`）
 
+### 找 Mark2 中枢项目
+- 总入口：`projects/mark2/README.md`（功能清单 + 文档索引）
+- 用户说「Mark2项目 加个功能」→ 直接定位到 `projects/mark2/README.md`
+- 部署启动手册：`docs/贾维斯中枢-Mark2-部署启动手册.md`
+- 迁移方案 v3：`docs/plans/2026-06-15-服务器迁移方案-v3.md`
+- 安全体系设计：`docs/贾维斯中枢安全体系设计.md`
+
 ### 找 OpenCode / 备用模型 / API key 指针
 - 先看 `TOOLS_INDEX.md` → `Local-only credential pointers`
 - 再跳到 `TOOLS.md` 看路径和用途边界
