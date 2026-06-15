@@ -44,6 +44,7 @@
 | 2 | `docs/plans/2026-06-15-服务器迁移方案-v3.md` | 📐 架构设计 + 17步部署 |
 | 3 | `docs/贾维斯中枢安全体系设计.md` | 🛡️ 七层纵深防御 + 配置命令 |
 | 4 | `docs/贾维斯中枢-Mark2-回收机制设计.md` | 🧹 七层智能回收：发现→分析→判定→回收 |
+| 5 | `docs/贾维斯中枢-Mark2-开发工作台设计.md` | 🖥️ code-server + 远程驱动 + 外部预览 |
 | 参考 | `docs/贾维斯系统架构全景分析.md` | Mark1 基线（对标） |
 | 参考 | `docs/plans/2026-06-15-8核32G服务器能力推演.md` | 资源估算 |
 
@@ -69,7 +70,7 @@
 | 1 | 贾维斯核心（Gateway + embed + infos-handle） | 待迁移 | L2 | 从 Mark1 迁移 |
 | 2 | 统一网关（Caddy） | 待部署 | L1 | 替代 unified-proxy |
 | 3 | Cloudflare Tunnel + Access | 待部署 | 边缘 | 免费方案 |
-| 4 | 开发工作台（code-server） | 待部署 | L3 | Web VS Code |
+| 4 | 开发工作台（code-server + 远程驱动 + 外部预览） | 已设计 | L3 | 📘 独立成册 |
 | 5 | Docker 服务管理（Portainer） | 待部署 | L4 | docker-socket-proxy 隔离 |
 | 6 | 私人网盘（Nextcloud） | 待部署 | L4 | Docker |
 | 7 | 文件同步（Syncthing） | 待部署 | L4 | Docker |
