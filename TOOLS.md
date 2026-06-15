@@ -44,6 +44,7 @@ Things like:
 | 工作区总导航 | `WORKSPACE_INDEX.md` |
 | 工具二级索引 | `TOOLS_INDEX.md` |
 | 本地凭据指针 | `Local-only credential pointers` |
+| API 密钥归属清单 | `docs/贾维斯中枢-API密钥清单.md`（个人/公司/免费归属与统一换密钥指南） |
 | OpenClaw 自动化 / 监工 / watcher | `OpenClaw automation` |
 | 升级后自检 / 升级记录 | `OpenClaw automation` |
 | 大工程 / scratch / 批量改名 | `OpenClaw automation` |
