@@ -93,6 +93,50 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
 
+# ── v2026.6.6 Rolldown 架构适配 — 函数映射: _h→isHidden, TA→unwrap, Th→role, wA→meta, jA→hasContent ──
+# JA 函数是新的 chat items builder（替代了旧版 OA/WA 等单体函数）
+YIELDED_HISTORY_REPLY_V2026_6_6_OLD = "r=(Array.isArray(e.messages)?e.messages:[]).filter(e=>!_h(e))"
+YIELDED_HISTORY_REPLY_V2026_6_6_NEW = "r=JarvisProjectYieldedHistoryReply((Array.isArray(e.messages)?e.messages:[]).filter(e=>!_h(e)))"
+STREAM_INDICATOR_V2026_6_6_OLD = "if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=vh(MA(e.stream),f),i=LA(t,e.streamStartedAt??Date.now());r.length>0?mh(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}"
+STREAM_INDICATOR_V2026_6_6_NEW = "let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||pendingIndicator){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=vh(e.stream!==null?MA(e.stream):'',f),i=LA(t,e.streamStartedAt??Date.now());r.length>0?mh(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):t.push({kind:`reading-indicator`,key:n})}"
+JARVIS_FUNCTIONS_V2026_6_6 = (
+    "function JarvisReadYieldedToolResultText(e){"
+    + "let t=Th(e?.role??'');"
+    + "if(t!=='toolresult'&&t!=='tool_result'&&t!=='tool')return null;"
+    + "let n=typeof e?.content=='string'?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text=='string'?e.text:'').join('\\n'):typeof e?.text=='string'?e.text:'';"
+    + "if(!n.trim())return null;"
+    + "try{let r=JSON.parse(n),i=typeof r?.message=='string'?r.message.trim():'';"
+    + "return r?.status==='yielded'&&i&&!/^\\s*NO_REPLY\\s*$/.test(i)?i:null}catch{return null}}"
+    + "function JarvisProjectYieldedHistoryReply(e){"
+    + "if(!Array.isArray(e)||e.length===0)return[];"
+    + "let t=e.filter(e=>!_h(e)),n=-1;"
+    + "for(let r=t.length-1;r>=0;r--){if(Th(t[r]?.role??'')==='user'){n=r;break}}"
+    + "if(n<0)return t;"
+    + "for(let r=t.length-1;r>n;r--){let i=TA(t[r]);if(Th(i?.role??'')==='assistant'&&(Array.isArray(i?.content)?i.content:[]).length>0)return t}"
+    + "for(let r=t.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(t[r]);if(!i)continue;"
+    + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof t[r]?.timestamp=='number'?t[r].timestamp:Date.now()};return[...t,a]}return t}"
+    + "function JarvisAssistantHasVisibleContent(e){"
+    + "let t=TA(e),n=Th(t?.role??'');if(n!=='assistant')return!1;"
+    + "for(let r of Array.isArray(t?.content)?t.content:[]){"
+    + "if(!r||typeof r!='object')continue;"
+    + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\s*NO_REPLY\\s*$/.test(e))return!0}"
+    + "if(r.type==='attachment'||r.type==='canvas')return!0}return!1}"
+    + "function JarvisShouldShowPendingReadingIndicator(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "let t=e.sessionHasActiveRun===!0||e.sessionStatus==='running',"
+    + "n=typeof e.sessionEndedAt=='number'&&Date.now()-e.sessionEndedAt<=2e4;"
+    + "if(!t&&!n)return!1;"
+    + "let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;"
+    + "for(let s=r.length-1;s>=0;s--){if(Th(r[s]?.role??'')==='user'){a=s;break}}"
+    + "if(a<0)return!1;let o=!1,s=!1,c=0;"
+    + "for(let l=a+1;l<r.length;l++){let u=r[l];if(!u||typeof u!='object')continue;"
+    + "if(JarvisAssistantHasVisibleContent(u)){o=!0;break}"
+    + "let d=Th(TA(u)?.role??'');(d==='assistant'||d==='tool')&&(s=!0);"
+    + "let m=typeof u.timestamp=='number'?u.timestamp:0;m>c&&(c=m)}"
+    + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;"
+    + "return t||!c||Date.now()-c<=3e4}"
+)
+
 # ── v2026.5.22 适配 — 函数映射: fj→OD, ij→MT, ek→yT, bx→Bl, gx→Uc/Il, Wb→Bc, Tx→Gl/xl ──
 CHAT_RUNNING_PATCH_V22 = "let t=e.connected,a=e.sessions?.sessions?.find(t=>t.key===e.sessionKey),n=e.loading||e.sending||e.stream!==null||!!e.canAbort||(e.queue?.length??0)>0||a?.hasActiveRun===!0||a?.status===`running`,r=!!(e.canAbort&&e.onAbort),i=e.compactionStatus?.phase===`active`||e.compactionStatus?.phase===`retrying`,"
 INVALID_FINAL_RELOAD_V22_OLD = "if(d&&(s.pendingSessionMessageReloadSessionKey=null),u&&!o&&!a){Tx(e);return}f&&!o&&Tx(e)}"
@@ -264,6 +308,30 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
         content = asset_path.read_text(encoding="utf-8")
         updated = content
         changed = False
+
+        # Detect v2026.6.6+ Rolldown architecture — function JA present, WA/fj absent
+        is_v2026_6_6 = "function JA(e){" in content and "function WA(e){" not in content and "function fj(" not in content
+        if is_v2026_6_6:
+            # Inject Jarvis helper functions before JA()
+            _has_jarvis = "JarvisReadYieldedToolResultText" in updated
+            if not _has_jarvis:
+                _marker = "function JA(e){"
+                _pos = updated.index(_marker)
+                if _pos >= 0:
+                    updated = updated[:_pos] + JARVIS_FUNCTIONS_V2026_6_6 + _marker[0] + updated[_pos + 1:]
+                    changed = True
+            # Patch yielded history: wrap messages with JarvisProjectYieldedHistoryReply
+            if YIELDED_HISTORY_REPLY_V2026_6_6_NEW not in updated and YIELDED_HISTORY_REPLY_V2026_6_6_OLD in updated:
+                updated = updated.replace(YIELDED_HISTORY_REPLY_V2026_6_6_OLD, YIELDED_HISTORY_REPLY_V2026_6_6_NEW, 1)
+                changed = True
+            # Patch stream indicator: add JarvisShouldShowPendingReadingIndicator
+            if STREAM_INDICATOR_V2026_6_6_NEW not in updated and STREAM_INDICATOR_V2026_6_6_OLD in updated:
+                updated = updated.replace(STREAM_INDICATOR_V2026_6_6_OLD, STREAM_INDICATOR_V2026_6_6_NEW, 1)
+                changed = True
+            if changed:
+                asset_path.write_text(updated, encoding="utf-8")
+            patched_paths.append(asset_path)
+            continue
 
         # Detect v2026.6.5+ — function OA present, fj and OD absent
         is_v2026_6_5 = "function OA(e){" in content and "function fj(" not in content and "function OD(e){" not in content
