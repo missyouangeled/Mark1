@@ -532,3 +532,84 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 3. **烟测流程已固化**：修改 openclaw.json 后 → 先独立端口烟测（`--port 18799`）→ 通过后再正式重启。绕过了多次 `doctor --fix` → 重启失败的死循环。
 4. **品牌注入与上游变量冲突风险**：自定义 branding JS 中应避免使用 `let i` 等常见短变量名，防止与上游注入代码冲突。
 5. **infos-handle 入口不直连 sidecar**：应统一走代理（18788），以便 sidecar 端口或监听地址变化时无需改客户端。
+
+---
+
+## 升级 #3：2026.6.5 → 2026.6.6
+
+### 基本信息
+
+- **日期**：2026-06-15 12:30~12:37
+- **触发方式**：`npm update -g openclaw`
+- **版本变化**：`2026.6.5 (5181e4f)` → `2026.6.6 (8c802aa)`
+- **命令**：`npm update -g openclaw`（依赖无变化，55 个依赖保持不变）
+- **结果**：✅ 成功，2 个历史问题被重新触发 + 1 个新架构兼容性问题
+
+### 升级前预检（新 SOP）
+
+1. ✅ 备份关键文件 → `tmp/upgrade-backups/2026-06-15-6.5to6.6/`（openclaw.json、package.json、state-backup）
+2. ✅ 依赖版本对比：55 个依赖全部不变，仅代码层面改动
+3. ✅ 配置预检：所有 5 个 provider API key 正常、litellm models 数组格式正确、imageModel 配置有效
+4. ✅ systemd PATH 预检：4 个 watcher service 均已配置 `%h/.npm-global/bin`
+5. ✅ branding 变量冲突预检：无 `let i`/`var i` 冲突
+6. ✅ infos-handle 路由预检：已走 18788 统一代理
+
+### 发现的问题
+
+#### 问题 1：Control UI 静态文件 404（新架构兼容性）
+
+**根因**：OpenClaw 2026.6.6 的 Gateway 将 Control UI 静态文件服务**限制为 `assets/` 子目录**。非 HTML 文件（`.js`、`.json`、`.svg`、`.webmanifest`）只能从 `assets/` 提供服务。
+
+**表现**：
+- `index.html` ✅ 200
+- `jarvis-frontstage-status.html` ✅ 200（HTML 文件可访问）
+- `jarvis-branding-override.js` ❌ 404
+- `jarvis-frontstage-snapshot.json` ❌ 404
+- `favicon.svg` ❌ 404
+- `manifest.webmanifest` ❌ 404
+
+**修复**：
+1. 将 `jarvis-branding-override.js` 复制到 `assets/` 并更新 `index.html` 引用路径
+2. 将 `jarvis-frontstage-snapshot.json` / `jarvis-frontstage-status.json` 复制到 `assets/`
+3. 更新 override 内的 `snapshotJsonHref` 等路径为 `/__openclaw__/control-ui/assets/...`
+4. 更新 4 个脚本的写入/验证路径：
+   - `apply-openclaw-control-ui-branding.py`：override 写入 `assets/`，HTML 引用更新
+   - `apply-openclaw-frontstage-broker-data.py`：snapshot 路径改为 `assets/`
+   - `openclaw-frontstage-broker.py`：公开文件写入 `assets/`
+   - `openclaw-post-upgrade-self-check.py`：自检路径改为 `assets/`
+
+#### 问题 2：resume-watch timer 未启用
+
+**根因**：升级后 timer 的 `UnitFileState` 变为 `disabled`（虽然 `ActiveState=active`），属于上次未彻底修复的遗留。
+
+**修复**：`systemctl --user enable openclaw-resume-watch.timer`
+
+#### 问题 3：chatRunning marker 注入失效（待解决）
+
+**根因**：2026.6.6 采用了 Rolldown 模块拆分架构，原先的单体 `index-*.js` bundle 不再包含 `chatRunning` 字符串。chat 相关逻辑可能已分散到 `gateway-runtime`、`config-runtime` 等模块 chunk 中。
+
+**表现**：
+- `JarvisProjectYieldedHistoryReply` marker 注入目标不存在
+- `JarvisShouldShowPendingReadingIndicator` marker 注入目标不存在
+- `patch_chat_running_indicator()` 因版本检测失败而静默跳过（不报错但也不注入）
+
+**当前状态**：已知限制，待后续分析新模块结构后适配。核心功能（品牌标题、snapshot、infos-handle）不受影响。
+
+### 升级后自检结果
+
+- **25/26 PASS**（1 FAIL 为已知的 chatRunning marker 注入问题）
+- ✅ branding ExecStartPre 自动重打入口正常
+- ✅ broker snapshot dock 验证通过
+- ✅ infos-handle contract/snapshot/sources 入口正常
+- ✅ infos-handle sidecar 和 unified proxy service 正常运行
+- ✅ 5 个 watcher timer 均 enabled + active
+- ✅ 4 个最小回归测试均 ALL PASS
+- ✅ 生命周期维护器正常（timer + 今日 transcript）
+- ✅ 统一代理验证：local=200, remoteNoAuth=401, remoteWithAuth=200
+
+### 经验教训
+
+1. **Gateway 静态文件策略可能随版本收紧**：v6.6.6 引入 Rolldown 模块拆分的同时也改变了静态文件服务规则——非 HTML 文件只能放在 `assets/` 子目录。任何自定义品牌文件（JS override、snapshot JSON、favicon 等）都必须放到 `assets/` 内。
+2. **单体 bundle 打补丁策略在模块拆分架构下会失效**：之前的 `patch_chat_running_indicator()` 依赖在单一 `index-*.js` 中搜索代码模式，Rolldown 拆分后目标模式不再存在于任何单个 chunk 中。后续需要用模块级注入或独立的 ES module 替代方案。
+3. **升级前扫描 diff 不能只看依赖版本**：本次 55 个依赖全不变，但构建工具链（Rolldown）变化导致产出结构完全不同。理想的升级前预检还应包含「dist 目录结构 diff」。
+4. **timer UnitFileState 要在自检中列为 required**：resume-watch 的 `ActiveState=active` 但 `UnitFileState=disabled` 意味着重启后不会自动启动，应在升级后自检中强制校验 enabled 状态。

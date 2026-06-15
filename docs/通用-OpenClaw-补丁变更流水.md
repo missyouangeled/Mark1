@@ -1585,3 +1585,17 @@
 - 已插入到部署前声明之前，阅读顺序已更新
 - 相关文件：
 - `docs/贾维斯中枢-Mark2-部署启动手册.md`
+
+## 2026-06-15 12:38:28 CST (+08:00) — 适配 OpenClaw 2026.6.6 Gateway 静态文件路径限制
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- Gateway v6.6.6 将 Control UI 静态文件限制为 assets/ 子目录，branding override/snapshot JSON/favicon 等非 HTML 文件必须移至 assets/ 内。已更新 4 个脚本的写入/验证路径。
+- 验收 / 验证：
+- 所有非 HTML 文件从 assets/ 可正常访问（HTTP 200），自检 25/26 PASS
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py,scripts/openclaw-frontstage-broker.py,scripts/apply-openclaw-frontstage-broker-data.py,scripts/openclaw-post-upgrade-self-check.py`

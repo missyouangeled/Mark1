@@ -158,3 +158,15 @@
 - N/A
 - 相关文件：
 - `MEMORY.md`
+
+## 2026-06-15 12:38:32 CST (+08:00) — 2026.6.6 chatRunning marker 注入待适配
+
+- 类型：manual-fix
+- 适用范围：通用
+- 当前状态：待解决
+- 未纳入正式补丁原因：
+- Rolldown 模块拆分后 chatRunning 逻辑分散到多个 chunk，原有单体 bundle 注入策略失效。核心功能（品牌/快照/infos-handle）不受影响，属于 UI 增强层面的已知缺口。
+- 后续排查 / 恢复提示：
+- 后续需分析 gateway-runtime/config-runtime 等模块 chunk，确认 chat 渲染入口并设计模块级注入方案。
+- 相关文件：
+- `scripts/apply-openclaw-control-ui-branding.py`

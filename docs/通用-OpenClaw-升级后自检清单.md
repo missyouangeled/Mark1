@@ -5,6 +5,8 @@
 - 文档类型:升级后快速自检清单
 
 > 📖 **关联文档**：每次升级的完整记录请查看 [`docs/通用-OpenClaw-升级记录.md`](通用-OpenClaw-升级记录.md)——包括升级了什么版本、出了什么问题、怎么修复的、有哪些经验教训。升级后如发现新问题，除了修复外，还应追加到升级记录中。
+>
+> ⚠️ **v2026.6.6+ 注意**：Gateway 将 Control UI 静态文件服务限制为 `assets/` 子目录。非 HTML 文件（.js/.json/.svg/.webmanifest）只能从 `assets/` 提供服务。所有品牌自定义文件（override JS、snapshot JSON、favicon 等）必须放入 `assets/`，且相关脚本的写入/验证路径也已相应更新。
 
 ## 用途
 
@@ -84,13 +86,14 @@ ExecStartPre=-/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/
 
 最小要求:
 
-- live asset 里仍有 `JarvisProjectYieldedHistoryReply`
-- live asset 里仍有 `JarvisShouldShowPendingReadingIndicator`
-- live override 里仍优先指向 `/jarvis-frontstage-snapshot.json`
+- live asset 里仍有 `JarvisProjectYieldedHistoryReply`（⚠️ v2026.6.6+ Rolldown 模块拆分后此项可能因注入目标迁移而缺失，属已知限制）
+- live asset 里仍有 `JarvisShouldShowPendingReadingIndicator`（同上）
+- live override 里 snapshotJsonHref 指向 `/__openclaw__/control-ui/assets/jarvis-frontstage-snapshot.json`（v2026.6.6+）
 - live override 的 infos-handle Href 已改为同源 `/v1/...`（如 `/v1/query/snapshot.summary?format=json` / `/v1/query/contract.catalog?format=json` / `/v1/events/stream?kind=snapshot.summary`），且不再写死 `http://127.0.0.1:18790`
 - live asset 里 reading-indicator 片段已使用 `let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e)`，不再出现会触发重复声明的 `let c=...`
 - 对当前 `dist/control-ui/assets/index-*.js` 执行 `node --check` 应通过
 - live asset 里模型下拉仍带 `s?.resolved?.modelProvider` / `refresh-tools-effective`，且旧的 `if(_U(e)===t)return!0` 早退分支不存在
+- live override 文件位于 `dist/control-ui/assets/jarvis-branding-override.js`（v2026.6.6+）且 HTTP 可访问（200）
 
 ---
 
@@ -106,8 +109,8 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-sna
 
 - `snapshotFirst = true`
 - `snapshotFirstReady = true`
-- `jarvis-frontstage-snapshot.json` 存在
-- `jarvis-frontstage-status.json` 仍作为兼容别名存在
+- `assets/jarvis-frontstage-snapshot.json` 存在（v2026.6.6+）
+- `assets/jarvis-frontstage-status.json` 仍作为兼容别名存在（v2026.6.6+）
 
 ---
 
