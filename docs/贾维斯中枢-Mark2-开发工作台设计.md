@@ -1,7 +1,7 @@
 # 🖥️ Mark2 — 开发工作台与环境设计 v1.0
 
 > 创建：2026-06-15
-> 状态：v1.0（审查后初版）
+> 状态：v1.1（Linux 小程序方案确认 + 审查修订）
 > 适用范围：中枢服务器（Ubuntu 24.04）
 > 原则：环境隔离 → 直接可用 → 远程驱动 → 外部可验
 
@@ -80,10 +80,14 @@
 │   ├── public/
 │   └── .env
 │
-├── miniapp/           # 小程序项目
+├── miniapp/           # 小程序项目（uni-app CLI）
 │   ├── package.json
 │   ├── node_modules/
+│   ├── vite.config.ts
 │   └── src/
+│       ├── pages/
+│       ├── components/
+│       └── App.vue
 │
 ├── api/               # API 服务
 │   ├── requirements.txt 或 pyproject.toml
@@ -172,7 +176,9 @@ code-server --install-extension yzhang.markdown-all-in-one
 
 ```bash
 # 小程序
-code-server --install-extension uni-helper.uni-app-schemas  # uni-app
+code-server --install-extension uni-helper.uni-app-schemas  # uni-app 语法提示
+code-server --install-extension uni-helper.uni-cloud-snippets # uni-cloud 代码段
+# 注意：微信官方开发者工具无 Linux 版，见 4.2.1 节的 Linux 开发方案
 
 # React / Next.js
 code-server --install-extension dsznajder.es7-react-js-snippets
@@ -184,6 +190,52 @@ code-server --install-extension dsznajder.es7-react-js-snippets
 code-server --install-extension ms-python.black-formatter   # Python 格式化
 code-server --install-extension tamasfe.even-better-toml    # pyproject.toml 支持
 ```
+
+### 4.2.1 🆕 小程序在 Linux 上开发的实际情况
+
+> **核心事实**：微信官方开发者工具没有 Linux 版。Mark2 服务器是 Ubuntu 24.04（无 GUI），以下为实测可行的方案。
+
+#### 三种可行路线
+
+```
+ 路线A: uni-app CLI 模式（推荐，主路线）
+   ✅ 在 Linux 上完全原生运行（只依赖 Node.js）
+   ✅ H5 模式：npm run dev:h5 → 浏览器直接预览
+   ✅ 小程序模式：npm run dev:mp-weixin → 编出微信小程序包
+   ✅ 在 code-server 中写 Vue3 代码，插件提示完整
+   ⚠️ 不能实时小程序真机预览（需上传后扫码）
+
+ 路线B: msojocs/wechat-web-devtools-linux（备选，需桌面环境）
+   ✅ 社区移植版，支持 Linux GNOME 桌面
+   ⚠️ 需要 X11/Wayland 显示服务器 → Mark2 服务器无 GUI，不可用
+   ⚠️ 维护依赖微信版本更新，可能滞后
+   
+ 路线C: 手机扫码体验版（验收用）
+   ✅ 构建 → 上传微信后台 → 设为体验版 → 手机扫码打开
+   ✅ 完全真机环境，所见即所得
+   ⚠️ 不能实时 debug（断点/console），只能看表现
+```
+
+#### 最终方案
+
+```
+Mark2 开发阶段（Linux 服务器上）：
+  1. code-server 中写 uni-app Vue3 代码
+  2. npm run dev:h5 → 浏览器预览（最快反馈循环）
+  3. npm run dev:mp-weixin → 编出小程序包验证无编译错误
+
+验收阶段（手机）：
+  4. npm run build:mp-weixin → 上传微信后台
+  5. 设为体验版 → 手机扫码打开
+  6. 贾维斯用 web_fetch 抓取构建日志回报
+
+备选（如果你的 Windows 掌机可以用）：
+  7. 同一份代码 push 到 Git
+  8. Windows 掌机 pull → 微信官方开发者工具打开 → 真机调试
+```
+
+> 📌 结论：小程序在 Mark2 上用 **uni-app CLI + H5 预览** 写代码完全没问题。
+> 真机验收通过上传体验版走。不需要在服务器上折腾 Wine 或 X11 转发的开发工具。
 
 ### 4.3 系统级依赖
 
@@ -402,7 +454,7 @@ Caddy 路由（方案B）:
 | 项目类型 | 单元测试 | E2E 测试 | 启动命令 |
 |---------|---------|---------|---------|
 | 前端网站 (Vue/React) | Vitest | Playwright / Cypress | `npm test` |
-| 小程序 | miniprogram-simulate | 微信开发者工具预览 | 按框架而定 |
+| 小程序 | miniprogram-simulate | 手机扫码体验版 | `npm run dev:mp-weixin` |
 | API 后端 (Python) | pytest | httpx / requests | `pytest` |
 | 静态网站 | HTML validate | Lighthouse | 无需测试 |
 | 图片处理 | pytest (PIL/opencv) | 目视验收 | `pytest` |
@@ -514,7 +566,7 @@ dev.yourdomain.com {
 {
   "folders": [
     { "name": "Web 项目",     "path": "/srv/projects/web" },
-    { "name": "小程序",       "path": "/srv/projects/miniapp" },
+    { "name": "小程序(uni-app)", "path": "/srv/projects/miniapp" },
     { "name": "API 服务",     "path": "/srv/projects/api" },
     { "name": "图片处理",     "path": "/srv/projects/image" },
     { "name": "视频处理",     "path": "/srv/projects/video" }
@@ -610,7 +662,7 @@ dev.yourdomain.com {
 
 | # | 问题 | 影响 |
 |---|------|------|
-| 1 | 需要装微信小程序开发工具（Linux 版 wine？）吗，还是只做 Web + API？ | L3 插件清单 |
+| 1 | ~~需要装微信小程序开发工具吗？~~ → 已确认：uni-app CLI + H5 预览 + 手机扫码体验版 | ✅ 已写入 4.2.1 节 |
 | 2 | 是否需要 Playwright/Cypress 做 E2E 测试？ | 依赖体积较大 |
 | 3 | 项目是直接用 `npm create vite@latest`（每次都最新），还是固定模板？ | 开发一致性 |
 | 4 | 临时预览域名要不要绑到固定子域名（如 `preview.yourdomain.com`）？ | Caddy 配置 |
