@@ -81,6 +81,7 @@ def mark42_init() -> None:
         "bytesPerKtoken": BYTES_PER_KTOKEN,
         "models": {"llmAnalyze": "deepseek-v4-pro", "llmProvider": "deepseek"},
         "daemon": {"scanInterval": 30, "autoArmorCompress": True, "autoTaskWatch": True},
+        "heavy": {"autoDetect": "semi", "autoDetectEnabled": True},
     }
     _save_config(cfg)
     for d in [ARMOR_STATE, ENGINE_STATE, HEAVY_STATE]:
@@ -113,3 +114,7 @@ def mark42_config() -> None:
     print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
     print(f"     自动压缩: {d.get('autoArmorCompress', '?')}")
     print(f"     自动监控: {d.get('autoTaskWatch', '?')}")
+    h = cfg.get("heavy", {})
+    print(f"\n   重型战甲:")
+    print(f"     大工程检测: {'启用' if h.get('autoDetectEnabled') else '关闭'}")
+    print(f"     检测模式: {h.get('autoDetect', 'ask')} (ask=询问/semi=半自动30s/full=全自动)")

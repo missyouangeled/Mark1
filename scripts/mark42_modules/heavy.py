@@ -4,7 +4,10 @@
 
 import json
 import os
+import select
 import shutil
+import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +42,161 @@ def heavy_preflight(path_str: str) -> None:
     for mp in ["/", "/mnt/data"]:
         out = os.popen(f"df -h {mp} | tail -1 | awk '{{print $4\"/\"$2}}'").read().strip()
         print(f"💽 {mp}: 剩余 {out}" if out else "")
+
+
+def heavy_detect(path_str: str) -> dict[str, Any]:
+    """自动检测工程是否达到大工程标准，返回检测结果 dict。
+
+    大工程标准（满足任一即触发）：
+    - 文件数 >= 50
+    - 总大小 >= 50MB
+    - 嵌套层级 >= 5
+    - 上下文余量 < 30%
+    """
+    p = Path(path_str).expanduser().resolve()
+    result: dict[str, Any] = {
+        "path": str(p),
+        "exists": False,
+        "isHeavy": False,
+        "reasons": [],
+        "metrics": {},
+        "advice": "",
+    }
+    if not p.exists():
+        result["advice"] = "路径不存在"
+        return result
+    result["exists"] = True
+
+    # 统计文件
+    all_files = []
+    max_depth = 0
+    for f in p.rglob("*"):
+        if f.is_file() and not f.name.startswith(".") and ".meta/" not in str(f):
+            if any(skip in str(f) for skip in ["__pycache__", ".pyc", ".git/", "node_modules/"]):
+                continue
+            all_files.append(f)
+            depth = len(f.relative_to(p).parts)
+            if depth > max_depth:
+                max_depth = depth
+
+    total_files = len(all_files)
+    total_size = sum(f.stat().st_size for f in all_files)
+    total_size_mb = total_size / (1024 * 1024)
+
+    result["metrics"] = {
+        "files": total_files,
+        "sizeMB": round(total_size_mb, 2),
+        "maxDepth": max_depth,
+    }
+
+    # 检查上下文
+    check = armor_check()
+    usage = check.get("usagePercent", 0)
+    result["metrics"]["contextUsage"] = usage
+
+    # 判定
+    if total_files >= 50:
+        result["isHeavy"] = True
+        result["reasons"].append(f"文件数 {total_files} >= 50")
+    if total_size_mb >= 50:
+        result["isHeavy"] = True
+        result["reasons"].append(f"总大小 {total_size_mb:.1f}MB >= 50MB")
+    if max_depth >= 5:
+        result["isHeavy"] = True
+        result["reasons"].append(f"目录深度 {max_depth} >= 5 层")
+    if usage > 70:
+        result["isHeavy"] = True
+        result["reasons"].append(f"上下文已用 {usage}% (>70%)，直接操作风险高")
+
+    if result["isHeavy"]:
+        result["advice"] = (
+            f"检测到 {total_files} 文件 / {total_size_mb:.1f}MB，已达到大工程标准。"
+            f"建议使用 heavy --start 开工，自动分批处理。"
+        )
+    else:
+        result["advice"] = f"{total_files} 文件 / {total_size_mb:.1f}MB，未達大工程标准，可前台直接处理。"
+
+    return result
+
+
+def _auto_task_name(path_str: str) -> str:
+    """从路径自动生成任务名。"""
+    import datetime
+    p = Path(path_str).expanduser().resolve()
+    name = p.name if p.name else "大工程"
+    ts = datetime.datetime.now().strftime("%m%d-%H%M")
+    return f"{name}-{ts}"
+
+
+def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
+    """以人类可读格式输出检测结果。
+
+    auto_mode:
+      - "ask": 每次都问（默认，安全优先）
+      - "semi": 半自动——检测到大工程后倒计时 30s，不拒绝就自动开工
+      - "full": 全自动——直接开工
+    """
+    r = heavy_detect(path_str)
+    if not r["exists"]:
+        print(f"❌ 路径不存在: {r['path']}")
+        return
+    m = r["metrics"]
+    print(f"🔍 大工程检测: {r['path']}")
+    print(f"   📂 {m['files']} 文件  |  💾 {m['sizeMB']:.1f}MB  |  📁 最深 {m['maxDepth']} 层")
+    print(f"   🧠 上下文: {m['contextUsage']}%")
+    if not r["isHeavy"]:
+        print(f"\n✅ {r['advice']}")
+        return
+
+    print(f"\n⚠️ 已达到大工程标准：")
+    for reason in r["reasons"]:
+        print(f"   • {reason}")
+    print(f"\n💡 {r['advice']}")
+
+    if auto_mode == "full":
+        # 全自动：直接开工
+        task_name = _auto_task_name(path_str)
+        print(f"\n🚀 全自动模式：直接开工 → {task_name}")
+        heavy_start(path_str, task_name)
+        return
+
+    if auto_mode == "semi":
+        # 半自动：倒计时 30s
+        import time
+        task_name = _auto_task_name(path_str)
+        print(f"\n⏳ 半自动模式：30 秒后自动开工 → {task_name}")
+        print(f"   拒绝：输入 'n' 或 Ctrl+C")
+        print(f"   立即开工：输入 'y' 或按回车跳过等待")
+        try:
+            import select
+            print(f"   ", end="", flush=True)
+            for i in range(30, 0, -1):
+                print(f"\r   ⏳ {i}s... ", end="", flush=True)
+                # 用 select 非阻塞检查 stdin 是否有输入
+                rlist, _, _ = select.select([sys.stdin], [], [], 1.0)
+                if rlist:
+                    line = sys.stdin.readline().strip().lower()
+                    if line in ("n", "no", "不", "拒绝"):
+                        print(f"\n❌ 已取消。手动开工:")
+                        print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+                        return
+                    elif line in ("y", "yes", "是", "好", "开", ""):
+                        print(f"\n✅ 立即开工")
+                        heavy_start(path_str, task_name)
+                        return
+                time.sleep(1)
+            # 倒计时结束，自动开工
+            print(f"\n✅ 倒计时结束，自动开工")
+            heavy_start(path_str, task_name)
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n❌ 已取消。手动开工:")
+            print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+        return
+
+    # "ask" 模式：只提示
+    task_name = _auto_task_name(path_str)
+    print(f"\n💡 手动开工命令:")
+    print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
 
 
 def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> None:

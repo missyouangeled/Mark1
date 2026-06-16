@@ -1,0 +1,14 @@
+[Unit]
+Description=Mark42 Bootstrap — 开机自动挂载四个守护 Loop
+After=openclaw-gateway.service
+Wants=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/missyouangeled/.openclaw/workspace/tools/mark42-bootstrap/mark42-bootstrap.sh
+StandardOutput=journal
+StandardError=journal
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

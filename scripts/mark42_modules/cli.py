@@ -149,6 +149,8 @@ def main() -> None:
     )
     parser.add_argument("--init", action="store_true", help="初始化 Mark42 配置")
     parser.add_argument("--config", action="store_true", help="查看当前配置")
+    parser.add_argument("--tune-compaction", action="store_true", help="诊断并调优 OpenClaw 压缩配置")
+    parser.add_argument("--apply", action="store_true", help="实际应用调优（默认仅预览）")
 
     sub = parser.add_subparsers(dest="module", help="模块选择")
 
@@ -181,6 +183,9 @@ def main() -> None:
 
     # ── Heavy ──
     heavy_p = sub.add_parser("heavy", help="⚙️ 重型战甲")
+    heavy_p.add_argument("--detect", type=str, help="自动检测工程是否为大工程")
+    heavy_p.add_argument("--auto", type=str, choices=["ask","semi","full"], default="ask",
+                        help="大工程检测后的行为：ask(默认,询问) / semi(半自动,30s倒计时) / full(全自动)")
     heavy_p.add_argument("--preflight", type=str, help="大工程预检")
     heavy_p.add_argument("--start", type=str, help="大工程开工")
     heavy_p.add_argument("--task-name", type=str, help="任务名")
@@ -192,6 +197,7 @@ def main() -> None:
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
+    sub.add_parser("compaction", help="📊 OpenClaw 压缩配置诊断 & 调优")
     sub.add_parser("assemble", help="一键启动完整战甲")
     sub.add_parser("status", help="一屏聚合系统状态")
 
@@ -205,6 +211,16 @@ def main() -> None:
         if args.config:
             from .config import mark42_config
             mark42_config()
+            return
+        if args.tune_compaction:
+            from .compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
+            if args.apply:
+                result = compaction_apply(auto_confirm=True)
+                print_apply_result(result)
+            else:
+                result = compaction_apply(auto_confirm=False)
+                print_apply_result(result)
+                print("  💡 使用 --apply 实际应用更改，或 --tune-compaction --apply")
             return
         parser.print_help()
         return
@@ -274,11 +290,14 @@ def main() -> None:
     if args.module == "heavy":
         from .heavy import (
             heavy_cleanup, heavy_execute, heavy_execute_all,
-            heavy_finish, heavy_preflight, heavy_start,
+            heavy_finish, heavy_preflight, heavy_start, heavy_detect_human,
         )
-        path = args.path or args.preflight or args.start or ""
+        path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
-        if args.preflight:
+        if args.detect:
+            auto_mode = getattr(args, 'auto', 'ask') or 'ask'
+            heavy_detect_human(args.detect, auto_mode=auto_mode)
+        elif args.preflight:
             heavy_preflight(args.preflight)
         elif args.start and task_name:
             heavy_start(args.start, task_name,
@@ -297,6 +316,15 @@ def main() -> None:
             heavy_preflight(args.preflight)
         else:
             print("❌ 请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup")
+        return
+
+    if args.module == "compaction":
+        from .compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
+        diag = compaction_diagnose()
+        print_diagnose(diag)
+        if diag["actionable"]:
+            print("  💡 如需自动调优: python3 scripts/mark42.py --tune-compaction")
+            print("     直接应用: python3 scripts/mark42.py --tune-compaction --apply")
         return
 
     if args.module == "assemble":

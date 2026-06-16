@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-06-16
+
+### ✅ 安装：Scrapling Official Skill
+- **时间**：2026-06-16 11:10 CST
+- **来源**：Clawhub → `clawhub install scrapling-official`
+- **GitHub**：https://github.com/D4Vinci/Scrapling
+- **安装路径**：`skills/scrapling-official/`（336KB）
+- **依赖**：无（纯文档 Skill，不包含 Python 库本身；实际使用需 `pip install scrapling` + Playwright）
+- **备注**：全栈网页抓取框架 Skill。支持反爬绕过（含 Cloudflare Turnstile）、自适应元素追踪、浏览器自动化、大规模爬虫编排、MCP Server。已登记到 SKILL_CATALOG.md。BSD-3 开源。
+
+---
+
 ## 2026-06-10 | 老电脑（Windows 10 + GTX 1070）计算节点部署
 
 ### ✅ 安装：Python 3.12.8 完整版
