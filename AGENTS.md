@@ -68,6 +68,13 @@ BOOT_INDEX.md  ─── 启动入口，指向下面各层
 - 高风险系统操作前读崩坏案例
 - 群聊：质量>数量，用 emoji 反应
 
+### 分身并发规则
+
+- `sessions_spawn` 自动决策：`lightContext=true/false`、`model` 选择、`context:"fork"` vs `"isolated"`，由我根据任务类型自动判断
+- 高频短任务/纯执行（转码、查状态、简单命令）→ `lightContext=true`
+- 需理解上下文/复杂判定的任务 → 默认不带 `lightContext`
+- 无需你来指定分身参数
+
 ### 安装/启用新东西前三步
 
 用户提到要装新工具、启用新 Skill、或新的自动化能力（如「自动登录」）时：
