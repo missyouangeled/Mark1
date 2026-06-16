@@ -14,6 +14,7 @@
 
 - 做系统稳定性高风险动作前，必须先查看 `docs/对系统操作必须要参考的崩坏案例.md`
 - 帮朋友清理电脑、修电脑时同样适用
+- **修改 openclaw.json 规则**：一律用 `openclaw config set`，严禁直接用 Python/`write`/`edit` 写 agents 段（CASE-20260616-002：重复键导致 Gateway 启动失败）
 
 ## 凭据与隐私
 
