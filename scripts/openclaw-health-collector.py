@@ -216,12 +216,19 @@ def main():
     # ── 轻量层（每次都做）──
 
     # 1. 刷新 supervisor 状态
-    checks.append(run_sub_check(
+    sv_check = run_sub_check(
         "supervisor-refresh",
         [sys.executable, str(SCRIPTS / "openclaw-supervisor-status.py"),
          "--notify-transitions", "--print-human"],
         timeout=30,
-    ))
+    )
+    # supervisor 刷新不是关键路径，失败降级为 degraded
+    if not sv_check.get("ok") and not sv_check.get("degraded"):
+        sv_check["degraded"] = True
+        sv_check["ok"] = True  # 不拖垮 collector
+        if not sv_check.get("degradedReason"):
+            sv_check["degradedReason"] = "supervisor refresh non-critical failure"
+    checks.append(sv_check)
 
     # 1.5 监工自动管理（从 task-scheduler 内迁；只在 auto 模式干预）
     _auto_manage_supervisor()

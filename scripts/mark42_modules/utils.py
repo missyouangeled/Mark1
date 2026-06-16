@@ -4,9 +4,13 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+# 活跃 session 的 .lock 文件最大年龄（秒），超过视为死 session
+LOCK_MAX_AGE = 120
 
 # 从 config 导入常量
 from .config import (
@@ -59,7 +63,27 @@ def _run_script(name: str, *args: str, check: bool = True) -> subprocess.Complet
     return subprocess.run(cmd, capture_output=True, text=True, check=check)
 
 def _find_active_session() -> Path | None:
-    sessions_dir = XDG_STATE / "openclaw" / "sessions"
+    """找当前活跃 session：优先用 .lock 文件，按 mtime 取最新。
+    
+    选择策略：
+    1. 找所有 .jsonl.lock 文件，按修改时间排序
+    2. 过滤掉 LOCK_MAX_AGE 秒内未更新的死 session
+    3. 取最新的活跃 session，回退到对应 JSONL 文件
+    4. 无 .lock 文件时回退到按 mtime 取最新 .jsonl
+    """
+    sessions_dir = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+    now = time.time()
+    # 策略 A：.lock 文件
+    lock_files = sorted(sessions_dir.glob("*.jsonl.lock"),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+    for lock in lock_files:
+        age = now - lock.stat().st_mtime
+        if age > LOCK_MAX_AGE:
+            continue  # 死 session
+        jsonl_path = Path(str(lock).replace(".lock", ""))
+        if jsonl_path.exists():
+            return jsonl_path
+    # 策略 B：回退——按 mtime 取最新 JSONL
     best = None
     best_mtime = 0
     for candidate in sessions_dir.glob("*.jsonl"):
