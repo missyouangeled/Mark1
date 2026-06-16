@@ -7,6 +7,8 @@
 
 ## 1. 监工服务
 
+> 💡 系统操作相关的脚本路径、服务配置、凭据指针 → 详见 `TOOLS.md`。
+
 ### 控制语义
 - 状态脚本：`python3 scripts/openclaw-supervisor-status.py`
 - 模式：`policyMode=auto|force_on|force_off` + `taskActive=true|false`
@@ -27,7 +29,7 @@
 - 标签：`main-supervisor-lite@<runtime-host>`
 - 数量原则：0 或 1（单例）
 - 工作型任务期应为 1，无后台任务约 2 分钟后可回到 0
-- 有普通任务分身时，必须同时存在一个监工分身
+- 有普通任务分身**且当前轮需要前台协作/插播时**，必须同时存在一个监工分身
 - 发现两个同标号监工→保留最新且健康的，其余删除
 
 ### 监工行为
@@ -101,6 +103,8 @@
 ---
 
 ## 7. 会话清理
+
+> ⚠️ 此段与 `rules/operations/session-cleanup.md` 和 `rules/work.md` §12 重复定义——修改任一处时务必同步另外两处。
 
 - 用户说"清会话"→按分层方案执行
 - 先保留当前会话树与主会话

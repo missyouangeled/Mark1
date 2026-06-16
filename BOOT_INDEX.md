@@ -51,15 +51,18 @@
 - 内容：我是谁、语言规则、对话风格、我在帮谁
 - → 回复「正在加载系统」
 
-### 第 2 步 — 读取上下文层（今日状态）
+### 第 2 步 — 读取核心行为协议层（AGENTS-CORE）
+- 路径：`rules/agents-core.md`
+- 内容：身份指令、启动流程、域规则触发、记忆体系、修改类任务流程、群聊规则、主机定位
+- ⚠️ 这是 Mark42 分层加载的第一层核心，始终加载，≤120行
+
+### 第 3 步 — 读取上下文层（今日状态）
 - `memory/daily/YYYY-MM-DD.md`（今天 + 昨天）
 - `/mnt/data/openclaw/session-backup/` 最新快照中的 `context-summary.md`
 - `docs/模型使用说明.md` ⭐ 每个模型的正确用法和已知坑点（图生绕过方案、GLM 不稳定、thinking 兼容性等）
 
-### 第 3 步 — 读取 MEMORY.md（偏好与规则层）
-- 路径：`MEMORY.md`
-
-### 第 4 步 — 读取索引与技能层（全局导航）
+### 第 4 步 — 读取 MEMORY.md + 索引层
+- `MEMORY.md`（总索引，只主会话加载）
 - `SKILL_CATALOG.md`
 - `WORKSPACE_INDEX.md`
 
@@ -84,12 +87,20 @@
 | 查安装记录 | `docs/install-registry.md` |
 | 语音回复 | `skills/chattts-stable/SKILL.md` 或 `skills/noizai-tts/SKILL.md` |
 | 排查/修复/修改类任务 | `docs/通用-问题解决标准流程.md`（标准六步流程） |
+| **Mark42 操作模板** | |
+| 监工服务 / 后台插播 | `rules/operations/supervisor.md` |
+| 心跳 / 定时检查 | `rules/operations/heartbeat.md` |
+| 视频平台下载 | `rules/operations/video-download.md` |
+| 多机器同步与维护 | `rules/operations/multi-machine.md` |
+| 会话清理 | `rules/operations/session-cleanup.md` |
+| 前台常驻 / 后台插播 | `rules/operations/foreground-background.md` |
 
 ---
 
 ## 设计原则
 
-- 启动时全量加载，不偷懒
-- 分层只是为了结构清晰，不是用来跳过加载的
-- 切模型 = 一次新的接管，必须完整加载
+- 启动时加载核心链（第 0-5 步）：全量加载，不偷懒
+- 按需表（对话中用到时读）：系统操作/CPU 应急/方案/项目/安装/TTS 等——属于「用到时再读」，不是跳过
+- 分层是为了结构清晰 + 上下文预算优化，不是用来跳过加载的
+- 切模型 = 一次新的接管，必须完整加载核心链
 - 「OK 已经读取完成。」是硬指令，不是建议

@@ -1613,3 +1613,155 @@
 - 烟测通过:script正常,broker事件写入,status文件更新,severity变化去重正确,timer active
 - 相关文件：
 - `scripts/openclaw-context-monitor.py`
+
+## 2026-06-16 08:22:10 CST (+08:00) — Mark42 初步实现 — scripts/mark42.py 统一入口
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 三模块骨架完成（armor/engine/heavy）+ assemble 一键启动，单文件 ~470 行，烟测 5/5 全通过，broker 事件正常写入
+- 验收 / 验证：
+- armor --check / --compress / --guard · engine --list / --start / --watch-task · heavy --preflight / --start / --finish · assemble · memory-index.json 生成 · actions.jsonl 记录 · broker events.jsonl 写入
+- 相关文件：
+- `scripts/mark42.py`
+
+## 2026-06-16 09:02:59 CST (+08:00) — Mark42 v2.0 — Armor 智能记忆索引 + Engine 模板/daemon/kill
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- Armor: 从硬编码模板升级为 JSONL 启发式分析（_read_session_tail + _classify_messages），按角色/关键词/长度分类 preserved/discarded；Engine: 新增 4 模板(context-guard/health-watch/task-watch/model-fallback)、daemon 事件驱动守护模式、--kill 终止 Loop、--templates 模板列表
+- 验收 / 验证：
+- armor --compress 分析49条消息产出分类索引 · engine --templates 四模板正常 · --start --template 正常 · --run 模板路由正常 · --kill 正常 · --daemon 事件扫描+Loop执行正常
+- 相关文件：
+- `scripts/mark42.py`
+
+## 2026-06-16 09:16:15 CST (+08:00) — Mark42 v2.1 — LLM驱动记忆索引 + Heavy自动分批 + Engine闭环联动 + 配置系统
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- v2.0→v2.1: Armor新增_llm_analyze()通过HTTP直调DeepSeek v4-pro做语义分析(JSON mode)，失败自动回退启发式；Heavy heavy_start()新增自动分批——扫描文件列表+按上下文余量计算批次+拆分子任务+写status.json；Engine engine_run_loop()升级Observe→Decide→Act→Verify闭环(4模板全覆盖)，engine_daemon()新增Heavy任务联动事件；新增--init/--config配置系统和mark42_init()/mark42_config()
+- 验收 / 验证：
+- armor --compress LLM分析成功产出高质量结构化索引 · heavy --start自动拆102文件为4批 · engine --run 4模板闭环正常 · --init/--config正常 · 全量10项烟测通过
+- 相关文件：
+- `scripts/mark42.py`
+
+## 2026-06-16 09:27:16 CST (+08:00) — Mark42 v2.2 — 模块拆分 + log rotation
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 单文件1401行拆为8文件：mark42.py(28行入口)+mark42_modules/(config/utils/armor/engine/heavy/logs/cli共7模块)。解决循环依赖(config.py内联JSON工具)。新增logs模块：log_rotate()统一清理history/actions/broker/scratch；log_rotate_status()查看状态；阈值可配(MAX_LOG_AGE_DAYS/MAX_BROKER_EVENTS_MB/MAX_HISTORY_FILES/MAX_ACTIONS_LINES)；engine_daemon每10次循环自动调log_rotate()。heavy新增--cleanup命令。
+- 验收 / 验证：
+- 9项烟测全通过 · armor/engine/heavy/logs/cli独立可导入 · log rotate状态正常(6历史文件/0.9MB broker/15 scratch目录) · --cleanup可用
+- 相关文件：
+- `scripts/mark42.py`
+
+## 2026-06-16 09:44:26 CST (+08:00) — Mark42 v2.2→v2.2r2: 代码审查修复 + 3低风险项（压缩联动/Heavy执行/status dashboard）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 12个代码审查问题修复11个（1个已知容忍）+ 压缩联动broker事件 + Heavy --execute/--execute-all自动入队 + status一屏聚合仪表盘。8/8编译通过，15项烟测全部通过。
+- 验收 / 验证：
+- 15项烟测全通过，status dashboard正常展示Armor/Engine/Heavy/Logs四模块聚合。
+- 相关文件：
+- `scripts/mark42.py`
+- `scripts/mark42_modules/`
+
+## 2026-06-16 09:55:38 CST (+08:00) — Mark42 engine: model-fallback 模板定位修正（OpenClaw内置failover已接管）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- model-fallback 模板从"自动切换模型"改为"监测态势感知"——OpenClaw内置模型failover已完整覆盖自动切换/退避/恢复逻辑，铠甲只需感知和记录。daemon中的故障信号处理文案同步修正。
+- 验收 / 验证：
+- 编译通过，engine --templates 显示修正后的model-fallback模板说明。
+- 相关文件：
+- `scripts/mark42_modules/engine.py`
+
+## 2026-06-16 10:04:53 CST (+08:00) — Mark42 v2.2: AGENTS.md 分层加载体系 + 记忆自动归类 Loop + 市场调研归档
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- AGENTS.md 从 515行/43KB 巨石拆成：① AGENTS.md 精简入口(73行) ② rules/agents-core.md 核心层(121行始终加载) ③ 4个域规则按需触发 ④ 6个操作模板按需读取。核心层始终加载从43KB降到6.8KB，节省85%。同步更新BOOT_INDEX.md。Engine新增memory-index模板(21600s周期)。市场调研材料归档到 plans/mark42-market-research-context-management.md。
+- 验收 / 验证：
+- AGENTS.md + agents-core.md 编译无语法错误。Mark42 status dashboard 正常。engine --templates 显示 5 个模板含 memory-index。
+- 相关文件：
+- `AGENTS.md`
+- `BOOT_INDEX.md`
+- `rules/agents-core.md`
+- `rules/operations/`
+- `scripts/mark42_modules/engine.py`
+
+## 2026-06-16 10:09:49 CST (+08:00) — Mark42: 分层加载审查修复（循环引用/过期引用/大小描述）
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 审查修复3个问题：①agents-core.md启动流程段循环引用BOOT_INDEX.md→改为\"遵循BOOT_INDEX分层流程\" ②RULES_INDEX.md底层大文件表中AGENTS.md描述过期→更新为\"精简入口→指向agents-core+操作模板\" ③域规则大小上限从150行→200行（work.md实际162行）
+- 验收 / 验证：
+- 循环引用已消除（grep 0匹配）。AGENTS.md引用已更新。启动始终加载6.7KB。
+- 相关文件：
+- `RULES_INDEX.md`
+- `rules/agents-core.md`
+
+## 2026-06-16 10:14:52 CST (+08:00) — Mark42: AGENTS.md 分层加载全量审查 + 补全 15 条遗漏逻辑
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 全量审查旧 AGENTS.md 515行/33个章节→新分层体系。发现并补全 5 类遗漏：①agents-core记忆体系段：补 Memory flush 扁平路径+lifecycle-maintainer兜底+memory_get确认+L1/L2脚本路径 ②群聊段：补avoid triple-tap ③主机段：补判定优先级+不按主机变persona+不自动覆写命名 ④项目方案隔离段：补文档引用+项目改名同步 ⑤修改任务段：补学教训更新规则+context-degradation诊断。Supervisor.md 补 10分钟等待窗口+activeTaskCount核对+dashboard移动。交叉引用链全部验证通过。最终始终加载 195行（旧515行）。
+- 验收 / 验证：
+- 核心层27项关键检查全通过。交叉引用链全部正确（无过期引用）。始终加载195行/全量规则883行。
+- 相关文件：
+- `RULES_INDEX.md`
+- `rules/agents-core.md`
+- `rules/operations/supervisor.md`
+
+## 2026-06-16 10:23:52 CST (+08:00) — Mark42: 全量逻辑一致性审查 — 修复 8 处逻辑问题
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 三轮审查发现并修复：①CORE启动流程缺六步法和模型使用说明→补第0步+上下文层 ②system/supervisor监工触发条件矛盾→统一为保守版 ③拿不准策略CORE写work.md但RULES_INDEX写全读→统一为全读 ④system.md不引用TOOLS.md→补 ⑤会话清理三处分散→加交叉引用标签 ⑥supervisor缺阻塞判定回退→补 ⑦记忆归档缺触发机制→补 ⑧BOOT_INDEX全量加载声明歧义→精确声明 ⑨安装注册表缺卸载细节→补。最终：逻辑悖论0、死循环0、规则互相否定0、覆盖盲区0
+- 验收 / 验证：
+- 始终加载303行(入口+核心)。域规则447行。操作模板248行。15文件1155行46.3KB。交叉引用链+循环引用+规则否定+覆盖盲区全部通过
+- 相关文件：
+- `BOOT_INDEX.md`
+- `rules/agents-core.md`
+- `rules/operations/session-cleanup.md`
+- `rules/operations/supervisor.md`
+- `rules/system.md`

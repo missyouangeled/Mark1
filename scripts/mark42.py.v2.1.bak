@@ -1,0 +1,1401 @@
+#!/usr/bin/env python3
+"""
+Mark42 模块化智能铠甲系统 — 统一入口
+
+代号：Mark42
+原则：每一块拆开能独立战斗，拼在一起是完整战甲
+
+模块:
+  armor   — 🛡️ 上下文铠甲：检测、诊断、智能压缩
+  engine  — 🔄 循环引擎：Observe→Decide→Act→Verify 标准化 Loop
+  heavy   — ⚙️ 重型战甲：大工程安全执行 + 上下文感知
+
+用法:
+  python3 scripts/mark42.py armor --check              # 检查上下文健康
+  python3 scripts/mark42.py armor --compress           # 触发智能压缩
+  python3 scripts/mark42.py armor --guard              # 守护模式
+
+  python3 scripts/mark42.py engine --list              # 查看活跃 Loop
+  python3 scripts/mark42.py engine --start --task "..." # 启动 Loop
+  python3 scripts/mark42.py engine --watch-task NAME   # 监控大工程
+
+  python3 scripts/mark42.py heavy --preflight /path    # 大工程预检
+  python3 scripts/mark42.py heavy --start /path --task-name X  # 开工
+  python3 scripts/mark42.py heavy --finish --task-name X        # 收工
+
+  python3 scripts/mark42.py assemble                   # 一键启动完整战甲
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+# ── 常量 ──────────────────────────────────────────────
+
+WORKSPACE = Path(__file__).resolve().parent.parent
+SCRIPTS = WORKSPACE / "scripts"
+SCRATCH = Path("/mnt/data/openclaw/scratch")
+
+XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
+MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
+ARMOR_STATE = MARK42_STATE / "armor"
+ENGINE_STATE = MARK42_STATE / "engine"
+HEAVY_STATE = MARK42_STATE / "heavy"
+
+BROKER_DIR = XDG_STATE / "openclaw" / "broker"
+BROKER_EVENTS = BROKER_DIR / "events.jsonl"
+BROKER_DIRTY = BROKER_DIR / ".dirty"
+
+# 上下文阈值
+THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))
+THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", "85"))
+THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", "95"))
+
+BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(14 * 1024)))
+DEFAULT_CONTEXT_WINDOW = 131072
+
+BROKER_SOURCE = "mark42"
+
+
+CONFIG_PATH = MARK42_STATE / "config.json"
+
+
+# ── 配置系统 ────────────────────────────────────────────
+
+def _load_config() -> dict[str, Any]:
+    """加载 Mark42 配置，不存在则返回默认值。"""
+    if CONFIG_PATH.exists():
+        return _load_json(CONFIG_PATH)
+    return {}
+
+
+def _save_config(cfg: dict[str, Any]) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _save_json(CONFIG_PATH, cfg)
+
+
+def mark42_init() -> None:
+    """初始化 Mark42 配置和目录结构。"""
+    if CONFIG_PATH.exists():
+        cfg = _load_config()
+        print(f"⚙️ Mark42 已初始化（版本: {cfg.get('version', '?')})，使用 --config 修改")
+        return
+
+    cfg = {
+        "version": "2.1",
+        "initializedAt": _now_iso(),
+        "thresholds": {
+            "warn": THRESHOLD_WARN,
+            "alert": THRESHOLD_ALERT,
+            "crit": THRESHOLD_CRIT,
+        },
+        "contextWindow": DEFAULT_CONTEXT_WINDOW,
+        "bytesPerKtoken": BYTES_PER_KTOKEN,
+        "models": {
+            "llmAnalyze": "deepseek-v4-pro",
+            "llmProvider": "deepseek",
+        },
+        "daemon": {
+            "scanInterval": 30,
+            "autoArmorCompress": True,
+            "autoTaskWatch": True,
+        },
+    }
+    _save_config(cfg)
+
+    # 确保目录存在
+    for d in [ARMOR_STATE, ENGINE_STATE, HEAVY_STATE]:
+        d.mkdir(parents=True, exist_ok=True)
+    (ARMOR_STATE / "history").mkdir(parents=True, exist_ok=True)
+
+    print("✅ Mark42 已初始化")
+    print(f"   配置: {CONFIG_PATH}")
+    print(f"   状态: {MARK42_STATE}")
+    print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
+    print(f"   使用 'python3 scripts/mark42.py --config' 查看/修改")
+
+
+def mark42_config() -> None:
+    """显示当前配置。"""
+    if not CONFIG_PATH.exists():
+        print("❌ 尚未初始化，请先运行: mark42.py --init")
+        return
+
+    cfg = _load_config()
+    print("⚙️ Mark42 配置:\n")
+    print(f"   版本: {cfg.get('version', '?')}")
+    print(f"   初始化于: {cfg.get('initializedAt', '?')}")
+    print(f"   上下文窗口: {cfg.get('contextWindow', 0)/1000:.0f}K")
+    print(f"   字节/KToken: {cfg.get('bytesPerKtoken', '?')}")
+    print(f"\n   阈值:")
+    t = cfg.get("thresholds", {})
+    print(f"     WARN: {t.get('warn', '?')}%  |  ALERT: {t.get('alert', '?')}%  |  CRIT: {t.get('crit', '?')}%")
+    print(f"\n   模型:")
+    m = cfg.get("models", {})
+    print(f"     LLM 分析: {m.get('llmAnalyze', '?')}  ({m.get('llmProvider', '?')})")
+    print(f"\n   守护模式:")
+    d = cfg.get("daemon", {})
+    print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
+    print(f"     自动压缩: {d.get('autoArmorCompress', '?')}")
+    print(f"     自动监控: {d.get('autoTaskWatch', '?')}")
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _now_ts() -> float:
+    return time.time()
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def _save_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def _append_broker(source_view: str, event_type: str, label: str, level: str,
+                   message: str, data: dict[str, Any] | None = None) -> None:
+    """向 broker 写入标准化 mark42 事件。"""
+    BROKER_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "recordType": "broker.source.event",
+        "source": BROKER_SOURCE,
+        "sourceEventType": f"mark42.{event_type}",
+        "sourceEventLabel": label,
+        "sourceView": source_view,
+        "eventKey": f"mark42-{event_type}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+        "sessionKey": "agent:main:main",
+        "message": message,
+        "recordedAt": _now_iso(),
+        "metadata": {"level": level, **(data or {})},
+    }
+    with open(BROKER_EVENTS, "a") as f:
+        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    BROKER_DIRTY.touch()
+
+
+def _run_script(name: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    """运行 scripts/ 下的同目录脚本。"""
+    script = SCRIPTS / name
+    cmd = ["python3", str(script), *args]
+    return subprocess.run(cmd, capture_output=True, text=True, check=check)
+
+
+# ── 模块A: 上下文铠甲 Armor ────────────────────────────
+
+def _find_active_session() -> Path | None:
+    """找到当前活跃 session JSONL。"""
+    sessions_dir = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+    if not sessions_dir.exists():
+        return None
+    lock_files = sorted(sessions_dir.glob("*.jsonl.lock"))
+    if not lock_files:
+        return None
+    jsonl = Path(str(lock_files[0]).replace(".lock", ""))
+    return jsonl if jsonl.exists() else None
+
+
+def _estimate_tokens(session_path: Path) -> dict[str, Any]:
+    size = session_path.stat().st_size
+    est = int(size / BYTES_PER_KTOKEN * 1000)
+    return {"sessionPath": str(session_path), "fileSizeBytes": size, "estimatedTokens": est}
+
+
+def _get_context_window() -> int:
+    """从 openclaw.json 读取 deepseek 上下文窗口。"""
+    for cp in [Path.home() / ".openclaw" / "openclaw.json", WORKSPACE / "openclaw.json"]:
+        if cp.exists():
+            try:
+                data = _load_json(cp)
+                agents = data.get("agents", {})
+                defaults = agents.get("defaults", {})
+                models = defaults.get("models", {})
+                for mid, cfg in models.items():
+                    if "deepseek" in str(mid).lower():
+                        ctx = cfg.get("contextWindow")
+                        if ctx:
+                            return int(ctx)
+            except Exception:
+                pass
+    return DEFAULT_CONTEXT_WINDOW
+
+
+def armor_check() -> dict[str, Any]:
+    """检查上下文健康度。"""
+    result = {
+        "checkedAt": _now_iso(),
+        "host": os.uname().nodename,
+        "status": "ok",
+        "severity": "ok",
+        "summary": "上下文使用率正常",
+        "usagePercent": 0,
+        "estimatedTokens": 0,
+        "contextWindow": DEFAULT_CONTEXT_WINDOW,
+    }
+
+    active = _find_active_session()
+    if not active:
+        result["status"] = "unknown"
+        result["severity"] = "warn"
+        result["summary"] = "找不到活跃 session"
+        return result
+
+    token_info = _estimate_tokens(active)
+    est = token_info["estimatedTokens"]
+    result["estimatedTokens"] = est
+
+    cw = _get_context_window()
+    result["contextWindow"] = cw
+
+    usage = round(est / cw * 100, 1) if cw > 0 else 0
+    result["usagePercent"] = usage
+
+    if usage >= THRESHOLD_CRIT:
+        result["status"] = "critical"
+        result["severity"] = "critical"
+        result["summary"] = f"🔥 上下文 {usage}%（≥{THRESHOLD_CRIT}%），建议立即处理"
+    elif usage >= THRESHOLD_ALERT:
+        result["status"] = "alert"
+        result["severity"] = "error"
+        result["summary"] = f"⚠️ 上下文 {usage}%（≥{THRESHOLD_ALERT}%），建议压缩"
+    elif usage >= THRESHOLD_WARN:
+        result["status"] = "warn"
+        result["severity"] = "warn"
+        result["summary"] = f"上下文 {usage}%（≥{THRESHOLD_WARN}%），注意监控"
+    else:
+        result["status"] = "ok"
+        result["severity"] = "ok"
+        result["summary"] = f"上下文 {usage}%，正常"
+
+    return result
+
+
+def _read_session_tail(jsonl_path: Path, lines: int = 60) -> list[dict[str, Any]]:
+    """读取 JSONL 尾部 N 条消息。"""
+    if not jsonl_path.exists():
+        return []
+    try:
+        with open(jsonl_path, "r") as f:
+            all_lines = f.readlines()
+    except OSError:
+        return []
+    tail = all_lines[-lines:]
+    messages = []
+    for line in tail:
+        try:
+            msg = json.loads(line)
+            # 只取有实际内容的文本消息
+            content = msg.get("message", {}).get("content", "") or msg.get("text", "")
+            if isinstance(content, list):
+                # 可能是个 content blocks 数组
+                texts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("text")]
+                content = " ".join(texts)
+            if not content or not isinstance(content, str):
+                continue
+            messages.append({
+                "role": msg.get("role") or msg.get("message", {}).get("role", "unknown"),
+                "content": str(content)[:500],  # 截断过长消息
+                "contentLen": len(str(content)),
+            })
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return messages
+
+
+def _classify_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    """启发式分类：preserved vs discarded。"""
+    preserved = []
+    discarded = []
+
+    # 关键词规则
+    PRESERVE_KW = ["偏好", "设定", "规则", "模型", "配置", "记住", "重要",
+                    "Mark42", "Mark1", "Mark2", "方案", "设计", "架构",
+                    "密码", "凭据", "API", "Key", "部署", "系统",
+                    "永远", "永久", "一直", "总是", "默认"]
+    DISCARD_KW = ["天气", "吃饭", "在吗", "在不在", "还在", "好了", "OK",
+                  "哦", "嗯", "行", "好", "哈哈", "嘿嘿", "test", "测试"]
+
+    for msg in messages:
+        content = msg.get("content", "")
+        role = msg.get("role", "")
+        content_len = msg.get("contentLen", 0)
+
+        score = 0
+        # 长消息更可能是重要内容
+        if content_len > 500:
+            score += 3
+        elif content_len > 200:
+            score += 1
+
+        # 用户消息更可能包含设定/偏好
+        if role == "user":
+            score += 2
+        elif role == "system":
+            score += 3
+
+        # 关键词匹配
+        for kw in PRESERVE_KW:
+            if kw.lower() in content.lower():
+                score += 2
+        for kw in DISCARD_KW:
+            if kw.lower() in content.lower():
+                score -= 1
+
+        entry = {"role": role, "preview": content[:120], "length": content_len}
+        if score >= 2:
+            preserved.append(entry)
+        else:
+            discarded.append(entry)
+
+    return {"preserved": preserved[:20], "discarded": discarded[:10], "totalAnalyzed": len(messages)}
+
+
+def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """
+    调用 DeepSeek API 对会话消息做智能分析。
+    返回结构化 JSON：{preserved: {...}, discarded: {...}, degradation: ...}
+    若 API 不可用则返回 None，此时应回退到启发式规则。
+    """
+    import urllib.request
+
+    config_path = Path.home() / ".openclaw" / "openclaw.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path) as f:
+            cfg = json.load(f)
+        provider = cfg.get("models", {}).get("providers", {}).get("deepseek", {})
+        api_key = provider.get("apiKey", "")
+        base_url = provider.get("baseUrl", "https://api.deepseek.com")
+
+        if not api_key:
+            return None
+    except Exception:
+        return None
+
+    # 格式化消息列表为文本（截断到 8KB 避免 prompt 溢出）
+    lines = []
+    for msg in messages[-40:]:  # 最多分析 40 条
+        role = msg.get("role", "?")
+        text = msg.get("content", "")[:200]
+        lines.append(f"[{role}] {text}")
+    convo_text = "\n".join(lines)[:8192]
+
+    prompt = f"""分析以下 AI 助手与用户的对话记录片段。你的任务：
+1. 提取需要**保留**的关键信息（用户身份、偏好设定、活跃项目、重要决策、任务状态）
+2. 识别可以**丢弃**的内容（闲聊、已完成子任务、重复确认、简短应答）
+3. 检测上下文退化类型（lost-in-middle / distraction / confusion / clash / 无）
+
+对话记录（按时间顺序）：
+{convo_text}
+
+请返回纯 JSON（不要 markdown 代码块包裹）：
+{{
+  "preserved": {{
+    "userIdentity": "用户身份描述",
+    "preferences": ["偏好1", "偏好2"],
+    "activeProjects": ["项目名称"],
+    "recentDecisions": ["重要决策"],
+    "taskState": {{"current": "当前任务", "progress": "进度描述"}}
+  }},
+  "discarded": {{
+    "summary": "丢弃内容的一句话概括",
+    "estimatedTokensSaved": 数字
+  }},
+  "degradationDetected": "类型或无",
+  "suggestedAction": "/compact 或 monitor"
+}}"""
+
+    try:
+        body = json.dumps({
+            "model": "deepseek-v4-pro",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 2000,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }).encode()
+
+        req = urllib.request.Request(
+            f"{base_url}/v1/chat/completions",
+            data=body,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        )
+        resp = urllib.request.urlopen(req, timeout=45)
+        data = json.loads(resp.read())
+        content = data["choices"][0]["message"]["content"]
+
+        # 尝试解析（可能包裹在 markdown 代码块里）
+        content = content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip()
+
+        result = json.loads(content)
+        result["_llm_meta"] = {
+            "model": data.get("model"),
+            "tokens": data.get("usage", {}),
+            "responseFormat": "json_object",
+        }
+        return result
+    except Exception as e:
+        # API 失败时返回 None，由调用方回退到启发式
+        return None
+
+
+def armor_compress(dry_run: bool = False) -> dict[str, Any]:
+    """
+    触发智能压缩 — v2.1：LLM 驱动的记忆索引。
+    优先调用 DeepSeek API 做语义分析，失败则回退到启发式规则。
+    """
+    check = armor_check()
+    usage = check.get("usagePercent", 0)
+
+    if usage < THRESHOLD_WARN and not dry_run:
+        result = {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {THRESHOLD_WARN}%", "check": check}
+        return result
+
+    # ── v2.1: LLM 驱动 + 启发式回退 ──
+    active = _find_active_session()
+    session_messages = _read_session_tail(active) if active else []
+
+    # 优先 LLM 分析
+    llm_result = _llm_analyze(session_messages) if session_messages else None
+
+    if llm_result:
+        # LLM 成功，用分析结果
+        index = {
+            "generatedAt": _now_iso(),
+            "preCompressUsage": usage,
+            "modelGenerated": True,
+            "analyzedMessages": min(len(session_messages), 40),
+            "preserved": llm_result.get("preserved", {}),
+            "discarded": llm_result.get("discarded", {}),
+            "degradationDetected": llm_result.get("degradationDetected"),
+            "strategyUsed": "llm-analyze",
+            "recommendedAction": llm_result.get("suggestedAction", "monitor"),
+            "llmMeta": llm_result.get("_llm_meta", {}),
+        }
+        print(f"🧠 LLM 分析完成 (model: {llm_result.get('_llm_meta', {}).get('model', '?')})")
+    else:
+        # LLM 不可用，回退启发式
+        classification = _classify_messages(session_messages)
+
+        preserved_items = classification.get("preserved", [])
+        preserved_roles = {}
+        for item in preserved_items:
+            role = item.get("role", "unknown")
+            if role not in preserved_roles:
+                preserved_roles[role] = []
+            preserved_roles[role].append(item.get("preview", ""))
+
+        discarded_items = classification.get("discarded", [])
+        discarded_summary = [d.get("preview", "")[:80] for d in discarded_items[:5]]
+
+        degradation = None
+        if usage > 90:
+            degradation = "lost-in-middle"
+        elif classification.get("totalAnalyzed", 0) > 40:
+            degradation = "distraction"
+
+        index = {
+            "generatedAt": _now_iso(),
+            "preCompressUsage": usage,
+            "modelGenerated": False,
+            "analyzedMessages": classification.get("totalAnalyzed", 0),
+            "preserved": {
+                "userIdentity": "点点（袁文涛），1991-11-29，中文优先",
+                "byRole": {role: previews[:5] for role, previews in preserved_roles.items()},
+                "keyMessagesCount": len(preserved_items),
+            },
+            "discarded": {
+                "samples": discarded_summary,
+                "count": len(discarded_items),
+            },
+            "degradationDetected": degradation,
+            "strategyUsed": "heuristic-classify",
+            "recommendedAction": "/compact" if usage >= THRESHOLD_ALERT else "monitor",
+        }
+        print(f"⚠️ LLM 不可用，回退到启发式分析")
+
+    index_path = ARMOR_STATE / "memory-index.json"
+    _save_json(index_path, index)
+
+    # 写历史
+    history_dir = ARMOR_STATE / "history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    _save_json(history_dir / f"memory-index-{ts}.json", index)
+
+    # 记录出手日志
+    actions_log = ARMOR_STATE / "actions.jsonl"
+    actions_log.parent.mkdir(parents=True, exist_ok=True)
+    action_entry = {
+        "ts": _now_iso(),
+        "action": "compress" if not dry_run else "compress-dryrun",
+        "preCompressUsage": usage,
+        "indexPath": str(index_path),
+    }
+    with open(actions_log, "a") as f:
+        f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
+
+    # 发 broker 事件
+    _append_broker("health", "armor.compress", f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
+                   "warn" if usage >= THRESHOLD_WARN else "ok",
+                   f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
+                   {"usagePercent": usage, "dryRun": dry_run})
+
+    return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
+
+
+def armor_guard(interval_s: int = 300) -> None:
+    """守护模式：每 N 秒检查一次，超阈值自动出手。"""
+    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查）")
+    print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
+    print(f"   按 Ctrl+C 退出\n")
+
+    try:
+        while True:
+            check = armor_check()
+            usage = check.get("usagePercent", 0)
+            severity = check.get("severity", "ok")
+
+            ts = datetime.now().strftime("%H:%M:%S")
+            if severity == "ok":
+                print(f"[{ts}] ✅ {usage}% — 正常")
+            elif severity == "warn":
+                print(f"[{ts}] 🟡 {usage}% — 接近阈值")
+            elif severity == "error":
+                print(f"[{ts}] 🟠 {usage}% — 触发压缩")
+                result = armor_compress()
+                print(f"   → {result.get('action')}: {result.get('reason', result.get('indexWritten', ''))}")
+            elif severity == "critical":
+                print(f"[{ts}] 🔴 {usage}% — 紧急！已生成索引，建议立即 /compact")
+
+            _save_json(ARMOR_STATE / "status.json", check)
+            time.sleep(interval_s)
+    except KeyboardInterrupt:
+        print("\n🛡️ 守护模式已退出")
+
+
+
+# ── 模板系统 ──────────────────────────────────────────
+
+TEMPLATES: dict[str, dict[str, Any]] = {
+    "context-guard": {
+        "description": "持续监控上下文健康 + 自动出手",
+        "observe": "armor --check",
+        "decide": "if usage > 85% → trigger compress; if > 70% → warn",
+        "act": "armor --compress",
+        "verify": "armor --check（确认使用率下降）",
+        "interval": 300,
+    },
+    "task-watch": {
+        "description": "大工程执行 + 全程护航",
+        "observe": "heavy task status via scratch/{name}/status.json",
+        "decide": "if stalled → alert; if done → verify; if failed → retry",
+        "act": "notify frontstage via broker",
+        "verify": "输出文件存在 + 非空",
+        "interval": 30,
+    },
+    "model-fallback": {
+        "description": "模型调用失败自动切换",
+        "observe": "check gateway health / recent errors",
+        "decide": "if 401/429/5xx → fallback to next model",
+        "act": "switch model via openclaw gateway call",
+        "verify": "新模型正常返回",
+        "interval": 60,
+    },
+    "health-watch": {
+        "description": "系统健康监控（CPU/内存/磁盘）",
+        "observe": "free -h && df -h / /mnt/data",
+        "decide": "if disk < 5GB or mem < 500MB → alert",
+        "act": "write broker warning event",
+        "verify": "资源恢复正常",
+        "interval": 600,
+    },
+}
+
+
+def engine_templates() -> None:
+    """列出所有可用模板。"""
+    print("🔄 可用 Loop 模板:\n")
+    for name, tmpl in sorted(TEMPLATES.items()):
+        print(f"  📋 {name}")
+        print(f"     {tmpl['description']}")
+        print(f"     周期: {tmpl['interval']}s")
+        print(f"     Observe: {tmpl['observe'][:60]}")
+        print(f"     Decide:  {tmpl['decide'][:60]}")
+        print(f"     Act:     {tmpl['act'][:60]}")
+        print()
+
+
+# ── 模块B: 循环引擎 Engine ─────────────────────────────
+
+def _engine_status_path() -> Path:
+    return ENGINE_STATE / "loops.json"
+
+
+def _load_loops() -> dict[str, Any]:
+    return _load_json(_engine_status_path())
+
+
+def _save_loops(loops: dict[str, Any]) -> None:
+    _save_json(_engine_status_path(), loops)
+
+
+def engine_list() -> None:
+    """列出所有活跃 Loop。"""
+    loops = _load_loops()
+    if not loops:
+        print("🔄 当前没有活跃 Loop")
+        return
+
+    print("🔄 活跃 Loop 清单:\n")
+    for name, cfg in sorted(loops.items()):
+        status = cfg.get("status", "unknown")
+        icon = {"running": "▶️", "paused": "⏸️", "done": "✅", "failed": "❌", "registered": "📋"}.get(status, "❓")
+        print(f"  {icon} {name}")
+        print(f"     状态: {status}  |  周期: {cfg.get('interval', 'N/A')}s  |  "
+              f"循环: {cfg.get('cycle', 0)}/{cfg.get('maxCycles') or '∞'}")
+        tmpl = cfg.get("template", "")
+        if tmpl:
+            print(f"     模板: {tmpl}")
+        print(f"     任务: {cfg.get('task', '')[:80]}")
+        print()
+
+
+def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template: str = "") -> None:
+    """注册一个 Loop 任务。支持模板化启动。"""
+    loops = _load_loops()
+
+    # 模板模式
+    if template:
+        if template not in TEMPLATES:
+            print(f"❌ 模板 '{template}' 不存在。可用模板：")
+            engine_templates()
+            return
+        tmpl = TEMPLATES[template]
+        name = template
+        task = task or tmpl["description"]
+        interval_s = interval_s if interval_s != 300 else tmpl["interval"]
+    else:
+        name = f"loop-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    if name in loops:
+        print(f"⚠️ Loop '{name}' 已存在，跳过")
+        return
+
+    loops[name] = {
+        "task": task,
+        "template": template or None,
+        "interval": interval_s,
+        "maxCycles": max_cycles if max_cycles > 0 else None,
+        "cycle": 0,
+        "status": "registered",
+        "createdAt": _now_iso(),
+        "lastRun": None,
+        "lastResult": None,
+    }
+    _save_loops(loops)
+
+    _append_broker("tasks", "engine.loop.registered", f"Loop 注册: {name}", "ok",
+                   f"任务: {task[:100]}" + (f" (模板: {template})" if template else ""),
+                   {"loopName": name, "interval": interval_s, "template": template or None})
+
+    print(f"🔄 Loop '{name}' 已注册")
+    print(f"   任务: {task}")
+    print(f"   周期: {interval_s}s  |  最大循环: {max_cycles or '无限'}")
+    if template:
+        print(f"   模板: {template} — {TEMPLATES[template]['description']}")
+    print(f"   执行: python3 scripts/mark42.py engine --run {name}")
+    print(f"   监控: python3 scripts/mark42.py engine --watch-task {name}")
+
+
+def engine_kill(name: str) -> None:
+    """终止指定 Loop。"""
+    loops = _load_loops()
+    if name not in loops:
+        print(f"❌ Loop '{name}' 不存在")
+        return
+
+    loop = loops[name]
+    prev_status = loop.get("status", "unknown")
+    del loops[name]
+    _save_loops(loops)
+
+    _append_broker("tasks", "engine.loop.killed", f"Loop 终止: {name}", "ok",
+                   f"状态 {prev_status} → killed", {"loopName": name})
+
+    print(f"💀 Loop '{name}' 已终止（原状态: {prev_status})")
+
+
+def engine_watch_task(task_name: str, interval_s: int = 30) -> None:
+    """
+    监控指定大工程任务。
+    对接 Heavy Task Suit 的状态文件，通过 Loop 逻辑推进。
+    增强：自动重试失败子任务（最多3次），30min 无进展告警。
+    """
+    status_file = SCRATCH / task_name / "status.json"
+    if not status_file.exists():
+        print(f"❌ 任务 '{task_name}' 的 scratch 目录不存在，或尚未开工")
+        print(f"   预期路径: {status_file}")
+        return
+
+    print(f"🔍 开始监控任务: {task_name} (每 {interval_s}s)")
+    print(f"   状态文件: {status_file}\n")
+
+    last_summary = ""
+    stalled_count = 0
+    try:
+        while True:
+            state = _load_json(status_file)
+            progress = state.get("progress", "unknown")
+            summary = state.get("summary", "")
+            subtasks = state.get("subtasks", {})
+            completed = sum(1 for s in subtasks.values() if s.get("status") in ("done", "success"))
+            failed = sum(1 for s in subtasks.values() if s.get("status") in ("failed", "error"))
+            running = sum(1 for s in subtasks.values() if s.get("status") in ("running", "started"))
+            total = len(subtasks)
+
+            ts = datetime.now().strftime("%H:%M:%S")
+
+            if progress == "done":
+                print(f"[{ts}] ✅ 任务完成 ({completed}/{total} 子任务)")
+                _append_broker("tasks", "engine.watch.done", f"任务 {task_name} 完成", "ok",
+                               f"{completed}/{total} 子任务完成", {"taskName": task_name})
+                break
+            elif progress == "failed":
+                print(f"[{ts}] ❌ 任务失败 ({failed}/{total} 子任务失败)")
+                _append_broker("tasks", "engine.watch.failed", f"任务 {task_name} 失败", "error",
+                               f"{failed}/{total} 失败", {"taskName": task_name})
+                break
+
+            if summary != last_summary:
+                print(f"[{ts}] 📊 进度: {completed}/{total} (运行中 {running}) | {summary}")
+                last_summary = summary
+            else:
+                print(f"[{ts}] ⏳ 运行中 ({completed}/{total}, 活跃 {running})")
+
+            # 自动重试失败子任务（标记为 retry）
+            retry_count = state.get("retryCount", {})
+            for sid, st in subtasks.items():
+                if st.get("status") in ("failed", "error"):
+                    rc = retry_count.get(sid, 0)
+                    if rc < 3:
+                        retry_count[sid] = rc + 1
+                        st["status"] = "retrying"
+                        print(f"[{ts}] 🔄 子任务 {sid} 失败，第 {rc+1}/3 次重试")
+                        _append_broker("tasks", "engine.watch.retry",
+                                       f"子任务 {sid} 重试 #{rc+1}", "warn",
+                                       f"{task_name} 子任务 {sid} 第 {rc+1}/3 次重试",
+                                       {"taskName": task_name, "subtaskId": sid, "retry": rc + 1})
+
+            state["retryCount"] = retry_count
+            _save_json(status_file, state)
+
+            # 检测卡住（30 分钟无进展）
+            last_update = state.get("lastUpdate", "")
+            if last_update:
+                try:
+                    last_ts = datetime.fromisoformat(last_update).timestamp()
+                    idle_s = _now_ts() - last_ts
+                    if idle_s > 1800:
+                        stalled_count += 1
+                        if stalled_count == 1:
+                            print(f"[{ts}] ⚠️ 任务可能卡住：{int(idle_s/60)} 分钟无更新")
+                            _append_broker("tasks", "engine.watch.stalled", f"{task_name} 可能卡住", "warn",
+                                           f"{int(idle_s/60)} 分钟无更新", {"taskName": task_name})
+                except Exception:
+                    pass
+            else:
+                stalled_count = 0
+
+            time.sleep(interval_s)
+    except KeyboardInterrupt:
+        print(f"\n🔍 监控已停止（任务 '{task_name}' 仍在运行）")
+
+
+def engine_run_loop(name: str) -> None:
+    """
+    手动触发一个已注册 Loop 执行一次。
+    v2.1: Observe→Decide→Act→Verify 闭环。
+    """
+    loops = _load_loops()
+    if name not in loops:
+        print(f"❌ Loop '{name}' 不存在")
+        return
+
+    loop = loops[name]
+    loop["status"] = "running"
+    loop["lastRun"] = _now_iso()
+    _save_loops(loops)
+
+    template_name = loop.get("template", "")
+    task = loop["task"]
+    print(f"▶️ 执行 Loop '{name}': {task}")
+
+    # ── Observe→Decide→Act→Verify ──
+    if template_name == "context-guard":
+        # Observe
+        check = armor_check()
+        usage = check.get("usagePercent", 0)
+        print(f"   🔍 Observe: 上下文 {usage}%")
+        # Decide
+        if usage >= THRESHOLD_ALERT:
+            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，触发压缩")
+            result = armor_compress()
+            # Verify
+            verify = armor_check()
+            new_usage = verify.get("usagePercent", 0)
+            print(f"   ✅ Verify: {usage}% → {new_usage}%")
+            loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
+        else:
+            print(f"   ✅ Decide: 未达阈值，继续监控")
+            loop["lastResult"] = {"action": "monitor", "usage": usage}
+
+    elif template_name == "task-watch":
+        # Observe: 扫描 active heavy tasks
+        heavy_tasks = list(HEAVY_STATE.glob("*.json"))
+        active_tasks = []
+        for tf in heavy_tasks:
+            ts = _load_json(tf)
+            if ts.get("status") == "started":
+                active_tasks.append(ts.get("taskName"))
+        print(f"   🔍 Observe: {len(active_tasks)} 活跃重型任务")
+        for tn in active_tasks:
+            status_file = SCRATCH / tn / "status.json"
+            st = _load_json(status_file) if status_file.exists() else {}
+            pending = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") == "pending")
+            failed = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") in ("failed", "error"))
+            print(f"      {tn}: {pending} pending, {failed} failed")
+        loop["lastResult"] = {"activeTasks": active_tasks, "pending": pending, "failed": failed}
+
+    elif template_name == "health-watch":
+        import subprocess
+        # 快速健康检查
+        disk_root = os.popen("df -h / | tail -1 | awk '{print $4}'").read().strip()
+        disk_data = os.popen("df -h /mnt/data 2>/dev/null | tail -1 | awk '{print $4}'").read().strip()
+        mem_avail = os.popen("free -h | grep Mem | awk '{print $7}'").read().strip()
+        print(f"   🩺 根盘: {disk_root} | 数据盘: {disk_data} | 可用内存: {mem_avail}")
+        # Decide: 资源紧张时告警
+        try:
+            disk_root_gb = float(disk_root.replace("G", "").replace("T", "000"))
+            mem_avail_mb = subprocess.run(["free", "-m"], capture_output=True, text=True).stdout
+            mem_line = mem_avail_mb.strip().split("\n")[1].split()
+            mem_avail_num = int(mem_line[-1]) if len(mem_line) > 1 else 1000
+        except Exception:
+            disk_root_gb = 100
+            mem_avail_num = 1000
+        alerts = []
+        if disk_root_gb < 5:
+            alerts.append(f"磁盘不足 ({disk_root})")
+        if mem_avail_num < 500:
+            alerts.append(f"内存紧张 ({mem_avail})")
+        if alerts:
+            print(f"   ⚠️ 告警: {', '.join(alerts)}")
+            _append_broker("health", "engine.health.warn", "系统资源告警", "warn", ", ".join(alerts), {})
+        loop["lastResult"] = {"diskRoot": disk_root, "diskData": disk_data, "memAvail": mem_avail, "alerts": alerts}
+
+    elif template_name == "model-fallback":
+        # Observe: 检查 gateway health
+        try:
+            import urllib.request
+            resp = urllib.request.urlopen("http://127.0.0.1:18788/healthz", timeout=5)
+            gw_ok = resp.status == 200
+        except Exception:
+            gw_ok = False
+        print(f"   🔍 Gateway: {'✅ 正常' if gw_ok else '❌ 不可达'}")
+        loop["lastResult"] = {"gatewayOk": gw_ok}
+        if not gw_ok:
+            _append_broker("health", "engine.model.fallback", "Gateway 不可达", "error",
+                           "Gateway health check 失败", {})
+
+    else:
+        # 通用路由
+        task_lower = task.lower()
+        if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
+            result = armor_compress()
+            loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+        else:
+            loop["lastResult"] = {"action": "executed", "note": "通用任务"}
+
+    loop["cycle"] = loop.get("cycle", 0) + 1
+    loop["status"] = "done"
+    if loop.get("maxCycles") and loop["cycle"] >= loop["maxCycles"]:
+        loop["status"] = "completed"
+    else:
+        loop["status"] = "registered"
+
+    _save_loops(loops)
+    print(f"✅ Loop '{name}' 完成 (cycle {loop['cycle']}/{loop.get('maxCycles', '∞')})")
+
+
+def engine_daemon(interval_s: int = 30) -> None:
+    """
+    守护进程模式：持续运行，扫描 broker 事件 + 执行已注册 Loop。
+    支持事件驱动：检测到 armor 告警 → 自动出手。
+    """
+    print("🔄 循环引擎守护模式启动")
+    print(f"   扫描间隔: {interval_s}s")
+    print(f"   按 Ctrl+C 退出\n")
+
+    # 读取上次 broker 位置
+    cursor_file = ENGINE_STATE / "daemon-cursor.json"
+    cursor = _load_json(cursor_file)
+    last_event_offset = cursor.get("brokerOffset", 0)
+
+    try:
+        while True:
+            loops = _load_loops()
+            ts = datetime.now().strftime("%H:%M:%S")
+
+            # ── 1. 扫描新 broker 事件 ──
+            if BROKER_EVENTS.exists():
+                try:
+                    with open(BROKER_EVENTS, "r") as f:
+                        f.seek(last_event_offset)
+                        new_lines = f.readlines()
+                        last_event_offset = f.tell()
+                except OSError:
+                    new_lines = []
+
+                for line in new_lines:
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    source_evt = event.get("sourceEventType", "")
+                    metadata = event.get("metadata", {})
+
+                    # Armor 告警 → 自动压缩
+                    if "armor.compress" not in source_evt and \
+                       ("context_monitor.alert" in source_evt or "context_monitor.critical" in source_evt or
+                        "mark42.armor.compress" in source_evt):
+                        usage = metadata.get("usagePercent", 0)
+                        if usage >= THRESHOLD_ALERT:
+                            print(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，自动触发压缩")
+                            armor_compress()
+
+                    # Heavy 任务状态事件 → 联动 Engine
+                    if "heavy.task.started" in source_evt:
+                        task_name = metadata.get("taskName", "?")
+                        print(f"[{ts}] ⚙️ 检测到 Heavy 任务开工: {task_name}")
+                        # 自动注册 task-watch loop
+                        loops2 = _load_loops()
+                        watch_name = f"watch-{task_name}"
+                        if watch_name not in loops2:
+                            engine_start(task=f"监控大工程: {task_name}", interval_s=30,
+                                         template="task-watch")
+
+                    # Engine 自身健康检测事件
+                    if "engine.health.warn" in source_evt:
+                        print(f"[{ts}] ⚠️ Engine 健康告警: {metadata.get('summary', '')}")
+
+            # ── 2. 执行到期的 Loop ──
+            for name, loop in list(loops.items()):
+                status = loop.get("status", "")
+                if status not in ("registered",):
+                    continue
+                last_run = loop.get("lastRun", "")
+                if last_run:
+                    try:
+                        last_ts = datetime.fromisoformat(last_run).timestamp()
+                        if _now_ts() - last_ts < loop.get("interval", 300):
+                            continue
+                    except Exception:
+                        pass
+
+                print(f"[{ts}] ▶️ 触发 Loop '{name}'")
+                engine_run_loop(name)
+
+            # ── 3. 保存游标 ──
+            _save_json(cursor_file, {"brokerOffset": last_event_offset, "lastScan": _now_iso()})
+
+            time.sleep(interval_s)
+    except KeyboardInterrupt:
+        _save_json(cursor_file, {"brokerOffset": last_event_offset, "lastScan": _now_iso()})
+        print("\n🔄 守护模式已退出")
+
+
+# ── 模块C: 重型战甲 Heavy ─────────────────────────────
+
+def heavy_preflight(path_str: str) -> None:
+    """大工程预检。"""
+    p = Path(path_str).expanduser().resolve()
+    print(f"⚙️ 重型战甲预检: {p}\n")
+
+    if not p.exists():
+        print(f"❌ 路径不存在: {p}")
+        return
+
+    # 文件统计
+    files = [f for f in p.rglob("*") if f.is_file() and ".meta/" not in str(f)]
+    total_size = sum(f.stat().st_size for f in files)
+    print(f"📂 文件数: {len(files)}")
+    print(f"💾 总大小: {total_size / 1024 / 1024:.1f} MB")
+
+    # 上下文余量
+    check = armor_check()
+    usage = check.get("usagePercent", 0)
+    print(f"🧠 上下文余量: {100 - usage:.0f}% (当前 {usage}%)")
+    if usage < 50:
+        print(f"   ✅ 充足 — 可前台启动")
+    elif usage < 70:
+        print(f"   ⚠️ 偏紧 — 建议卸后台执行")
+    else:
+        print(f"   🔴 不足 — 建议先压缩再开工")
+        print(f"      运行: python3 scripts/mark42.py armor --compress")
+
+    # 系统资源
+    mem_info = os.popen("free -h | grep Mem").read().strip()
+    print(f"🖥️ 内存: {mem_info.split()[1] if mem_info else 'N/A'}")
+
+    disk_info = os.popen("df -h / /mnt/data 2>/dev/null").read().strip()
+    for line in disk_info.split("\n"):
+        if line.startswith("/"):
+            parts = line.split()
+            print(f"💽 {parts[0]}: 剩余 {parts[3]} / {parts[1]}")
+
+
+def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> None:
+    """
+    大工程开工 — v2.1：上下文感知自动分批。
+    1. 扫描文件列表
+    2. 按上下文余量计算批次大小
+    3. 自动拆分成子任务
+    4. 写 status.json 供 Engine watch 监控
+    """
+    import shutil
+
+    target = Path(path_str).expanduser().resolve()
+    if not target.exists():
+        print(f"❌ 路径不存在: {target}")
+        return
+
+    task_dir = SCRATCH / task_name
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / ".keep").write_text("keep\n", encoding="utf-8")
+
+    # ── 上下文感知 ──
+    check = armor_check()
+    usage = check.get("usagePercent", 0)
+
+    print(f"⚙️ 重型战甲开工: {task_name}")
+    print(f"   目标: {target}")
+    print(f"   Scratch: {task_dir}")
+    print(f"   🧠 上下文: {usage}%")
+
+    if context_aware:
+        if usage >= THRESHOLD_ALERT:
+            print(f"   ⚠️ 上下文偏高，自动触发压缩...")
+            armor_compress()
+        elif usage >= THRESHOLD_WARN:
+            print(f"   💡 建议后台执行（上下文偏紧）")
+
+    # ── 自动分批 ──
+    files = []
+    if target.is_file():
+        files = [target]
+    else:
+        for f in sorted(target.rglob("*")):
+            if f.is_file() and not f.name.startswith(".") and ".meta" not in str(f):
+                # 跳过常见的非工作文件
+                if any(skip in str(f) for skip in ["__pycache__", ".pyc", ".git/"]):
+                    continue
+                files.append(f)
+
+    total_files = len(files)
+    total_size = sum(f.stat().st_size for f in files)
+    total_size_mb = total_size / (1024 * 1024)
+
+    # 批次计算：基于文件量和上下文余量
+    # 每个子任务大约处理 contextWindow / 50 条文件（粗略估算）
+    remaining_pct = 100 - usage
+    batch_size = max(3, min(30, int(total_files * remaining_pct / 200)))
+    num_batches = max(1, (total_files + batch_size - 1) // batch_size)
+
+    print(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
+    print(f"   📦 批次: {num_batches} 批 (每批 ≤{batch_size} 个文件)")
+
+    # 拆分批次
+    batches = []
+    for i in range(0, total_files, batch_size):
+        chunk = files[i:i + batch_size]
+        batches.append({
+            "id": f"batch-{len(batches)+1:03d}",
+            "files": [str(f.relative_to(target)) for f in chunk],
+            "count": len(chunk),
+            "sizeMB": round(sum(f.stat().st_size for f in chunk) / (1024 * 1024), 2),
+        })
+
+    # 写子任务状态
+    subtasks = {}
+    for b in batches:
+        subtasks[b["id"]] = {
+            "status": "pending",
+            "files": b["files"],
+            "count": b["count"],
+            "sizeMB": b["sizeMB"],
+            "createdAt": _now_iso(),
+        }
+
+    init_status = {
+        "taskName": task_name,
+        "progress": "started",
+        "summary": f"{total_files} 文件, {num_batches} 批次, {total_size_mb:.1f}MB",
+        "subtasks": subtasks,
+        "batchSize": batch_size,
+        "totalBatches": num_batches,
+        "lastUpdate": _now_iso(),
+    }
+    _save_json(task_dir / "status.json", init_status)
+
+    # 写 heavy 状态
+    heavy_status = HEAVY_STATE / f"{task_name}.json"
+    _save_json(heavy_status, {
+        "taskName": task_name,
+        "targetPath": str(target),
+        "scratchPath": str(task_dir),
+        "status": "started",
+        "startedAt": _now_iso(),
+        "contextAware": context_aware,
+        "preflightUsage": usage,
+        "totalFiles": total_files,
+        "totalSizeMB": round(total_size_mb, 2),
+        "batches": len(batches),
+    })
+
+    _append_broker("tasks", "heavy.task.started", f"大工程开工: {task_name}", "ok",
+                   f"{total_files} 文件 | {num_batches} 批次 | {total_size_mb:.1f}MB",
+                   {"taskName": task_name, "totalFiles": total_files, "batches": num_batches})
+
+    print(f"\n   📋 批次清单:")
+    for b in batches:
+        print(f"      {b['id']}: {b['count']} 文件 ({b['sizeMB']:.1f}MB)")
+    print(f"\n✅ 已开工。使用以下命令监控：")
+    print(f"   python3 scripts/mark42.py engine --watch-task {task_name}")
+    print(f"   完工后: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
+
+
+def heavy_finish(task_name: str) -> None:
+    """大工程收工校验。"""
+    task_dir = SCRATCH / task_name
+    status_file = task_dir / "status.json"
+
+    print(f"⚙️ 重型战甲收工: {task_name}")
+
+    if not status_file.exists():
+        print(f"   ⚠️ 未找到状态文件，可能尚未开工")
+        return
+
+    state = _load_json(status_file)
+    subtasks = state.get("subtasks", {})
+    done = sum(1 for s in subtasks.values() if s.get("status") in ("done", "success"))
+    total = len(subtasks)
+    print(f"   子任务: {done}/{total} 完成")
+
+    state["progress"] = "done"
+    state["lastUpdate"] = _now_iso()
+    _save_json(status_file, state)
+
+    # 更新 heavy 状态
+    heavy_status_path = HEAVY_STATE / f"{task_name}.json"
+    if heavy_status_path.exists():
+        hs = _load_json(heavy_status_path)
+        hs["status"] = "done"
+        hs["finishedAt"] = _now_iso()
+        _save_json(heavy_status_path, hs)
+
+    _append_broker("tasks", "heavy.done", f"大工程 {task_name} 完成", "ok",
+                   f"{done}/{total} 子任务完成", {"taskName": task_name})
+
+    print(f"\n✅ 收工完成。scratch 保留在: {task_dir}")
+    print(f"   清理: python3 scripts/openclaw-scratch-cleanup.py --dry-run")
+
+
+# ── 组装模式 Assemble ──────────────────────────────────
+
+def assemble() -> None:
+    """一键启动全部装备。"""
+    print("""
+┌──────────────────────────────────────────┐
+│         🦾 Mark42 完整战甲启动            │
+│                                          │
+│  🛡️ 上下文铠甲  → 守护模式               │
+│  🔄 循环引擎    → 待命                    │
+│  ⚙️ 重型战甲    → 按需激活                │
+│                                          │
+│  通过 broker 事件总线联动                 │
+│  ~/.local/state/openclaw/broker/         │
+└──────────────────────────────────────────┘
+""")
+    check = armor_check()
+    print(f"📊 启动时上下文: {check.get('usagePercent', 0)}% — {check.get('summary', '')}")
+    print()
+
+    if check.get("severity", "ok") in ("error", "critical"):
+        print("⚠️ 上下文已偏高，启动前先压缩...")
+        armor_compress()
+        print()
+
+    print("🛡️ 上下文铠甲守护已启动（由 systemd timer 管理）")
+    print("   手动守护: python3 scripts/mark42.py armor --guard")
+    print("🔄 循环引擎待命（通过 --start 注册 Loop）")
+    print("⚙️ 重型战甲按需激活（通过 heavy --start 开工）\n")
+    print("✅ Mark42 就绪。拆开是刀，拼上是甲。")
+
+
+# ── CLI ────────────────────────────────────────────────
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Mark42 模块化智能铠甲系统",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  mark42.py --init
+  mark42.py --config
+  mark42.py armor --check
+  mark42.py armor --compress --dry-run
+  mark42.py armor --guard
+  mark42.py engine --templates
+  mark42.py engine --daemon
+  mark42.py engine --start --task "监控上下文" --interval 300
+  mark42.py engine --kill loop-name
+  mark42.py engine --watch-task my-task
+  mark42.py heavy --preflight /path/to/project
+  mark42.py heavy --start /path/to/project --task-name my-task
+  mark42.py heavy --finish --task-name my-task
+  mark42.py assemble
+        """,
+    )
+
+    # ── 顶层选项 ──
+    parser.add_argument("--init", action="store_true", help="初始化 Mark42 配置")
+    parser.add_argument("--config", action="store_true", help="查看当前配置")
+
+    sub = parser.add_subparsers(dest="module", help="模块选择")
+
+    # ── Armor ──
+    armor_p = sub.add_parser("armor", help="🛡️ 上下文铠甲")
+    armor_p.add_argument("--check", action="store_true", help="检查上下文健康度")
+    armor_p.add_argument("--compress", action="store_true", help="触发智能压缩")
+    armor_p.add_argument("--dry-run", action="store_true", help="压缩预览（不实际写入索引）")
+    armor_p.add_argument("--guard", action="store_true", help="启动守护模式")
+    armor_p.add_argument("--interval", type=int, default=300, help="守护模式检查间隔秒数")
+
+    # ── Engine ──
+    engine_p = sub.add_parser("engine", help="🔄 循环引擎")
+    engine_p.add_argument("--list", action="store_true", help="列出活跃 Loop")
+    engine_p.add_argument("--start", action="store_true", help="注册新 Loop")
+    engine_p.add_argument("--task", type=str, help="Loop 任务描述")
+    engine_p.add_argument("--interval", type=int, default=300, help="Loop 周期间隔秒数")
+    engine_p.add_argument("--max-cycles", type=int, default=0, help="最大循环次数（0=无限）")
+    engine_p.add_argument("--template", type=str, default="", help="Loop 模板名")
+    engine_p.add_argument("--templates", action="store_true", help="列出所有可用模板")
+    engine_p.add_argument("--run", type=str, help="手动触发 Loop 执行")
+    engine_p.add_argument("--kill", type=str, help="终止指定 Loop")
+    engine_p.add_argument("--daemon", action="store_true", help="守护进程模式（事件驱动+Loop执行）")
+    engine_p.add_argument("--watch-task", type=str, help="监控大工程任务进度")
+
+    # ── Heavy ──
+    heavy_p = sub.add_parser("heavy", help="⚙️ 重型战甲")
+    heavy_p.add_argument("--preflight", type=str, help="大工程预检（指定路径）")
+    heavy_p.add_argument("--start", type=str, help="大工程开工（指定路径）")
+    heavy_p.add_argument("--task-name", type=str, help="任务名（用于 scratch 目录）")
+    heavy_p.add_argument("--no-context-aware", action="store_true", help="禁用上下文感知")
+    heavy_p.add_argument("--finish", action="store_true", help="大工程收工")
+    heavy_p.add_argument("--path", type=str, help="工作路径（同位置参数）")
+
+    # ── Assemble ──
+    sub.add_parser("assemble", help="一键启动完整战甲")
+
+    args = parser.parse_args()
+
+    if not args.module:
+        if args.init:
+            mark42_init()
+            return
+        if args.config:
+            mark42_config()
+            return
+        parser.print_help()
+        return
+
+    if args.module == "armor":
+        if args.guard:
+            armor_guard(interval_s=args.interval)
+        elif args.compress:
+            result = armor_compress(dry_run=args.dry_run)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            # 默认 check
+            result = armor_check()
+            print(f"🛡️ 上下文铠甲")
+            print(f"   状态: {result['status'].upper()} ({result['severity']})")
+            print(f"   使用率: {result.get('usagePercent', 0)}% ({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
+            print(f"   {result['summary']}")
+
+    elif args.module == "engine":
+        if args.templates:
+            engine_templates()
+        elif args.list:
+            engine_list()
+        elif args.kill:
+            engine_kill(args.kill)
+        elif args.daemon:
+            engine_daemon(interval_s=args.interval if args.interval != 300 else 30)
+        elif args.run:
+            engine_run_loop(args.run)
+        elif args.watch_task:
+            engine_watch_task(args.watch_task)
+        elif args.start:
+            if not args.task:
+                print("❌ --start 需要 --task")
+                return
+            engine_start(args.task, args.interval, args.max_cycles, args.template)
+        else:
+            print("❌ 请指定操作: --templates / --list / --start / --kill / --daemon / --run / --watch-task")
+            engine_list()
+
+    elif args.module == "heavy":
+        if args.preflight:
+            heavy_preflight(args.preflight)
+        elif args.start:
+            if not args.task_name:
+                print("❌ --start 需要 --task-name")
+                return
+            heavy_start(args.start, args.task_name, not args.no_context_aware)
+        elif args.finish:
+            if not args.task_name:
+                print("❌ --finish 需要 --task-name")
+                return
+            heavy_finish(args.task_name)
+        else:
+            print("❌ 请指定操作: --preflight / --start / --finish")
+
+    elif args.module == "assemble":
+        assemble()
+
+
+if __name__ == "__main__":
+    main()
