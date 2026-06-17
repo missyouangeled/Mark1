@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, BROKER_EVENTS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN, WORKSPACE,
+    ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, BROKER_EVENTS, BROKER_DIR, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN, WORKSPACE,
 )
 from .utils import (
     _append_broker, _load_json, _now_iso, _now_ts, _save_json,
@@ -34,7 +34,16 @@ def _load_loops() -> dict[str, Any]:
 
 def _save_loops(loops: dict[str, Any]) -> None:
     ENGINE_STATE.mkdir(parents=True, exist_ok=True)
-    _save_json(ENGINE_LOOPS, loops)
+    # ── 文件锁：防止 daemon 和 cli 并发写入互相覆盖 ──
+    import fcntl
+    lock_path = str(ENGINE_LOOPS) + ".lock"
+    # 用 "a" 模式避免 truncate 已有内容；如文件不存在则创建
+    with open(lock_path, "a") as lf:
+        try:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+            _save_json(ENGINE_LOOPS, loops)
+        finally:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
 
 def engine_templates() -> None:
@@ -191,9 +200,12 @@ def engine_watch_task(task_name: str, interval_s: int = 30) -> None:
         print(f"\n🔍 监控已退出（任务 '{task_name}' 仍在运行中）")
 
 
-def engine_run_loop(name: str) -> None:
-    """手动触发 Loop 执行 — Observe→Decide→Act→Verify 闭环。"""
-    loops = _load_loops()
+def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | None = None) -> None:
+    """手动触发 Loop 执行 — Observe→Decide→Act→Verify 闭环。
+    persist=True（默认）：执行后持久化到磁盘。daemon 应传 persist=False + _loops。
+    _loops: daemon 传入当前 loops 引用，避免再 load（避免丢失并行修改）。
+    """
+    loops = _loops if _loops is not None else _load_loops()
     if name not in loops:
         print(f"❌ Loop '{name}' 不存在")
         return
@@ -226,12 +238,16 @@ def engine_run_loop(name: str) -> None:
             if ts.get("status") == "started":
                 active_tasks.append(ts.get("taskName"))
         print(f"   🔍 Observe: {len(active_tasks)} 活跃重型任务")
+        pending = 0
+        failed = 0
         for tn in active_tasks:
             status_file = SCRATCH / tn / "status.json"
             st = _load_json(status_file) if status_file.exists() else {}
-            pending = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") == "pending")
-            failed = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") in ("failed", "error"))
-            print(f"      {tn}: {pending} pending, {failed} failed")
+            p = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") == "pending")
+            f = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") in ("failed", "error"))
+            pending += p
+            failed += f
+            print(f"      {tn}: {p} pending, {f} failed")
         loop["lastResult"] = {"activeTasks": active_tasks, "pending": pending, "failed": failed}
     elif template_name == "health-watch":
         disk_root = os.popen("df -h / | tail -1 | awk '{print $4}'").read().strip()
@@ -272,13 +288,24 @@ def engine_run_loop(name: str) -> None:
             loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
         else:
             loop["lastResult"] = {"action": "executed", "note": "通用任务"}
+    
+    # ── C 项：Loop 执行完成 → emit 标准化事件 ──
+    _append_broker("engine", "mark42.engine.loop.completed",
+                   f"Loop '{name}' 执行完成",
+                   "ok" if not isinstance(loop.get("lastResult"), dict) or
+                           not loop["lastResult"].get("alerts") else "warn",
+                   f"模板: {template_name or '通用'} | cycle {loop.get('cycle',0)+1}",
+                   {"loopName": name, "template": template_name or "generic",
+                    "lastResult": loop.get("lastResult", {})})
     loop["cycle"] = loop.get("cycle", 0) + 1
     loop["status"] = "done"
     if loop.get("maxCycles") and loop["cycle"] >= loop["maxCycles"]:
         loop["status"] = "completed"
     else:
         loop["status"] = "registered"
-    _save_loops(loops)
+    # 持久化策略：daemon 路径传 persist=False，由 daemon 统一写；CLI 手动路径默认持久化
+    if persist:
+        _save_loops(loops)
     max_display = loop.get("maxCycles") or "∞"
     print(f"✅ Loop '{name}' 完成 (cycle {loop['cycle']}/{max_display})")
 
@@ -315,6 +342,16 @@ def engine_daemon(interval_s: int = 30) -> None:
                         continue
                     source_evt = event.get("sourceEventType", "")
                     metadata = event.get("metadata", {})
+                    # ── C 项标准化事件桥接：Engine ↔ Armor ↔ Heavy ──
+                    # 压缩完成 → 记录并评估是否需要触发 context-guard Loop
+                    if source_evt == "mark42.armor.compress.done":
+                        usage = metadata.get("usagePercent", 0)
+                        strategy = metadata.get("strategy", "?")
+                        print(f"[{ts}] 🧠 检测到铠甲压缩完成 (策略: {strategy}, 使用率: {usage}%)")
+                        _append_broker("engine", "mark42.engine.bridge.armor_compress_seen",
+                                       f"Engine 已收到压缩完成信号", "ok",
+                                       f"策略: {strategy} | 使用率: {usage}%",
+                                       {"bridgeEvent": "armor.compress.done", "usagePercent": usage})
                     # ── 压缩联动：上下文危险 → 建议 /compact ──
                     if "compaction.advised" in source_evt:
                         usage = metadata.get("usagePercent", 0)
@@ -323,12 +360,20 @@ def engine_daemon(interval_s: int = 30) -> None:
                                        f"建议压缩: {usage}%", "warn",
                                        f"Armor 建议手动执行 /compact",
                                        {"usagePercent": usage})
-                    # ── 系统级上下文告警 ──
+                    # ── 系统级上下文告警 → 异步触发压缩（不阻塞 daemon 主循环） ──
                     if "context_monitor.alert" in source_evt or "context_monitor.critical" in source_evt:
                         usage = metadata.get("usagePercent", 0)
                         if usage >= THRESHOLD_ALERT:
-                            print(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，自动触发压缩")
-                            armor_compress()
+                            print(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，启动压缩子进程")
+                            script = str(Path(__file__).resolve().parent.parent / "mark42.py")
+                            try:
+                                subprocess.Popen(
+                                    [sys.executable, "-u", script, "armor", "--compress"],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    start_new_session=True,
+                                )
+                            except Exception as e:
+                                print(f"[{ts}] ❌ 启动压缩子进程失败: {e}")
                     # ── 模型故障检测（只感知，不切换 — OpenClaw 内置 failover 接管） ──
                     if "model.fallback" in source_evt or "engine.model.fallback" in source_evt:
                         summary = event.get("summary", "")
@@ -338,18 +383,39 @@ def engine_daemon(interval_s: int = 30) -> None:
                                        f"模型故障: {summary}", "warn",
                                        f"已记录，failover 由 OpenClaw 接管",
                                        {"signal": source_evt, "summary": summary})
-                    # ── Heavy 开工 ──
+                    # ── Heavy 开工 → 自动创建 task-watch Loop（守卫：必须真实存在） ──
                     if "heavy.task.started" in source_evt:
                         task_name = metadata.get("taskName", "?")
+                        # 守卫：检查 Heavy 任务文件是否确实存在且未过期（24h）
+                        task_file = HEAVY_STATE / f"{task_name}.json"
+                        task_valid = False
+                        if task_file.exists():
+                            td = _load_json(task_file)
+                            td_ts = td.get("startedAt") or td.get("checkedAt", "")
+                            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                            try:
+                                started_dt = _dt.fromisoformat(td_ts)
+                                if _dt.now(_tz.utc) - started_dt < _td(hours=24):
+                                    task_valid = True
+                            except Exception:
+                                pass
+                        if not task_valid:
+                            print(f"[{ts}] ℹ️ Heavy 开工信号但任务文件无效/过期 ({task_name})，跳过创建 watch")
+                            continue
                         print(f"[{ts}] ⚙️ 检测到 Heavy 任务开工: {task_name}")
                         loops2 = _load_loops()
                         watch_name = f"watch-{task_name}"
                         if watch_name not in loops2:
                             engine_start(task=f"监控大工程: {task_name}", interval_s=30,
                                          template="task-watch")
+                        _append_broker("engine", "mark42.engine.bridge.heavy_started",
+                                       f"Engine 已为 Heavy 任务创建监控 Loop", "ok",
+                                       f"任务: {task_name}",
+                                       {"taskName": task_name})
             # ── 2. 重新加载 loops（处理 broker 事件中可能新增的） ──
             loops = _load_loops()
             # ── 3. 执行到期 Loop ──
+            executed_any = False
             for name, loop in list(loops.items()):
                 status = loop.get("status", "")
                 if status not in ("registered",):
@@ -362,14 +428,38 @@ def engine_daemon(interval_s: int = 30) -> None:
                             continue
                     except Exception:
                         pass
+                # 每个 Loop 执行前重新加载最新状态（避免多 Loop 同 tick 竞态）
+                fresh_loops = _load_loops()
+                if name in fresh_loops:
+                    loops[name] = fresh_loops[name]
                 print(f"[{ts}] ▶️ 触发 Loop '{name}'")
-                engine_run_loop(name)
+                engine_run_loop(name, persist=False, _loops=loops)
+                executed_any = True
+            # 统一持久化：所有到期 Loop 执行完后一次性写入
+            if executed_any:
+                _save_loops(loops)
             # ── 4. 保存游标 ──
             _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
-            # ── 5. 每 10 次循环做一次 log rotation ──
+            # ── 5. 每 10 次循环做一次 log rotation + mark42 状态快照 ──
             rotation_check_count += 1
             if rotation_check_count % 10 == 0:
                 log_rotate("all")
+                # D 项：把 Mark42 状态 JSON 写入 broker views，供 Control UI 消费
+                try:
+                    from .cli import status_dashboard
+                    status_json = status_dashboard(json_mode=True)
+                    if status_json:
+                        BROKER_VIEWS = BROKER_DIR / "views"
+                        BROKER_VIEWS.mkdir(parents=True, exist_ok=True)
+                        _save_json(BROKER_VIEWS / "mark42-status.json", {
+                            "checkedAt": status_json["checkedAt"],
+                            "armor": status_json["armor"],
+                            "engine": status_json["engine"],
+                            "heavy": status_json["heavy"],
+                            "actions": status_json["actions"],
+                        })
+                except Exception:
+                    pass  # 守护模式下静默失败
             time.sleep(interval_s)
     except KeyboardInterrupt:
         _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})

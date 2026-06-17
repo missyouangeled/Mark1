@@ -1,0 +1,86 @@
+# Mark42 更新日志
+
+> 每次代码/功能变动后追加一条，按日期倒序。
+> 格式：日期 → 版本 → 标题 → 变更清单 → 验证结果。
+
+---
+
+## 2026-06-17 — v2.2 阶段 1 核心缺口补齐
+
+**背景**：Mark42 商品化路线图阶段 1（内测可用）A~E 五项诊断缺口需要全部补齐。经过完整代码审查 → 第一轮烟测 → 发现 bug → 修复 → 第二轮烟测 → 全绿通过。
+
+### 新增/改进
+
+| 项 | 模块 | 内容 |
+|:---:|------|------|
+| A | armor | LLM 压缩链路闭环：`_read_session_tail` 解嵌套 OpenClaw JSONL 格式（`{"type":"message","message":{"role":"user"}}`），读取消息从 0→60 条；`_llm_analyze` 中 `content` 数组提取修复 |
+| B | engine | 清理 loops.json：23 个历史垃圾 → 3 个核心模板（context-guard / health-watch / task-watch） |
+| C | armor+engine | 三模块事件桥接标准化：协议命名空间 `mark42.armor.compress.done` / `mark42.engine.loop.completed` / `mark42.engine.bridge.armor_compress_seen` / `mark42.engine.bridge.heavy_started` |
+| D | cli | `status_dashboard(json_mode=True)` 纯 JSON 输出 + `--json` CLI 标志；engine daemon 每 10 次循环写入 `broker/views/mark42-status.json` |
+| E | cli | `assemble()` 重写：`subprocess.Popen` fork armor-guard + engine-daemon，PID 文件 + 3 秒健康检查 + SIGTERM 优雅关闭 |
+
+### 修复的 bug
+
+1. **`_read_session_tail` 返回 0 条消息**：OpenClaw JSONL 外层是 `{"type":"message","message":{"role":"user","content":[...]}}`，原先在外层找 `"role"` 找不到
+2. **`_classify_messages` content 提取失败**：OpenClaw content 是 `[{type:"text",text:"..."}]` 数组格式，原先当字符串处理
+3. **`task-watch` 在无活跃任务时 `UnboundLocalError`**：`pending`/`failed` 变量未初始化
+4. **daemon 无条件创建 watch Loop**：检测到 `heavy.task.started` 后未验证任务文件是否真实存在；已加守卫（文件存在 + 24h 内）
+5. **`task-watch-2` 残留**：由已不存在的 `test-exec-demo` Heavy 任务触发创建；已手工清理 + 守卫防止复发
+
+### 验证
+
+- 第一轮烟测：9/9 全部通过（发现上述 5 个 bug）
+- 第二轮烟测：16/16 全部通过（修复后零失败）
+- LLM 压缩：DeepSeek V4 Pro 正确分析上下文 → `memory-index.json` 的 `modelGenerated: true`，策略从 `heuristic-classify` 升级为 `llm-analyze`
+- assemble：fork 双守护进程启动 → 健康检查 → SIGTERM 优雅关闭，全程正常
+
+### 修改文件
+
+- `scripts/mark42_modules/armor.py` — 解嵌套 JSONL + content 数组提取 + 事件 emit
+- `scripts/mark42_modules/engine.py` — 事件桥接 + Heavy watch 守卫 + mark42-status.json 写入 + BROKER_DIR 导入
+- `scripts/mark42_modules/cli.py` — assemble 重写 + status --json
+- `docs/design/mark42-商品化路线图.md` — 诊断标记 + 进度更新
+- `~/.local/state/openclaw/mark42/armor/loops.json` — 清理 23→3
+
+### 当前状态
+
+- 版本：2.2
+- 循环：3/3 活跃（context-guard cycle 3、health-watch cycle 3、task-watch cycle 5）
+- Broker 事件：130 行 / 41.6KB
+- Memory 索引：llm-analyze（`modelGenerated: true`）
+
+---
+
+## 2026-06-17 #2 — v2.3 daemon 持久化 + 资源泄漏 + 信号隔离修复
+
+**背景**：v2.2 assemble 首次真跑后发现 6 个问题。逐行审查 3172 行代码 → 联网搜索最佳实践 → 修复 → 烟测全绿通过。
+
+### 修复的 bug
+
+1. **CLI 手动 `engine --run` 执行后 cycle/lastRun 不持久化**：上一版修复 isuue 时让 `engine_run_loop()` 不再自己 `_save_loops`，但忘了给 CLI 手动路径留 `persist=True` 入口。加 `persist` 参数，daemon 传 `False`，CLI 默认 `True`
+2. **daemon 的 loops 修改被丢弃（cycle 永远不递增）**：`engine_run_loop()` 内部自己 `_load_loops()` 了独立副本，daemon 传入的 `loops` dict 从未被改动。加 `_loops` 可选参数，daemon 传当前 `loops` 引用
+3. **`assemble()` 每次启动泄漏 4 个文件句柄**：`open("a")` 返回的 stdout/stderr file object 在父进程中永不 `.close()`。合并为单 log fd（stdout+stderr 汇入同一文件），优雅关闭时 close，加 `start_new_session=True` 防止 Ctrl+C 穿透
+4. **daemon broker 主循环内 `armor_compress()` 可能阻塞 45 秒**：LLM API 调用在 daemon tick 循环中，会卡住所有其他 Loop。改为 `subprocess.Popen` 异步启动压缩子进程
+5. **`flock` 锁文件用 `"w"` 模式打开**：每次 truncate 已有内容，丢失元数据。改为 `"a"` 模式
+6. **子进程未设置 `start_new_session`**：Ctrl+C 从父终端可能同时命中父进程和子进程。所有 `Popen` 加了 `start_new_session=True`
+
+### 验证
+
+- 烟测：6/6 全部通过（fd 泄漏 4→4 零泄漏、daemon tick 正常、cycle 递增 6→7→8、CLI 手动 run 持久化、assemble 优雅关闭无残留、导入验证）
+- 无残留进程、无泄漏 fd
+
+### 修改文件
+
+- `scripts/mark42_modules/engine.py` — `engine_run_loop` 加 `persist`+`_loops` 参数；daemon 传 `persist=False, _loops=loops`；broker 压缩改为异步子进程；flock lock 文件 `"a"` 模式
+- `scripts/mark42_modules/cli.py` — assemble 合并 stdout+stderr 为单 log fd；`start_new_session=True`；优雅关闭 close log fd；children 元组从 2→3 含 log_fd
+
+### 当前状态
+
+- 版本：2.3
+- 循环：3/3 活跃（context-guard cycle 4、health-watch cycle 3、task-watch cycle 8）
+- fd 泄漏：已消灭
+- daemon 持久化：cycle 递增正确
+
+---
+
+*日志文件创建于 2026-06-17。此前所有开发记录分散在 `商品化路线图.md` 和各模块注释中。*
