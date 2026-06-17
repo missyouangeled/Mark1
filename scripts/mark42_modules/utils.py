@@ -107,6 +107,29 @@ def _estimate_tokens(session_path: Path) -> dict[str, Any]:
     except OSError:
         return {"estimatedTokens": 0, "fileSizeMB": 0}
 
+# ── 公共文件扫描（统一跳过规则，供 heavy.preflight/detect/start 复用） ──
+
+_SKIP_PATTERNS = ["__pycache__", ".pyc", ".git/", "node_modules/", ".meta/"]
+
+def _list_project_files(path: Path) -> list[Path]:
+    """扫描目录下所有非隐藏文件，跳过 __pycache__/.pyc/.git/node_modules/.meta。
+    保证 heavy_preflight、heavy_detect、heavy_start 三处使用统一过滤规则。
+    """
+    if path.is_file():
+        return [path]
+    files = []
+    for f in path.rglob("*"):
+        if not f.is_file():
+            continue
+        if f.name.startswith("."):
+            continue
+        path_str = str(f)
+        if any(skip in path_str for skip in _SKIP_PATTERNS):
+            continue
+        files.append(f)
+    return files
+
+
 def _get_context_window() -> int:
     try:
         cfg = _load_json(CONFIG_PATH)

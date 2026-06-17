@@ -74,7 +74,7 @@ def mark42_init() -> None:
         print(f"⚙️ Mark42 已初始化（版本: {cfg.get('version', '?')})，使用 --config 修改")
         return
     cfg = {
-        "version": "2.2",
+        "version": "2.3",
         "initializedAt": _conf_now_iso(),
         "thresholds": {"warn": THRESHOLD_WARN, "alert": THRESHOLD_ALERT, "crit": THRESHOLD_CRIT},
         "contextWindow": DEFAULT_CONTEXT_WINDOW,

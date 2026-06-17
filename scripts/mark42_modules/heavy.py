@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
-from .utils import _append_broker, _load_json, _now_iso, _save_json
+from .utils import _append_broker, _load_json, _now_iso, _save_json, _list_project_files
 from .armor import armor_check, armor_compress
 
 
@@ -23,7 +23,7 @@ def heavy_preflight(path_str: str) -> None:
     if not p.exists():
         print(f"❌ 路径不存在: {p}")
         return
-    files = [f for f in p.rglob("*") if f.is_file() and ".meta/" not in str(f)]
+    files = _list_project_files(p)
     total_size = sum(f.stat().st_size for f in files)
     print(f"📂 文件数: {len(files)}")
     print(f"💾 总大小: {total_size / (1024*1024):.1f} MB")
@@ -67,14 +67,11 @@ def heavy_detect(path_str: str) -> dict[str, Any]:
         return result
     result["exists"] = True
 
-    # 统计文件
-    all_files = []
+    # 使用公共扫描规则
+    all_files = _list_project_files(p) if p.is_dir() else [p]
     max_depth = 0
-    for f in p.rglob("*"):
-        if f.is_file() and not f.name.startswith(".") and ".meta/" not in str(f):
-            if any(skip in str(f) for skip in ["__pycache__", ".pyc", ".git/", "node_modules/"]):
-                continue
-            all_files.append(f)
+    if p.is_dir():
+        for f in all_files:
             depth = len(f.relative_to(p).parts)
             if depth > max_depth:
                 max_depth = depth
@@ -220,19 +217,13 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
             armor_compress()
         elif usage >= THRESHOLD_WARN:
             print(f"   💡 建议后台执行（上下文偏紧）")
-    files = []
-    if target.is_file():
-        files = [target]
-    else:
-        for f in sorted(target.rglob("*")):
-            if f.is_file() and not f.name.startswith(".") and ".meta" not in str(f):
-                if any(skip in str(f) for skip in ["__pycache__", ".pyc", ".git/"]):
-                    continue
-                files.append(f)
+    files = _list_project_files(target)
     total_files = len(files)
     total_size = sum(f.stat().st_size for f in files)
     total_size_mb = total_size / (1024 * 1024)
     remaining_pct = 100 - usage
+    # batch_size 公式：文件越多/上下文越紧 → 每批越小（上限 30，下限 3）
+    # 分母 200 是经验校准值：100 个文件、20% 余量 → 10 文件/批
     batch_size = max(3, min(30, int(total_files * remaining_pct / 200)))
     num_batches = max(1, (total_files + batch_size - 1) // batch_size)
     print(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
@@ -322,7 +313,7 @@ def heavy_finish(task_name: str) -> None:
     print(f"✅ 任务 '{task_name}' 已归档")
 
 
-def heavy_execute(task_name: str, batch_id: str | None = None) -> None:
+def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None) -> None:
     """自动执行大工程子任务 — 将 batch 分配给后台分身。
     不传 batch_id 则按序执行第一个 pending batch。
     """
@@ -374,7 +365,11 @@ def heavy_execute(task_name: str, batch_id: str | None = None) -> None:
                     f"cd {target_full}"]
     for f in files:
         script_lines.append(f"echo '  processing: {f}'")
-        script_lines.append(f"# TODO: replace with actual file operation")
+        if command:
+            # 用户提供的命令，{f} 会被替换为实际文件路径
+            script_lines.append(command.replace("{f}", str(target_full / f)))
+        else:
+            script_lines.append(f"# TODO: replace with actual file operation")
     script_lines.append(f"echo '✅ {target_id} done'")
     with open(script_path, "w") as sf:
         sf.write("\n".join(script_lines) + "\n")

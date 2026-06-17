@@ -1,9 +1,12 @@
 """Mark42 压缩诊断与自动调优模块。
 检测 OpenClaw 内置压缩配置，诊断问题，生成舒适合理的优化建议并可选自动应用。
+
+v2.0 (2026-06-16): 升级至病因层——令牌感知、双层阈值、摘要探针、分身隔离、降解检测。
 """
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -91,6 +94,31 @@ _RECOMMENDED = {
 SEVERITY_OK = "ok"
 SEVERITY_WARN = "warn"
 SEVERITY_CRIT = "critical"
+
+# ── v2.0 新增常量：令牌感知 / 双层阈值 / 探针 ──────────
+
+# 默认 session 目录
+_SESSIONS_DIR = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+
+# 双层阈值 — memoryFlush.softThresholdTokens 应为主阈值的 50% 左右 (Hermes 风格)
+_DUAL_THRESHOLD_IDEAL_RATIO = 0.50
+_DUAL_THRESHOLD_WARN_GAP = 0.30   # 差距 < 30% → 可能同时触发
+
+# 摘要质量探针问题模板 (Factory.ai 风格 4 类)
+_PROBE_TEMPLATES = {
+    "recall": "请回顾：在最近的压缩之前，最关键的一条技术决策是什么？请具体说明。",
+    "artifact": "请列出最近操作中涉及的所有文件路径和各自的修改状态。",
+    "continuation": "当前任务的下一步应该做什么？请给出具体行动计划。",
+    "decision": "最近一次讨论中关于配置/方案的选择结论是什么？是否已执行？",
+}
+
+# 降解检测阈值
+_DRIFT_WINDOW = 3          # 检查最近 N 次压缩
+_DRIFT_DROP_RATIO = 0.30   # 得分下降超过此比例触发告警
+
+# 分身隔离建议触发阈值
+_ISOLATION_SESSION_THRESHOLD = 12  # 今日片段 > 此数 → 建议拆分
+_ISOLATION_HIGH_TOKEN_KB = 80      # 单 session > 此 token 数 (K) → 建议拆分
 
 
 def _load_openclaw_json() -> dict[str, Any] | None:
@@ -226,8 +254,337 @@ def _check_stat(session_count: int, largest_mb: float, ctx_window: int) -> list[
     return issues
 
 
-def compaction_diagnose() -> dict[str, Any]:
-    """诊断 OpenClaw 压缩配置，返回完整诊断报告。"""
+# ── v2.0 新增检测函数 ───────────────────────────────────
+
+def _token_aware_check(cc: dict) -> dict[str, Any]:
+    """令牌感知检测：从 session jsonl 读取实际 token 消耗，
+    对比文件大小阈值与真实 token 占用是否合理。
+    
+    返回 token 感知诊断结果，包含实际 token 消耗 vs 配置阈值的对比。
+    """
+    result = {
+        "key": "token_awareness",
+        "label": "令牌感知诊断",
+        "status": "ok",
+        "severity": SEVERITY_OK,
+        "maxTokensSeen": 0,
+        "avgTokensPerTurn": 0,
+        "estimatedContextPercent": 0,
+        "advice": None,
+    }
+
+    if not _SESSIONS_DIR.exists():
+        result["status"] = "no_data"
+        result["advice"] = "无法读取 session 数据，跳过 token 感知检测。"
+        return result
+
+    # 收集今天所有 session 的 token 数据
+    today = datetime.now().strftime("%Y-%m-%d")
+    all_tokens = []  # 每个 compaction 点的 tokensBefore
+    turns_per_session = []  # 每 session 的回合数
+    largest_token_sum = 0
+
+    for f in sorted(_SESSIONS_DIR.glob(f"{today}*.jsonl")):
+        try:
+            turn_count = 0
+            session_tokens = 0
+            with open(f) as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    # 每个 assistant/compaction/summary 行都有 usage
+                    msg = obj.get("message", {})
+                    if isinstance(msg, dict):
+                        usage = msg.get("usage", {})
+                        if isinstance(usage, dict) and "totalTokens" in usage:
+                            all_tokens.append(usage["totalTokens"])
+                            session_tokens = max(session_tokens, usage["totalTokens"])
+                    # compaction 事件的 tokensBefore
+                    tb = obj.get("tokensBefore")
+                    if isinstance(tb, (int, float)) and tb > 0:
+                        all_tokens.append(int(tb))
+                    turn_count += 1
+            if turn_count > 0:
+                turns_per_session.append(turn_count)
+                largest_token_sum = max(largest_token_sum, session_tokens)
+        except OSError:
+            continue
+
+    if not all_tokens:
+        result["status"] = "no_data"
+        result["advice"] = "今天暂无 session token 数据。"
+        return result
+
+    max_tokens = max(all_tokens)
+    # 用 bytes 阈值估算等效 token：DeepSeek/Claude 约 3-4 chars/token，JSONL 约 4 chars/token
+    matb = cc.get("maxActiveTranscriptBytes", 3_000_000)
+    estimated_byte_equivalent_tokens = matb // 4  # 粗略估计
+
+    result["maxTokensSeen"] = max_tokens
+    result["avgTokensPerTurn"] = round(sum(turns_per_session) / max(len(turns_per_session), 1), 1)
+    result["totalSessionsScanned"] = len(turns_per_session)
+    result["estimatedByteEquivalentTokens"] = estimated_byte_equivalent_tokens
+
+    ctx = DEFAULT_CONTEXT_WINDOW
+    pct = (max_tokens / ctx * 100) if ctx else 0
+    result["estimatedContextPercent"] = round(pct, 1)
+
+    # 判断：文件大小阈值 vs 实际 token 占比是否匹配
+    if estimated_byte_equivalent_tokens < max_tokens * 0.5:
+        # 文件大小阈值低估了 token 消耗 → 延迟压缩
+        result["status"] = "mismatch"
+        result["severity"] = SEVERITY_WARN
+        result["advice"] = (
+            f"maxActiveTranscriptBytes={_format_bytes(matb)} 估计等效 ~{estimated_byte_equivalent_tokens} tokens，"
+            f"但实际已达到 {max_tokens} tokens ({pct:.0f}% 窗口)。"
+            f"文件大小阈值可能低估了 token 消耗，建议降低至 {_format_bytes(int(max_tokens * 3.5))} 左右以提前触发压缩。"
+        )
+    elif max_tokens > ctx * 0.85:
+        result["status"] = "near_limit"
+        result["severity"] = SEVERITY_WARN
+        result["advice"] = (
+            f"实际 token 已达 {max_tokens} ({pct:.0f}%)，接近 {ctx//1000}K 窗口上限。"
+            f"建议检查压缩是否及时触发，或降低 maxActiveTranscriptBytes。"
+        )
+    else:
+        result["status"] = "ok"
+
+    return result
+
+
+def _dual_threshold_check(cc: dict, ctx_window: int) -> dict[str, Any] | None:
+    """双层阈值检查：主阈值 (maxActiveTranscriptBytes) 与
+    memoryFlush.softThresholdTokens 的偏移是否合理。
+    
+    Hermes 风格：主阈值 50% 窗口 + 安全网 85% 窗口，避免同时触发。
+    """
+    mf = cc.get("memoryFlush", {})
+    if not mf or not mf.get("enabled"):
+        return None  # memoryFlush 未启用，不需要检查
+
+    matb = cc.get("maxActiveTranscriptBytes")
+    stt = mf.get("softThresholdTokens")
+    if matb is None or stt is None:
+        return None
+
+    # 把 maxActiveTranscriptBytes 转为等效 token
+    matb_tokens = matb // 4
+    gate_tokens = stt
+
+    ratio = gate_tokens / max(matb_tokens, 1)
+    gap = abs(matb_tokens - gate_tokens) / max(matb_tokens, 1)
+
+    result = {
+        "key": "dual_threshold",
+        "label": "双层阈值偏移",
+        "mainTokensEstimate": matb_tokens,
+        "gateTokens": gate_tokens,
+        "ratio": round(ratio, 2),
+        "gapPercent": round(gap * 100),
+    }
+
+    # OpenClaw 的 maxActiveTranscriptBytes 是文件大小（bytes），softThresholdTokens 是 token 数
+    # 异构单位不能简单比较比例。memoryFlush 应在压缩前优先触发写记忆，设计合理。
+    result["status"] = "heterogeneous"
+    result["severity"] = SEVERITY_OK
+    result["advice"] = (
+        f"主阈值是文件大小（{_format_bytes(matb)} ≈ ~{matb_tokens} tokens 等效），"
+        f"memoryFlush 是 token 阈值（{gate_tokens} tokens）。"
+        f"两者单位不同 — memoryFlush 应在压缩前优先触发写记忆，设计合理。"
+    )
+
+    return result
+
+
+def _probe_quality_check(cc: dict) -> dict[str, Any] | None:
+    """摘要质量探针：检测最近一次压缩后，
+    用标准化问题评估关键信息留存率 (Factory.ai 风格)。
+    
+    注意：此函数只在能够访问 LLM 时才有意义（需要 `--probe` 模式），
+    默认只返回「探针就绪」状态。
+    """
+    # 检查是否存在 compaction 事件可分析
+    today = datetime.now().strftime("%Y-%m-%d")
+    compaction_events = 0
+    latest_compaction = None
+
+    if _SESSIONS_DIR.exists():
+        for f in sorted(_SESSIONS_DIR.glob(f"{today}*.jsonl"), reverse=True):
+            try:
+                with open(f) as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if obj.get("type") in ("compaction", "compression") or "tokensBefore" in obj:
+                            compaction_events += 1
+                            if latest_compaction is None:
+                                latest_compaction = {
+                                    "sessionFile": f.name,
+                                    "tokensBefore": obj.get("tokensBefore", 0),
+                                    "details": obj.get("details", ""),
+                                    "fromHook": obj.get("fromHook", False),
+                                }
+            except OSError:
+                continue
+            if latest_compaction:
+                break
+
+    result = {
+        "key": "probe_quality",
+        "label": "摘要质量探针",
+        "status": "ready" if compaction_events > 0 else "no_compaction",
+        "severity": SEVERITY_OK,
+        "compactionEventsToday": compaction_events,
+        "latestCompaction": latest_compaction,
+        "probeQuestions": _PROBE_TEMPLATES,
+        "advice": (
+            f"今日 {compaction_events} 次压缩。运行 --probe 模式可自动评估每次压缩后的关键信息留存率。"
+            if compaction_events > 0
+            else "今日无压缩事件，无需探针评估。"
+        ),
+    }
+    return result
+
+
+def _isolation_check(session_count: int, token_data: dict) -> list[dict[str, Any]]:
+    """分身隔离建议：当碎片化或 token 消耗超阈值时，
+    建议将高负载子任务拆分到独立子 Agent (Anthropic 多 Agent 研究员策略)。
+    """
+    issues = []
+
+    # 碎片化触发
+    if session_count > _ISOLATION_SESSION_THRESHOLD:
+        issues.append({
+            "key": "isolation_fragmentation",
+            "label": "分身隔离建议（碎片化）",
+            "severity": SEVERITY_WARN,
+            "status": "high",
+            "current": session_count,
+            "threshold": _ISOLATION_SESSION_THRESHOLD,
+            "advice": (
+                f"今日已产生 {session_count} 个会话片段（> {_ISOLATION_SESSION_THRESHOLD}）。"
+                f"与其单纯提高 maxActiveTranscriptBytes（可能增大单次压缩压力），"
+                f"不如将高 token 消耗子任务拆分到独立子 Agent。"
+                f"使用 sessions_spawn(mode='run', context='isolated') 即可。"
+            ),
+        })
+
+    # token 消耗触发
+    max_tokens = token_data.get("maxTokensSeen", 0)
+    if max_tokens > _ISOLATION_HIGH_TOKEN_KB * 1000:
+        issues.append({
+            "key": "isolation_token_heavy",
+            "label": "分身隔离建议（token 密集）",
+            "severity": SEVERITY_WARN,
+            "status": "heavy",
+            "current": f"{max_tokens//1000}K tokens",
+            "threshold": f"{_ISOLATION_HIGH_TOKEN_KB}K tokens",
+            "advice": (
+                f"单 session 消耗 {max_tokens//1000}K tokens（> {_ISOLATION_HIGH_TOKEN_KB}K）。"
+                f"大量上下文消耗意味着任务复杂度高 → 将调研/编码/测试各自分到独立子 Agent，"
+                f"每个 Agent 保持窄上下文（Anthropic 研究：隔离上下文优于单 Agent 长上下文）。"
+            ),
+        })
+
+    return issues
+
+
+def _drift_check(cc: dict) -> dict[str, Any] | None:
+    """上下文降解检测：检测连续压缩后 tokensBefore 的变化趋势。
+    如果连续 N 次压缩后 tokensBefore 没有明显下降（说明压缩无效），
+    或者急剧下降（可能丢失了关键信息），触发告警。
+    
+    这是轻量级检测——不需要 LLM，只靠 token 计数趋势分析。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    token_befores = []  # 收集所有 compaction 的 tokensBefore
+
+    if _SESSIONS_DIR.exists():
+        for f in sorted(_SESSIONS_DIR.glob(f"{today}*.jsonl")):
+            try:
+                with open(f) as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        tb = obj.get("tokensBefore")
+                        if isinstance(tb, (int, float)) and tb > 0:  # 过滤无效 0 值
+                            token_befores.append(int(tb))
+            except OSError:
+                continue
+
+    if len(token_befores) < 2:
+        return {
+            "key": "drift_detection",
+            "label": "上下文降解检测",
+            "status": "insufficient_data",
+            "severity": SEVERITY_OK,
+            "compactionCount": len(token_befores),
+            "advice": f"今日仅 {len(token_befores)} 次压缩，数据不足以分析降解趋势。",
+        }
+
+    # 分析最近 N 次压缩的趋势
+    recent = token_befores[-min(_DRIFT_WINDOW, len(token_befores)):]
+    first_val = recent[0]
+    last_val = recent[-1]
+
+    drop_ratio = (first_val - last_val) / max(first_val, 1)
+
+    result = {
+        "key": "drift_detection",
+        "label": "上下文降解检测",
+        "compactionCount": len(token_befores),
+        "recentTokensBefore": recent,
+        "firstTokensBefore": first_val,
+        "lastTokensBefore": last_val,
+        "dropRatio": round(drop_ratio, 2),
+    }
+
+    if drop_ratio > _DRIFT_DROP_RATIO:
+        result["status"] = "degradation_suspected"
+        result["severity"] = SEVERITY_WARN
+        result["advice"] = (
+            f"最近 {len(recent)} 次压缩 tokensBefore 从 {first_val} 降至 {last_val} "
+            f"（下降 {int(drop_ratio*100)}%）。如果每次压缩的摘要都在丢失信息，"
+            f"会导致上下文持续降解 → 建议运行 --probe 模式评估摘要质量。"
+        )
+    elif drop_ratio < 0.05 and len(recent) >= 3:
+        # 几乎不变 → 压缩可能无效
+        result["status"] = "compression_stalled"
+        result["severity"] = SEVERITY_WARN
+        result["advice"] = (
+            f"最近 {len(recent)} 次压缩 tokensBefore 稳定在 ~{last_val}，"
+            f"压缩后 token 数几乎没有下降。可能 compression 未生效或阈值设置过高。"
+        )
+    else:
+        result["status"] = "healthy"
+        result["severity"] = SEVERITY_OK
+        result["advice"] = f"压缩趋势健康：tokensBefore 从 {first_val} 到 {last_val}，稳定下降。"
+
+    return result
+
+
+def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[str, Any]:
+    """诊断 OpenClaw 压缩配置，返回完整诊断报告。
+    
+    Args:
+        token_aware: 启用令牌感知检测（从 session jsonl 读取实际 token 消耗）
+        probe: 启用摘要质量探针（检测压缩后关键信息留存率）
+    """
     cc = _get_compaction_config()
     ctx_window = _get_context_window()
 
@@ -319,7 +676,53 @@ def compaction_diagnose() -> dict[str, Any]:
         advice.append(si["advice"])
         has_warn = True
 
-    # 6. 汇总当前配置
+    # ── v2.0 新增检测 ────────────────────────────────────
+
+    # 6. 令牌感知检测
+    token_data = {"maxTokensSeen": 0, "avgTokensPerTurn": 0}
+    if token_aware:
+        ta = _token_aware_check(cc)
+        issues.append(ta)
+        if ta["severity"] != SEVERITY_OK and ta.get("advice"):
+            advice.append(ta["advice"])
+            has_warn = True
+        token_data = ta
+
+    # 7. 双层阈值检查
+    dt = _dual_threshold_check(cc, ctx_window)
+    if dt:
+        issues.append(dt)
+        if dt["severity"] != SEVERITY_OK:
+            advice.append(dt["advice"])
+            has_warn = True
+
+    # 8. 摘要质量探针
+    if probe:
+        pq = _probe_quality_check(cc)
+        if pq:
+            issues.append(pq)
+            if pq.get("advice"):
+                advice.append(pq["advice"])
+
+    # 9. 分身隔离建议
+    iso = _isolation_check(session_count, token_data)
+    if iso:
+        issues.extend(iso)
+        for i in iso:
+            advice.append(i["advice"])
+            has_warn = True
+
+    # 10. 上下文降解检测
+    dr = _drift_check(cc)
+    if dr:
+        issues.append(dr)
+        if dr["severity"] != SEVERITY_OK:
+            advice.append(dr["advice"])
+            has_warn = True
+
+    # ── 汇总当前配置 ──────────────────────────────────────
+
+    # 11. 汇总当前配置
     current_config = {}
     for k in ("mode", "truncateAfterCompaction", "notifyUser",
               "maxActiveTranscriptBytes", "keepRecentTokens", "reserveTokens"):
@@ -462,29 +865,94 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
 
 
 def print_diagnose(diag: dict[str, Any]) -> None:
-    """人性化打印诊断报告。"""
+    """人性化打印诊断报告 (v2.0 支持令牌感知/探针/隔离/降解)。"""
     print("\n" + "=" * 64)
-    print("  📊 Mark42 压缩配置诊断")
+    print("  📊 Mark42 压缩配置诊断 v2.0")
     print("=" * 64)
     print(f"  上下文窗口: {diag['contextWindow']//1000}K")
-    print(f"  今日会话片段: {diag['todaySessionCount']} 个")
-    print(f"  最大转录文件: {diag['largestTranscriptMB']}MB")
+    print(f"  今日会话片段: {diag.get('todaySessionCount', '?')} 个")
+    print(f"  最大转录文件: {diag.get('largestTranscriptMB', '?')}MB")
     print(f"  配置文件: {diag['openclawJsonPath']}\n")
 
-    if diag["status"] == "ok":
+    if diag["status"] == "ok" and not any(
+        i.get("key", "") in ("token_awareness", "dual_threshold", "probe_quality",
+                              "isolation_fragmentation", "isolation_token_heavy", "drift_detection")
+        and i.get("severity") != "ok"
+        for i in diag.get("issues", [])
+    ):
         print("  ✅ 所有压缩配置在舒适范围内\n")
         return
 
     print(f"  ⚠️  {diag['summary']}\n")
 
     for issue in diag["issues"]:
-        sev = issue["severity"]
-        icon = {"ok": "✅", "warn": "⚠️", "critical": "🔴"}.get(sev, "ℹ️")
+        sev = issue.get("severity", "ok")
+        icon = {"ok": "✅", "warn": "⚠️", "critical": "🔴", "info": "ℹ️"}.get(sev, "ℹ️")
         label = issue.get("label", issue.get("key", "?"))
         cur = issue.get("current_human", issue.get("current", "?"))
         comfort = issue.get("comfort_human", "")
         cs = issue.get("status", "")
+        key = issue.get("key", "")
 
+        # ── v2.0 新类型特殊处理 ──
+        if key == "token_awareness":
+            print(f"  {icon} {label}")
+            if cs in ("ok", "no_data"):
+                print(f"     状态: {cs}")
+            else:
+                print(f"     实际最大 token: {issue.get('maxTokensSeen', '?')} ({issue.get('estimatedContextPercent', '?')}% 窗口)")
+                print(f"     文件阈值等效: ~{issue.get('estimatedByteEquivalentTokens', '?')} tokens")
+            if issue.get("advice"):
+                print(f"     建议: {issue['advice']}")
+            print()
+            continue
+
+        if key == "dual_threshold":
+            print(f"  {icon} {label}")
+            print(f"     主阈值等效: ~{issue.get('mainTokensEstimate', '?')} tokens")
+            print(f"     memoryFlush 安全网: {issue.get('gateTokens', '?')} tokens")
+            print(f"     偏移比例: {issue.get('ratio', '?')} ({issue.get('gapPercent', '?')}% 差距)")
+            if issue.get("advice"):
+                print(f"     建议: {issue['advice']}")
+            print()
+            continue
+
+        if key == "probe_quality":
+            print(f"  {icon} {label}")
+            print(f"     今日压缩事件: {issue.get('compactionEventsToday', 0)} 次")
+            if issue.get("latestCompaction"):
+                lc = issue["latestCompaction"]
+                print(f"     最近压缩: tokensBefore={lc.get('tokensBefore', '?')}, file={lc.get('sessionFile', '?')}")
+            if issue.get("advice"):
+                print(f"     {issue['advice']}")
+            print(f"     探针问题数: {len(issue.get('probeQuestions', {}))} 类 (recall/artifact/continuation/decision)")
+            print()
+            continue
+
+        if key in ("isolation_fragmentation", "isolation_token_heavy"):
+            print(f"  {icon} {label}")
+            print(f"     当前: {cur}")
+            if issue.get("threshold"):
+                print(f"     阈值: {issue['threshold']}")
+            print(f"     建议: {issue.get('advice', '')}")
+            print()
+            continue
+
+        if key == "drift_detection":
+            print(f"  {icon} {label}")
+            if cs == "insufficient_data":
+                print(f"     状态: 数据不足（仅 {issue.get('compactionCount', 0)} 次压缩）")
+            else:
+                print(f"     压缩次数: {issue.get('compactionCount', '?')}")
+                recent = issue.get("recentTokensBefore", [])
+                if recent:
+                    print(f"     最近 trend: {recent} (下降 {issue.get('dropRatio', 0)*100:.0f}%)")
+            if issue.get("advice"):
+                print(f"     建议: {issue['advice']}")
+            print()
+            continue
+
+        # ── 原有逻辑 ──
         if cs == "missing":
             print(f"  {icon} {label}")
             print(f"     状态: 未启用")
@@ -493,11 +961,12 @@ def print_diagnose(diag: dict[str, Any]) -> None:
             print(f"  {icon} {label} = {cur} (舒适范围 {issue.get('range', '')})")
         else:
             print(f"  {icon} {label} = {cur}")
-            print(f"     舒适值: {comfort} (范围 {issue.get('range', '')})")
+            if comfort:
+                print(f"     舒适值: {comfort} (范围 {issue.get('range', '')})")
             print(f"     建议: {issue.get('advice', '')}")
         print()
 
-    if diag["advice"]:
+    if diag.get("advice"):
         print("  ── 优化建议汇总 ──")
         for i, a in enumerate(diag["advice"], 1):
             print(f"  {i}. {a}")

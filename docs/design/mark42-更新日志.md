@@ -84,3 +84,36 @@
 ---
 
 *日志文件创建于 2026-06-17。此前所有开发记录分散在 `商品化路线图.md` 和各模块注释中。*
+
+---
+
+## 2026-06-17 #3 — v2.3 全线审查 + 红色项/黄色项修复
+
+**背景**：完成 Mark42 全线审查（8 模块 / ~3200 行），对照设计文档 + 联网最佳实践，输出审查报告 `mark42-全线审查报告-20260617.md`。发现 12 个问题：🔴2 / 🟡7 / 🔵3。本轮全部红色+黄色修复。
+
+### 修复的问题
+
+| # | 等级 | 位置 | 问题 | 修复方式 |
+|:---|:---:|------|------|------|
+| B1 | 🔴 | engine.py | daemon 无心跳检测 | 每 tick 写 `daemon-heartbeat.json`（lastTick/cycle/loops）；assemble `proc.wait()` → 非阻塞轮询 `os.kill(pid,0)` + 30s 间隔 |
+| D1 | 🔴 | config.py | 版本号 2.2 | `mark42_init()` 写入 `"version": "2.3"` |
+| A1 | 🟡 | armor.py | token 估算精度低（BPT 常数偏大） | 前 100 行采样 → `avg_chars_per_line / 2.5` 动态校准；回退保留原固定估算 |
+| C1 | 🟡 | heavy.py | 文件扫描规则 3 处重复 | 抽取 `_list_project_files()` 到 utils.py，`_SKIP_PATTERNS` 统一，preflight/detect/start 共用 |
+| B3 | 🟡 | engine.py | health-watch df/free 解析脆弱 | 改用 `shutil.disk_usage()` + `/proc/meminfo`，不再依赖外部命令输出格式 |
+| C3 | 🟡 | heavy.py | batch_size magic number | 加注释说明 200 分母是经验校准值 |
+| B2 | 🟡 | engine.py | Loop 模板编号逻辑边界 | 同名活跃 Loop 提示 "将被覆盖"，加固边界 |
+| C2 | 🟡 | heavy.py | execute 脚本 TODO 占位 | `heavy_execute` 新增 `command` 参数，`{f}` 替换为文件路径；CLI 加 `--command` |
+| — | 🟡 | utils/config | `_load_json/_save_json` 重复 | **保留不动**：config.py 本地副本是防循环导入的架构决策 |
+
+### 审查关键发现
+
+- **设计一致性**：代码与 `mark42-context-loop-heavy.md` 设计文档无结构性偏离
+- **事件总线**：文件追加 JSONL 符合单机轻量系统实践；Linux `O_APPEND` 写入 <4KB 时原子安全
+- **信号隔离**：`start_new_session=True` 正确防止 SIGINT 穿透；SIGTERM 通过 `os.kill` 逐子进程发送
+- **模块评分**：Armor 9 / Engine 8 / Heavy 7 / Config 9 / Utils 8 / CLI 8 / Logs 9 / CompactionDiag 8
+
+### 验证
+
+- 烟测：assemble 启动双守护 → 心跳文件 30s 写入 → SIGTERM 优雅关闭 → 零残留 ✅
+- 语法：全部 6 个修改文件通过 `ast.parse` ✅
+- 公共函数：`_list_project_files` 在 heavy 三处统一调用

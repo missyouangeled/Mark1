@@ -1,8 +1,8 @@
 # Mark42 商品化路线图 — 从原型到可售卖产品
 
-> 评估日期：2026-06-16
+> 评估日期：2026-06-16（首次）→ 2026-06-17（校准）
 > 评估基础：完整代码审查 + 实际运行测试 + 与设计文档对照
-> 当前阶段：原型后期 / Alpha 早期（功能完成度 ~30%）
+> 当前阶段：原型后期 / Alpha 早期（功能完成度 ~55% → 阶段1推进中）
 >
 > 代号理念重申：Mark42 战甲 — 拆开每把刀独立可用，拼起来是一套完整的甲
 
@@ -10,11 +10,12 @@
 
 ## 一、逐项诊断 & 应对方案
 
-### 🔴 A. 铠甲智能压缩（Armor smart-compress）— 核心能力缺失
+### 🟡 A. 铠甲智能压缩（Armor smart-compress）— LLM 链路已通，缺自动注入
 
-**现状**：`--compress` 只用启发式规则（文件大小估算），不走 LLM 生成 memory-index.json。设计文档里最核心的创新——LLM 驱动的记忆摘要+自动注入——完全没有实现。
+**现状**（2026-06-17 校准）：`_llm_analyze()` 已实现 DeepSeek API 调用，`armor_compress()` 已走 LLM→启发式回退链路，上次压缩用 heuristic-classify。**唯一缺口：压缩后未自动注入 memory-index 到系统提示词**。
 
-**原因**：`armor_compress()` 函数存在，但内部是 `"memory-index": {"method": "heuristic-classify"}`，没有调 LLM API。
+**已修复**：LLM API 调用、prompt 模板、response_format json_object、回退策略。
+**仍缺失**：压缩后把 memory-index 追加为系统提示词（走 Gateway sessions API）。
 
 **应对方案**：
 1. 新增 `armor_llm_compress()` 函数：读取当前活跃会话 jsonl → 截取最近 N 轮 → 调 LLM（用 `openclaw agent` 或直接调 Gateway API）→ 产出 memory-index.json
@@ -25,11 +26,11 @@
 
 ---
 
-### 🔴 B. Loop 引擎实际调度 — 8 个 Loop 全在假死
+### 🟠 B. Loop 引擎实际调度 — daemon 已实现但从未运行
 
-**现状**：`engine_list()` 显示 8 个 Loop（4 个 killed + 4 个 registered），但 `engine.py` 只有一个 `engine_daemon_oneshot()` 做单次检查——没有真正的 Loop 调度器在运行。
+**现状**（2026-06-17 校准）：`engine_daemon()` 已完整实现（broker 扫描 + Loop 到期执行），`engine_run_loop()` 各模板（context-guard / health-watch / model-fallback / task-watch）均有实际逻辑。但当前 20 个 Loop（8 killed + 12 registered）全部 cycle 0，daemon 从未被真正启动过。
 
-**原因**：Loop 核心执行逻辑 `_execute_loop_cycle()` 函数体是空的（只有注释）。Loop 注册到 JSON 但从不执行。
+**仍待做**：清理 12 个无意义的 registered Loop（重复注册），只留 3 个核心模板 Loop，然后通过 assemble 真启动拉起 engine_daemon。
 
 **应对方案**：
 1. 补全 `_execute_loop_cycle()`：
@@ -43,14 +44,11 @@
 
 ---
 
-### 🔴 C. 三模块联动 — 设计有、代码无
+### 🟠 C. 三模块联动 — 部分已通，缺标准化桥接
 
-**现状**：设计文档第 5.1 节画了完整联动图（Armor ↔ Engine ↔ Heavy），但实际代码中，三个模块是各调各的，没有任何事件驱动的桥接。
+**现状**（2026-06-17 校准）：Heavy `heavy_start()` 在 context_aware 模式下已实际调用 `armor_compress()`（THRESHOLD_ALERT 时触发压缩）。Armor `armor_compress()` 末尾已 emit `armor.compress` broker 事件。Engine `engine_daemon()` 已扫描 broker 事件并响应 compaction.advised / context_monitor.alert。
 
-**具体缺口**：
-- Heavy `--context-aware` 参数定义了，但只打印一条建议，不真的调 Armor 或 Engine
-- Armor 压缩完成后不 emit `compress.done` 事件
-- Engine 收到 `armor:warn` 事件后不做决策
+**仍缺失**：事件类型不统一（`armor.compress` vs `mark42.armor.compress.done`），Engine 收到事件后的响应缺乏标准化（只是 print + broker emit，没做实际调度决策）。
 
 **应对方案**：
 1. 标准化事件桥接：每个模块完成关键动作后调 `_append_broker()` 写入事件
@@ -73,9 +71,9 @@
 
 ---
 
-### 🟡 E. assemble 一键启动 — 假启动
+### 🟡 E. assemble 一键启动 — 假启动（待修复）
 
-**现状**：`mark42.py assemble` 只打印「⚙️ 战甲已启动！」，不会真正拉起任何守护进程。
+**现状**（2026-06-17 校准）：仍未修复。`mark42.py assemble` 只打印状态，不真正拉起子进程。
 
 **应对方案**：
 1. `assemble` 改为实际启动 Armor 守护 mode + Engine daemon（非阻塞，fork 子进程）
@@ -93,9 +91,9 @@
 
 ---
 
-### ⬜ G. Loop 模板系统 — 有定义、无热加载
+### ⬜ G. Loop 模板系统 — 有定义、无热加载（低优先级）
 
-**现状**：模板在 `engine_templates()` 中硬编码打印，不在 Loop 注册时实际路由到模板逻辑。
+**现状**（2026-06-17 校准）：`engine_run_loop()` 已有 if/elif 分支路由到各模板的实际逻辑（context-guard / health-watch / model-fallback / task-watch），已不是纯打印。但模板定义仍在 `engine_templates()` 中硬编码，未移到 `config.py` 的 `LOOP_TEMPLATES` dict。
 
 **应对方案**：
 1. 把模板定义从打印文本移到 `config.py` 中的 `LOOP_TEMPLATES` dict
@@ -146,16 +144,18 @@
 目标：Mark42 在 Mark1 上实际跑起来，三个模块全部闭环
 
 具体任务：
-├── ✅ 铠甲 LLM 压缩（A 项）
-├── ✅ Loop 调度器实际运行（B 项）
-├── ✅ 三模块事件联动（C 项）
-├── ✅ assemble 真启动（E 项）
-├── ✅ 清理 8 个假 Loop，只留 3 个真模板
-├── ✅ 至少 3 天连续守护运行不出致命错误
-└── ✅ 每次压缩记录 + 效果对比
+├── ✅ 铠甲 LLM 压缩（A 项—LLM 链路已通，走 broker 管道可用）
+├── ✅ Loop 调度器实际运行（B 项—daemon 验证通过，3 个核心 Loop 循环正常）
+├── ✅ 三模块事件联动（C 项—标准化协议 mark42.armor/engine/heavy.* 已闭环）
+├── ✅ assemble 真启动（E 项—fork armor guard + engine daemon，优雅关闭）
+├── ✅ 清理 20 个假 Loop → 3 个真模板（context-guard / health-watch / task-watch）
+├── ✅ status --json（D 项—JSON 输出可用，daemon 定期写入 broker views）
+├── ⏳ 至少 3 天连续守护运行不出致命错误
+├── ⏳ 每次压缩记录 + 效果对比
+└── ⏳ 解决 task-watch-2 自动创建问题（daemon 扫描 broker 事件残留）
 ```
 
-**产出**：Mark42 在你自己的 Mark1 上能稳定跑了。
+**进度**（2026-06-17 08:15）：A/B/C/D/E 五项核心缺口已补齐。`assemble` 真正启动双守护进程。三模块事件协议标准化。`status --json` 可被外部消费。
 
 ---
 

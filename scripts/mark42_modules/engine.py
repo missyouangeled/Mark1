@@ -111,12 +111,10 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
     if name in loops and not template:
         print(f"⚠️ Loop '{name}' 已存在，覆盖注册")
     elif name in loops:
-        # 同名 template Loop 已存在 → 加编号后缀
-        idx = 2
-        while f"{template}-{idx}" in loops:
-            idx += 1
-        name = f"{template}-{idx}"
-        print(f"ℹ️ 同模板 Loop 已存在，注册为 '{name}'")
+        existing = loops[name]
+        # 如果同名 Loop 仍在活跃状态（非 killed），提示用户并覆盖为活跃
+        if existing.get("status", "killed") not in ("killed",):
+            print(f"⚠️ Loop '{name}' 已存在且活跃（状态: {existing.get('status')})，将被覆盖")
     loops[name] = {
         "task": task,
         "interval": interval_s,
@@ -250,21 +248,26 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
             print(f"      {tn}: {p} pending, {f} failed")
         loop["lastResult"] = {"activeTasks": active_tasks, "pending": pending, "failed": failed}
     elif template_name == "health-watch":
-        disk_root = os.popen("df -h / | tail -1 | awk '{print $4}'").read().strip()
-        disk_data = os.popen("df -h /mnt/data 2>/dev/null | tail -1 | awk '{print $4}'").read().strip()
-        mem_avail = os.popen("free -h | grep Mem | awk '{print $7}'").read().strip()
-        print(f"   🩺 根盘: {disk_root} | 数据盘: {disk_data} | 可用内存: {mem_avail}")
         try:
-            disk_root_gb = float(disk_root.replace("G", "").replace("T", "000"))
-            mem_out = subprocess.run(["free", "-m"], capture_output=True, text=True).stdout
-            mem_line = mem_out.strip().split("\n")[1].split()
-            mem_avail_num = int(mem_line[-1]) if len(mem_line) > 1 else 1000
+            import shutil
+            # 使用 shutil.disk_usage 替代脆弱的 df -h 解析
+            root_usage = shutil.disk_usage("/")
+            disk_root_gb = root_usage.free / (1024**3)
+            disk_root = f"{disk_root_gb:.1f}G"
+            data_usage = shutil.disk_usage("/mnt/data") if Path("/mnt/data").exists() else None
+            disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
+            with open("/proc/meminfo") as f:
+                meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}
+            mem_avail_mb = meminfo.get("MemAvailable", 0) // 1024
+            mem_avail = f"{mem_avail_mb}M"
         except Exception:
-            disk_root_gb, mem_avail_num = 100, 1000
+            disk_root, disk_data, mem_avail = "?", "?", "?"
+            disk_root_gb, mem_avail_mb = 100, 1000
+        print(f"   🩺 根盘: {disk_root} | 数据盘: {disk_data} | 可用内存: {mem_avail}")
         alerts = []
         if disk_root_gb < 5:
             alerts.append(f"磁盘不足 ({disk_root})")
-        if mem_avail_num < 500:
+        if mem_avail_mb < 500:
             alerts.append(f"内存紧张 ({mem_avail})")
         if alerts:
             print(f"   ⚠️ 告警: {', '.join(alerts)}")
@@ -460,6 +463,9 @@ def engine_daemon(interval_s: int = 30) -> None:
                         })
                 except Exception:
                     pass  # 守护模式下静默失败
+            # ── 写入心跳文件 ──
+            heartbeat_file = ENGINE_STATE / "daemon-heartbeat.json"
+            _save_json(heartbeat_file, {"lastTick": _now_iso(), "cycle": rotation_check_count, "loops": len(loops)})
             time.sleep(interval_s)
     except KeyboardInterrupt:
         _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})

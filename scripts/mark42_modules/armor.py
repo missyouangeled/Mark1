@@ -49,7 +49,23 @@ def armor_check() -> dict[str, Any]:
     }
     est = {}
     try:
-        est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
+        # 动态采样校准：在前 100 行中取样估算 chars/token 比率
+        sample_chars = 0
+        sample_lines = 0
+        with open(active, "r") as f:
+            for _ in range(100):
+                line = f.readline()
+                if not line:
+                    break
+                sample_chars += len(line)
+                sample_lines += 1
+        # DeepSeek 中文模型：每 token 约 1.5-2 字符；JSONL 含大量 JSON 控制字符
+        # 取保守估计 2.5 chars/token（中文约1.5 + JSON结构开销）
+        if sample_lines > 0:
+            avg_chars_per_line = sample_chars / sample_lines
+            est = {"estimatedTokens": int(active.stat().st_size / avg_chars_per_line / 2.5)}
+        else:
+            est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
     except OSError:
         est = {"estimatedTokens": 0}
     context_window = _get_context_window()
@@ -84,7 +100,7 @@ def armor_check() -> dict[str, Any]:
 
 
 def _read_session_tail(jsonl_path: Path, lines: int = 60) -> list[dict[str, Any]]:
-    """读取 JSONL 会话文件尾部 N 行。"""
+    """读取 JSONL 会话文件尾部 N 行。兼容 OpenClaw 嵌套格式。"""
     messages = []
     try:
         with open(jsonl_path, "rb") as f:
@@ -100,9 +116,13 @@ def _read_session_tail(jsonl_path: Path, lines: int = 60) -> list[dict[str, Any]
                 chunk = raw_lines[0]
                 for ln in raw_lines[1:]:
                     try:
-                        msg = json.loads(ln.strip())
-                        if isinstance(msg, dict) and "role" in msg:
-                            messages.append(msg)
+                        obj = json.loads(ln.strip())
+                        if not isinstance(obj, dict):
+                            continue
+                        # OpenClaw 嵌套格式: {"type":"message", "message":{"role":"user",...}}
+                        inner = obj.get("message") if isinstance(obj.get("message"), dict) else obj
+                        if isinstance(inner, dict) and "role" in inner:
+                            messages.append(inner)
                     except (json.JSONDecodeError, ValueError):
                         continue
     except OSError:
@@ -123,7 +143,14 @@ def _classify_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
                    "谢谢", "多谢", "NO_REPLY", "no_reply"]
     for i, msg in enumerate(messages):
         role = msg.get("role", "unknown")
-        text = msg.get("content", "")
+        raw_content = msg.get("content", "")
+        # 处理 OpenClaw content 数组格式
+        if isinstance(raw_content, list):
+            text = " ".join(c.get("text", "") for c in raw_content if isinstance(c, dict))
+        elif isinstance(raw_content, str):
+            text = raw_content
+        else:
+            text = str(raw_content)
         if not text:
             continue
         entry = {"index": i, "role": role, "preview": text[:120]}
@@ -170,7 +197,15 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
     lines = []
     for msg in messages[-40:]:
         role = msg.get("role", "?")
-        text = msg.get("content", "")[:200]
+        raw_content = msg.get("content", "")
+        # 处理 OpenClaw content 数组格式: [{"type":"text","text":"..."}]
+        if isinstance(raw_content, list):
+            text = " ".join(c.get("text", "") for c in raw_content if isinstance(c, dict))
+        elif isinstance(raw_content, str):
+            text = raw_content
+        else:
+            text = str(raw_content)
+        text = text[:200]
         lines.append(f"[{role}] {text}")
     convo_text = "\n".join(lines)[:8192]
     prompt = f"""分析以下 AI 助手与用户的对话记录片段。你的任务：
@@ -303,6 +338,16 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                    "warn" if usage >= THRESHOLD_WARN else "ok",
                    f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
                    {"usagePercent": usage, "dryRun": dry_run})
+    # ── C 项：标准化事件桥接 ──
+    _append_broker("armor", "mark42.armor.compress.done",
+                   f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
+                   "ok" if index.get('strategyUsed') == 'llm-analyze' else "warn",
+                   f"策略: {index.get('strategyUsed', '?')} | "
+                   f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) +
+                            len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
+                   f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
+                   {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
+                    "modelGenerated": index.get('modelGenerated', False)})
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 

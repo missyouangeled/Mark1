@@ -107,10 +107,37 @@ def assemble() -> None:
     print("   按 Ctrl+C 关闭所有守护进程")
     print(f"   查看状态: python3 scripts/mark42.py status")
 
-    # 挂起主进程等待子进程退出（armor/engine 都是长期守护，正常不会退出）
+    # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
+    import signal as _sig
+    engine_state = ARMOR_STATE.parent / "engine"
+    heartbeat_file = engine_state / "daemon-heartbeat.json"
+    heartbeat_timeout = 120  # 超过 120s 无心跳视为僵死
+    print("\n👁️ assemble 监护中（30s 轮询）...")
     try:
-        for proc in [armor_proc, engine_proc]:
-            proc.wait()
+        while True:
+            # 检查所有子进程是否仍在运行
+            all_alive = True
+            for name, pid, _log_fd in children:
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    all_alive = False
+                    print(f"⚠️ {name} (PID {pid}) 已退出！")
+                    # 检查心跳文件判断是否僵死已久
+                    if name == "engine-daemon" and heartbeat_file.exists():
+                        hb = _load_json(heartbeat_file)
+                        if hb:
+                            from datetime import datetime as _dt, timezone as _tz
+                            try:
+                                last_tick = _dt.fromisoformat(hb.get("lastTick", ""))
+                                gap = (_dt.now(_tz.utc) - last_tick).total_seconds()
+                                print(f"   最后一次心跳: {gap:.0f}s 前")
+                            except Exception:
+                                pass
+            if not all_alive:
+                print("🛑 子进程异常退出，assemble 退出")
+                break
+            time.sleep(30)
     except KeyboardInterrupt:
         _shutdown(None, None)
 
@@ -361,6 +388,7 @@ def main() -> None:
     heavy_p.add_argument("--execute", action="store_true", help="执行下一批次")
     heavy_p.add_argument("--execute-all", action="store_true", help="执行所有 pending 批次")
     heavy_p.add_argument("--batch", type=str, default="", help="指定批次ID (配合 --execute)")
+    heavy_p.add_argument("--command", type=str, default="", help="每个文件执行的自定义命令，{f} 替换为文件路径")
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
@@ -488,7 +516,7 @@ def main() -> None:
             heavy_start(args.start, task_name,
                        context_aware=not args.no_context_aware)
         elif args.execute and task_name:
-            heavy_execute(task_name, args.batch or None)
+            heavy_execute(task_name, args.batch or None, command=args.command or None)
         elif args.execute_all and task_name:
             heavy_execute_all(task_name)
         elif args.finish and task_name:
