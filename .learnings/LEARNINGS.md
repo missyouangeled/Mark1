@@ -2,6 +2,67 @@
 
 Corrections, insights, and knowledge gaps captured during development.
 
+## [LRN-20260617-001] best_practice
+
+**Logged**: 2026-06-17T09:50:00+08:00
+**Priority**: high
+**Status**: promoted
+**Area**: docs
+
+### Summary
+Mark42 三轮审查/烟测（v2.2→v2.3）共修复 20 个问题，根因可归为六类。
+
+### 一、对输入格式假设错误（3 个）
+
+**表现**：JSONL 嵌套格式找不到消息、content 数组被当字符串、事件守卫不验证文件存在。
+**根因**：写代码时假设外部数据格式与内部结构一致。
+**原则**：先读后写——消费外部数据前先打印真实样本；写守卫前反问"如果为空/格式不对会崩吗"。
+
+### 二、变量/状态初始化遗漏（2 个）
+
+**表现**：UnboundLocalError、残留死 Loop。
+**根因**：只在 happy path 赋值。
+**原则**：所有分支前先置默认值；消费事件后检查死状态并清理。
+
+### 三、修改时只修了一半（2 个）
+
+**表现**：改 daemon 忘同步改 CLI、改保存策略忘改调用方。
+**根因**：只找主调用方没 grep 全仓。
+**原则**：改签名前 `grep -rn` 全仓搜；改后反搜确认每个调用方知道语义变化。
+
+### 四、资源管理粗放（3 个）
+
+**表现**：fd 泄漏、lock truncate、信号未隔离。
+**原则**：Popen fd 要 track 并 close；flock 用 `"a"` 不 truncate；子进程默认 `start_new_session=True`。
+
+### 五、阻塞调用未隔离（1 个）
+
+**表现**：LLM API 同步调用阻塞 daemon 45 秒。
+**原则**：daemon/事件循环内禁止同步 IO——所有网络调用必须异步或子进程。
+
+### 六、编码健壮性细节（9 个黄色项）
+
+**表现**：token 估算是硬编码常数、df/free 解析脆弱、文件扫描重复、magic number、TODO 占位。
+**原则**：能用标准库就不 `os.popen`；三处重复抽公共函数；magic number 加注释；估算用采样不用固定常数；TODO 留--command 参数入口。
+
+### 开发自检清单
+
+1. 外部数据：读了真实样本吗？
+2. 变量初始化：所有分支有默认值吗？
+3. 调用方：改签名前 grep 全仓了吗？
+4. fd/锁：flock `"a"`、fd close、`start_new_session` 设了吗？
+5. 阻塞：循环内有网络 IO 吗？异步了吗？
+6. 外部命令：能用标准库替代 `os.popen` 吗？
+7. 重复代码：三处一样该抽函数吗？
+8. magic number：有注释说明来历吗？
+
+### Metadata
+- Source: mark42 全线审查
+- Related Files: docs/design/mark42-全线审查报告-20260617.md, docs/design/mark42-更新日志.md
+- Tags: mark42, review, bug-classification, best-practice, dev-checklist
+
+---
+
 **Categories**: correction | insight | knowledge_gap | best_practice
 **Areas**: frontend | backend | infra | tests | docs | config
 **Statuses**: pending | in_progress | resolved | wont_fix | promoted | promoted_to_skill
@@ -1268,5 +1329,77 @@ Review the correction and update the working understanding or prompt guidance if
 - Related Files: .learnings/LEARNINGS.md
 - Tags: auto-captured, correction
 - Session Key: agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270
+
+---
+
+## [LRN-20260616-001] correction
+
+**Logged**: 2026-06-16T04:56:27.189Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 额 不用了 应该是自动压缩了。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260616-002] correction
+
+**Logged**: 2026-06-16T05:18:18.113Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 那我们能用神经网络做什么，你能思考这个问题吗，我之前用神经网络结合物理模拟软件 做过机器人训练，只有一个什么oonx文件 当然可能后缀名不是这个 记不太清了 大改是这样的。你搜索一下互联网，看看神经网络能干什么。还有给我返回一个最简单的神经网络的代码，我想看看具体怎么写。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260616-003] correction
+
+**Logged**: 2026-06-16T09:41:42.253Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Image] User text: 现在应该是有两个Session 把那个删了。 清空残留。 Description: The image shows a user interface for managing sessions. At the top is a dropdown labeled “Main Session.” Below it is a search bar titled “Search sessions” with a magnifying glass icon. Two session entries are visible: …
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
 
 ---
