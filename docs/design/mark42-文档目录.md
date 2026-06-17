@@ -2,6 +2,20 @@
 
 > ⚠️ 换模型/重建上下文后，先读这个文件，搞清楚每份文档是干什么的。
 
+## 📂 路径速查（换模型时必看）
+
+| 什么东西 | 路径 |
+|:---|:---|
+| **代码入口** | `scripts/mark42.py`（CLI）/ `scripts/mark42_modules/`（模块） |
+| **配置文件** | `~/.local/state/openclaw/mark42/config.json` |
+| **运行日志** | `/mnt/data/openclaw/mark42/logs/`（数据盘） |
+| **引擎心跳** | `~/.local/state/openclaw/mark42/engine/daemon-heartbeat.json` |
+| **Loop 状态** | `~/.local/state/openclaw/mark42/engine/loops.json` |
+| **铠甲记忆索引** | `~/.local/state/openclaw/mark42/armor/memory-index.json` |
+| **铠甲出手记录** | `~/.local/state/openclaw/mark42/armor/actions.jsonl` |
+| **3天守护日志** | `docs/design/mark42-3天守护日志.md` |
+| **broker 事件** | `~/.local/state/openclaw/mark42/broker/mark42-events.jsonl` |
+
 ## 文档速查
 
 | 文档 | 用途 | 什么时候看 |

@@ -9,11 +9,12 @@
 | 指标 | 值 |
 |:---|:---|
 | 上下文使用率 | 54.2% |
-| armor-guard cycle | 第 1 轮 |
-| engine-daemon cycle | 4 |
-| task-watch cycle | 19 |
+| armor-guard cycle | 第 1 轮（新启动） |
+| engine-daemon cycle | 3 |
+| task-watch cycle | 31 |
 | broker 事件 | 239 条 / 81.4KB |
-| config.json 版本 | 2.2（旧，代码已 2.3） |
+| 日志位置 | `/mnt/data/openclaw/mark42/logs/` |
+| 日志阈值 | 单文件 ≤50MB / ≤10000 行，超限自动截尾 |
 
 ## 检查点记录
 
