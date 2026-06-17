@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-06-17 — v2.3.0 工程管理正式化
+
+**背景**：工程越来越大，需要正式化流程。校准版本号为语义化版本 v2.3.0，整理文档体系，创建烟测脚本。
+
+### 变更清单
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| D | chore | 版本号校准：v2.3 → v2.3.0（Semantic Versioning） |
+| D | chore | 文档重组：context-loop-heavy.md → 架构设计.md；审查报告归入 审查报告/ 子目录 |
+| D | chore | 新增 mark42-工程管理方案.md：版本号/分支/Git/质量门禁/每周检查 |
+| D | chore | mark42-文档目录.md 新增路径速查表 + 工程管理方案入口 |
+| D | chore | 修缮 mark42-运维日志.md（由 3天守护日志 改名，通用化为长期运维日志） |
+| C | chore | 日志迁移到数据盘 /mnt/data/openclaw/mark42/logs/，新增 daemon 日志自动截尾（≤50MB） |
+| C | chore | 清理旧日志目录 armor/daemon-logs/（已停止写入，残留 9.9KB） |
+| B | feat | 创建 scripts/mark42-tests.py：8 模块导入 + 语法 + CLI + 配置文件 + 日志路径 + 守护启停 |
+| A | fix | status_dashboard JSON 输出补上 version 字段 |
+| A | fix | status --json 现在从 config.json 读取版本号 |
+
+### 验证
+
+- 烟测：python3 scripts/mark42-tests.py --full → **24/24 全通过**
+- 守护启停：双守护启动 → 心跳正常 → stderr 干净 → 优雅关闭零残留
+- 语法：compileall 零错误
+- 版本号：config.json → 2.3.0，status --json → version: 2.3.0
+
+### 修改文件
+
+- scripts/mark42_modules/config.py — 版本号 2.3 → 2.3.0；新增 LOG_DIR/DATA_ROOT/MAX_DAEMON_LOG_MB/MAX_DAEMON_LOG_LINES
+- scripts/mark42_modules/cli.py — status_dashboard 加 version 字段；assemble 日志输出到 LOG_DIR；_trim_daemon_logs()
+- scripts/mark42_modules/engine.py — daemon 每 20 tick 检查日志大小自动截尾
+- scripts/mark42_modules/logs.py — log_rotate 加 rotate_daemon_logs()
+- scripts/mark42-tests.py — 新建
+- docs/design/ — 5 个文件改名/新增
+
+---
+
 ## 2026-06-17 — v2.2 阶段 1 核心缺口补齐
 
 **背景**：Mark42 商品化路线图阶段 1（内测可用）A~E 五项诊断缺口需要全部补齐。经过完整代码审查 → 第一轮烟测 → 发现 bug → 修复 → 第二轮烟测 → 全绿通过。

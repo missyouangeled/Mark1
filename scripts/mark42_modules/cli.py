@@ -177,12 +177,17 @@ def status_dashboard(json_mode: bool = False) -> dict | None:
 
     # ── Armor ──
     from .armor import armor_check
-    from .config import ARMOR_STATE, ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, SCRATCH, THRESHOLD_WARN, THRESHOLD_ALERT
+    from .config import ARMOR_STATE, ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, SCRATCH, THRESHOLD_WARN, THRESHOLD_ALERT, CONFIG_PATH
     from .utils import _load_json
 
     check = armor_check()
     usage = check.get("usagePercent", 0)
     status_icon = "🟢" if usage < THRESHOLD_WARN else ("🟠" if usage < THRESHOLD_ALERT else "🔴")
+
+    # 版本号
+    version = "?"
+    if CONFIG_PATH.exists():
+        version = _load_json(CONFIG_PATH).get("version", "?")
 
     # 记忆索引
     index_path = ARMOR_STATE / "memory-index.json"
@@ -270,6 +275,7 @@ def status_dashboard(json_mode: bool = False) -> dict | None:
     # ── 构建 JSON 输出数据 ──
     status_data = {
         "checkedAt": now_str,
+        "version": version,
         "armor": {
             "usagePercent": usage,
             "status": check.get("status", "?"),
