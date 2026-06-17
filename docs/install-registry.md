@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-06-17
+
+### ✅ 调研：3D Gaussian Splatting (3DGS)
+- **时间**：2026-06-17 11:50 CST
+- **触发**：点点主动搜索 GitHub 3DGS
+- **调研范围**：开源仓库、零代码在线查看器、Web 渲染库
+- **保存位置**：docs/reference/3d-gaussian-splatting-速查.md
+- **本地克隆**：tmp/3dgs-demo/（GaussianSplats3D，因缺少 .ply 未跑通本地 demo）
+- **关键链接**：https://supersplat.xyz | https://poly.cam | https://github.com/mkkellogg/GaussianSplats3D
+- **状态**：已整理保存，待后续有具体用途时深入
+
 ## 2026-06-16
 
 ### ✅ 安装：Scrapling Official Skill
