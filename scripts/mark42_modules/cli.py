@@ -4,6 +4,26 @@ import argparse
 import sys
 
 
+def _trim_daemon_logs(log_dir):
+    """检查 daemon 日志大小：单个文件超限则截尾保留最新部分。"""
+    from .config import MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+    max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
+    for fpath in sorted(log_dir.glob("*.log")):
+        try:
+            size = fpath.stat().st_size
+            if size <= max_bytes:
+                continue
+            # 读全部行，保留后一半（最新日志）
+            with open(fpath) as f:
+                lines = f.readlines()
+            keep = min(MAX_DAEMON_LOG_LINES // 2, len(lines) // 2)
+            with open(fpath, "w") as f:
+                f.writelines(lines[-keep:])
+            print(f"   🧹 截尾 {fpath.name}: {size/1024/1024:.1f}MB → {keep} 行")
+        except OSError:
+            pass
+
+
 def assemble() -> None:
     """全甲启动入口 — fork 子进程拉起 armor guard + engine daemon。"""
     import subprocess, sys, time, signal, os
@@ -34,9 +54,13 @@ def assemble() -> None:
     # ── Fork 子进程 ──
     script = str(Path(__file__).resolve().parent.parent / "mark42.py")
     children = []
+    from .config import ARMOR_STATE, LOG_DIR, MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
     pid_file = ARMOR_STATE / "assemble.pids"
-    log_dir = ARMOR_STATE / "daemon-logs"
+    log_dir = LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 日志大小检查（启动时先清一次旧日志） ──
+    _trim_daemon_logs(log_dir)
 
     # 1. Armor 守护（间隔 300s）
     print("🛡️ 启动上下文铠甲守护...")

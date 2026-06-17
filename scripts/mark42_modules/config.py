@@ -32,9 +32,18 @@ SCRATCH = Path("/mnt/data/openclaw/scratch")
 
 XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
+
+# 数据盘路径（优先 /mnt/data，回退 ~/.local/state）
+DATA_ROOT = Path("/mnt/data/openclaw/mark42")
+if not DATA_ROOT.parent.parent.exists():
+    DATA_ROOT = XDG_STATE / "openclaw" / "mark42"
+
 ARMOR_STATE = MARK42_STATE / "armor"
 ENGINE_STATE = MARK42_STATE / "engine"
 HEAVY_STATE = MARK42_STATE / "heavy"
+
+# 日志统一放到数据盘
+LOG_DIR = DATA_ROOT / "logs"
 
 BROKER_DIR = XDG_STATE / "openclaw" / "broker"
 BROKER_EVENTS = BROKER_DIR / "events.jsonl"
@@ -56,6 +65,8 @@ MAX_LOG_AGE_DAYS = 30
 MAX_BROKER_EVENTS_MB = 10
 MAX_HISTORY_FILES = 50
 MAX_ACTIONS_LINES = 500
+MAX_DAEMON_LOG_MB = 50  # 单个 daemon 日志最大 50MB，超额截尾
+MAX_DAEMON_LOG_LINES = 10000  # 单文件最大 10000 行
 
 # ── 配置系统 ────────────────────────────────────────────
 

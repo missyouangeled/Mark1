@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import (
-    ARMOR_STATE, BROKER_DIR, MARK42_BROKER_EVENTS,
-    MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_HISTORY_FILES,
-    MAX_LOG_AGE_DAYS,
+    ARMOR_STATE, BROKER_DIR, LOG_DIR, MARK42_BROKER_EVENTS,
+    MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_DAEMON_LOG_MB,
+    MAX_DAEMON_LOG_LINES, MAX_HISTORY_FILES, MAX_LOG_AGE_DAYS,
 )
 
 LOG_ROTATION_STATE = ARMOR_STATE.parent / "log-rotation.json"
@@ -98,6 +98,30 @@ def rotate_broker_events() -> dict:
         return {"trimmed": 0, "error": "IO 错误"}
 
 
+def rotate_daemon_logs() -> dict:
+    """检查 daemon 日志大小：单个文件超 MAX_DAEMON_LOG_MB 则截尾。"""
+    if not LOG_DIR.exists():
+        return {"trimmed": 0, "note": "无日志目录"}
+    max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
+    trimmed_files = 0
+    trimmed_lines = 0
+    for fpath in sorted(LOG_DIR.glob("*.log")):
+        try:
+            size = fpath.stat().st_size
+            if size <= max_bytes:
+                continue
+            with open(fpath) as f:
+                lines = f.readlines()
+            keep = min(MAX_DAEMON_LOG_LINES // 2, len(lines) // 2)
+            with open(fpath, "w") as f:
+                f.writelines(lines[-keep:])
+            trimmed_files += 1
+            trimmed_lines += len(lines) - keep
+        except OSError:
+            pass
+    return {"trimmed_files": trimmed_files, "trimmed_lines": trimmed_lines}
+
+
 def rotate_scratch_old() -> dict:
     """清理超过 MAX_LOG_AGE_DAYS 天且无 .keep 标记的 scratch 目录。"""
     from .config import SCRATCH
@@ -118,9 +142,11 @@ def rotate_scratch_old() -> dict:
 
 def log_rotate(target: str = "all") -> dict:
     """执行日志轮替。target: all / history / actions / broker / scratch"""
-    targets = ["history", "actions", "broker", "scratch"] if target == "all" else [target]
+    targets = ["daemon", "history", "actions", "broker", "scratch"] if target == "all" else [target]
     results = {}
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    if "daemon" in targets:
+        results["daemon"] = rotate_daemon_logs()
     if "history" in targets:
         results["history"] = rotate_history_files()
     if "actions" in targets:
@@ -129,7 +155,7 @@ def log_rotate(target: str = "all") -> dict:
         results["broker"] = rotate_broker_events()
     if "scratch" in targets:
         results["scratch"] = rotate_scratch_old()
-    total = sum(r.get("cleaned", 0) + r.get("trimmed", 0) for r in results.values())
+    total = sum(r.get("cleaned", 0) + r.get("trimmed", 0) + r.get("trimmed_files", 0) + r.get("trimmed_lines", 0) for r in results.values())
     state = _load_state()
     state["lastRotation"] = now_str
     state["rotationCount"] = state.get("rotationCount", 0) + 1
@@ -140,6 +166,8 @@ def log_rotate(target: str = "all") -> dict:
             print(f"   {k}: 删除 {v['cleaned']} 个文件")
         if v.get("trimmed", 0) > 0:
             print(f"   {k}: 裁剪 {v['trimmed']} 行")
+        if v.get("trimmed_files", 0) > 0:
+            print(f"   {k}: 截尾 {v['trimmed_files']} 个日志 ({v.get('trimmed_lines', 0)} 行)")
     if total == 0:
         print(f"   ℹ️ 无需清理")
     return {"status": "ok", "results": results, "totalItems": total}

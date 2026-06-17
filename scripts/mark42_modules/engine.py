@@ -466,6 +466,22 @@ def engine_daemon(interval_s: int = 30) -> None:
             # ── 写入心跳文件 ──
             heartbeat_file = ENGINE_STATE / "daemon-heartbeat.json"
             _save_json(heartbeat_file, {"lastTick": _now_iso(), "cycle": rotation_check_count, "loops": len(loops)})
+            # ── 每 20 次循环检查 daemon 日志大小（超额截尾，防止磁盘撑爆） ──
+            if rotation_check_count % 20 == 0:
+                from .config import LOG_DIR, MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+                if LOG_DIR.exists():
+                    max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
+                    for fpath in sorted(LOG_DIR.glob("*.log")):
+                        try:
+                            if fpath.stat().st_size > max_bytes:
+                                with open(fpath) as f:
+                                    lines = f.readlines()
+                                keep = min(MAX_DAEMON_LOG_LINES // 2, len(lines) // 2)
+                                with open(fpath, "w") as f:
+                                    f.writelines(lines[-keep:])
+                                print(f"[{ts}] 🧹 daemon 日志截尾: {fpath.name} ({len(lines)}→{keep} 行)")
+                        except OSError:
+                            pass
             time.sleep(interval_s)
     except KeyboardInterrupt:
         _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
