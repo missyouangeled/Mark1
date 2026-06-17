@@ -94,7 +94,7 @@ def inspect_control_ui_snapshot_dock() -> dict[str, object]:
     if not dist_root:
         return payload
 
-    override_script = dist_root / OVERRIDE_SCRIPT_NAME
+    override_script = dist_root / "assets" / OVERRIDE_SCRIPT_NAME
     payload["overrideScript"] = str(override_script)
     if not override_script.exists():
         return payload

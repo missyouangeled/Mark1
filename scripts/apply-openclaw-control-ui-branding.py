@@ -93,6 +93,53 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
 
+# ── v2026.6.8 适配 — 函数映射: bh→isHidden, OA→unwrap, FA→textExtract, ZA→chatRender, xh→markdown, _h→shouldSkip ──
+# ZA 函数是新的 chat items builder，消息对象直接访问无需额外解包
+YIELDED_HISTORY_REPLY_V2026_6_8_OLD = "r=(Array.isArray(e.messages)?e.messages:[]).filter(e=>!bh(e)),i=Array.isArray(e.toolMessages)?e.tool"
+YIELDED_HISTORY_REPLY_V2026_6_8_NEW = "r=JarvisProjectYieldedHistoryReply((Array.isArray(e.messages)?e.messages:[]).filter(e=>!bh(e))),i=Array.isArray(e.toolMessages)?e.tool"
+STREAM_INDICATOR_V2026_6_8_OLD = "if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=xh(FA(e.stream),f),i=BA(t,e.streamStartedAt??Date.now());r.length>0?_h(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}return jA(NA(VA(t)))"
+STREAM_INDICATOR_V2026_6_8_NEW = "let pendingIndicator=JarvisShouldShowPendingReadingIndicator(e);if(e.stream!==null||pendingIndicator){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=xh(e.stream!==null?FA(e.stream):'',f),i=BA(t,e.streamStartedAt??Date.now());r.length>0?_h(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):t.push({kind:`reading-indicator`,key:n})}return jA(NA(VA(t)))"
+JARVIS_FUNCTIONS_V2026_6_8 = (
+    "function JarvisReadYieldedToolResultText(e){"
+    + "if(!e||typeof e!='object')return null;"
+    + "let t=(e?.role||'').toLowerCase();"
+    + "if(t!=='toolresult'&&t!=='tool_result'&&t!=='tool'&&t!=='function')return null;"
+    + "let n=typeof e?.content=='string'?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text=='string'?e.text:'').join('\\n'):typeof e?.text=='string'?e.text:'';"
+    + "if(!n.trim())return null;"
+    + "try{let r=JSON.parse(n),i=typeof r?.message=='string'?r.message.trim():'';"
+    + "return r?.status==='yielded'&&i&&!/^\\s*NO_REPLY\\s*$/.test(i)?i:null}catch{return null}}"
+    + "function JarvisProjectYieldedHistoryReply(e){"
+    + "if(!Array.isArray(e)||e.length===0)return[];"
+    + "let t=e.filter(e=>!bh(e)),n=-1;"
+    + "for(let r=e.length-1;r>=0;r--){if(!e[r])continue;let i=(e[r]?.role||'').toLowerCase();if(i==='user'){n=r;break}}"
+    + "if(n<0)return t;"
+    + "for(let r=e.length-1;r>n;r--){let i=e[r];if(!i||typeof i!='object')continue;"
+    + "if(!bh(i)&&(i?.role||'').toLowerCase()==='assistant'&&(Array.isArray(i?.content)?i.content:[]).length>0)return t}"
+    + "for(let r=e.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(e[r]);if(!i)continue;"
+    + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof e[r]?.timestamp=='number'?e[r].timestamp:Date.now()};return[...t,a]}return t}"
+    + "function JarvisAssistantHasVisibleContent(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "let t=(e?.role||'').toLowerCase();if(t!=='assistant')return!1;"
+    + "for(let r of Array.isArray(e?.content)?e.content:[]){"
+    + "if(!r||typeof r!='object')continue;"
+    + "if(r.type==='text'&&typeof r.text=='string'){let e=r.text.trim();if(e&&!/^\\s*NO_REPLY\\s*$/.test(e))return!0}"
+    + "if(r.type==='attachment'||r.type==='canvas')return!0}return!1}"
+    + "function JarvisShouldShowPendingReadingIndicator(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "let t=e.sessionHasActiveRun===!0||e.sessionStatus==='running',"
+    + "n=typeof e.sessionEndedAt=='number'&&Date.now()-e.sessionEndedAt<=2e4;"
+    + "if(!t&&!n)return!1;"
+    + "let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;"
+    + "for(let s=r.length-1;s>=0;s--){let o=(r[s]?.role||'').toLowerCase();if(o==='user'){a=s;break}}"
+    + "if(a<0)return!1;let o=!1,s=!1,c=0;"
+    + "for(let l=a+1;l<r.length;l++){let u=r[l];if(!u||typeof u!='object')continue;"
+    + "if(JarvisAssistantHasVisibleContent(u)){o=!0;break}"
+    + "let d=(u?.role||'').toLowerCase();(d==='assistant'||d==='tool')&&(s=!0);"
+    + "let m=typeof u.timestamp=='number'?u.timestamp:0;m>c&&(c=m)}"
+    + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;"
+    + "return t||!c||Date.now()-c<=3e4}"
+)
+
 # ── v2026.6.6 Rolldown 架构适配 — 函数映射: _h→isHidden, TA→unwrap, Th→role, wA→meta, jA→hasContent ──
 # JA 函数是新的 chat items builder（替代了旧版 OA/WA 等单体函数）
 YIELDED_HISTORY_REPLY_V2026_6_6_OLD = "r=(Array.isArray(e.messages)?e.messages:[]).filter(e=>!_h(e))"
@@ -308,6 +355,27 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
         content = asset_path.read_text(encoding="utf-8")
         updated = content
         changed = False
+
+        # Detect v2026.6.8+ — function ZA present (new render), fj+OD present
+        is_v2026_6_8 = "function ZA(e){" in content and "function fj(" in content and "function OD(e){" in content
+        if is_v2026_6_8:
+            _has_jarvis = "JarvisReadYieldedToolResultText" in updated
+            if not _has_jarvis:
+                _marker = "function ZA(e){"
+                _pos = updated.index(_marker)
+                if _pos >= 0:
+                    updated = updated[:_pos] + JARVIS_FUNCTIONS_V2026_6_8 + updated[_pos:]
+                    changed = True
+            if YIELDED_HISTORY_REPLY_V2026_6_8_NEW not in updated and YIELDED_HISTORY_REPLY_V2026_6_8_OLD in updated:
+                updated = updated.replace(YIELDED_HISTORY_REPLY_V2026_6_8_OLD, YIELDED_HISTORY_REPLY_V2026_6_8_NEW, 1)
+                changed = True
+            if STREAM_INDICATOR_V2026_6_8_NEW not in updated and STREAM_INDICATOR_V2026_6_8_OLD in updated:
+                updated = updated.replace(STREAM_INDICATOR_V2026_6_8_OLD, STREAM_INDICATOR_V2026_6_8_NEW, 1)
+                changed = True
+            if changed:
+                asset_path.write_text(updated, encoding="utf-8")
+            patched_paths.append(asset_path)
+            continue
 
         # Detect v2026.6.6+ Rolldown architecture — function JA present, WA/fj absent
         is_v2026_6_6 = "function JA(e){" in content and "function WA(e){" not in content and "function fj(" not in content

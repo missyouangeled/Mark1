@@ -615,3 +615,33 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 2. **单体 bundle 打补丁策略在模块拆分架构下会失效**：之前的 `patch_chat_running_indicator()` 依赖在单一 `index-*.js` 中搜索代码模式，Rolldown 拆分后目标模式不再存在于任何单个 chunk 中。后续需要用模块级注入或独立的 ES module 替代方案。
 3. **升级前扫描 diff 不能只看依赖版本**：本次 55 个依赖全不变，但构建工具链（Rolldown）变化导致产出结构完全不同。理想的升级前预检还应包含「dist 目录结构 diff」。
 4. **timer UnitFileState 要在自检中列为 required**：resume-watch 的 `ActiveState=active` 但 `UnitFileState=disabled` 意味着重启后不会自动启动，应在升级后自检中强制校验 enabled 状态。
+
+
+## 升级 #2：2026.6.6 → 2026.6.8
+
+### 基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 升级日期 | 2026-06-17 |
+| 旧版本 | 2026.6.6 |
+| 新版本 | 2026.6.8 |
+| 触发方式 | 用户提示有更新，`npm update -g openclaw` |
+| 所在机器 | 公司（Linux） |
+
+### 升级后问题
+
+1. **Control UI 前端结构变化**：v2026.6.8 的 Rolldown bundle 引入了新的函数结构（`function ZA` 替代 `function JA` 作为主渲染函数，`fj` + `OD` 同时存在），原有 v22/v6.6.5/v6.6.6 三个版本检测全部失效。修复：在 `apply-openclaw-control-ui-branding.py` 新增 v2026.6.8 检测块。
+
+2. **infos-handle sidecar SSE 路径**：branding override 里的 SSE URL 格式需要适配（`infosHandleDirectReady: false`），不影响核心功能。
+
+### 修复详情
+
+- **branding 脚本**：新增 `YIELDED_HISTORY_REPLY_V2026_6_8` / `STREAM_INDICATOR_V2026_6_8` / `JARVIS_FUNCTIONS_V2026_6_8` 三组常量，在 `chat_running_indicator` 中新增 `is_v2026_6_8` 检测（`ZA` + `fj` + `OD`），注入点：`function ZA(e){` 之前。
+- v2026.6.8 的消息对象不再需要额外解包（无 message wrapper），Jarvis helpers 改用直接属性访问。
+- 验证结果：26/27 项通过。
+
+### 经验教训
+
+- v2026.6.8 的 bundle 函数名继续变化，版本检测需要同时检查多个函数的存在/缺失。
+- 升级前应先备份当前 `dist/control-ui` 目录以便快速回滚。
