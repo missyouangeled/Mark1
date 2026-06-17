@@ -111,6 +111,11 @@
 - **当前阶段**：初步设计完成，待调研商业渠道后开工
 - **常用入口**：
   - 设计文档：`docs/design/mark42-context-loop-heavy.md`
+  - 📂 文档目录（先看这个）：`docs/design/mark42-文档目录.md`
+  - 🧠 开发经验（写代码前先看）：`docs/design/mark42-开发经验.md`
+  - 📋 变更记录：`docs/design/mark42-更新日志.md`
+  - 🔍 审查报告：`docs/design/mark42-全线审查报告-20260617.md`
+  - 🗺️ 路线图：`docs/design/mark42-商品化路线图.md`
   - 复用资产：`context-monitor.py` / `supervisor-*.py` / `heavy-task-*.py` / `frontstage-broker.py`
 - **检索提示**：
   - 用户说"Mark42"或"战甲"时，直接定位到这个项目
