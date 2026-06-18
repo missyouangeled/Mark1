@@ -165,18 +165,18 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         # 从 openclaw.json 取 API key
         with open(config_path) as f:
             cfg = json.load(f)
-        provider = cfg.get("models", {}).get("providers", {}).get("deepseek", {})
+        provider = cfg.get("models", {}).get("providers", {}).get("minimax", {})
         api_key = provider.get("apiKey", "")
-        base_url = provider.get("baseUrl", "https://api.deepseek.com")
+        base_url = provider.get("baseUrl", "https://api.minimax.chat/v1")
         if not api_key:
             return None
         # 从 Mark42 配置取模型名
-        model_name = "deepseek-v4-pro"
+        model_name = "MiniMax-M3"
         if mark42_config_path.exists():
             try:
                 with open(mark42_config_path) as f:
                     mcfg = json.load(f)
-                model_name = mcfg.get("models", {}).get("llmAnalyze", "deepseek-v4-pro")
+                model_name = mcfg.get("models", {}).get("llmAnalyze", "MiniMax-M3")
             except Exception:
                 pass
     except Exception:

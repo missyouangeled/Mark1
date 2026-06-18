@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-06-18 — v2.3.1 LLM 压缩链路修复
+
+**背景**：铠甲 LLM 压缩需指定 provider/模型。先切到公司 DeepSeek，后改为 MiniMax M3（DeepSeek 留给主会话）。
+
+### 变更清单
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | fix | armor.py:168 `_llm_analyze()` provider → `"minimax"`，默认模型 → `"MiniMax-M3"` |
+
+### 验证
+
+- API key 查找链路：minimax → apiKey ✅
+- 烟测：18/18 全通过 ✅
+
+### 修改文件
+
+- scripts/mark42_modules/armor.py — provider + 默认模型名
+
+---
+
 ## 2026-06-17 — v2.3.0 工程管理正式化
 
 **背景**：工程越来越大，需要正式化流程。校准版本号为语义化版本 v2.3.0，整理文档体系，创建烟测脚本。
