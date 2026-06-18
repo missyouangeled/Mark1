@@ -28,6 +28,7 @@ def assemble() -> None:
     """全甲启动入口 — fork 子进程拉起 armor guard + engine daemon。"""
     import subprocess, sys, time, signal, os
     from pathlib import Path
+    from .utils import _now_iso, _save_json, _load_json
     from .config import ARMOR_STATE, mark42_config, mark42_init
     from .utils import _now_iso, _save_json
     from .armor import armor_check

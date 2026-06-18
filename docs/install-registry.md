@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-06-18
+
+### ✅ 安装：Agent Reach v1.5.0
+- **时间**：2026-06-18 12:54 CST
+- **来源**：https://github.com/Panniantong/Agent-Reach
+- **安装方式**：uv venv + pip install from GitHub archive
+- **安装路径**：`~/.agent-reach-venv/`（venv）+ `~/.agent-reach/`（config/token）
+- **依赖**：Python 3.12、requests、feedparser、loguru、pyyaml、rich、yt-dlp、mcporter、Exa
+- **前置审查**：MIT 协议、安全/隐私/兼容性全项通过
+- **激活渠道**：YouTube、RSS、Exa 搜索、Jina Reader（网页）、B站（基础搜索）、OpenCLI（Twitter/小红书/Reddit 兜底后端）
+- **未装**：twitter-cli（编译 OOM，OpenCLI 兜底）、小宇宙播客（需 Groq Key，用户要求删除）
+- **待配置**：GitHub（需 gh auth login）、V2EX（需代理）、Twitter/小红书（需配 Cookie）
+- **命令**：`~/.agent-reach-venv/bin/agent-reach` 或 `agent-reach`（需 PATH）
+- **SKILL.md**：已安装到 `~/.openclaw/skills/agent-reach/` 和 `~/.agents/skills/agent-reach/`
+- **备注**：5/13 渠道立即可用。需登录的平台用 `agent-reach install --channels=xxx` 解锁
+
+---
+
 ## 2026-06-17
 
 ### ✅ 调研：3D Gaussian Splatting (3DGS)

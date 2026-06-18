@@ -14,15 +14,20 @@
 | # | 类型 | 内容 |
 |:---|:---:|------|
 | A | fix | armor.py:168 `_llm_analyze()` provider → `"minimax"`，默认模型 → `"MiniMax-M3"` |
+| B | fix | cli.py:30 `assemble()` 补全 import `_now_iso, _save_json, _load_json`（之前漏 import 导致启动报错 NameError） |
+| C | fix | config.json `llmProvider: deepseek` → `minimax`，`llmAnalyze: deepseek-v4-pro` → `MiniMax-M3` |
 
 ### 验证
 
 - API key 查找链路：minimax → apiKey ✅
+- assemble 启动：守护双进程正常拉起 ✅
 - 烟测：18/18 全通过 ✅
 
 ### 修改文件
 
 - scripts/mark42_modules/armor.py — provider + 默认模型名
+- scripts/mark42_modules/cli.py — assemble() 补 import
+- ~/.local/state/openclaw/mark42/config.json — llmProvider/llmAnalyze
 
 ---
 

@@ -50,6 +50,26 @@
 | `agent-browser` | 无头浏览器自动化（导航/填表/点击/截图/抓取） | 需要打开网页、自动填表、截图、抓数据时 |
 | `browser-automation` | Web 页面控制，多步骤流程/登录/标签管理 | 复杂网页交互、登录流程、多标签操作时 |
 | `scrapling-official` | 全栈网页抓取框架：反爬绕过/自适应解析/浏览器自动化/大规模爬虫 | 需要抓取网页数据、绕过 Cloudflare、批量采集、结构化提取时 |
+| `agent-reach` | 统一互联网接入层：10+ 平台一键读取，多后端路由+自动故障切换。程序 `~/.agent-reach-venv/bin/agent-reach`，SKILL.md 在 `~/.openclaw/skills/agent-reach/`。⚠️ 均为按需调用的 CLI 工具，无常驻进程 | 需要读 YouTube/B站/Twitter/小红书/Reddit/RSS/任意网页/全网搜索时 |
+
+### agent-reach 可用渠道速查
+
+> 所有渠道通过 CLI 工具按需调用，无需后台运行。命令格式见各平台说明。
+
+| 平台 | 能力 | 调用方式 |
+|------|------|---------|
+| 🌐 任意网页 | 读取网页纯文本（Jina Reader） | `curl https://r.jina.ai/URL` |
+| 🔍 全网搜索 | AI 语义搜索（Exa，免费） | 经由 mcporter MCP 调用 |
+| 📺 YouTube | 提取字幕 + 视频信息 | `yt-dlp`（已配置） |
+| 📺 B站 | 搜索 + 视频详情（bili-cli） | `bili` 命令或 B站搜索 API |
+| 📡 RSS/Atom | 解析任意订阅源 | `feedparser`（Python 库） |
+| 🐦 Twitter/X | 读推文/搜索/时间线 | `twitter-cli`（未装，走 OpenCLI 兜底） |
+| 📕 小红书 | 搜索/阅读/评论 | OpenCLI（需先装 Chrome 扩展） |
+| 📖 Reddit | 搜索+读帖子和评论 | OpenCLI 或 `rdt-cli` |
+| 📦 GitHub | 读仓库/Issue/搜索 | `gh` CLI（已装，需 `gh auth login` 认证） |
+| 💻 V2EX | 热门/节点/帖子 | 直连 API（当前需代理） |
+
+> 需要登录的平台（Twitter/小红书/Reddit）：用 Chrome 插件 Cookie-Editor 导出 → `agent-reach configure xxx-cookies` 配置
 
 ---
 
