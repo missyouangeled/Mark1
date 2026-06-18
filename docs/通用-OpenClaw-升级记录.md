@@ -740,3 +740,42 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 **验证**：`openclaw security audit` 0 critical · 0 warn · 2 info ✅
 
 **其他修复**：`system-summary.py` watchers 计数 5→6（session-size-watcher 是合法第 6 个 timer）
+
+---
+
+## 升级 #4：2026.6.6 → 2026.6.8 (重做)
+
+### 基本信息
+
+- **日期**：2026-06-18 10:36~10:40
+- **触发方式**：用户要求"按规定走再升级"，先读历史升级记录 + 预检再升级
+- **升级命令**：`npm update -g openclaw`（changed 285 packages in 24s）
+- **前置准备**：
+  - git 硬重置到 HEAD（按用户"以 GitHub 为准"）
+  - git pull Mark1 master 至最新（含 v2026.6.18-1/2）
+  - 备份 dist/control-ui + openclaw.json + package.json 到 `/tmp/upgrade-backups/2026-06-18-6.6to6.8/`
+  - systemd 服务全 active（gateway / sidecar / unified proxy）
+
+### 升级中配置修复
+
+1. **logging.redactSensitive**: "off" → "tools"（v6.6.18-2 修复）
+2. **gateway.controlUi.allowedOrigins**: 补 4 个 origin（localhost/127.0.0.1/LAN/hostname）
+3. **agents.list[*].model.fallbacks**: 显式声明 `[litellm/agnes-2.0-flash]`，避免 clobber defaults
+4. **2 cron payload.model**: deepseek-company/deepseek-v4-pro → minimax/MiniMax-M3
+5. **a240f88c TaskFlow (blocked 2d1h)**: 显式 cancel（maintenance 不会自动清）
+
+### 升级后验证
+
+- ✅ OpenClaw 2026.6.8 (844f405)
+- ✅ 升级后自检 26/26 PASS
+- ✅ branding 脚本自动检测 v2026.6.8 + 应用 chatRunning indicator 补丁
+- ✅ model-selector 补丁自动检测 v2026.6.8（`Gz` + `Oz` 函数名变化）并应用
+- ✅ security audit: 0 critical · 0 warn · 2 info
+- ✅ 6 timer all active
+- ✅ bundle 文件名 `index-Wjxp3gyC.js` 与升级记录中描述一致
+
+### 经验教训
+
+- **mark1 git pull 不会动 ~/.openclaw/openclaw.json**：v6.6.18-2 升级记录里说"修了 controlUi.allowedOrigins/auth.rateLimit/logging.redactSensitive"——但 openclaw.json 是运行时配置，不在 git 里。需要手动从升级记录里读出来补打。
+- **auth.rateLimit 不是 OpenClaw schema 字段**：升级记录里说"添加 auth.rateLimit"——但 OpenClaw 2026.6.6 的 auth schema 实际只接受 profiles/order/cooldowns，没有 rateLimit。强行写入会导致 `auth: Invalid input`，配置 invalid。正确做法：查 `openclaw config schema` 确认后再写。
+- **piped python -c 输出要纯 JSON**：用 `python3 -c '...'; echo` 混到 JSON 前面会让文件变无效。`--print-human` 等场景下尤其要注意 stdout 重定向到 cp。

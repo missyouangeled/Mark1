@@ -1851,3 +1851,18 @@
 - `docs/通用-OpenClaw-升级记录.md`
 - `scripts/apply-openclaw-session-model-selector-fix.py`
 - `scripts/verify-today-patches.py`
+
+## 2026-06-18 10:40:59 CST (+08:00) — OpenClaw 升级 2026.6.6 → 2026.6.8 + Mark1 拉取 + 配置修复
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：26/26-PASS
+- 结果摘要：
+- 成功升级：版本 8c802aa→844f405，285 packages changed；Mark1 拉至 master（v2026.6.18-1/2 已合入）。配置修复：logging.redactSensitive=tools、controlUi.allowedOrigins、agents.list[*].fallbacks、2 cron payload.model→minimax/MiniMax-M3
+- 验收 / 验证：
+- 26/26 升级后自检 PASS；security 0/0/2；6 timer active；bundle index-Wjxp3gyC.js
+- 相关文件：
+- `docs/通用-OpenClaw-升级记录.md`
+- `~/.openclaw/openclaw.json`
