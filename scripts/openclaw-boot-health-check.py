@@ -28,6 +28,7 @@ TIMERS = {
 
 STATE_DIR = Path.home() / ".local/state/openclaw/boot-health"
 STATE_FILE = STATE_DIR / "last-check.json"
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def run(cmd: list[str], timeout: int = 5) -> tuple[int, str, str]:
@@ -194,14 +195,52 @@ def main():
     # 写状态文件
     STATE_FILE.write_text(json.dumps(results, ensure_ascii=False, indent=2))
 
+    # ── 运行升级自检 ──
+    try:
+        upgrade = subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "openclaw-post-upgrade-self-check.py"), "--print-boot-json"],
+            capture_output=True, text=True, timeout=30
+        )
+        upgrade_data = json.loads(upgrade.stdout.strip())
+        upgrade_msg = upgrade_data.get("bootMessage", "")
+        if upgrade_data.get("versionChanged"):
+            print(f"[boot] 检测到版本变化: {upgrade_data.get('previousVersion')} → {upgrade_data.get('currentVersion')}")
+    except Exception as e:
+        print(f"[boot] 升级自检跳过: {e}")
+        upgrade_msg = ""
+
     # 输出 JSON 供 BOOT.md 调用
     boot_message = summary if issues else "✅ 开机体检通过，所有服务正常。"
+    full_boot_msg = f"🩺 开机体检:\n{boot_message}"
+    if upgrade_msg:
+        full_boot_msg = f"{upgrade_msg}\n\n{full_boot_msg}"
     print(json.dumps({
         "ok": results["all_ok"],
         "issues": issues,
-        "bootMessage": f"🩺 开机体检:\n{boot_message}",
+        "bootMessage": full_boot_msg,
         "detail": str(STATE_FILE),
     }, ensure_ascii=False))
+
+    # ── 发射 broker 启动事件，让 frontstage broker 推送到聊天 ──
+    try:
+        from datetime import datetime, timezone
+        broker_dir = Path.home() / ".local/state/openclaw/broker"
+        broker_dir.mkdir(parents=True, exist_ok=True)
+        event = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "source": "boot-health",
+            "event": "boot.completed",
+            "ok": results["all_ok"],
+            "issues": issues,
+            "bootMessage": full_boot_msg,
+        }
+        with open(broker_dir / "events.jsonl", "a") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        # 设 dirty flag 触发 frontstage broker 重建
+        (broker_dir / "dirty").write_text(datetime.now(timezone.utc).isoformat())
+        print(f"[boot] broker 启动事件已发射")
+    except Exception as e:
+        print(f"[boot] broker 事件发射失败: {e}")
 
 
 if __name__ == "__main__":
