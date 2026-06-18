@@ -242,6 +242,28 @@ def main():
     except Exception as e:
         print(f"[boot] broker 事件发射失败: {e}")
 
+    # ── 注入启动系统事件到主会话，触发 AGENTS.md 加载流程 ──
+    try:
+        startup_msg = (
+            "🎬 系统启动事件\n\n"
+            "请执行以下启动流程：\n\n"
+            "1. 向用户发送「⏳ 贾维斯正在加载系统，请稍候...」\n"
+            "2. 按 AGENTS.md 启动流程依次读取："
+            "ACTIVE_RULES.md → BOOT_INDEX.md → RULES_INDEX.md → "
+            "SOUL.md → USER.md → MEMORY.md → SKILL_CATALOG.md → WORKSPACE_INDEX.md\n"
+            "3. 读取完成后向用户发送「✅ 系统已就绪，我在。需要我的话，直接说。」\n"
+            "4. 回复 NO_REPLY"
+        )
+        subprocess.run(
+            ["openclaw", "gateway", "call", "chat.inject",
+             "--params", json.dumps({"sessionKey": "agent:main:main", "message": startup_msg}),
+             "--json"],
+            capture_output=True, timeout=15
+        )
+        print("[boot] 启动流程系统事件已注入主会话")
+    except Exception as e:
+        print(f"[boot] 启动事件注入失败: {e}")
+
 
 if __name__ == "__main__":
     main()
