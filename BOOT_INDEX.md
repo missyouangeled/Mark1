@@ -66,6 +66,11 @@
 - `SKILL_CATALOG.md`
 - `WORKSPACE_INDEX.md`
 
+### 第 4.5 步 — Agent 边界自检（多 Agent 体系）
+- 从当前系统提示 Runtime 行确认 `agentId`
+- 读取 `rules/agent-boundaries.md`，按自己的 agentId 确定 ✅/❌ 操作边界
+- 此步确保每个 Agent 知道自己的权限范围和与其它 Agent 的通信规则
+
 ### 第 5 步 — 加载域规则，处理用户消息
 - 根据用户第一条消息类型，从 `RULES_INDEX.md` 查表加载对应域规则
 - 日常聊天 → `rules/chat.md` | 工作任务 → `rules/work.md` | 系统操作 → `rules/system.md` + `rules/work.md` | 高风险 → 叠加 `rules/safety.md`

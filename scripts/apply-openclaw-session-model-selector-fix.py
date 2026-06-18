@@ -164,14 +164,25 @@ TARGET_CHAT_MODEL_SWITCH = "async function CW(e,t){if(!e.client||!e.connected)re
 
 CURRENT_BUILTIN_CHAT_MODEL_SWITCH = "async function gz(e,t){if(!e.client||!e.connected)return!1;if(ZL(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n];_R(e,null),e.chatModelOverrides={...e.chatModelOverrides,[n]:Da(t)};let i=e.client,a={},o=()=>{if(e.chatModelSwitchPromises?.[n]===a.current){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}},s=(async()=>{try{return await i.request(`sessions.patch`,{key:n,...Nv(e,n),model:t||null}),QR(e),await bR(e),!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},_R(e,`Failed to set model: ${String(t)}`),!1}finally{o()}})();return a.current=s,e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:s},s}"
 
+# v2026.6.8: function renamed gz → Gz
+CURRENT_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8 = "async function Gz(e,t){if(!e.client||!e.connected)return!1;if(ER(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n];KR(e,null),e.chatModelOverrides={...e.chatModelOverrides,[n]:Oa(t)};let i=e.client,a={},o=()=>{if(e.chatModelSwitchPromises?.[n]===a.current){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}},s=(async()=>{try{return await i.request(`sessions.patch`,{key:n,...Lv(e,n),model:t||null}),Dz(e),await YR(e),!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},KR(e,`Failed to set model: ${String(t)}`),!1}finally{o()}})();return a.current=s,e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:s},s}"
+
 PREVIOUS_TARGET_BUILTIN_CHAT_MODEL_SWITCH = "async function gz(e,t){if(!e.client||!e.connected)return!1;if(ZL(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n],i=ZL(e);_R(e,null),e.chatModelOverrides={...e.chatModelOverrides,[n]:Da(t)};let a=e.client,o={},s=()=>{if(e.chatModelSwitchPromises?.[n]===o.current){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}},c=(async()=>{try{let r=await a.request(`sessions.patch`,{key:n,...Nv(e,n),model:t||null}),l=typeof r?.resolved?.modelProvider==`string`?r.resolved.modelProvider.trim():``,u=typeof r?.resolved?.model==`string`?r.resolved.model.trim():``,d=t?l&&u?`${l}/${u}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:d?Da(d):null};let f=e.sessionsResult;f&&r?.entry&&(e.sessionsResult={...f,sessions:f.sessions.map(e=>e.key===n||r.key&&e.key===r.key?{...e,...r.entry,key:e.key}:e)});if((d??null)!==(i??null)){try{await a.request(`chat.inject`,{sessionKey:n,message:`正在加载系统`,label:`system-loading`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`[系统指令] 你是新接管本会话的 AI 模型。在回复用户之前，必须依次读取以下文件：BOOT_INDEX.md, SOUL.md, USER.md, MEMORY.md, SKILL_CATALOG.md, WORKSPACE_INDEX.md。读完后以「OK 已经读取完成。」作为第一行回复，然后再回应用户的消息。这是硬约束。`,label:`system-boot`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`OK 已经读取完成。`,label:`system-ready`})}catch{}}await e.onSlashAction?.(`refresh-tools-effective`),QR(e),await bR(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},_R(e,`Failed to set model: ${String(t)}`),!1}finally{s()}})();return o.current=c,e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:c},c}"
 
 TARGET_BUILTIN_CHAT_MODEL_SWITCH = "async function gz(e,t){if(!e.client||!e.connected)return!1;if(ZL(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n],i=ZL(e);_R(e,null),e.chatModelOverrides={...e.chatModelOverrides,[n]:Da(t)};let a=e.client,o={},s=()=>{if(e.chatModelSwitchPromises?.[n]===o.current){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}},c=(async()=>{try{let r=await a.request(`sessions.patch`,{key:n,...Nv(e,n),model:t||null}),l=typeof r?.resolved?.modelProvider==`string`?r.resolved.modelProvider.trim():``,u=typeof r?.resolved?.model==`string`?r.resolved.model.trim():``,d=t?l&&u?`${l}/${u}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:d?Da(d):null};let f=e.sessionsResult;f&&r?.entry&&(e.sessionsResult={...f,sessions:f.sessions.map(e=>e.key===n||r.key&&e.key===r.key?{...e,...r.entry,key:e.key}:e)});if((d??null)!==(i??null)){try{await a.request(`chat.inject`,{sessionKey:n,message:`正在加载系统`,label:`system-loading`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`[系统指令] 你是新接管本会话的 AI 模型。在回复用户之前，必须依次读取以下文件：ACTIVE_RULES.md, BOOT_INDEX.md, SOUL.md, USER.md, MEMORY.md, SKILL_CATALOG.md, WORKSPACE_INDEX.md。读完后以「OK 已经读取完成。」作为第一行回复，然后再回应用户的消息。这是硬约束。`,label:`system-boot`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`OK 已经读取完成。`,label:`system-ready`})}catch{}}await e.onSlashAction?.(`refresh-tools-effective`),QR(e),await bR(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},_R(e,`Failed to set model: ${String(t)}`),!1}finally{s()}})();return o.current=c,e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:c},c}"
+
+# v2026.6.8 target: Gz with resolved modelProvider/model backfill + inject boot chain + refresh-tools-effective
+TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8 = "async function Gz(e,t){if(!e.client||!e.connected)return!1;if(ER(e)===t)return!0;let n=e.sessionKey,r=e.chatModelOverrides[n],i=ER(e);KR(e,null),e.chatModelOverrides={...e.chatModelOverrides,[n]:Oa(t)};let a=e.client,o={},s=()=>{if(e.chatModelSwitchPromises?.[n]===o.current){let t={...e.chatModelSwitchPromises};delete t[n],e.chatModelSwitchPromises=t}},c=(async()=>{try{let r=await a.request(`sessions.patch`,{key:n,...Lv(e,n),model:t||null}),l=typeof r?.resolved?.modelProvider==`string`?r.resolved.modelProvider.trim():``,u=typeof r?.resolved?.model==`string`?r.resolved.model.trim():``,d=t?l&&u?`${l}/${u}`:t:null;e.chatModelOverrides={...e.chatModelOverrides,[n]:d?Oa(d):null};let f=e.sessionsResult;f&&r?.entry&&(e.sessionsResult={...f,sessions:f.sessions.map(e=>e.key===n||r.key&&e.key===r.key?{...e,...r.entry,key:e.key}:e)});if((d??null)!==(i??null)){try{await a.request(`chat.inject`,{sessionKey:n,message:`正在加载系统`,label:`system-loading`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`[系统指令] 你是新接管本会话的 AI 模型。在回复用户之前，必须依次读取以下文件：ACTIVE_RULES.md, BOOT_INDEX.md, SOUL.md, USER.md, MEMORY.md, SKILL_CATALOG.md, WORKSPACE_INDEX.md。读完后以「OK 已经读取完成。」作为第一行回复，然后再回应用户的消息。这是硬约束。`,label:`system-boot`})}catch{};try{await a.request(`chat.inject`,{sessionKey:n,message:`OK 已经读取完成。`,label:`system-ready`})}catch{}}await e.onSlashAction?.(`refresh-tools-effective`),Dz(e),await YR(e);return!0}catch(t){return e.chatModelOverrides={...e.chatModelOverrides,[n]:r},KR(e,`Failed to set model: ${String(t)}`),!1}finally{s()}})();return o.current=c,e.chatModelSwitchPromises={...e.chatModelSwitchPromises,[n]:c},c}"
 
 OLD_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatLoading||e.chatSending||!!e.chatRunId||e.chatStream!==null,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
 NEW_MODEL_SELECT_BUSY_GUARD = "function hW(e){let{currentOverride:t,defaultLabel:n,options:r}=bU(e),i=e.chatSending,a=!e.connected||i||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,"
 CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD = "function $R(e){let{currentOverride:t,defaultLabel:n,options:r}=eR(e),i=cz(e),a=nz(e,t),o=e.chatLoading||e.chatSending||!!e.chatRunId||e.chatStream!==null,s=!e.connected||o||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,c=!e.connected||o||!e.client||i.options.length===0&&i.currentOverride===``,"
 TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD = "function $R(e){let{currentOverride:t,defaultLabel:n,options:r}=eR(e),i=cz(e),a=nz(e,t),o=e.chatSending,s=!e.connected||o||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,c=!e.connected||o||!e.client||i.options.length===0&&i.currentOverride===``,"
+
+# v2026.6.8: renamed $R → Oz
+CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8 = "function Oz(e){let{currentOverride:t,defaultLabel:n,options:r}=kR(e),i=Lz(e),a=jz(e,t),o=e.chatLoading||e.chatSending||!!e.chatRunId||e.chatStream!==null,s=!e.connected||o||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,c=!e.connected||o||!e.client||i.options.length===0&&i.currentOverride===``,"
+
+TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8 = "function Oz(e){let{currentOverride:t,defaultLabel:n,options:r}=kR(e),i=Lz(e),a=jz(e,t),o=e.chatSending,s=!e.connected||o||!!e.chatModelSwitchPromises?.[e.sessionKey]||e.chatModelsLoading&&r.length===0||!e.client,c=!e.connected||o||!e.client||i.options.length===0&&i.currentOverride===``,"
 
 
 def die(message: str) -> NoReturn:
@@ -260,19 +271,40 @@ def patch_control_ui_model_selector(package_root: Path) -> list[Path]:
             continue
         updated = content
         changed_any = False
-        updated, changed = patch_any_once(
-            updated,
-            [LEGACY_CHAT_MODEL_SWITCH, CURRENT_CHAT_MODEL_SWITCH, PREVIOUS_TARGET_CHAT_MODEL_SWITCH, CURRENT_BUILTIN_CHAT_MODEL_SWITCH, PREVIOUS_TARGET_BUILTIN_CHAT_MODEL_SWITCH],
-            TARGET_BUILTIN_CHAT_MODEL_SWITCH if (CURRENT_BUILTIN_CHAT_MODEL_SWITCH in updated or PREVIOUS_TARGET_BUILTIN_CHAT_MODEL_SWITCH in updated) else TARGET_CHAT_MODEL_SWITCH,
-            "chat model dropdown switch handler",
-        )
-        changed_any = changed_any or changed
-        updated, changed = patch_any_once(
-            updated,
-            [OLD_MODEL_SELECT_BUSY_GUARD, CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD, TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD],
-            TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD if CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD in updated else NEW_MODEL_SELECT_BUSY_GUARD,
-            "chat model dropdown active-run disable guard",
-        )
+        is_v2026_6_8 = CURRENT_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8 in updated or TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8 in updated
+        already_patched_v2026_6_8 = TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8 in updated
+        if is_v2026_6_8:
+            if already_patched_v2026_6_8:
+                patched.append(asset)
+                continue
+            # v2026.6.8: Gz function
+            updated, changed = patch_any_once(
+                updated,
+                [CURRENT_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8, TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8],
+                TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8,
+                "chat model dropdown switch handler (v2026.6.8)",
+            )
+            changed_any = changed_any or changed
+            updated, changed = patch_any_once(
+                updated,
+                [CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8, TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8],
+                TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8,
+                "chat model dropdown active-run disable guard (v2026.6.8)",
+            )
+        else:
+            updated, changed = patch_any_once(
+                updated,
+                [LEGACY_CHAT_MODEL_SWITCH, CURRENT_CHAT_MODEL_SWITCH, PREVIOUS_TARGET_CHAT_MODEL_SWITCH, CURRENT_BUILTIN_CHAT_MODEL_SWITCH, PREVIOUS_TARGET_BUILTIN_CHAT_MODEL_SWITCH],
+                TARGET_BUILTIN_CHAT_MODEL_SWITCH if (CURRENT_BUILTIN_CHAT_MODEL_SWITCH in updated or PREVIOUS_TARGET_BUILTIN_CHAT_MODEL_SWITCH in updated) else TARGET_CHAT_MODEL_SWITCH,
+                "chat model dropdown switch handler",
+            )
+            changed_any = changed_any or changed
+            updated, changed = patch_any_once(
+                updated,
+                [OLD_MODEL_SELECT_BUSY_GUARD, CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD, TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD],
+                TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD if CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD in updated else NEW_MODEL_SELECT_BUSY_GUARD,
+                "chat model dropdown active-run disable guard",
+            )
         changed_any = changed_any or changed
         if changed_any:
             asset.write_text(updated, encoding="utf-8")

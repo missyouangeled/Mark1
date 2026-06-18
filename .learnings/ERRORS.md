@@ -21936,3 +21936,123 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260616-001] user-reported-error
+
+**Logged**: 2026-06-16T04:21:22.188Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: 之前重启以后 连不上，我从终端手动重启 报错。查查看为什么。看看会对现在的功能，设置，多Agent协作 有影响吗。仔细分析一下。 Description: The image shows a terminal window on a VMware Virtual Platform. The user ran `openclaw gateway restart`, but the command failed due to an invalid configuration file (`openclaw.json`)…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260616-002] user-reported-error
+
+**Logged**: 2026-06-16T04:27:50.933Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Write: to ~/.openclaw/workspace/memory/daily/2026-06-16.md (957 chars) failed 出错了
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260616-003] user-reported-error
+
+**Logged**: 2026-06-16T09:21:01.665Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: 报错了 Description: The image shows a terminal session on a VMware Virtual Platform, running OpenClaw version 2026.6.6. The user "missyouangeled" attempted to run an agent command with local mode and the DeepSeek V4 Pro model, but encountered an error requiring a…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260617-001] user-reported-error
+
+**Logged**: 2026-06-17T02:20:23.177Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+日志相关的东西放到数据盘。并且限制好大小。 如果异常增大 有及时处理机制。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

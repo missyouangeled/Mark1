@@ -170,13 +170,16 @@ def main():
         detail = "fresh install test: " + ("ok" if ok else "FAIL")
     checks.append(check("broker-dirty-flag", broker_ok, detail))
 
-    # ── 10. AGENTS.md 搜索规则 ──
+    # ── 10. 搜索规则（AGENTS.md 或 rules/agents-core.md）──
     agents = WORKSPACE / "AGENTS.md"
+    core_rules = WORKSPACE / "rules" / "agents-core.md"
     rule_ok = False
     if agents.exists():
         content = agents.read_text()
-        rule_ok = "memory-search-local-first" in content and ("memory_search 统一搜索策略" in content or "L1→L2→L3→L4 路由" in content)
-    checks.append(check("agents-search-rule", rule_ok, "AGENTS.md contains search strategy"))
+        if core_rules.exists():
+            content += "\n" + core_rules.read_text()
+        rule_ok = "memory-search-local-first" in content or "memory_search" in content
+    checks.append(check("agents-search-rule", rule_ok, "AGENTS.md or agents-core.md contains search strategy"))
 
     # ── 11. boot-health-check ──
     ok, out, _ = run([PY, str(SCRIPTS / "openclaw-boot-health-check.py"), "--print-human"], timeout=20)

@@ -641,7 +641,25 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 - v2026.6.8 的消息对象不再需要额外解包（无 message wrapper），Jarvis helpers 改用直接属性访问。
 - 验证结果：26/27 项通过。
 
+- 验证结果：26/27 项通过。
+
+3. **model-selector 补丁失效**（2026-06-18 发现）：v2026.6.8 升级后，`dist/control-ui/assets/index-Wjxp3gyC.js` 中 Rolldown 打包的函数名再次变化——模型下拉切换函数从 `gz` → `Gz`，busy guard 从 `$R` → `Oz`，辅助函数 `_U` → `ER`、`mW` → `Dz`、`RU` → `YR`、`yp` → `Oa`、`$R` → `Oz`。原有的 5 个 candidate old 模式全部无法匹配。
+   - **修复**：在 `scripts/apply-openclaw-session-model-selector-fix.py` 中新增 v2026.6.8 专属分支：
+     - `CURRENT_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8` ← 原始 `Gz` 函数（674 字符）
+     - `TARGET_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_8` ← 替换后含 resolved modelProvider/model 回填 + `chat.inject` 引导链 + `refresh-tools-effective`
+     - `CURRENT_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8` ← 原始 `Oz` 函数（838 字符）
+     - `TARGET_BUILTIN_MODEL_SELECT_BUSY_GUARD_V2026_6_8` ← 仅 `chatSending` 禁用的简化版 busy guard
+     - `is_v2026_6_8` 检测逻辑：`CURRENT_*_V2026_6_8 in updated or TARGET_*_V2026_6_8 in updated`
+     - 幂等性修复：添加 `already_patched` 提前退出，避免补丁已打后第二次运行报「候选命中数 0」错误
+   - **验证**：15 项 bundle 完整性检查全部通过 ✅
+
+4. **verify-today-patches 搜索规则检查失灵**（2026-06-18 发现）：`verify-today-patches.py` 的 `agents-search-rule` 检查仅在 `AGENTS.md` 中搜索「搜索策略」关键字，但实际搜索策略描述在 `rules/agents-core.md` 第 53 行。
+   - **修复**：合并读取 `AGENTS.md` + `rules/agents-core.md` 后再检查
+   - **验证**：12/12 passed ✅
+
 ### 经验教训
 
-- v2026.6.8 的 bundle 函数名继续变化，版本检测需要同时检查多个函数的存在/缺失。
+- v2026.6.8 的 bundle 函数名继续变化（全变大写首字母 + 部分完全重命名），版本检测需要同时检查多个函数的存在/缺失。
+- model-selector 补丁不仅受 Gz 函数名变化影响，Oz busy guard 也变了；必须同时替换两个函数才能完整修复。
+- 补丁脚本幂等性很重要：已打补丁后再次运行应静默成功而非报错，否则 `ExecStartPre` 每次重启 Gateway 都会触发红色告警。
 - 升级前应先备份当前 `dist/control-ui` 目录以便快速回滚。

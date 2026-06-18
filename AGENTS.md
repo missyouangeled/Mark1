@@ -28,6 +28,9 @@ BOOT_INDEX.md  ─── 启动入口，指向下面各层
     │
     ├─ rules/agents-core.md  ─── ✅ 始终加载（核心行为协议）
     │
+    ├─ Agent 边界自检（第 4.5 步）：
+    │     rules/agent-boundaries.md  ─── 多 Agent 角色隔离规则
+    │
     ├─ 域规则（按第一条消息触发）：
     │     rules/chat.md      ─── 日常聊天
     │     rules/work.md      ─── 工作任务

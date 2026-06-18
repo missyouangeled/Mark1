@@ -1765,3 +1765,89 @@
 - `rules/operations/session-cleanup.md`
 - `rules/operations/supervisor.md`
 - `rules/system.md`
+
+## 2026-06-16 12:37:46 CST (+08:00) — Mark42 compaction_diag v2.0 升级：症状层→病因层
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- compaction_diag 新增 5 项诊断：令牌感知检测、双层阈值检查、摘要质量探针、分身隔离建议、上下文降解检测。CLI 新增 --token-aware/--probe/--drift-check 参数。v1 兼容性 100%。
+- 验收 / 验证：
+- python3 scripts/mark42.py compaction 正常输出；--token-aware/--probe/--drift-check 均正常
+- 相关文件：
+- `scripts/mark42_modules/compaction_diag.py`
+
+## 2026-06-16 12:48:54 CST (+08:00) — 全面体检三修：context-monitor误报 + 废弃unit清理 + main Agent model
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 修复 context-monitor find_active_session 取死session误报；清理 4 个已废弃 systemd unit（.deprecated）；main Agent 显式设定 model via gateway config set（安全性：走gateway API避重复键崩坏）
+- 验收 / 验证：
+- python3 openclaw-context-monitor.py 找到正确session 88.3%；systemd unit已弃用；openclaw config get agents.list 三Agent均有model
+- 相关文件：
+- `scripts/openclaw-context-monitor.py`
+
+## 2026-06-16 12:52:26 CST (+08:00) — 功能去重：context-monitor并入armor + utils修复 + unit清理
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 发现 context-monitor 与 armor_check 完全重复。修复 utils._find_active_session 两个bug（路径错误+缺lock过滤），并入 armor。停用 context-monitor timer。清理 6 个废弃 systemd unit。
+- 验收 / 验证：
+- armor_check 正确显示 96.1%；timer 从 8个→6个无冗余；语法全过
+- 相关文件：
+- `scripts/mark42_modules/utils.py`
+
+## 2026-06-16 13:03:52 CST (+08:00) — health-collector: supervisor-refresh 失败降级为 degraded，不拖垮整体
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- supervisor-refresh 子检查失败时降级为 degraded 而非 failed，防止监工状态刷新偶发异常导致 health-collector 整体 exit 1
+- 验收 / 验证：
+- 干跑通过 overall=OK；supervisor-refresh ok=true 即使子进程返回非0也降级；语法通过
+- 相关文件：
+- `scripts/openclaw-health-collector.py`
+
+## 2026-06-17 08:39:54 CST (+08:00) — Agent 边界隔离规则 — 预防针部署
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：未更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 rules/agent-boundaries.md + 收窄 A2A/subagents 白名单到只 main + 在 BOOT_INDEX/AGENTS.md/agents-core 中加入边界自检步骤
+- 验收 / 验证：
+- 5/5 烟测通过，Gateway 正常重启，A2A/subagents 已收窄为 [main]
+- 相关文件：
+- `rules/agent-boundaries.md`
+
+## 2026-06-18 08:04:13 CST (+08:00) — v2026.6.8 model-selector + verify-today 补丁修复
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- v2026.6.8 Rolldown 函数名变化 (gz→Gz, $R→Oz) 导致 model-selector 补丁 5 个候选模式全部失效；verify-today-patches 搜索策略检查只读 AGENTS.md 未读 agents-core.md。新增 v2026.6.8 专属常量块 + 幂等性修复 + 合并文件检查。
+- 验收 / 验证：
+- 15 项 bundle 完整性检查全部通过；12/12 patches passed；幂等运行静默成功
+- 相关文件：
+- `docs/通用-OpenClaw-升级记录.md`
+- `scripts/apply-openclaw-session-model-selector-fix.py`
+- `scripts/verify-today-patches.py`

@@ -88,7 +88,30 @@
 
 ---
 
-## 6. 关键脚本入口
+## 6. 升级与补丁检查
+
+### 升级前
+
+- 先读 `docs/通用-OpenClaw-升级记录.md`，了解历史升级中发生过的问题类型
+- 备份当前 `dist/control-ui` 目录
+
+### 升级后
+
+- 首先读 `docs/通用-OpenClaw-升级记录.md`，逐条对照历史问题排查：
+  1. 函数/变量名变化（Rolldown 打包后 minify 每次可能不同，如 `gz → Gz`、`$R → Oz`）
+  2. Control UI 结构变化（从 `JA`→`ZA` 等渲染函数变更）
+  3. 所有自定义补丁脚本是否仍然有效（branding / model-selector 等）
+  4. systemd PATH 环境隔离
+  5. infos-handle sidecar 协议兼容性
+  6. session 索引兼容性
+- 运行 `python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
+- 运行 `python3 scripts/verify-today-patches.py --print`
+- 运行 `python3 scripts/openclaw-system-summary.py --print-human`
+- 若发现新问题，事后追记到 `docs/通用-OpenClaw-升级记录.md`（含现象/根因/修复/验证）
+
+> ⚠️ 这是硬规则：每次升级后必须走一遍以上流程，不能因为之前升级顺利就跳过。任何模型升级后都应先查历史记录再排查，而不是从零猜。
+
+## 7. 关键脚本入口
 
 | 用途 | 命令 |
 |------|------|

@@ -3,7 +3,37 @@
 各类方案、调研结论、技术决策的归档。每次有新方案，先写到这里，再在 MEMORY.md 挂索引。
 
 > 边界规则：本文件只存放"方案 / 决策 / 调研结论"，不承担系统配置说明、维护步骤、脚本运行说明、日常执行记录的归档职责。这些内容必须分别写入对应的 `docs/` / `TOOLS.md` / 脚本头部 / `memory/daily/`，避免与方案存档互相干涉。
+
+---
+
+## SkillOpt（微软）- 收藏待用
+
+- **日期**：2026-06-17 调研
+- **状态**：`收藏` — 当前不适用，等有自动评分 benchmark 后再评估
+- **标签**：`AI工具`, `skill优化`, `微软`, `开源MIT`
+- **仓库**：https://github.com/microsoft/SkillOpt
+- **论文**：https://arxiv.org/abs/2605.23904
+- **定位**：文本空间优化器，把 SKILL.md 当可训练参数，通过 rollout→reflect→edit→gate 四步循环自动打磨 agent skill 文档
+- **核心数据**：52/52 全胜，GPT-5.5 +23.5，训练成本 $1-5/任务，零部署开销
+- **不适用原因**：需要可自动评分的 benchmark（train/val/test split），当前 Mark42 面向开放域系统管理+日常对话，无可量化评分闭环
+- **何时重评**：Mark42 有了 armor 压缩准确率 benchmark / engine 调度成功率 benchmark 等可评分任务后
 > **方案索引**:`PLANS_INDEX.md` - 历史方案过长时先看这里,按主题 / 状态 / 适用时机定位到正确方案,避免误把旧方案当当前方案。
+
+---
+
+## TouchDesigner — 收藏
+
+- **日期**：2026-06-17 调研
+- **状态**：`收藏` — 创意视觉工具，与 Mark42/OpenClaw 无关，备用
+- **标签**：`创意工具`, `可视化编程`, `实时渲染`, `闭源商业软件`
+- **官网**：https://derivative.ca
+- **下载页**：https://derivative.ca/download（最新 2025.32820 / 2026-05-06）
+- **定位**：节点式可视化编程环境，用于实时交互 3D/2D 多媒体创作。40 年历史（PRISMS→Houdini→TouchDesigner），获两次奥斯卡科学技术奖。
+- **许可**：Non-Commercial 免费（1280×1280 限制） / Educational $300 / Commercial $600 / Pro 面议
+- **是否开源**：❌ 闭源。GitHub 上 `github.com/TouchDesigner` 只放插件/扩展（TouchEngine-UE、TouchEngine-macOS 等），核心引擎不开源
+- **用途**：舞台视觉、互动装置、商业展示、XR/虚拟制片、AI 实时生成
+- **⚠️ 备份提醒**：无法 fork 源码（闭源），但可下载当前安装包存到 NAS/数据盘防下架。当前未安装。建议从 https://derivative.ca/download 下载 Windows 版 `.exe` 安装包存档到 `/mnt/data/backup/software/`
+- **何时重评**：想做实时可视化面板、互动装置、或给项目加视觉层时
 
 ---
 
@@ -3752,3 +3782,111 @@ QMD vsearch 调用链：`vsearch → expandQuery() → ensureGenerateModel()`，
 - **风险**：Google 账号有封号风险、匿名模式限模型、接口可能变化
 - **判断**：适合临时免费大容量输出，不适合做日常工作主力
 - **状态**：暂不部署，方案已保存
+
+---
+
+## 桌面 AI 宠物 — 反浩克装甲能量核心方案
+
+- **日期**：2026-06-17 讨论定案
+- **状态**：`待开工` — 明天（6/18）先在老电脑上装环境试跑
+- **标签**：`桌面宠物`, `小模型`, `本地AI`, `多模型路由`, `反浩克装甲`
+
+### 架构理念
+
+多个专用小模型各自独立部署，由一个轻量路由器按任务类型分发。每个模型只做一件事——类似反浩克装甲每个关节有独立能量核心。
+
+```
+┌──────────────────────────────────────────────┐
+│ 桌面宠物「反浩克装甲」能量核心分配             │
+│                                              │
+│ 🔵 主力对话     → Qwen3.5-0.8B 或 Gemma 3n   │
+│ 🟢 记忆检索     → BGE-M3 或 all-MiniLM-L6-v2 │
+│ 🟡 耳朵(STT)    → Whisper tiny 或 Moonshine   │
+│ 🟣 嘴巴(TTS)    → Kokoro（已有）+ ChatTTS     │
+│ 🔴 眼睛(视觉)   → Gemma 3n 自带多模态         │
+│ ⚪ 工具调用     → Gemma 3n 自带 Func Calling  │
+│ ⚪ 情感识别     → DistilBERT                  │
+└──────────────────────────────────────────────┘
+```
+
+### 小模型全类型速查
+
+#### 🔵 对话/文本生成（通用大脑）
+| 模型 | 参数量 | 内存 | 特点 |
+|:---|:---|:---|:---|
+| Qwen3.5-0.8B | 0.8B | ~500MB | 极轻量对话，中文最优 |
+| Gemma 3 270M | 0.27B | ~200MB | 极小，Google 出品 |
+| Gemma 3n E2B | 2B（有效） | ~2GB | 移动端多模态，按需唤醒 |
+| SmolLM3-3B | 3B | ~2.5GB | HuggingFace，综合能力强 |
+| Phi-4-mini | 3.8B | ~3GB | 微软，推理突出 |
+| Qwen2.5-3B | 3B | ~2.5GB | 中文生态最完整 |
+| Ministral-3-3B | 3B | ~2.5GB | Mistral 出品 |
+
+#### 🟢 Embedding / 向量化（记忆检索核心）
+| 模型 | 大小 | 用途 |
+|:---|:---|:---|
+| all-MiniLM-L6-v2 | ~80MB | 英文最快，384维 |
+| all-mpnet-base-v2 | ~420MB | 英文质量最高，768维 |
+| BGE-M3 | ~2GB | 中英多语言，1024维，国产最强 |
+| Qwen3-Embedding-0.6B | 0.6B | 中文语义搜索专用 |
+| Nomic Embed Text V2 | ~500MB | 多语言 MoE |
+| Jina Embeddings v4 | ~1GB | 多模态+多语言 |
+
+#### 🟡 语音识别 STT（耳朵）
+| 模型 | 大小 | 特点 |
+|:---|:---|:---|
+| Whisper tiny | ~150MB | 最小，CPU实时可用 |
+| Whisper base | ~280MB | 平衡版 |
+| Whisper small | ~950MB | 准确度大幅提升 |
+| Distil-Whisper | ~750MB | 蒸馏版，速度6x |
+| Canary Qwen 2.5B | 2.5B | 语音增强语言模型，中文强 |
+| Moonshine | ~100MB | 边缘设备专用 |
+
+#### 🟣 语音合成 TTS（嘴巴）
+| 模型 | 大小 | 特点 |
+|:---|:---|:---|
+| Kokoro v1.0 int8 | ~300MB | ✅已装，中日英，ONNX |
+| ChatTTS stable | ~2GB | ✅已装，中文自然对话 |
+| Piper TTS | ~50MB/语音 | 极轻量 |
+| Bark small | ~1GB | 多语言+笑声叹气 |
+| XTTS v2 | ~1.8GB | 5秒克隆人声 |
+
+#### 🔴 多模态小模型
+| 模型 | 参数量 | 支持 |
+|:---|:---|:---|
+| Gemma 3n E4B | 4B（有效） | 文字+图片+音频+视频 |
+| Qwen2.5-VL-3B | 3B | 文字+图片+视频 |
+| Phi-3.5-vision | 4.2B | 文字+图片 |
+| Apple On-Device 3B | 3B | 文字+图片 |
+
+#### ⚪ 专用功能模型
+| 类型 | 模型 | 大小 | 用途 |
+|:---|:---|:---|:---|
+| 代码生成 | Qwen2.5-Coder-1.5B | 1.5B | 代码补全 |
+| 翻译 | NLLB-200-600M | 0.6B | 200种语言 |
+| 情感分析 | DistilBERT | ~260MB | 正负面判断 |
+| 文本分类 | ModernBERT-base | ~550MB | 比BERT快2x |
+
+### 目标机器
+
+**老电脑（Windows 10）**：
+- CPU：i7-6700K @ 4.00GHz（4核8线程）
+- GPU：GTX 1070（8GB VRAM）
+- 内存：8 GB
+- 存储：E 盘 476GB 可用
+- SSH：`ssh old-pc`（192.168.18.13）
+
+### 阶段 1 计划（明天）
+
+1. 在老电脑上装 Python 环境 + Ollama/llama.cpp
+2. 先跑通最小配置：Gemma 3 270M（对话）+ all-MiniLM-L6-v2（向量）
+3. Whisper tiny 语音识别试跑
+4. Kokoro TTS 已有，尝试移植到 Windows
+5. 验证 8GB 内存下多模型按需加载的可行性
+
+### 参考
+
+- Google AI Edge 官方博客：https://developers.googleblog.com/google-ai-edge-small-language-models-multimodality-rag-function-calling
+- BentoML SLM 2026 排行：https://www.bentoml.com/blog/the-best-open-source-small-language-models
+- 完整模型类型速查见本文「小模型全类型速查」章节
+
