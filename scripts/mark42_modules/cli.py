@@ -103,7 +103,12 @@ def assemble() -> None:
     # 保存 PID 文件
     pid_data = {"startedAt": _now_iso(), "children": [{"name": n, "pid": p} for n, p, _ in children]}
     _save_json(pid_file, pid_data)
-    print(f"\n📄 PID 文件: {pid_file}")
+    # 校验写入
+    verify_data = _load_json(pid_file)
+    if not verify_data or not verify_data.get("children"):
+        print(f"\n⚠️ PID 文件写入校验失败，但子进程已在运行")
+    else:
+        print(f"\n📄 PID 文件: {pid_file} (已验证)")
 
     # ── 优雅关闭 ──
     def _shutdown(sig, frame):

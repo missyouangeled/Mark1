@@ -49,23 +49,10 @@ def armor_check() -> dict[str, Any]:
     }
     est = {}
     try:
-        # 动态采样校准：在前 100 行中取样估算 chars/token 比率
-        sample_chars = 0
-        sample_lines = 0
-        with open(active, "r") as f:
-            for _ in range(100):
-                line = f.readline()
-                if not line:
-                    break
-                sample_chars += len(line)
-                sample_lines += 1
-        # DeepSeek 中文模型：每 token 约 1.5-2 字符；JSONL 含大量 JSON 控制字符
-        # 取保守估计 2.5 chars/token（中文约1.5 + JSON结构开销）
-        if sample_lines > 0:
-            avg_chars_per_line = sample_chars / sample_lines
-            est = {"estimatedTokens": int(active.stat().st_size / avg_chars_per_line / 2.5)}
-        else:
-            est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
+        # 用文件字节数直接估算 token 数
+        # JSONL 每字节 ≈ 0.25 token（中文约2-3 chars/token + JSON 控制字符）
+        # 14 KB/1000 tokens 是 DeepSeek 模型的经验值
+        est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
     except OSError:
         est = {"estimatedTokens": 0}
     context_window = _get_context_window()

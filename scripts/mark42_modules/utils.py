@@ -84,19 +84,13 @@ def _find_active_session() -> Path | None:
         if jsonl_path.exists():
             return jsonl_path
     # 策略 B：回退——按 mtime 取最新 JSONL
-    best = None
-    best_mtime = 0
-    for candidate in sessions_dir.glob("*.jsonl"):
-        if ".meta" in candidate.suffixes or "snapshot" in candidate.name:
-            continue
-        try:
-            mtime = candidate.stat().st_mtime
-            if mtime > best_mtime:
-                best_mtime = mtime
-                best = candidate
-        except OSError:
-            continue
-    return best
+    # 优先看 .reset / .deleted / .bak 后缀，排除; 再按 mtime 倒序
+    candidates = [
+        c for c in sessions_dir.glob("*.jsonl")
+        if all(bad not in str(c) for bad in [".reset.", ".deleted.", ".bak-", ".trajectory."])
+    ]
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0] if candidates else None
 
 def _estimate_tokens(session_path: Path) -> dict[str, Any]:
     try:

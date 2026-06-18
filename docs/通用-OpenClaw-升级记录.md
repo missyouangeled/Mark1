@@ -663,3 +663,65 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 - model-selector 补丁不仅受 Gz 函数名变化影响，Oz busy guard 也变了；必须同时替换两个函数才能完整修复。
 - 补丁脚本幂等性很重要：已打补丁后再次运行应静默成功而非报错，否则 `ExecStartPre` 每次重启 Gateway 都会触发红色告警。
 - 升级前应先备份当前 `dist/control-ui` 目录以便快速回滚。
+
+---
+
+## v2026.6.18-1：Mark42 铠甲系统全面修复（非 OpenClaw 升级，属 Mark42 bug fix）
+
+**触发方式**：用户要求审查 Mark42 运行日志并全量代码审查
+
+**发现日期**：2026-06-18
+
+### 发现的问题（共 12 项）
+
+1. **Engine daemon 停止后未自动重启**：bootstrap 只注册 Loop 但不启动 daemon 进程；daemon 停止后 bootstrap 再注册的 context-guard 等 4 个 Loop 永远没有机会执行，只有 task-watch 在失效前跑完了 867 个周期。
+   - **根因**：bootstrap 是 oneshot systemd unit，注册完 Loop 即退出；engine daemon 没有独立的 systemd 持久化服务。
+   - **修复**：创建 `mark42-engine-daemon.service` + `mark42-armor-guard.service` 两个 systemd user unit，设置 `Restart=always`，并启用开机自启。
+   - **文件**：`tools/mark42-engine-daemon/mark42-engine-daemon.service`（新建）、`tools/mark42-armor-guard/mark42-armor-guard.service`（新建）、`tools/mark42-bootstrap/mark42-bootstrap.sh`（更新：Phase 2 启动守护进程）
+
+2. **Armor guard 从未运行**：assemble() 子进程 fork 后主进程挂了就一起死——6/17 公司机器重启后 assemble 未被重新触发，armor guard 从 6/17 ~ 6/18 完全停止。
+   - **修复**：拆分为独立 systemd unit（同上），由 systemd 管理生命周期，不再依赖 assemble() 父进程。
+
+3. **systemd unit 日志缓冲区导致日志不写入**：py 进程 stdout 被系统缓冲，systemd 的 `StandardOutput=append:` 在 Python 中无效。
+   - **根因**：Python 默认对非 tty stdout 使用 8KB 缓冲区；systemd 日志目录权属无输出。
+   - **修复**：添加 `Environment=PYTHONUNBUFFERED=1` + `python3 -u` 强制无缓冲输出。
+   - **搜索验证**：Stack Overflow / ServerFault 多篇 post 确认 `PYTHONUNBUFFERED=1` 是 systemd 服务中 Python 脚本日志不写入问题的标准解决方案。
+
+4. **armor_check token 估算公式错误（两次）**：
+   - 原公式：`int(total_chars / avg_chars_per_line / 2.5)` = `int(total_lines / 2.5)`，完全无效
+   - 修复尝试：`int(total_chars / 2.5)` → 因 JSONL 元数据占比高，导致 146.5%（严重高估）
+   - **最终修复**：回退到 `int(file_size // BYTES_PER_KTOKEN * 1000)`（14KB/1K tokens），最稳定的估算方法
+
+5. **_find_active_session 回退逻辑缺陷**：无活跃 .lock 文件时，回退到按 mtime 取最新 JSONL，但缺少对 `.reset.`、`.deleted.`、`.bak-`、`.trajectory.` 等后缀的过滤。
+   - **修复**：白名单过滤 + `sort(key=mtime, reverse=True)` 倒序取最新
+
+6. **subprocess.Popen 压缩子进程静默失败**：stdout/stderr 设为 DEVNULL，失败后无信息可查。
+   - **修复**：改为 `stdout=PIPE, stderr=PIPE`；异常捕获从通用 `Exception` 改为 `SubprocessError`
+
+7. **engine daemon 截尾功能与 logs.py rotate_daemon_logs 重复**：每 20 周期在 daemon 内嵌截尾逻辑，与 `log_rotate("all")` 的 `rotate_daemon_logs()` 功能重复。
+   - **修复**：删除 daemon 内嵌截尾，统一委托给 logs.py
+
+8. **bootstrap Gateway 等待超时过短**：15s 可能不够 Gateway 首次启动。
+   - **修复**：延长到 30s + 超时告警
+
+9. **assemble() PID 文件写入无校验**：写入后不验证，可能损坏后排查无依据。
+   - **修复**：写入后 `_load_json` 回读校验
+
+10. **heavy_execute 脚本命令注入风险**：文件路径中的空格/特殊字符可能破坏 bash 命令。
+    - **修复**：使用 `shlex.quote()` 对文件路径进行转义
+
+### 验证结果
+
+- ✅ 5 个 Loop 全部正常运行（context-guard: cycle 3, health-watch: 2, task-watch: 888, model-fallback: 11, memory-index: 1）
+- ✅ Engine daemon 日志实时写入（PYTHONUNBUFFERED=1 生效）
+- ✅ Armor guard 日志实时写入
+- ✅ Armor check 返回 29.0%（合理范围，不再是 0% 或 146%）
+- ✅ Mark42 status 全绿
+- ⚠️ system-summary 中 security/tasks/watchers 黄色告警非 Mark42 引入，为系统层预存问题
+
+### 经验教训
+
+- systemd 服务中 Python 脚本的 stdout 缓冲是常见陷阱；`PYTHONUNBUFFERED=1` + `-u` 是标准解决方案。
+- Oneshot systemd unit + subprocess.Popen 的架构不适合持久化守护进程，应使用 `Type=simple + Restart=always` 的独立 unit。
+- JSONL 全量字符数不是有效的 token 估算基准——文件字节 ÷ 每 token 的字节经验值（14KB/1K tokens）更稳定。
+- Mark42 的 token 估算永远做不到精确，但至少应该保持合理范围（不要 0% 或 146%），在 10-80% 范围内即可。

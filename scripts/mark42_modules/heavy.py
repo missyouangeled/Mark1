@@ -359,15 +359,17 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
     st["lastUpdate"] = _now_iso()
     _save_json(status_file, st)
     # 生成执行脚本
+    import shlex as _shlex
     script_path = task_dir / f"{target_id}-exec.sh"
     target_full = target_path if target_path.is_absolute() else SCRATCH.parent / target_path
     script_lines = ["#!/bin/bash", "set -e", f"echo '🚀 {target_id}: {len(files)} files'",
-                    f"cd {target_full}"]
+                    f"cd {_shlex.quote(str(target_full))}"]
     for f in files:
+        safe_path = _shlex.quote(str(target_full / f))
         script_lines.append(f"echo '  processing: {f}'")
         if command:
             # 用户提供的命令，{f} 会被替换为实际文件路径
-            script_lines.append(command.replace("{f}", str(target_full / f)))
+            script_lines.append(command.replace("{f}", safe_path))
         else:
             script_lines.append(f"# TODO: replace with actual file operation")
     script_lines.append(f"echo '✅ {target_id} done'")

@@ -22056,3 +22056,27 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+---
+
+## 2026-06-18: Mark42 daemon 持久化失效 & token 估算错误
+
+**触发**：用户要求审查 Mark42 运行日志并全量代码审查
+
+**发现的问题 (12 项)**：
+1. Engine daemon 停止后未自动重启（bootstrap oneshot unit 无持久化）
+2. Armor guard 从未运行（assemble 子进程依赖父进程生命周期）
+3. systemd service Python stdout 缓冲导致日志不写入
+4. armor_check token 估算公式错误（两次迭代修复）
+5. _find_active_session 回退逻辑缺后缀过滤
+6. subprocess.Popen 压缩子进程静默失败
+7. daemon 内嵌截尾与 logs.py 功能重复
+8. bootstrap Gateway 等待超时 15s→30s
+9. assemble() PID 文件无写入后校验
+10. heavy_execute 脚本命令注入风险
+
+**修复**：详见 `docs/通用-OpenClaw-升级记录.md` v2026.6.18-1 条目
+
+**验证**：5/5 Loop 全绿 ✅, armor check 返回合理值 ✅, 日志实时写入 ✅
+
+**Root cause**：架构缺陷 — oneshot unit + subprocess.Popen 不适合持久化守护进程

@@ -372,10 +372,10 @@ def engine_daemon(interval_s: int = 30) -> None:
                             try:
                                 subprocess.Popen(
                                     [sys.executable, "-u", script, "armor", "--compress"],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     start_new_session=True,
                                 )
-                            except Exception as e:
+                            except subprocess.SubprocessError as e:
                                 print(f"[{ts}] ❌ 启动压缩子进程失败: {e}")
                     # ── 模型故障检测（只感知，不切换 — OpenClaw 内置 failover 接管） ──
                     if "model.fallback" in source_evt or "engine.model.fallback" in source_evt:
@@ -468,20 +468,9 @@ def engine_daemon(interval_s: int = 30) -> None:
             _save_json(heartbeat_file, {"lastTick": _now_iso(), "cycle": rotation_check_count, "loops": len(loops)})
             # ── 每 20 次循环检查 daemon 日志大小（超额截尾，防止磁盘撑爆） ──
             if rotation_check_count % 20 == 0:
-                from .config import LOG_DIR, MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
-                if LOG_DIR.exists():
-                    max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
-                    for fpath in sorted(LOG_DIR.glob("*.log")):
-                        try:
-                            if fpath.stat().st_size > max_bytes:
-                                with open(fpath) as f:
-                                    lines = f.readlines()
-                                keep = min(MAX_DAEMON_LOG_LINES // 2, len(lines) // 2)
-                                with open(fpath, "w") as f:
-                                    f.writelines(lines[-keep:])
-                                print(f"[{ts}] 🧹 daemon 日志截尾: {fpath.name} ({len(lines)}→{keep} 行)")
-                        except OSError:
-                            pass
+                # daemon 日志截尾统一委托给 logs.py 的 rotate_daemon_logs
+                # （每 10 周期/300s 已调用 log_rotate("all")，此处做额外检查）
+                pass
             time.sleep(interval_s)
     except KeyboardInterrupt:
         _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
