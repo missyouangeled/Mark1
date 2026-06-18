@@ -725,3 +725,18 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 - Oneshot systemd unit + subprocess.Popen 的架构不适合持久化守护进程，应使用 `Type=simple + Restart=always` 的独立 unit。
 - JSONL 全量字符数不是有效的 token 估算基准——文件字节 ÷ 每 token 的字节经验值（14KB/1K tokens）更稳定。
 - Mark42 的 token 估算永远做不到精确，但至少应该保持合理范围（不要 0% 或 146%），在 10-80% 范围内即可。
+
+---
+
+## v2026.6.18-2：系统安全配置修复
+
+**触发**：全绿验证发现 `openclaw security audit` 返回 1 critical · 2 warn
+
+**修复内容**：
+1. **CRITICAL**: `controlUi.allowedOrigins` 缺失 → 设置 explicit origins (localhost/127.0.0.1/LAN IPs/hostname)
+2. **WARN**: `auth.rateLimit` 缺失 → 添加 `{maxAttempts:10, windowMs:60000, lockoutMs:300000}`
+3. **WARN**: `logging.redactSensitive="off"` → 改为 `"tools"`
+
+**验证**：`openclaw security audit` 0 critical · 0 warn · 2 info ✅
+
+**其他修复**：`system-summary.py` watchers 计数 5→6（session-size-watcher 是合法第 6 个 timer）
