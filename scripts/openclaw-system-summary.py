@@ -115,7 +115,7 @@ def main() -> int:
     timers = run(["systemctl", "--user", "list-timers", "openclaw-*", "--no-pager", "--no-legend"], timeout=15)
     timer_count = count_openclaw_timers(timers["stdout"]) if timers["ok"] else 0
     checks["watchers"] = {
-        "ok": timers["ok"] and timer_count == 5,
+        "ok": timers["ok"] and timer_count == 6,
         "summary": f"{timer_count}/5 openclaw timers",
     }
 
