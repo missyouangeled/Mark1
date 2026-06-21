@@ -170,3 +170,15 @@
 - 后续需分析 gateway-runtime/config-runtime 等模块 chunk，确认 chat 渲染入口并设计模块级注入方案。
 - 相关文件：
 - `scripts/apply-openclaw-control-ui-branding.py`
+
+## 2026-06-22 07:23:04 CST (+08:00) — 模型选择器补丁适配 v2026.6.9
+
+- 类型：manual-fix
+- 适用范围：通用
+- 当前状态：已修复
+- 未纳入正式补丁原因：
+- v2026.6.9 JS bundle 函数名变更 CW→sH, _U→HB, hW→WV; 补丁脚本新增 CURRENT/TARGET_BUILTIN_*_V2026_6_9 常量并更新版本检测逻辑
+- 后续排查 / 恢复提示：
+- 后续大版本升级需再次核对函数名；查看 Console 中 sessions.patch 返回的 resolved.modelProvider
+- 相关文件：
+- `scripts/apply-openclaw-session-model-selector-fix.py`

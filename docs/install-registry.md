@@ -330,3 +330,10 @@
 - **依赖**: Python 3, systemd user session
 - **成功**: ✅ 烟测通过
 - **备注**: 每 5 分钟检查上下文使用率，70%/85%/95% 三级告警
+
+### OpenClaw 升级：v2026.6.8 → v2026.6.9
+- **日期**：2026-06-22
+- **操作**：升级
+- **方式**：`openclaw update`（通过 systemd-run 瞬态单元执行）
+- **新增/变更**：deepseek 插件自动安装；session-utils JS 文件名变更；chat model switch 函数名 CW→sH
+- **备注**：升级过程因需要在 gateway 外执行，使用 systemd-run 绕过；并行修复了 cron 模型、systemd timeout、boot-health-check

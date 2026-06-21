@@ -117,6 +117,44 @@ def check_gateway_port() -> dict:
         return {"port": 18789, "status": "unreachable", "error": str(e)}
 
 
+def check_gateway_startup_errors() -> dict:
+    """检查 Gateway 启动过程中是否有 config invalid 等严重错误。
+    2026-06-22: gateway 7 连败后才通过 doctor --fix 启动成功，
+    但 systemctl is-active 返回 active，boot health 误报 OK。"""
+    try:
+        rc, out, err = run(
+            ["journalctl", "--user", "-u", "openclaw-gateway.service",
+             "--since", "5 minutes ago", "--no-pager"],
+            timeout=5
+        )
+        if rc != 0:
+            return {"status": "ok", "note": "journalctl failed"}
+
+        errors = []
+        for line in out.split("\n"):
+            lower = line.lower()
+            if "invalid config" in lower:
+                errors.append(f"config-invalid: {line.strip()[-200:]}")
+            elif "gateway failed to start" in lower:
+                errors.append(f"startup-failed: {line.strip()[-200:]}")
+            elif "failed with result" in lower and "openclaw-gateway" in lower:
+                errors.append(f"service-failed: {line.strip()[-200:]}")
+
+        # 统计失败次数
+        fail_count = len([e for e in errors if "service-failed" in e or "startup-failed" in e])
+
+        if fail_count > 0:
+            return {
+                "status": "warning",
+                "failures": fail_count,
+                "detail": errors[:5],  # 最多5条
+                "note": f"Gateway 启动过程中失败了 {fail_count} 次，最终通过修复启动",
+            }
+        return {"status": "ok", "failures": 0}
+    except Exception as e:
+        return {"status": "ok", "note": f"check failed: {e}"}
+
+
 def main():
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -155,6 +193,7 @@ def main():
     results["disk"] = check_disk()
     results["memory"] = check_memory()
     results["gateway_port"] = check_gateway_port()
+    results["gateway_startup"] = check_gateway_startup_errors()
 
     # 汇总
     for svc in results["services"].values():
@@ -168,6 +207,9 @@ def main():
     if results["memory"].get("status") not in ("ok",):
         results["all_ok"] = False
     if results["gateway_port"].get("status") != "reachable":
+        results["all_ok"] = False
+    gs = results.get("gateway_startup", {})
+    if gs.get("status") == "warning" and gs.get("failures", 0) >= 3:
         results["all_ok"] = False
 
     # 生成摘要
@@ -183,6 +225,9 @@ def main():
         elif tmr["status"] == "inactive":
             issues.append(f"⚠️ {name} 定时器未激活")
 
+    gs = results.get("gateway_startup", {})
+    if gs.get("status") == "warning":
+        issues.append(f"⚠️ Gateway 启动失败 {gs.get('failures',0)} 次后才成功（可能是配置损坏）")
     if results["disk"].get("status") == "warning":
         issues.append(f"⚠️ 磁盘使用率 {results['disk'].get('used_pct')}%")
     if results["memory"].get("status") == "warning":

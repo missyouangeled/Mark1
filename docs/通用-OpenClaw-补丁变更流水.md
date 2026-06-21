@@ -1866,3 +1866,17 @@
 - 相关文件：
 - `docs/通用-OpenClaw-升级记录.md`
 - `~/.openclaw/openclaw.json`
+
+## 2026-06-22 07:23:04 CST (+08:00) — v2026.6.8→v2026.6.9 升级全面体检+修复
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：已更新
+- 结果摘要：
+- 升级到 2026.6.9(c645ec4)。修复4项：mark42-cron模型切Agnes免费、systemd TimeoutStop 30→60s、boot-health-check增加启动失败检测、模型选择器补丁适配v2026.6.9(sH+WV函数名变更)
+- 验收 / 验证：
+- 全部验证通过:openclaw --version=2026.6.9, timeout=1min, 6/6 patcher checks pass
+- 相关文件：
+- `scripts/apply-openclaw-session-model-selector-fix.py`

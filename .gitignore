@@ -44,3 +44,4 @@ skills/web-claude/
 # Memory runtime artifacts
 memory/.????-??-??-*.fallback.tmp
 memory/daily/*-transcript.md
+openclaw-workspace-state.json

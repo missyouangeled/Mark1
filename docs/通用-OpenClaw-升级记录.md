@@ -779,3 +779,50 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 - **mark1 git pull 不会动 ~/.openclaw/openclaw.json**：v6.6.18-2 升级记录里说"修了 controlUi.allowedOrigins/auth.rateLimit/logging.redactSensitive"——但 openclaw.json 是运行时配置，不在 git 里。需要手动从升级记录里读出来补打。
 - **auth.rateLimit 不是 OpenClaw schema 字段**：升级记录里说"添加 auth.rateLimit"——但 OpenClaw 2026.6.6 的 auth schema 实际只接受 profiles/order/cooldowns，没有 rateLimit。强行写入会导致 `auth: Invalid input`，配置 invalid。正确做法：查 `openclaw config schema` 确认后再写。
 - **piped python -c 输出要纯 JSON**：用 `python3 -c '...'; echo` 混到 JSON 前面会让文件变无效。`--print-human` 等场景下尤其要注意 stdout 重定向到 cp。
+
+---
+
+## 升级 #N：2026.6.8 → 2026.6.9
+
+### 基本信息
+- **日期**：2026-06-22 07:14 ~ 07:16
+- **版本**：`v2026.6.8 (844f405)` → `v2026.6.9 (c645ec4)`
+- **触发方式**：手动 `openclaw update`（通过 systemd-run 瞬态单元执行）
+- **升级方式**：`systemd-run --user --unit=openclaw-upgrader` 独立于 Gateway 进程树执行
+- **耗时**：~43s（npm install 26s + doctor 15s + plugin install + restart）
+
+### 升级过程
+1. 停止 gateway（`systemctl --user stop`）
+2. 执行 `openclaw update`（发现必须在 gateway 进程树外运行，改用 systemd-run）
+3. npm global install 完成，`openclaw doctor` 自动运行
+4. deepseek 插件自动安装（`@openclaw/deepseek-provider`）
+5. daemon-reload + gateway 启动
+6. 版本验证通过
+
+### 发现的问题
+1. **模型选择器补丁失效**：JS bundle 函数名变更（CW→sH, _U→HB, hW/WV→WV），旧补丁无法匹配
+2. **Gateway 启动短暂 ERR_MODULE_NOT_FOUND**：旧进程残留导致新代码引用不存在的 chunk 文件，重启后自愈
+3. **session-utils 文件名变化**：从旧名变更为 `session-utils-CnvO9oEi.js`
+
+### 修复详情
+1. 模型选择器补丁适配 v2026.6.9：添加 `CURRENT_BUILTIN_CHAT_MODEL_SWITCH_V2026_6_9` 等 4 个新常量
+2. 更新版本检测逻辑，新增 `is_v2026_6_9` 分支
+3. Busy guard 函数名适配：`Oz`→`WV`
+
+### 并行修复（非升级导致）
+- mark42-3day-checkpoint cron 模型从 `deepseek-v4-pro` → `litellm/agnes-2.0-flash`（免费）
+- TimeoutStopSec 30s → 60s（防止 SIGKILL 打断 update 导致配置损坏）
+- boot-health-check 新增 `check_gateway_startup_errors()` 检测启动失败模式
+
+### 验证结果
+- ✅ `openclaw --version` = 2026.6.9
+- ✅ 6 项模型选择器补丁检查全部通过
+- ✅ 3 个 cron 任务均使用免费模型
+- ✅ TimeoutStopSec=1min 生效
+- ✅ 所有 watcher timer active
+- ✅ 升级后自检 21/21 PASS
+
+### 经验教训
+- `openclaw update` 必须在 gateway 进程树外运行（systemd-run / cron command payload 均可）
+- 每次大版本升级必须重新验证模型选择器补丁（JS bundle 函数名可能变更）
+- config 损坏的根本原因是 update 被 SIGKILL 打断；TimeoutStopSec 不够长是系统级隐患
