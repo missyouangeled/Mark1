@@ -90,7 +90,7 @@ def mark42_init() -> None:
         "thresholds": {"warn": THRESHOLD_WARN, "alert": THRESHOLD_ALERT, "crit": THRESHOLD_CRIT},
         "contextWindow": DEFAULT_CONTEXT_WINDOW,
         "bytesPerKtoken": BYTES_PER_KTOKEN,
-        "models": {"llmAnalyze": "deepseek-v4-pro", "llmProvider": "deepseek"},
+        "models": {"llmAnalyze": "MiniMax-M3", "llmProvider": "minimax"},
         "daemon": {"scanInterval": 30, "autoArmorCompress": True, "autoTaskWatch": True},
         "heavy": {"autoDetect": "semi", "autoDetectEnabled": True},
     }
