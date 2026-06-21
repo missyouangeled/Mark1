@@ -14,7 +14,7 @@ from typing import Any
 from .config import (
     ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
     DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
-    THRESHOLD_WARN, WORKSPACE, XDG_STATE,
+    THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
 )
 from .utils import (
     _append_broker, _find_active_session, _get_context_window, _load_json,
@@ -156,31 +156,18 @@ def _classify_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """调用 DeepSeek API 对会话消息做智能分析。失败则返回 None。"""
-    config_path = Path.home() / ".openclaw" / "openclaw.json"
-    mark42_config_path = CONFIG_PATH
-    if not config_path.exists():
+    """调用 LLM API 对会话消息做智能分析。失败则返回 None。
+    模型和参数统一从 Mark42 模型配置表读取。"""
+    resolved = resolve_model("llmAnalyze")
+    if not resolved:
         return None
-    try:
-        # 从 openclaw.json 取 API key
-        with open(config_path) as f:
-            cfg = json.load(f)
-        provider = cfg.get("models", {}).get("providers", {}).get("minimax", {})
-        api_key = provider.get("apiKey", "")
-        base_url = provider.get("baseUrl", "https://api.minimax.chat/v1")
-        if not api_key:
-            return None
-        # 从 Mark42 配置取模型名
-        model_name = "MiniMax-M3"
-        if mark42_config_path.exists():
-            try:
-                with open(mark42_config_path) as f:
-                    mcfg = json.load(f)
-                model_name = mcfg.get("models", {}).get("llmAnalyze", "MiniMax-M3")
-            except Exception:
-                pass
-    except Exception:
-        return None
+    model_name = resolved["model"]
+    api_key = resolved["apiKey"]
+    base_url = resolved["baseUrl"]
+    endpoint = resolved["endpoint"]
+    timeout = resolved["timeout"]
+    max_tokens = resolved["maxTokens"]
+    temperature = resolved["temperature"]
     lines = []
     for msg in messages[-40:]:
         role = msg.get("role", "?")
@@ -220,16 +207,16 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         body = json.dumps({
             "model": model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 2000,
-            "temperature": 0.1,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
             "response_format": {"type": "json_object"},
         }).encode()
         req = urllib.request.Request(
-            f"{base_url}/v1/chat/completions",
+            f"{base_url}{endpoint}",
             data=body,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         )
-        resp = urllib.request.urlopen(req, timeout=45)
+        resp = urllib.request.urlopen(req, timeout=timeout)
         data = json.loads(resp.read())
         content = data["choices"][0]["message"]["content"]
         content = content.strip()

@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 # ── 本地基础工具（不依赖 utils，避免循环导入） ──
 
@@ -68,6 +69,83 @@ MAX_ACTIONS_LINES = 500
 MAX_DAEMON_LOG_MB = 50  # 单个 daemon 日志最大 50MB，超额截尾
 MAX_DAEMON_LOG_LINES = 10000  # 单文件最大 10000 行
 
+# ── 统一模型配置表 ─────────────────────────────────────
+# Mark42 所有 AI 模型调用必须从此表读取，禁止在各模块硬编码模型名/参数。
+
+MARK42_MODEL_TABLE: dict[str, dict[str, Any]] = {
+    # 用途：上下文压缩时的 LLM 智能分析（armor._llm_analyze）
+    "llmAnalyze": {
+        "model": "MiniMax-M3",
+        "provider": "minimax",         # openclaw.json 中对应的 provider key
+        "maxTokens": 2000,
+        "temperature": 0.1,
+        "timeout": 45,
+        "baseUrlFallback": "https://api.minimax.chat/v1",  # openclaw.json 中无 baseUrl 时回退
+        "endpoint": "/v1/chat/completions",
+    },
+    # 预留：未来新增 AI 用途时在此添加条目
+    # "memoryIndex": { "model": "MiniMax-M3", ... },
+    # "taskClassify": { "model": "MiniMax-M3", ... },
+}
+
+def get_model_config(config_key: str) -> dict[str, Any] | None:
+    """从 Mark42 统一模型配置表读取指定用途的配置。
+    优先读运行时 config.json，不存在时回退到代码中的 MARK42_MODEL_TABLE 默认值。
+    """
+    # 先尝试从运行时配置读取
+    if CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text())
+            models = cfg.get("models", {})
+            entry = models.get(config_key)
+            if entry:
+                # 兼容旧格式：如果是纯字符串则包装
+                if isinstance(entry, str):
+                    return dict(MARK42_MODEL_TABLE.get(config_key, {}), model=entry)
+                return dict(MARK42_MODEL_TABLE.get(config_key, {}), **entry)
+        except Exception:
+            pass
+    # 回退到代码默认值
+    return MARK42_MODEL_TABLE.get(config_key)
+
+def resolve_model(config_key: str) -> dict[str, Any] | None:
+    """解析最终模型调用参数。
+    从统一配置表取模型名/参数，从 openclaw.json 取 API key/baseUrl。
+    返回可直接用于 API 调用的参数字典。
+    """
+    model_entry = get_model_config(config_key)
+    if not model_entry:
+        return None
+    
+    provider_key = model_entry.get("provider", "")
+    api_key = ""
+    base_url = model_entry.get("baseUrlFallback", "")
+    
+    # 从 openclaw.json 取 API key 和 baseUrl
+    openclaw_path = Path.home() / ".openclaw" / "openclaw.json"
+    if openclaw_path.exists():
+        try:
+            oc = json.loads(openclaw_path.read_text())
+            provider = oc.get("models", {}).get("providers", {}).get(provider_key, {})
+            api_key = provider.get("apiKey", "")
+            if provider.get("baseUrl"):
+                base_url = provider["baseUrl"]
+        except Exception:
+            pass
+    
+    if not api_key:
+        return None
+    
+    return {
+        "model": model_entry.get("model", ""),
+        "apiKey": api_key,
+        "baseUrl": base_url,
+        "endpoint": model_entry.get("endpoint", "/v1/chat/completions"),
+        "maxTokens": model_entry.get("maxTokens", 2000),
+        "temperature": model_entry.get("temperature", 0.1),
+        "timeout": model_entry.get("timeout", 45),
+    }
+
 # ── 配置系统 ────────────────────────────────────────────
 
 def _load_config() -> dict[str, any]:  # noqa
@@ -90,7 +168,15 @@ def mark42_init() -> None:
         "thresholds": {"warn": THRESHOLD_WARN, "alert": THRESHOLD_ALERT, "crit": THRESHOLD_CRIT},
         "contextWindow": DEFAULT_CONTEXT_WINDOW,
         "bytesPerKtoken": BYTES_PER_KTOKEN,
-        "models": {"llmAnalyze": "MiniMax-M3", "llmProvider": "minimax"},
+        "models": {
+            "llmAnalyze": {
+                "model": "MiniMax-M3",
+                "provider": "minimax",
+                "maxTokens": 2000,
+                "temperature": 0.1,
+                "timeout": 45,
+            }
+        },
         "daemon": {"scanInterval": 30, "autoArmorCompress": True, "autoTaskWatch": True},
         "heavy": {"autoDetect": "semi", "autoDetectEnabled": True},
     }
@@ -117,9 +203,13 @@ def mark42_config() -> None:
     print(f"\n   阈值:")
     t = cfg.get("thresholds", {})
     print(f"     WARN: {t.get('warn', '?')}%  |  ALERT: {t.get('alert', '?')}%  |  CRIT: {t.get('crit', '?')}%")
-    print(f"\n   模型:")
+    print(f"\n   模型配置表:")
     m = cfg.get("models", {})
-    print(f"     LLM 分析: {m.get('llmAnalyze', '?')}  ({m.get('llmProvider', '?')})")
+    for key, entry in m.items():
+        if isinstance(entry, dict):
+            print(f"     {key}: {entry.get('model', '?')}  (provider: {entry.get('provider', '?')})")
+        elif isinstance(entry, str):
+            print(f"     {key}: {entry}  (旧格式)")
     print(f"\n   守护模式:")
     d = cfg.get("daemon", {})
     print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
