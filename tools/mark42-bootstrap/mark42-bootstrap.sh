@@ -39,6 +39,45 @@ for i in $(seq 1 30); do
 done
 
 # ── Phase 1: 注册 Loop（纯注册，不执行） ──
+# 先清理上轮遗留的 registered/running 状态的 Loop（防止连续开机多次重复注册）
+# 保留 status=killed/completed 的（历史记录）
+log "清理上轮残留 Loop (status=registered/running 且未在心跳周期内)..."
+python3 << 'PYEOF' >> "$LOGFILE" 2>&1 || true
+import json
+from pathlib import Path
+import time
+from datetime import datetime, timezone, timedelta
+
+loops_file = Path("/home/missyouangeled/.local/state/openclaw/mark42/engine/loops.json")
+if loops_file.exists():
+    try:
+        loops = json.loads(loops_file.read_text())
+        cleaned = []
+        kept = []
+        now = datetime.now(timezone.utc)
+        for name, lp in loops.items():
+            status = lp.get("status", "")
+            interval = lp.get("interval", 300)
+            last_run_str = lp.get("lastRun")
+            if status in ("registered", "running") and last_run_str:
+                # 如果 lastRun 距今超过 3 倍 interval，说明这个 Loop 已经死了
+                try:
+                    last_run = datetime.fromisoformat(last_run_str.replace("Z", "+00:00"))
+                    age = (now - last_run).total_seconds()
+                    if age > 3 * interval:
+                        cleaned.append(f"{name} (dead {age:.0f}s)")
+                        continue
+                except Exception:
+                    pass
+            kept.append(name)
+        # 重新构造：只留 kept
+        new_loops = {k: v for k, v in loops.items() if k in kept}
+        loops_file.write_text(json.dumps(new_loops, indent=2, ensure_ascii=False))
+        print(f"清理了 {len(cleaned)} 个死 Loop: {cleaned}")
+        print(f"保留 {len(kept)} 个 Loop: {kept}")
+    except Exception as e:
+        print(f"清理失败（忽略）: {e}")
+PYEOF
 register_loop() {
     local template="$1"
     local task="$2"

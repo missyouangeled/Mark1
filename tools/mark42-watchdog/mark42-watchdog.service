@@ -1,0 +1,13 @@
+[Unit]
+Description=Mark42 Watchdog — 检查 daemon 存活并自动重启
+After=openclaw-gateway.service mark42-engine-daemon.service mark42-armor-guard.service
+
+[Service]
+Type=oneshot
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash /home/missyouangeled/.openclaw/workspace/tools/mark42-watchdog/mark42-watchdog.sh
+StandardOutput=append:/home/missyouangeled/.local/state/openclaw/mark42/watchdog.log
+StandardError=append:/home/missyouangeled/.local/state/openclaw/mark42/watchdog.log
+
+[Install]
+WantedBy=default.target

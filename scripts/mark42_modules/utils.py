@@ -125,8 +125,70 @@ def _list_project_files(path: Path) -> list[Path]:
 
 
 def _get_context_window() -> int:
+    """获取当前会话上下文窗口大小。
+    策略：直接从 openclaw.json 的 providers 中读取主会话当前模型对应的 contextWindow。
+    优先级：
+      1. 当前主会话的 model+provider（从 sessions_list RPC 或会话 jsonl 获取）
+      2. openclaw.json agents.defaults.models.primary
+      3. openclaw.json 第一个有 contextWindow 的模型
+      4. config.json contextWindow
+      5. DEFAULT_CONTEXT_WINDOW
+    """
+    oc_path = Path.home() / ".openclaw" / "openclaw.json"
+    oc = {}
+    if oc_path.exists():
+        try:
+            oc = json.loads(oc_path.read_text())
+        except Exception:
+            pass
+
+    # 策略 1: 从 session jsonl 找当前 session 的 model（不再依赖 resolved）
+    # OpenClaw 会话 jsonl 顶层 type=session 没有 model 字段，只在 message 的 usage 里有
+    # 实际可靠路径：读 openclaw.json 的 agents.defaults.models.primary
+    primary_model = None
+    primary_provider = None
+    try:
+        agents = oc.get('agents', {})
+        defaults = agents.get('defaults', {})
+        primary = defaults.get('model', {}).get('primary', '')
+        # primary 格式: "minimax/MiniMax-M3" 或 "deepseek/deepseek-v4-pro"
+        if '/' in primary:
+            primary_provider, primary_model = primary.split('/', 1)
+    except Exception:
+        pass
+
+    if primary_model and primary_provider:
+        cw = _lookup_context_window(oc, primary_provider, primary_model)
+        if cw:
+            return cw
+
+    # 策略 2: 遍历 openclaw.json 所有 provider/models，取第一个有 contextWindow 的
+    try:
+        for pkey, pcfg in oc.get('models', {}).get('providers', {}).items():
+            for m in pcfg.get('models', []):
+                cw = m.get('contextWindow')
+                if isinstance(cw, int) and cw > 0:
+                    return cw
+    except Exception:
+        pass
+
+    # 策略 3: config.json
     try:
         cfg = _load_json(CONFIG_PATH)
-        return cfg.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+        cw = cfg.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+        if isinstance(cw, int) and cw > 0:
+            return cw
     except Exception:
-        return DEFAULT_CONTEXT_WINDOW
+        pass
+    return DEFAULT_CONTEXT_WINDOW
+
+
+def _lookup_context_window(oc: dict, provider: str, model_id: str) -> int | None:
+    """在 openclaw.json 中查找指定 provider.model 的 contextWindow。"""
+    pcfg = oc.get('models', {}).get('providers', {}).get(provider, {})
+    for m in pcfg.get('models', []):
+        if m.get('id') == model_id or m.get('name') == model_id:
+            cw = m.get('contextWindow')
+            if isinstance(cw, int) and cw > 0:
+                return cw
+    return None
