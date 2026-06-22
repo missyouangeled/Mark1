@@ -359,3 +359,13 @@
 - **用途**: AI Agent 用 CLI 创建/读取/编辑 Word (.docx)、Excel (.xlsx)、PPT (.pptx)
 - **许可**: Apache 2.0
 - **备注**: 单二进制、零依赖、内置 HTML/PNG 渲染引擎。OpenClaw 自动识别安装。
+
+### design-taste-frontend（2026-06-22）
+- **来源**：`https://github.com/Leonxlnx/taste-skill`
+- **类型**：前端设计 skill
+- **用途**：让 AI 在做 UI/前端时避免通用模板（anti-slop），强排版/留白/字距
+- **安装**：`git clone https://github.com/Leonxlnx/taste-skill skills/taste-skill`
+- **状态**：✓ ready（v2 experimental）
+- **配套**：v1（`design-taste-frontend-v1`）一并安装
+- **触发**："做 UI"、"前端设计"、"landing page"、"redesign"
+
