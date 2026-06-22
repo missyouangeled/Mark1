@@ -82,13 +82,12 @@
 
 ## API 路由规则（2026-06-22 更新）
 
-> 2026-06-22 大修：所有默认路由切 MiniMax-M3，个人/公司 DeepSeek 仅手动选择时使用。
+> 2026-06-22 大修：所有默认路由切 MiniMax-M3，DeepSeek 仅手动选择时使用。
 > 排查手册：`docs/通用-AI模型路由问题排查与修复手册.md`
 
 - **主会话默认**：`minimax/MiniMax-M3`（免费）
 - **子 agent（dashboard/coder/researcher）默认**：`minimax/MiniMax-M3`（免费）
 - **fallback**：`litellm/agnes-2.0-flash`（免费）
 - **当前会话模型**：由 Control UI 模型选择列表决定（sH 函数写 modelOverride 钉死当前会话）
-- **公司 DeepSeek**（`deepseek-company/deepseek-v4-pro`）：仅手动选择时使用，余额约 ¥1.76
-- **个人 DeepSeek**：已从 defaults 移除，仅手动选择时使用
+- **个人 DeepSeek**：provider 名 `deepseek-company`（apiKey: `sk-da159...912e`, key 名 `OpenClawtalk_`），仅手动选择时使用，余额约 ¥6.60
 - **所有 cron 定时任务**：统一使用 MiniMax-M3
