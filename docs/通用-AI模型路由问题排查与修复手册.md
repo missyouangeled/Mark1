@@ -18,7 +18,7 @@ for s in d['sessions']:
     print(f\"  {s['key'][:50]:50s}  {s.get('modelProvider','?')}/{s.get('model','?')}\")
 "
 
-# 3. 查公司 DeepSeek 余额
+# 3. 查个人 DeepSeek 余额
 python3 -c "
 import json, urllib.request
 with open(openclaw.json) as f: cfg=json.load(f)
