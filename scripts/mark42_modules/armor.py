@@ -220,6 +220,10 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         data = json.loads(resp.read())
         content = data["choices"][0]["message"]["content"]
         content = content.strip()
+        if content.startswith("<think>"):
+            end = content.find("</think>")
+            if end > 0:
+                content = content[end + 8:].strip()
         if content.startswith("```"):
             content = content.split("```")[1]
             if content.startswith("json"):
@@ -322,29 +326,20 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                    f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
                    {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
                     "modelGenerated": index.get('modelGenerated', False)})
-    # ── 实际压缩：调用 OpenClaw Gateway /compact API 缩减会话 ──
+    # ── 实际压缩：写入 /compact 消息到会话 transcript 触发 OpenClaw 内部压缩 ──
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
-            import urllib.request as _ur2
-            gw_url = "http://127.0.0.1:18789/v1/sessions/compact"
-            api_key = ""
-            oc_path = Path.home() / ".openclaw" / "openclaw.json"
-            if oc_path.exists():
-                oc = json.loads(oc_path.read_text())
-                api_key = oc.get("gateway", {}).get("token", "")
             active_session = _find_active_session()
             if active_session:
-                session_key = active_session.stem
-                body2 = json.dumps({"key": session_key, "agent": "main"}).encode()
-                req2 = _ur2.Request(gw_url, data=body2, headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                })
-                resp2 = _ur2.urlopen(req2, timeout=30)
-                comp_result = json.loads(resp2.read())
-                print(f"🧹 已触发 /compact: {json.dumps(comp_result, ensure_ascii=False)[:200]}")
+                compact_msg = json.dumps({
+                    "type": "message",
+                    "message": {"role": "user", "content": "/compact"},
+                    "ts": _now_iso()
+                }, ensure_ascii=False)
+                with open(active_session, "a") as sf:
+                    sf.write(compact_msg + "\n")
+                print(f"🧹 已注入 /compact 命令到会话: {active_session.name}")
                 index["compactTriggered"] = True
-                index["compactResult"] = comp_result
             else:
                 print("⚠️ 未找到活跃会话，跳过 compact")
                 index["compactTriggered"] = False

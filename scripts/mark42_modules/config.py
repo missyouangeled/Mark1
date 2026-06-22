@@ -81,7 +81,7 @@ MARK42_MODEL_TABLE: dict[str, dict[str, Any]] = {
         "temperature": 0.1,
         "timeout": 45,
         "baseUrlFallback": "https://api.minimax.chat/v1",  # openclaw.json 中无 baseUrl 时回退
-        "endpoint": "/v1/chat/completions",
+        "endpoint": "/chat/completions",
     },
     # 预留：未来新增 AI 用途时在此添加条目
     # "memoryIndex": { "model": "MiniMax-M3", ... },
