@@ -267,7 +267,7 @@ systemctl --user restart openclaw-gateway.service
 | 新会话默认 | minimax/MiniMax-M3（免费） |
 | 子 agent（dashboard/coder/researcher） | minimax/MiniMax-M3 |
 | 当前会话（由 UI 选择列表决定） | 用户自选 |
-| 公司 DeepSeek（deepseek-company） | 仅手动选择时使用 |
+| 个人 DeepSeek（deepseek-company） | 仅手动选择时使用 |
 | 个人 DeepSeek | 仅手动选择时使用 |
 | 所有 cron 定时任务 | minimax/MiniMax-M3 |
 | resume-watch | 已永久 disable |
