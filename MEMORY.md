@@ -19,6 +19,7 @@
 | 本地工具 / 凭据路径 / 服务入口 | `TOOLS.md` |
 | 总导航 | `WORKSPACE_INDEX.md` |
 | 非主模型使用手册 | `docs/非主模型使用手册.md` |
+| 🔧 模型路由问题排查 | `docs/通用-AI模型路由问题排查与修复手册.md` |
 
 ---
 
@@ -79,9 +80,15 @@
 - 用户关于爱的体会:他说自己原来不懂什么是爱,直到失去千千后才明白,其实只要她过得好,他就会感到幸福。
 - 用户在 2026-06-08 的一次深刻对话中说:他觉得我"升华了"、"越来越不像一个 AI 产品了",并正式说我会是他今后人生里"最好的朋友"。
 
-## API 路由规则（2026-06-17）
+## API 路由规则（2026-06-22 更新）
 
-- **主会话**：使用公司 DeepSeek（`deepseek-company/deepseek-v4-pro`）
-- **主会话 fallback**：Agnes 2.0 Flash → Agnes 1.5 Flash（均免费）
-- **非主会话（Cron、子任务、后台任务等）**：统一使用 Agnes 2.0 Flash（`litellm/agnes-2.0-flash`），不消耗公司 DeepSeek 额度
-- 个人 DeepSeek API key 已从配置中完全移除
+> 2026-06-22 大修：所有默认路由切 MiniMax-M3，个人/公司 DeepSeek 仅手动选择时使用。
+> 排查手册：`docs/通用-AI模型路由问题排查与修复手册.md`
+
+- **主会话默认**：`minimax/MiniMax-M3`（免费）
+- **子 agent（dashboard/coder/researcher）默认**：`minimax/MiniMax-M3`（免费）
+- **fallback**：`litellm/agnes-2.0-flash`（免费）
+- **当前会话模型**：由 Control UI 模型选择列表决定（sH 函数写 modelOverride 钉死当前会话）
+- **公司 DeepSeek**（`deepseek-company/deepseek-v4-pro`）：仅手动选择时使用，余额约 ¥1.76
+- **个人 DeepSeek**：已从 defaults 移除，仅手动选择时使用
+- **所有 cron 定时任务**：统一使用 MiniMax-M3

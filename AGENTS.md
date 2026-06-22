@@ -60,6 +60,7 @@ BOOT_INDEX.md  ─── 启动入口，指向下面各层
 | 方案存档 | `PLANS.md` |
 | 安装记录 | `docs/install-registry.md` |
 | 崩坏案例 | `docs/对系统操作必须要参考的崩坏案例.md` |
+| 🤖 AI模型路由 | `docs/通用-AI模型路由问题排查与修复手册.md` |
 
 ## 基本规则（摘要）
 
