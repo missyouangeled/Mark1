@@ -322,6 +322,36 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                    f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
                    {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
                     "modelGenerated": index.get('modelGenerated', False)})
+    # ── 实际压缩：调用 OpenClaw Gateway /compact API 缩减会话 ──
+    if not dry_run and usage >= THRESHOLD_WARN:
+        try:
+            import urllib.request as _ur2
+            gw_url = "http://127.0.0.1:18789/v1/sessions/compact"
+            api_key = ""
+            oc_path = Path.home() / ".openclaw" / "openclaw.json"
+            if oc_path.exists():
+                oc = json.loads(oc_path.read_text())
+                api_key = oc.get("gateway", {}).get("token", "")
+            active_session = _find_active_session()
+            if active_session:
+                session_key = active_session.stem
+                body2 = json.dumps({"key": session_key, "agent": "main"}).encode()
+                req2 = _ur2.Request(gw_url, data=body2, headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                })
+                resp2 = _ur2.urlopen(req2, timeout=30)
+                comp_result = json.loads(resp2.read())
+                print(f"🧹 已触发 /compact: {json.dumps(comp_result, ensure_ascii=False)[:200]}")
+                index["compactTriggered"] = True
+                index["compactResult"] = comp_result
+            else:
+                print("⚠️ 未找到活跃会话，跳过 compact")
+                index["compactTriggered"] = False
+        except Exception as e:
+            print(f"⚠️ compact 触发失败: {e}")
+            index["compactTriggered"] = False
+            index["compactError"] = str(e)
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 

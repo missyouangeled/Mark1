@@ -1922,3 +1922,17 @@
 - system-loading/boot/ready + chat.inject + resolved + refresh-tools-effective + model-select marker 全部找到
 - 相关文件：
 - `scripts/apply-openclaw-session-model-selector-fix.py`
+
+## 2026-06-22 08:29:55 CST (+08:00) — 安装 ponytail Skill (DietrichGebert/ponytail)
+
+- 类型：install
+- 适用范围：OpenClaw
+- 补丁注册表：已更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- clawhub install ponytail → ~/.openclaw/workspace/skills/ponytail* (6 skills)。MIT。46K star。和 karpathy-guidelines 共存，实测后再定取舍。
+- 验收 / 验证：
+- 6 个子 skill 目录已创建，SKILL.md 含 name/description/license
+- 相关文件：
+- `skills/ponytail/SKILL.md`

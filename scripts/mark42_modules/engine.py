@@ -284,7 +284,47 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         if not gw_ok:
             _append_broker("health", "engine.model.fallback", "Gateway 不可达", "error",
                            "Gateway health check 失败", {})
+    elif template_name == "memory-index":
+        # 扫描最近 7 天 memory/daily/ 文件，更新 INDEX.md 主题锚点
+        memory_dir = WORKSPACE / "memory" / "daily"
+        index_path = WORKSPACE / "memory" / "INDEX.md"
+        scanned = 0
+        new_anchors = []
+        if memory_dir.exists():
+            from datetime import datetime as _dt, timedelta as _td
+            cutoff = _dt.now() - _td(days=7)
+            for df in sorted(memory_dir.glob("*.md"), reverse=True):
+                try:
+                    date_str = df.stem
+                    dt = _dt.strptime(date_str, "%Y-%m-%d")
+                    if dt < cutoff:
+                        continue
+                    scanned += 1
+                    content = df.read_text()[:2000]
+                    # 提取 ## 标题作为主题锚点
+                    import re
+                    topics = re.findall(r'^##\s+(.+)', content, re.MULTILINE)
+                    for topic in topics:
+                        anchor = f"- [{date_str}] {topic.strip()}"
+                        if anchor not in new_anchors:
+                            new_anchors.append(anchor)
+                except Exception:
+                    pass
+            # 更新 INDEX.md
+            if new_anchors:
+                existing = index_path.read_text() if index_path.exists() else "# 记忆索引\n"
+                # 只追加不重复的锚点
+                added = 0
+                for anchor in new_anchors[:20]:
+                    if anchor not in existing:
+                        existing += f"\n{anchor}"
+                        added += 1
+                if added > 0:
+                    index_path.write_text(existing)
+        print(f"   📋 记忆索引: 扫描 {scanned} 天, 新增 {len(new_anchors)} 个锚点")
+        loop["lastResult"] = {"scannedDays": scanned, "newAnchors": len(new_anchors)}
     else:
+        # 通用/自定义 Loop 回退
         task_lower = task.lower()
         if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
             result = armor_compress()

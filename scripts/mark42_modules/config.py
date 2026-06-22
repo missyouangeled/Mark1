@@ -55,7 +55,7 @@ THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))
 THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", "85"))
 THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", "95"))
 
-BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(14 * 1024)))
+BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(2 * 1024)))
 DEFAULT_CONTEXT_WINDOW = 131072
 
 BROKER_SOURCE = "mark42"
