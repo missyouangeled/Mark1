@@ -337,3 +337,14 @@
 - **方式**：`openclaw update`（通过 systemd-run 瞬态单元执行）
 - **新增/变更**：deepseek 插件自动安装；session-utils JS 文件名变更；chat model switch 函数名 CW→sH
 - **备注**：升级过程因需要在 gateway 外执行，使用 systemd-run 绕过；并行修复了 cron 模型、systemd timeout、boot-health-check
+
+### ponytail (DietrichGebert/ponytail) — 2026-06-22 00:31 UTC
+- 类型: OpenClaw Skill (ClawHub)
+- 来源: https://github.com/DietrichGebert/ponytail · clawhub install ponytail
+- 版本: v4.7.0
+- 协议: MIT
+- 子 skill:
+  - ponytail (主) — clawhub 安装
+  - ponytail-review / audit / debt / gain / help — 手动从 GitHub raw 下载
+- 用途: AI agent 代码极简模式（YAGNI → stdlib → native → dep → 一行 → 最少）
+- 备注: 与 karpathy-guidelines 共存，实测后定取舍
