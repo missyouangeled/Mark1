@@ -1880,3 +1880,45 @@
 - 全部验证通过:openclaw --version=2026.6.9, timeout=1min, 6/6 patcher checks pass
 - 相关文件：
 - `scripts/apply-openclaw-session-model-selector-fix.py`
+
+## 2026-06-22 07:29:23 CST (+08:00) — 非主会话AI模型统一切到 MiniMax M3
+
+- 类型：patch
+- 适用范围：通用
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 全代码审计后：mark42-3day-checkpoint cron 从 agnes-2.0-flash → MiniMax-M3；Mark42 默认种子配置 deepseek-v4-pro → MiniMax-M3。3个cron+Mark42运行时+种子配置全部统一为 MiniMax M3
+- 验收 / 验证：
+- 3/3 cron=minimax/MiniMax-M3; Mark42 运行时+种子配置均=minimax/MiniMax-M3
+- 相关文件：
+- `scripts/mark42_modules/config.py`
+
+## 2026-06-22 07:35:04 CST (+08:00) — Mark42 统一 AI 模型配置表
+
+- 类型：patch
+- 适用范围：Mark42
+- 补丁注册表：不适用
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 创建 MARK42_MODEL_TABLE + resolve_model() / get_model_config() 函数。armor.py 重构为通过统一接口读取模型参数，消除硬编码。当前唯一条目 llmAnalyze=MiniMax-M3/minimax。config.json 升级为新格式。模型配置变更只需改一处。
+- 验收 / 验证：
+- resolve_model("llmAnalyze") 成功获取 apiKey/baseUrl/maxTokens；mark42.py --config 正常显示；config.py+armor.py 语法通过
+- 相关文件：
+- `scripts/mark42_modules/config.py`
+
+## 2026-06-22 07:59:49 CST (+08:00) — 模型选择器恢复启动项注入
+
+- 类型：patch
+- 适用范围：Control UI
+- 补丁注册表：已更新
+- 重建清单：已更新
+- 升级后自检清单：不适用
+- 结果摘要：
+- 切换模型时自动注入 chat.inject: system-loading → system-boot(系统指令要求读启动文件) → system-ready(OK已读取完成)。v2026.6.9 适配，7/7 checks pass
+- 验收 / 验证：
+- system-loading/boot/ready + chat.inject + resolved + refresh-tools-effective + model-select marker 全部找到
+- 相关文件：
+- `scripts/apply-openclaw-session-model-selector-fix.py`
