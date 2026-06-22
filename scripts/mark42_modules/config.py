@@ -2,14 +2,14 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
 # ── 本地基础工具（不依赖 utils，避免循环导入） ──
 
 def _conf_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone(timedelta(hours=8))).isoformat()
 
 def _conf_load_json(path: Path) -> dict:
     if not path.exists():

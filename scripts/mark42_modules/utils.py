@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +23,7 @@ from .config import (
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone(timedelta(hours=8))).isoformat()
 
 def _now_ts() -> float:
     return datetime.now(timezone.utc).timestamp()

@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .config import (
@@ -144,7 +144,7 @@ def log_rotate(target: str = "all") -> dict:
     """执行日志轮替。target: all / history / actions / broker / scratch"""
     targets = ["daemon", "history", "actions", "broker", "scratch"] if target == "all" else [target]
     results = {}
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
     if "daemon" in targets:
         results["daemon"] = rotate_daemon_logs()
     if "history" in targets:
