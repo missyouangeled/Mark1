@@ -1,52 +1,28 @@
-# PLANS_INDEX.md — 历史方案索引
+# PLANS_INDEX.md — 方案快速检索
 
-> 这是 `PLANS.md` 的二级索引。只记录方案标题、状态、标签和何时读取，不复制正文。
+> 详细方案已移至 `docs/plans/` 目录，每个方案一个独立文件。
+> 主索引见 `PLANS.md`。本文件提供主题/标签维度检索。
 
-## 方案状态说明
+## 标签索引
 
-| 状态 | 含义 |
-|---|---|
-| `active` | 当前仍可继续推进或仍推荐参考 |
-| `reference` | 历史参考，不代表当前默认落地 |
-| `done` | 已完成收口，可作为结果参考 |
-| `paused` | 暂停，等待用户继续 |
-|
+| 标签 | 相关方案 |
+|------|---------|
+| IPTV/视频 | #1 IPTV推流 |
+| 语音/TTS | #14 ChatTTS encoder, #15 流式直聊, #16 语音提速, #17 更像人研究, #22 语音架构重构, #28 语音随身助手 |
+| 部署/设备 | #9 云服务器, #10 ROG掌机, #11 双机协同, #12 三设备协同, #13 U盘方案 |
+| Broker/架构 | #5 broker收口, #6 infos-handle, #7 infos-handle phase2, #19 插层路线, #20 三层分层 |
+| 监工/守护 | #8 前台监工, #29 调度层, #30 任务调度器 |
+| Agent/自动化 | #24 Agent-S GUI, #25 tavily, #26 接单赚钱, #27 分布式算力 |
+| 微信 | #4 wechat-cli |
+| 视觉 | #21 视觉识别, #18 陪看片 |
+| 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物 |
 
-## 高价值方案目录
+## 文件结构
 
-| 日期 | 主题 | 状态 | 标签 | 什么时候读 |
-|---|---|---|---|---|
-| 2026-05-19 | broker / infos-handle v1 收口说明 | `done` | OpenClaw, broker, infos-handle | 查当前正式内部信息系统口径时 |
-| 2026-05-19 | infos-handle 增强轮 4 方向收口 | `done` | OpenClaw, infos-handle | 查增强轮收口范围时 |
-| 2026-05-18 | infos-handle phase2 最小增强落点 | `reference` | OpenClaw, infos-handle | 查 phase2 设计来源时 |
-| 2026-05-13 | 前台独立监工方案（脚本监工 + 前台状态面板） | `reference` | 监工, 前台, 状态面板 | 查监工体系设计来源时 |
-| 2026-04-29 | 云服务器部署方案 | `reference` | 部署, 云服务器 | 查云部署路线时 |
-| 2026-04-29 | ROG 掌机（Windows）部署方案 | `reference` | 掌机, Windows, 部署 | 查掌机单机方案时 |
-| 2026-04-30 | 双机协同推荐方案（公司机主脑 + 掌机远程入口） | `reference` | 多设备, 双机协同 | 查公司机/掌机协同时 |
-| 2026-04-30 | 三设备协同方案（微信总控 + 掌机对话 + 多设备执行） | `reference` | 多设备, 微信 | 查更复杂多端协同时 |
-| 2026-05-08 | ChatTTS encoder 补全与 zero-shot 恢复方案 | `reference` | 语音, ChatTTS | 查 ChatTTS 深层恢复路线时 |
-| 2026-05-09 | 主会话语音回复升级为“流式直聊”的方案 | `reference` | 语音, 主会话 | 查语音主线演进时 |
-| 2026-05-11 | 当前设备语音提速的最小实施方案 | `reference` | 语音, 提速 | 查低风险提速时 |
-| 2026-05-12 | 主会话语音模板不动前提下的“更像人 / 更有情感 / 更细腻”研究结论 | `reference` | 语音, 听感 | 查语音风格调优时 |
-| 2026-05-09 | FFmpeg + Gemma 4 31B 视觉陪看片方案 | `paused` | 视觉, FFmpeg, Gemma | 继续视觉陪看片时 |
-| 2026-05-15 | infos-handle 插层路线（broker 数据中心纯化） | `reference` | OpenClaw, broker | 查分层收敛路线时 |
-| 2026-05-14 | 工作层 / 数据层 / 渲染层分层路线（当前先升级 broker 为数据源） | `reference` | 架构, 分层 | 查整体分层方向时 |
-| 2026-05-22 | 贾维斯视觉识别能力调研 | `reference` | 视觉, 能力调研 | 查视觉能力方向时 |
-| 2026-05-22 | 贾维斯语音架构重构 | `reference` | 语音, 架构 | 查语音大方向时 |
-| 2026-05-22 | 贾维斯自进化方案（self-improvement + capability-evolver 融合） | `reference` | 自进化, 学习 | 查自进化方向时 |
-| 2026-05-25 | Agent-S GUI Agent — 待装机方案 | `paused` | Agent, GUI | 准备装 Agent-S 时 |
-| 2026-05-25 | tavily-key-generator — API Key 自动注册器 | `paused` | API, 自动注册 | 继续这条工具线时 |
-| 2026-05-25 | AI Agent 接单赚钱 — 待启动方案 | `paused` | 商业化 | 讨论副业/变现时 |
-| 2026-05-25 | 分布式 Agent 算力网络设计 | `reference` | Agent, 分布式 | 查算力网络思路时 |
-| 2026-05-25 | 贾维斯语音随身助手 — 蓝牙耳机实时对话方案 | `paused` | 语音, 随身助手 | 讨论耳机实时对话时 |
-| 2026-05-26 | 统一工作调度层方案 | `reference` | 调度, 架构 | 查任务调度层设计时 |
-| 2026-05-26 | 任务调度器（Task Scheduler）详细设计 | `reference` | 调度器, watcher | 查调度器细节时 |
-| 2026-06-08 | wechat-cli 微信命令行工具调研 | `reference` | 微信, CLI, 掌机 | 探索掌机微信接入时 |
-| 2026-05-29 | QMD 语义搜索排查结论 | `done` | memory_search, QMD | 查 memory_search / QMD 路线时 |
-| 2026-06-15 | Mark42 模块化智能铠甲系统 — 初步设计 | `active` | Mark42, 上下文管理, Loop, 大工程 | 启动 Mark42 开发时；商业渠道调研完成后 |
+```
+PLANS.md              ← 索引表（按编号列出所有方案）
+PLANS_INDEX.md        ← 本文件（标签维度检索）
+docs/plans/01-*.md   ← 每个方案的完整内容
+```
 
-## 使用提醒
-
-- 先看这里决定要读哪条方案，再去 `PLANS.md` 读正文
-- 若某条方案已经被当前正式架构替代，不要默认拿旧方案当现行方案
-- 新方案写进 `PLANS.md` 后，记得同步补一条到这里
+> 新增方案：直接在 `docs/plans/` 创建新文件，然后在 `PLANS.md` 表尾加一行。

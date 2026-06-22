@@ -348,3 +348,14 @@
   - ponytail-review / audit / debt / gain / help — 手动从 GitHub raw 下载
 - 用途: AI agent 代码极简模式（YAGNI → stdlib → native → dep → 一行 → 最少）
 - 备注: 与 karpathy-guidelines 共存，实测后定取舍
+
+### OfficeCLI (2026-06-22)
+
+- **名称**: OfficeCLI
+- **版本**: v1.0.116
+- **安装方式**: `curl -fsSL https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.sh | bash`
+- **二进制**: `~/.local/bin/officecli`
+- **Skill**: `~/.agents/skills/officecli/SKILL.md`
+- **用途**: AI Agent 用 CLI 创建/读取/编辑 Word (.docx)、Excel (.xlsx)、PPT (.pptx)
+- **许可**: Apache 2.0
+- **备注**: 单二进制、零依赖、内置 HTML/PNG 渲染引擎。OpenClaw 自动识别安装。

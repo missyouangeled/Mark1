@@ -1,0 +1,147 @@
+# OpenClaw automation
+
+> OpenClaw 自动化/监工/修复相关
+
+
+- 适用机器:通用(其中带"掌机"字样的条目仅适用于掌机(Windows))
+- 系统 / OS:通用 / Windows / Linux(按各条目说明执行)
+
+- 口袋速记:纯日常聊天 / 简单工作 = 监工服务默认 `auto + taskInactive`;复杂工程 / 长耗时 / 易阻塞前台 = 默认切到 `auto + taskActive`;用户可随时显式切成 `force_on` / `force_off`;媒体仍必须按主会话真实可用验收。
+- 补充硬规则:如果已经切到 `force_on` 或 `auto + taskActive=true`,并且已经对用户说"开始处理/继续推进",就要立刻核对是否真的出现 `activeTaskCount>0`;若没有,就不要假装监工已经在盯,要么马上真卸后台任务,要么明确说明这轮仍在前台做,所以监工会先显示 `idle/待命`。
+- 新增行为(2026-05-18):当上一轮后台任务完成后,监工会进入约 10 分钟的"等待接续任务"窗口,并向前台发一句简短提示;若这段时间内出现新的 active run,就继续盯下一轮;若 10 分钟内没有新的后台任务或继续信号,则自动退回 `auto + taskActive=false`,不再无限期空挂在 `force_on/armed`。
+- Startup online notice is driven by `BOOT.md` + the `boot-md` hook.
+- 升级后自检入口:`docs/通用-OpenClaw-升级后自检清单.md`
+- 升级后自检脚本:`scripts/openclaw-post-upgrade-self-check.py`
+  - 用途:检测 OpenClaw 版本是否变化;若已升级,则按自检清单主动核对关键补丁 / broker / infos-handle / sidecar / unified proxy / recovery watcher
+  - 常用命令:`python3 scripts/openclaw-post-upgrade-self-check.py --print-human`
+  - 启动行为:当前 `BOOT.md` 已改成启动时先跑这支脚本;若版本未变,只发普通上线消息;若版本变化,则先做升级后自检,再带结果上线
+- **升级历史记录**:`docs/通用-OpenClaw-升级记录.md` — 每次升级的完整经过:版本号、时间、触发方式、发现的问题、修复详情、验证结果、经验教训。升级后如发现新问题,修复后应追加到该文件。
+  - 状态目录:`~/.local/state/openclaw/post-upgrade-self-check/`
+- 变更流水文档:`docs/通用-OpenClaw-补丁变更流水.md`
+
+- Control UI 黑屏应急修复器：`scripts/openclaw-control-ui-emergency.py`
+  - 用途：从浏览器 HTTP 视角、Gateway、Control UI 静态资源、自定义 branding / 模型选择器补丁、broker/sidecar/proxy 逐层诊断 Control UI 黑屏/打不开问题
+  - 常用命令：`python3 scripts/openclaw-control-ui-emergency.py --check --print-human`
+  - 低风险修复：`python3 scripts/openclaw-control-ui-emergency.py --repair --print-human`
+  - 兜底 safe mode：`python3 scripts/openclaw-control-ui-emergency.py --safe-mode --print-human`（临时禁用 branding 注入，优先救回原始页面）
+  - 文档：`docs/通用-OpenClaw-ControlUI黑屏应急修复.md`
+- 系统一眼总览脚本：`scripts/openclaw-system-summary.py`
+  - 用途：聚合 gateway / security / tasks / watcher / patch verify / local-health / daily / git 工作区状态，快速判断当前系统是否干净
+  - 常用命令：`python3 scripts/openclaw-system-summary.py --print-human`
+  - 边界：只做低侵入聚合检查，不新增 timer，不替代细分诊断脚本
+- 大工程稳定运行方案：`docs/通用-OpenClaw-大工程稳定运行方案.md`
+  - 用途：统一约束大量文件/长耗时/高 IO/高上下文任务的执行方式，核心是“前台轻量化 + 后台分身 + scratch 落地 + 冲突预扫 + 收尾清理”
+  - 开工前建议：`python3 scripts/openclaw-heavy-task-start.py <目标目录> --task-name <任务名> --keep`，再执行 `python3 scripts/openclaw-system-summary.py --print-human && free -h && df -h / /mnt/data`
+  - 收工后建议：`python3 scripts/openclaw-heavy-task-finish.py`
+  - 当前 scratch：`/mnt/data/openclaw/scratch/`；Unity 重命名相关计划与操作记录默认优先保留到这里，不轻易删除
+- 大工程统一开工入口：`scripts/openclaw-heavy-task-start.py`
+  - 用途：自动建立 scratch 子目录、可选写入 `.keep`、运行 preflight，并给出 conflict-check / summary / finish 建议命令
+  - 常用命令：`python3 scripts/openclaw-heavy-task-start.py <目标目录> --task-name <任务名> --keep`
+  - 若改名规则会删除 `#` 后缀：额外加 `--strip-hash-suffix`
+  - 当前已验证：对 Wall 目录可正确创建 scratch 目录、写入 `.keep` 并输出后续建议命令
+- 大工程开工前预检：`scripts/openclaw-heavy-task-preflight.py`
+  - 用途：在大工程开始前检查文件量、可用内存、根盘/数据盘余量、当前 failed units，并给出后台化与 scratch 建议
+  - 常用命令：`python3 scripts/openclaw-heavy-task-preflight.py <目标目录> --task-name <任务名>`
+  - 当前已验证：对 Wall 目录可正确给出“114 个纳入规则文件、建议分批/优先后台、建议 scratch 路径”的预检结果
+- scratch 过期清理：`scripts/openclaw-scratch-cleanup.py`
+  - 用途：清理 `/mnt/data/openclaw/scratch/` 里超过阈值天数且未标记保留的目录/文件
+  - 保留机制：任一目录树内存在 `.keep`，则对应顶层项目目录整体保留
+  - 常用命令：`python3 scripts/openclaw-scratch-cleanup.py --dry-run --print-kept`
+  - 当前已验证：`unity-renames/2026-06-05-wall/.keep` 可正确保住整个 `unity-renames/` 顶层目录
+- 批量改名前冲突预扫：`scripts/openclaw-rename-conflict-check.py`
+  - 用途：在正式改名前，先扫描“原名 → 目标名”映射，检查是否多个文件会撞到同一个新文件名
+  - 常用命令：`python3 scripts/openclaw-rename-conflict-check.py <目录>`
+  - 若当前规则会删除 `#` 后缀：`python3 scripts/openclaw-rename-conflict-check.py <目录> --strip-hash-suffix --report-out /mnt/data/openclaw/scratch/reports/<name>.json`
+  - 当前已验证：能提前抓出 Wall/H2M 这类 `#PaintWhite` / `#BrickIndustrial_06` 覆盖风险
+- 当前正式架构状态源：`docs/通用-OpenClaw-当前正式架构状态.md`
+  - 用途：定义哪些组件是正式运行、哪些是历史回退、哪些是可选/手动，修复器和自检脚本应优先对齐此文件
+- Git 工作区污染规则：`docs/通用-OpenClaw-Git工作区污染规则.md`
+  - 用途：区分系统补丁提交、记忆/学习低频整理、运行态/临时文件忽略，避免 `git add .` 混入 transcript/fallback/tmp
+- 非正式修改备忘录:`docs/通用-OpenClaw-非正式修改备忘录.md`
+- 变更流水脚本:`scripts/openclaw-change-log.py`
+  - 用途:每次做完修改/修补后,把"这次实际改了什么"按时间追加到变更流水里;若是未进入正式补丁体系的临时/手工/外部修改,也可直接追加到非正式修改备忘录
+  - 推荐命令(变更流水):`python3 scripts/openclaw-change-log.py capture --title '本次改动标题' --kind patch --scope 通用 --summary '一句结果摘要' --verify '最小验收结果' --registry-status 已更新 --rebuild-status 已更新 --selfcheck-status 不适用 --file path/to/file`
+  - 推荐命令(非正式修改备忘录):`python3 scripts/openclaw-change-log.py memo --title '本次备忘录标题' --kind manual-fix --scope 通用 --current-status 备查 --reason '为何未纳入正式补丁' --recovery '后续排查提示' --file path/to/file`
+  - 说明:正式补丁除了写流水,还要同步更新补丁注册表 / 重建清单 / 必要时更新升级后自检清单;非正式但重要的修改还应补进非正式修改备忘录
+- Control UI 当前会话模型下拉补丁：`scripts/apply-openclaw-session-model-selector-fix.py`
+  - 用途：修复聊天页模型下拉“选了但当前会话实际不切”的问题；下拉选择后调用 `sessions.patch {key, model}`，使用后端 `resolved.modelProvider/model` 回填 UI，并刷新 `tools-effective`。
+  - 自动触发（公司 Linux）：`~/.config/systemd/user/openclaw-gateway.service.d/model-selector.conf` 的 `ExecStartPre`。
+  - 最小验收：`python3 scripts/apply-openclaw-session-model-selector-fix.py`；live asset 应包含 `data-chat-model-select="true"`、`s?.resolved?.modelProvider`、`refresh-tools-effective`，且旧早退 `if(_U(e)===t)return!0` 不存在；`index.html` 主 bundle 引用应带 `?jarvisModelSelector=`。
+  - 当前主会话模型与默认模型需保持 `github-copilot/gpt-5.5`；做烟测时不要随手把主会话切到别的模型，若必须测试切换，优先新建测试会话或最后立刻切回 GPT-5.5。
+- Resume recovery watcher script: `scripts/openclaw-resume-watch.sh`
+- WebChat / Control UI 直聊里的轻量后台分身,不要依赖 `thread:true` / `mode:"session"` 的线程绑定会话;默认优先使用一次性 `sessions_spawn(mode:"run", context:"isolated")`。
+- 本地健康诊断层(公司 / Linux 机器):
+  - 适用机器:公司(Linux)
+  - 系统 / OS:Linux
+  - 诊断脚本:`scripts/openclaw-local-health-diagnose.py`
+  - README:`tools/openclaw-local-health/README.md`
+  - systemd 模板:`tools/openclaw-local-health/openclaw-local-health-watch.service` / `tools/openclaw-local-health/openclaw-local-health-watch.timer`
+  - 当前状态目录:`~/.local/state/openclaw/local-health/`
+  - 用途:在不依赖 AI 回复的前提下,对 gateway、本机外联、主线 provider 路由做周期探测,并把结果写入本地状态文件
+  - 默认频率:开机后约 2 分钟首次运行,之后约每 5 分钟一次
+  - 当前也会读取监工状态文件,并在页面里显示"监工"卡片与明细
+  - 当前也可在 `warn / critical / recovered` 这些健康状态变化时,经由 frontstage broker 把一句摘要回到当前 dashboard 前台
+  - 边界:不负责页面主会话消息超时监听;那部分继续由监工服务 / 监工分身兜底
+- 会话文件大小监测与自动修复(公司 / Linux 机器):
+  - 适用机器:公司(Linux)
+  - 系统 / OS:Linux
+  - 监测脚本:`scripts/openclaw-session-size-watcher.py`
+  - 触发方式:双重 — (1) 事件驱动：每次收到用户消息时后台运行（`--gate-seconds 60` 门控去重）；(2) cron fallback：systemd timer 每 10 分钟兜底运行（`--systemd` 模式）
+  - systemd 文件:`tools/openclaw-session-watcher/openclaw-session-watcher.service` / `tools/openclaw-session-watcher/openclaw-session-watcher.timer`
+  - 当前状态目录:`~/.local/state/openclaw/session-size-watcher/`
+  - 默认频率:每收到用户消息触发（门控 60s 去重） + timer 每 10 分钟 cron fallback
+  - 阈值: CRITICAL=25MB（清理旧 checkpoint/trajectory/bak + 死会话 >=6h）/ FORCE_CLEAN=40MB（更强清理：死会话 >=2h + >1MB usage-cost-cache）/ trajectory 单文件 >5MB 告警 / 不设 WARN，日常只静默记录
+  - 用途:在会话压缩竞态发生前,提前清理旧会话数据,减少 "session file changed while lock released" 竞态概率
+  - 手动命令:`python3 scripts/openclaw-session-size-watcher.py --print-human`（查看状态） / `python3 scripts/openclaw-session-size-watcher.py --force-clean`（强制清理）
+  - 边界:不直接压缩当前活跃会话（OpenClaw 内部处理）,只清理其他会话的过期 checkpoint/trajectory/bak 文件
+- 监工状态脚本:`scripts/openclaw-supervisor-status.py`
+  - 状态文件:`~/.local/state/openclaw/supervisor/supervisor-status.json`
+  - 控制文件:`~/.local/state/openclaw/supervisor/service-control.json`
+  - 通知状态文件:`~/.local/state/openclaw/supervisor/notify-state.json`
+  - 策略模式:`auto` / `force_on` / `force_off`
+  - 当前默认基线:`auto + taskActive=false`
+  - 自动回报:可在 `stalled / failed / done` 这些状态变化时,通过 `send-frontstage + chat.inject` 把一句监工消息直接回到当前前台 dashboard,并做事件去重,避免 timer 每 30 秒重复刷屏
+  - 常用命令:
+    - 查看:`python3 scripts/openclaw-supervisor-status.py --print-human`
+    - 开监工服务:`python3 scripts/openclaw-supervisor-status.py --set-policy-mode force_on --reason 'user-request' --print-human`
+    - 关监工服务:`python3 scripts/openclaw-supervisor-status.py --set-policy-mode force_off --reason 'user-request' --print-human`
+    - 恢复自动:`python3 scripts/openclaw-supervisor-status.py --set-policy-mode auto --deactivate-task --reason 'back-to-auto' --print-human`
+    - 标记当前轮为复杂任务:`python3 scripts/openclaw-supervisor-status.py --set-policy-mode auto --activate-task --reason 'complex-work' --print-human`
+    - 手工触发一次自动回报判定:`python3 scripts/openclaw-supervisor-status.py --notify-transitions --print-json`
+- 前台辅助消息 broker:`scripts/openclaw-frontstage-broker.py`
+  - README:`tools/openclaw-frontstage-broker/README.md`
+  - 兼容状态文件:`~/.local/state/openclaw/frontstage/broker-state.json`
+  - 当前数据源目录:`~/.local/state/openclaw/broker/`
+  - 当前关键产物:`events.jsonl` / `manifest.json` / `views/frontstage.json` / `views/health.json` / `views/tasks.json` / `views/recovery.json`
+  - 最小回归:`scripts/test-frontstage-broker.py`
+  - 重建入口:`scripts/apply-openclaw-frontstage-broker-data.py` / `scripts/openclaw-frontstage-broker.py rebuild-views`
+  - systemd 模板:`tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.service` / `tools/openclaw-frontstage-broker/openclaw-frontstage-broker-rebuild.timer`
+  - 旧用户态 systemd:`~/.config/systemd/user/openclaw-frontstage-broker-rebuild.service` / `~/.config/systemd/user/openclaw-frontstage-broker-rebuild.timer` 当前保留为模板/手工兜底,默认不启用
+  - 当前默认刷新策略:Watcher v2 后由 `openclaw-health-collector` / `openclaw-frontstage-guardian` 通过 dirty flag 事件驱动重建 broker 视图,不再每 60 秒盲重建
+  - 用途:把监工、本地健康、前台恢复观察这类辅助消息统一收口后再发回当前前台 dashboard,并在当前阶段开始沉淀成 sidecar 数据源
+  - 当前来源:`supervisor` / `local-health` / `frontstage-recovery`
+  - 当前动作:`emit` / `rebuild-views`
+  - 路线:broker -> `openclaw-supervisor-subagent.py send-frontstage` -> `chat.inject`
+  - 规则:按 `source + eventKey` 去重;默认不接管正常主回复,只处理辅助消息;升级后可先跑 apply/rebuild 入口恢复视图;当前再由 rebuild timer 周期刷新视图,降低"长时间无新辅助消息时视图变旧"的风险
+- infos-handle sidecar:`scripts/openclaw-infos-handle-sidecar.py`
+  - README:`tools/openclaw-infos-handle-sidecar/README.md`
+  - service 模板:`tools/openclaw-infos-handle-sidecar/openclaw-infos-handle-sidecar.service`
+  - 当前用户态 systemd:`~/.config/systemd/user/openclaw-infos-handle-sidecar.service`
+  - 脚本默认监听:`127.0.0.1:18790`
+  - 当前 service 实际监听:`0.0.0.0:18790`
+  - 鉴权:本地 localhost 直连免鉴权;远程/LAN 访问需 `Authorization: Bearer <gateway-token>`;经统一入口代理时按 `X-Forwarded-For` / `X-Real-IP` 识别原始客户端
+  - 远程限流:默认只对非 localhost 客户端生效,`120 req / 60s`(环境变量:`INFOS_HANDLE_SIDECAR_REMOTE_RATE_MAX` / `INFOS_HANDLE_SIDECAR_REMOTE_RATE_WINDOW_S`)
+  - 用途:给 Control UI / 其他轻量 consumer 提供 infos-handle 的最小 HTTP / SSE 直连入口
+  - 当前最小接口:`GET /healthz` / `GET /v1/query/<kind>` / `POST /v1/handle` / `GET /v1/events/stream`
+  - 当前状态:已在公司(Linux)机安装并启用;Control UI branding 补丁默认会优先读这条 sidecar,失败时再回退 broker snapshot 静态文件
+- infos-handle 统一入口代理:`tools/openclaw-infos-handle-gateway-proxy/`
+  - Caddyfile:`tools/openclaw-infos-handle-gateway-proxy/Caddyfile`
+  - README:`tools/openclaw-infos-handle-gateway-proxy/README.md`
+  - apply/verify:`scripts/apply-openclaw-infos-handle-gateway-proxy.py`
+  - service 模板:`tools/openclaw-infos-handle-gateway-proxy/openclaw-unified-proxy.service`
+  - 当前用户态 systemd:`~/.config/systemd/user/openclaw-unified-proxy.service`
+  - 当前监听:`0.0.0.0:18788`
+  - 路由：infos-handle API → `127.0.0.1:18790`；其余 → Gateway `127.0.0.1:18789`
+  - 当前会透传原始客户端 IP（`X-Forwarded-For` 走 Caddy 默认反代行为，`X-Real-IP` 显式补上），避免 sidecar 把远程代理请求误判为 localhost 免鉴权
+
+### Watcher 体系（2026-05-26 整合后：8→5）
