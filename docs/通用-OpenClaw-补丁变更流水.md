@@ -1955,3 +1955,19 @@
 - `docs/plans/34-2026-06-23Trae-Linux-国内版--trae-agent-CLI-待装方案.md`
 - `docs/plans/34-trae-agent-烟测报告-2026-06-23.md`
 - `PLANS.md` / `PLANS_INDEX.md`
+
+## 2026-06-23 11:53:00 CST (+08:00) — trae-agent-engineering Skill 提案+apply
+
+- 类型：skill_create + skill_apply
+- 适用范围：OpenClaw（贾维斯）
+- 安装注册表：已更新（trae-agent-engineering 2026-06-23 提案，状态 applied）
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 用 skill_workshop create 创建 trae-agent-engineering 提案（ID trae-agent-engineering-20260623-17dd43031d），用户显式 apply 后生效。Skill 落地到 `skills/trae-agent-engineering/SKILL.md`（4222 字节、权限 600）。封装 trae-cli 标准调用流程：检查 trae 就位 → show-config 验证 → 用 jarvis-trae.sh wrapper 调 → 看轨迹验证 → 报告 token+改动。3 个坑固化（401/404/缺字段）+ trae_config.yaml 标准模板。
+- 验收 / 验证：
+- skill_workshop list 查询返回 'applied' 状态；install-registry.md 留档改完；skills/trae-agent-engineering/SKILL.md 内容完整；memory/INDEX.md 自动索引更新
+- 相关文件：
+- `skills/trae-agent-engineering/SKILL.md`（新文件）
+- `docs/install-registry.md`（修改）
+- `memory/INDEX.md`（自动索引更新）

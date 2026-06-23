@@ -369,3 +369,17 @@
 - **配套**：v1（`design-taste-frontend-v1`）一并安装
 - **触发**："做 UI"、"前端设计"、"landing page"、"redesign"
 
+
+### trae-agent-engineering（2026-06-23 提案）
+
+- **名称**：trae-agent-engineering
+- **状态**：✅ applied（`trae-agent-engineering-20260623-17dd43031d`），贾维斯工程任务默认加载
+- **Skill 来源**：贾维斯自创（skill_workshop → create）
+- **关联工具**：`bytedance/trae-agent` v0.1.0（已装好：`~/trae-agent/`）
+- **用途**：封装 trae-cli 标准调用流程，贾维斯工程任务默认走这条
+- **触发**："让 trae 改"、"调 trae"、"用 trae 重构"、"修这个 bug"、"加这个功能"、"跑测试"、大型多文件项目
+- **不触发**：单文件一句话改、聊天、查状态
+- **核心流程**：检查 trae 就位 → `trae-cli show-config` 验证 → 用 `~/trae-agent/jarvis-trae.sh` 调 → 看轨迹 → 验证改动 → 报告
+- **3 个坑固化**：401（占位 key）/ 404（provider: openai 改 openrouter）/ 缺字段（top_k + parallel_tool_calls）
+- **配套**：trae_config.yaml 标准模板走 DeepSeek V4 Flash
+- **备注**：✅ 已于 2026-06-23 11:53 apply。贾维斯以后遇到工程任务自动走这套流程。
