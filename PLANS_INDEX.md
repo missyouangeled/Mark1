@@ -15,7 +15,7 @@
 | Agent/自动化 | #24 Agent-S GUI, #25 tavily, #26 接单赚钱, #27 分布式算力 |
 | 微信 | #4 wechat-cli |
 | 视觉 | #21 视觉识别, #18 陪看片 |
-| 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物 |
+| 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物, #34 Trae Linux |
 
 ## 文件结构
 

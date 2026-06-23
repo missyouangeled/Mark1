@@ -1936,3 +1936,22 @@
 - 6 个子 skill 目录已创建，SKILL.md 含 name/description/license
 - 相关文件：
 - `skills/ponytail/SKILL.md`
+
+## 2026-06-23 10:55:30 CST (+08:00) — trae-agent CLI 装好+烟测通过（贾维斯可控）
+
+- 类型：install + verify
+- 适用范围：OpenClaw（贾维斯）
+- 补丁注册表：已更新（按 PLANS #34）
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 在公司(Linux)装 trae-agent CLI 0.1.0（bytedance 开源）。走 uv sync --all-extras。配置走 DeepSeek V4 Flash（v4-flash 模型，0.025 元/百万 token）。三个坑都解决：401（占位 key 换成真 key）→ 404（provider: openai 改 openrouter，走 chat.completions 端点）→ 必填字段（top_k=0, parallel_tool_calls=true）。烟测 2 个真任务：①生成 hello.html（700 字节，闪烁动画，4 步）②改 hello.html（加按钮、加 CSS、加说明文字，保留原动画，5 步）。贾维斯通过 `~/trae-agent/jarvis-trae.sh` wrapper 用 exec 完全可控。
+- 验收 / 验证：
+- 2/2 真任务 Success；hello.html 在 `~/trae-agent/hello.html`；浏览器打开闪烁 + 点击变红；轨迹文件落盘 `trajectories/trajectory_20260623_105358.json` 和 `...105418.json`；V4 Flash 总计 ~38260 token 估算成本 < 0.01 元
+- 相关文件：
+- `~/trae-agent/trae_config.yaml`
+- `~/trae-agent/jarvis-trae.sh`
+- `~/trae-agent/hello.html`
+- `docs/plans/34-2026-06-23Trae-Linux-国内版--trae-agent-CLI-待装方案.md`
+- `docs/plans/34-trae-agent-烟测报告-2026-06-23.md`
+- `PLANS.md` / `PLANS_INDEX.md`
