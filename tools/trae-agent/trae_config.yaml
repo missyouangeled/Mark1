@@ -1,0 +1,29 @@
+agents:
+  trae_agent:
+    enable_lakeview: false
+    model: trae_agent_model
+    max_steps: 30
+    tools:
+      - bash
+      - str_replace_based_edit_tool
+      - sequentialthinking
+      - task_done
+
+model_providers:
+  openrouter:
+    # API key 通过环境变量 OPENROUTER_API_KEY 注入（见 .env.example）
+    # trae-agent 看到 api_key 为空时会自动读环境变量
+    api_key: ""
+    provider: openrouter
+    base_url: "https://openrouter.ai/api/v1"
+
+models:
+  trae_agent_model:
+    model_provider: openrouter
+    model: openai/gpt-oss-120b:free
+    max_tokens: 4096
+    temperature: 0.3
+    top_p: 1
+    top_k: 0
+    max_retries: 5
+    parallel_tool_calls: true

@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-06-23
+
+### ✅ 配置：trae-agent 接通 OpenRouter + GPT-OSS-120B Free
+- **时间**：2026-06-23 17:21 CST
+- **触发**：点点给 trae-agent 配 OpenRouter API key（刚申请的真 key）
+- **关键转折**：原配置 key `sk-cf2…9fa9`（35 字符 OpenAI 格式，非 OpenRouter）→ 401 Missing Authentication header；后改 `***` → 404（:free 限流）
+- **最终方案**：模型改成 `openai/gpt-oss-120b:free`（OpenAI 官方开源，120B，OpenRouter 0$/M prompt+completion，1M context）
+- **备选测试**（都不限流的免费模型）：
+  - ✅ `openai/gpt-oss-120b:free`（3.6s）— 选这个
+  - ✅ `nvidia/nemotron-3-super-120b-a12b:free`（1.3s，但中文啰嗦）
+  - ❌ `qwen/qwen3-coder:free`（41-58s 后 429 Venice 限流）
+  - ❌ `meta-llama/llama-3.3-70b-instruct:free`（41s 后 429）
+- **烟测结果**：`trae-cli run "写 hello.py"` → 5 步、13474 tokens、Success ✅、hello.py 真写出来
+- **配置位置**：`~/trae-agent/trae_config.yaml`（api_key 73 字符 sk-or-v1-... 完整真 key，未 mask）+ `~/trae-agent/.env`（chmod 600 备份）
+- **.gitignore**：`.env` 已在 ignore 列表，trae_config.yaml 未 tracked（untracked 状态）
+- **备注**：trae-agent 启动命令 `source ~/trae-agent/.venv/bin/activate && trae-cli run "任务"`；总费用 = $0；OpenRouter 控制台 `https://openrouter.ai/activity` 实时看
+
+---
+
 ## 2026-06-18
 
 ### ✅ 安装：Agent Reach v1.5.0
