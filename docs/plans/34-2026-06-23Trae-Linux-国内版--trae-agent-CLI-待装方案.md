@@ -1,7 +1,7 @@
-# Trae Linux 国内版 + trae-agent CLI — 待装方案
+# Trae Linux 国内版 + trae-agent CLI — 安装记录
 
-- **日期**：2026-06-23 讨论
-- **状态**：`装上 trae-agent` — CLI 装好、烟测通过；Trae IDE 本体未装
+- **日期**：2026-06-23 实装
+- **状态**：`已装-部分` — trae-cli 0.1.0 装好、烟测 2/2 通过；Trae IDE 本体未装（备而未装）
 - **标签**：`IDE`, `Trae`, `trae-agent`, `代码生成`, `Linux`, `国产AI`, `已装-部分`
 
 ## 0. 为什么是这份方案
@@ -25,19 +25,19 @@
 
 ### 1.2 trae-agent 是什么（关键）
 
-- 字节开源的 **Trae 命令行版**，GitHub: `bytedance/trae-agent`（⭐ 4k+）
+- 字节开源的 **Trae 命令行版**，GitHub: `bytedance/trae-agent`（⭐ **11.7k**、fork **1.3k**，2026-06-22 验证）
 - 让 AI Agent **在 CLI 里完成工程任务**
 - 支持 YAML 配置 + CLI 参数 + 环境变量
 - 内置 OpenRouter 兼容 base_url，**可走 DeepSeek API**
-- **贾维斯能调它**（`exec` 工具直接跑 `trae-agent "任务"`）
-- **PyPI 上没有同名包** —— 必须**源码装**：`pip install git+https://github.com/bytedance/trae-agent`
+- **贾维斯能调它**（`exec` 工具直接跑 `trae-cli "任务"`）
+- **PyPI 上没有同名包** —— 仓库没 `setup.py`，**必须源码装**：`git clone + uv sync`
 
 ### 1.3 Trae IDE 本身能被自动控制吗？
 
 - ❌ **不能完全无人值守**
 - 没有 Headless API（不像 Claude Code 有 `claude --print`）
 - 没有真正的"无头模式"（Electron GUI 必须有显示）
-- 自动化能力**只在 trae-agent CLI 里**（不是 Trae IDE 本身）
+- 自动化能力**只在 trae-cli 里**（不是 Trae IDE 本身）
 
 ## 2. 安装环境确认
 
@@ -45,7 +45,7 @@
 - **桌面**：GNOME + Wayland + Xwayland 已经在跑（PID 2943）
 - **架构**：x86_64
 - **DISPLAY 变量**：当前 shell 上下文是空（exec 通道），但桌面 GUI session 有显示
-- **结论**：✅ **Trae IDE 能起来**（有图形栈）；✅ **trae-agent CLI 也能跑**（纯 CLI 不需要显示）
+- **结论**：✅ **Trae IDE 能起来**（有图形栈）；✅ **trae-cli 也能跑**（纯 CLI 不需要显示）
 
 ## 3. 完整安装方案
 
@@ -124,13 +124,13 @@ agents:
 model_providers:
   deepseek:
     api_key: "YOUR_DEEPSEEK_API_KEY"
-    provider: openai
+    provider: openrouter   # ← 关键：用 openrouter 触发 chat.completions 端点，否则 404
     base_url: "https://api.deepseek.com/v1"
 
 models:
   trae_agent_model:
     model_provider: deepseek
-    model: deepseek-chat
+    model: deepseek-v4-flash
     max_tokens: 4096
     temperature: 0.3
     top_p: 1
@@ -213,24 +213,26 @@ exec trae-cli run "$@"
 
 **未装的**：
 
-- Trae IDE 本体（**桌面 GUI 应用，本案不装**）
-- Trae 账号（trae.cn 国际版未注册，国内版账号未填）
-- DEEPSEEK_API_KEY（**需要在 trae_config.yaml 里填**）
+- Trae IDE 本体（**桌面 GUI 应用，备而未装**）
+- Trae 账号（**以后要装 IDE 时再注册**）
 
-**待填的**：
+**已装的（2026-06-23 10:38~10:55）**：
 
-1. 打开 `~/trae-agent/trae_config.yaml`
-2. 把 `YOUR_DEEPSEEK_API_KEY_HERE` 换成真的 `sk-...`
-3. 跑 `cd ~/trae-agent && source .venv/bin/activate && trae-cli show-config`
-4. 跑一次真的烟测：`trae-cli run "在当前目录写一个 hello.py，打印 'Hello from Trae'"`
+- trae-agent 0.1.0（`/home/missyouangeled/trae-agent/`）
+- trae-cli 命令（`~/trae-agent/.venv/bin/trae-cli`）
+- trae_config.yaml（**已含真 key，走 DeepSeek V4 Flash + provider: openrouter**）
+- jarvis-trae.sh wrapper（供贾维斯 exec 调）
+- hello.html（烟测产物）
 
 ## 8. 备查清单
 
 - [x] `git ls-remote https://github.com/bytedance/trae-agent` 验证仓库存在 ✅
+- [x] `uv sync --all-extras` 装好 trae-agent==0.1.0 ✅
+- [x] trae_config.yaml 配好（DeepSeek V4 Flash + openrouter） ✅
+- [x] trae-cli 烟测 2/2 通过（生成 + 修改 hello.html）✅
+- [x] jarvis-trae.sh wrapper 写好 ✅
 - [ ] `trae.cn` 注册账号（如果以后要装 Trae IDE）
-- [ ] 填 `DEEPSEEK_API_KEY` 到 trae_config.yaml
-- [ ] 跑一次真烟测
-- [ ] 把 hello.py 删了
+- [ ] 把 trae_config.yaml 里的真 key 移到环境变量（**P0 安全改进**）
 
 ## 9. 不装 Trae IDE 的理由（什么时候才该装）
 
