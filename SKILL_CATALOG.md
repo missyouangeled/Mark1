@@ -67,6 +67,7 @@
 | `humanizer-zh` | 中文去 AI 痕迹 |
 | `find-skills` | 搜索安装 Skill |
 | `clawhub` | Skill 注册表管理 |
+| `trae-agent-engineering` | trae-cli 工程任务标准调用流程（多文件重构/加功能/跑测试） |
 
 ## ⚙️ 系统
 | Skill | 用途 |
@@ -85,4 +86,4 @@
 | `ponytail` | 极简代码审查 |
 | `huashu-nuwa` | 女娲 AI |
 
-> 匹配规则：用途明显落入 Skill 范围时，先读 SKILL.md 再执行。共 30+ Skill · 更新于 2026-06-22
+> 匹配规则：用途明显落入 Skill 范围时，先读 SKILL.md 再执行。共 31+ Skill · 更新于 2026-06-23
