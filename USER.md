@@ -8,6 +8,7 @@ _Learn about the person you're helping. Update this as you go._
 - **Birthday:** 1991年11月29日
 - **Timezone:** Asia/Shanghai (UTC+8)
 - **Notes:** 习惯用"点点"自称，日常聊天中优先以此称呼
+- **上下班时间:** 9:00 上班 / 18:00 下班（一般提前到，~8:30 已经在公司了）
 
 ## Context
 
