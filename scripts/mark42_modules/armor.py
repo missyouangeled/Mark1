@@ -18,6 +18,8 @@ from .config import (
     # 阶段 1: 压缩算法常量 (2026-06-24)
     ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
     ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
+    # 阶段 1 Day 4: 调度器接入控制 (2026-06-24)
+    ALGO_USE_SCHEDULER, ALGO_PII_ENABLED, ALGO_FAIL_SAFE,
 )
 from .utils import (
     _append_broker, _find_active_session, _get_context_window, _load_json,
@@ -32,6 +34,15 @@ try:
 except ImportError as e:
     _COMPRESSION_AVAILABLE = False
     _COMPRESSION_IMPORT_ERROR = str(e)
+
+# 阶段 1 Day 4: 算法调度器 (2026-06-24)
+# 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
+try:
+    from .algo_scheduler import process as algo_scheduler_process, decide as algo_scheduler_decide
+    _SCHEDULER_AVAILABLE = True
+except ImportError as e:
+    _SCHEDULER_AVAILABLE = False
+    _SCHEDULER_IMPORT_ERROR = str(e)
 
 
 def armor_check() -> dict[str, Any]:
@@ -254,8 +265,13 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
                             dry_run: bool = False) -> dict[str, Any]:
-    """压缩前 hook: 对 session 尾部消息跑借鉴算法
-    阶段 1 (2026-06-24): 只启用 SmartCrusher
+    """压缩前 hook: 对 session 尾部消息跑压缩算法。
+
+    阶段 1 Day 1 (2026-06-24 上午): 只启用 SmartCrusher
+    阶段 1 Day 4 (2026-06-24 下午): 默认走 algo_scheduler
+        - 调度器提供：大小分层、PII 脱敏、压缩护栏、fail-safe
+        - 可通过 MARK42_ALGO_USE_SCHEDULER=false 退回旧路径
+
     - 默认 disabled, 需 env MARK42_ALGO_SMARTCRUSH=true 或 config 启用
     - dry_run=True 永远不修改数据, 只报告能压缩多少
     - 失败静默 (返回 stats with error)
@@ -264,10 +280,14 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
         "enabled": False,
         "ran": False,
         "algorithm": None,
+        "mode": None,               # "scheduler" | "direct" (Day 4)
         "filesProcessed": 0,
         "totalOriginalBytes": 0,
         "totalCrushedBytes": 0,
         "overallRatio": 0.0,
+        "piiRedactions": 0,
+        "decisionsByBucket": {},    # {"tiny": 0, "small": 0, ...}
+        "fallbackCount": 0,
         "error": None,
     }
 
@@ -278,16 +298,117 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
         return stats
     if not ALGO_EXPERIMENT_MODE:
         return stats
-    if dry_run:
-        # dry_run 模式总是跑, 报告会能压缩多少
-        pass
 
+    # ── Day 4 路径选择 ──
+    # MARK42_ALGO_USE_SCHEDULER=true (默认) 走 algo_scheduler.process()
+    # 获得：大小分层 + PII 脱敏 + 压缩护栏 + fail-safe
+    # false 走原始 SmartCrusher 直接压缩 (回退路径)
+    use_scheduler = (
+        ALGO_USE_SCHEDULER
+        and _SCHEDULER_AVAILABLE
+    )
+
+    if use_scheduler:
+        return _hook_via_scheduler(session_messages, stats, dry_run=dry_run)
+    else:
+        return _hook_direct_smartcrush(session_messages, stats, dry_run=dry_run)
+
+
+def _hook_via_scheduler(session_messages: list[dict[str, Any]],
+                         stats: dict[str, Any],
+                         dry_run: bool = False) -> dict[str, Any]:
+    """Day 4 调度器路径: PII 脱敏 + 大小分层 + 压缩护栏 + fail-safe。"""
     stats["enabled"] = True
-    stats["algorithm"] = "smartcrush"
+    stats["mode"] = "scheduler"
+    stats["algorithm"] = "algo_scheduler"
+
+    if not _SCHEDULER_AVAILABLE:
+        stats["error"] = (
+            f"scheduler not available: {_SCHEDULER_IMPORT_ERROR}. "
+            f"set MARK42_ALGO_USE_SCHEDULER=false to fallback."
+        )
+        if not ALGO_FAIL_SAFE:
+            raise RuntimeError(stats["error"])
+        return stats
 
     try:
         for msg in session_messages:
             # 只处理 message 类型 + content 为字符串
+            if msg.get("type") != "message":
+                continue
+            content = msg.get("message", {}).get("content", "")
+            if not isinstance(content, str):
+                continue
+
+            # 调度决策 (记录分布)
+            decision = algo_scheduler_decide(content)
+            bucket = decision.size_bucket
+            stats["decisionsByBucket"][bucket] = (
+                stats["decisionsByBucket"].get(bucket, 0) + 1
+            )
+
+            # dry_run 跳过实际处理, 只记录决策
+            if dry_run:
+                continue
+
+            # 调度处理
+            result = algo_scheduler_process(content)
+            stats["filesProcessed"] += 1
+            stats["totalOriginalBytes"] += len(content.encode('utf-8'))
+
+            # PII 脱敏统计
+            pii_stats = result.get("pii_stats")
+            if pii_stats:
+                stats["piiRedactions"] += pii_stats.get("total_redactions", 0)
+
+            # 护栏回退记录
+            if result.get("fallback_reason"):
+                stats["fallbackCount"] += 1
+                # fail-safe: 回退到原文
+                final_content = content
+            else:
+                final_content = result.get("result", content)
+
+            stats["totalCrushedBytes"] += len(final_content.encode('utf-8'))
+
+        if stats["totalOriginalBytes"] > 0:
+            stats["overallRatio"] = 1.0 - (
+                stats["totalCrushedBytes"] / stats["totalOriginalBytes"]
+            )
+        stats["ran"] = True
+
+        if stats["filesProcessed"] > 0:
+            pii_info = f" | PII: {stats['piiRedactions']}" if stats["piiRedactions"] else ""
+            fb_info = f" | 回退: {stats['fallbackCount']}" if stats["fallbackCount"] else ""
+            print(
+                f"🧪 算法调度器: {stats['filesProcessed']} 条 | "
+                f"压缩率 {stats['overallRatio']*100:.1f}% | "
+                f"桶分布 {stats['decisionsByBucket']}"
+                f"{pii_info}{fb_info}"
+            )
+
+    except Exception as e:
+        stats["error"] = f"scheduler failed: {e}"
+        # fail-safe 路径: 记录尝试 (ran=True) 但不实际处理
+        stats["ran"] = True
+        if ALGO_FAIL_SAFE:
+            print(f"⚠️ compression scheduler error (fail-safe 返回原文): {e}")
+        else:
+            raise
+
+    return stats
+
+
+def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
+                             stats: dict[str, Any],
+                             dry_run: bool = False) -> dict[str, Any]:
+    """Day 1-3 原始路径: 直接调 SmartCrusher, 无 PII / 无护栏。"""
+    stats["enabled"] = True
+    stats["mode"] = "direct"
+    stats["algorithm"] = "smartcrush"
+
+    try:
+        for msg in session_messages:
             if msg.get("type") != "message":
                 continue
             content = msg.get("message", {}).get("content", "")
@@ -308,9 +429,11 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
         stats["ran"] = True
 
         if stats["filesProcessed"] > 0:
-            print(f"🧪 SmartCrusher 实验: {stats['filesProcessed']} 条消息 | "
-                  f"压缩率 {stats['overallRatio']*100:.1f}% | "
-                  f"节省 {stats['totalOriginalBytes'] - stats['totalCrushedBytes']} bytes")
+            print(
+                f"🧪 SmartCrusher 直接路径: {stats['filesProcessed']} 条消息 | "
+                f"压缩率 {stats['overallRatio']*100:.1f}% | "
+                f"节省 {stats['totalOriginalBytes'] - stats['totalCrushedBytes']} bytes"
+            )
 
     except Exception as e:
         stats["error"] = f"smartcrush failed: {e}"

@@ -86,6 +86,23 @@ ALGO_EXPERIMENT_MODE = os.environ.get("MARK42_ALGO_EXPERIMENT", "false").lower()
 # 压缩算法历史记录 (与 armor/actions.jsonl 同目录)
 ALGO_HISTORY_DIR = ARMOR_STATE / "algo_history"
 
+# ── 阶段 1 Day 4: 算法调度器接入控制 (2026-06-24) ──
+# ALGO_USE_SCHEDULER: 是否让 armor_pre_compact_hook 走 algo_scheduler.process()
+#                     而不是直接调 SmartCrusher。
+#                     True = 走调度器（获得 PII 脱敏 + 大小分层 + 压缩护栏）。
+#                     False = 直接调 SmartCrusher（Day 1-3 原始路径，仅供回退）。
+ALGO_USE_SCHEDULER = os.environ.get("MARK42_ALGO_USE_SCHEDULER", "true").lower() == "true"
+
+# ALGO_PII_ENABLED: 调度器内 PII 脱敏总开关。
+#                   True = 压缩前自动脱敏邮箱/手机/身份证/信用卡/API key 等。
+#                   False = 跳过脱敏（仅当确认数据安全时使用）。
+ALGO_PII_ENABLED = os.environ.get("MARK42_ALGO_PII", "true").lower() == "true"
+
+# ALGO_FAIL_SAFE: 调度器出错时是否回退到原文。
+#                True = 错误静默返回原文（生产推荐）。
+#                False = 错误抛出（调试用）。
+ALGO_FAIL_SAFE = os.environ.get("MARK42_ALGO_FAIL_SAFE", "true").lower() == "true"
+
 # ── 统一模型配置表 ─────────────────────────────────────
 # Mark42 所有 AI 模型调用必须从此表读取，禁止在各模块硬编码模型名/参数。
 

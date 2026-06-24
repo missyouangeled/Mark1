@@ -9,6 +9,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -37,9 +38,9 @@ def err(label: str, detail: str = ""):
         print(f"      {detail}")
 
 
-def run(cmd: list[str], timeout: int = 15) -> tuple[int, str, str]:
+def run(cmd: list[str], timeout: int = 15, env: dict | None = None) -> tuple[int, str, str]:
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         return p.returncode, p.stdout, p.stderr
     except subprocess.TimeoutExpired:
         return -1, "", "TIMEOUT"
@@ -128,6 +129,23 @@ def test_session_fence():
         ok("session_fence 测试")
     else:
         err("session_fence 测试", stderr.strip() or out.strip()[-300:])
+
+
+def test_day4_integration():
+    """阶段 1 Day 4: 算法调度器接入 armor 集成测试"""
+    print("\n🔗 Day 4 集成 (algo_scheduler 接入 armor)")
+    env = os.environ.copy()
+    env["MARK42_ALGO_SMARTCRUSH"] = "true"
+    env["MARK42_ALGO_EXPERIMENT"] = "true"
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "test_day4_integration.py")],
+        timeout=60,
+        env=env,
+    )
+    if code == 0 and "0 失败" in out:
+        ok("Day 4 集成测试")
+    else:
+        err("Day 4 集成测试", stderr.strip() or out.strip()[-500:])
 
 
 def test_syntax():
@@ -345,6 +363,8 @@ def main():
     test_pii_redactor()
     test_algo_scheduler()
     test_session_fence()
+    # 阶段 1 Day 4 集成
+    test_day4_integration()
 
     if args.status:
         test_status()

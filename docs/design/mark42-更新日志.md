@@ -250,3 +250,69 @@
 3. **PII 脱敏**：LLM 调用前必走 `redact_pii()`，默认启用
 4. **压缩护栏**：低压缩率 / 失败率都回退原文
 5. **fail-safe 原则**：所有压缩/脱敏错误都返回原文，永不让错误传播到 LLM
+
+---
+
+## 2026-06-24 下午 · 阶段 1 Day 4 完成：算法调度器接入 armor ✅
+
+### 改造目标
+把 Day 1-3 写的 `algo_scheduler` / `pii_redactor` 真正接到 `armor_pre_compact_hook` 主流程，
+不再让 Day 1-3 的代码是"孤立模块"。
+
+### 代码改动
+
+**`scripts/mark42_modules/config.py`**
+- 新增 `ALGO_USE_SCHEDULER`（默认 true）— 总开关
+- 新增 `ALGO_PII_ENABLED`（默认 true）— PII 总开关
+- 新增 `ALGO_FAIL_SAFE`（默认 true）— 出错回退原文
+
+**`scripts/mark42_modules/armor.py`**
+- import 调度器（`_SCHEDULER_AVAILABLE` 自检）
+- `armor_pre_compact_hook` 拆成两条路径：
+  - `_hook_via_scheduler()` — 新路径（默认）：PII + 大小分层 + 护栏 + fail-safe
+  - `_hook_direct_smartcrush()` — 旧路径（`MARK42_ALGO_USE_SCHEDULER=false` 退回）
+- 新增 stats 字段：
+  - `mode` — `"scheduler"` 或 `"direct"`
+  - `piiRedactions` — 脱敏命中数
+  - `decisionsByBucket` — `{tiny/small/medium/large}` 分布
+  - `fallbackCount` — 护栏回退次数
+
+**`scripts/mark42_modules/test_day4_integration.py`** （新文件）
+- 7 个集成场景：调度器路径 / dry_run / 大小分层 / 降级 / fail-safe / 双重门 / 端到端
+- 7/7 全绿
+
+**`scripts/mark42-tests.py`**
+- 新增 `test_day4_integration()` 钩子（带 env 注入）
+
+### 行为变化
+
+**之前**（Day 1-3）：
+- `armor_pre_compact_hook` 直接调 `smartcrush()`
+- 无 PII 脱敏 → 敏感信息直接送 LLM
+- 无大小分层 → 小内容也压（浪费时间）
+- 无护栏 → 压缩率低时仍强制写入
+- 错误时崩溃 → armor 守护退出
+
+**现在**（Day 4）：
+- 默认走 `algo_scheduler.process()` — 自动按内容大小分层
+- 中型以上内容**自动 PII 脱敏**（邮箱/手机/身份证/信用卡/API key 等 13 种）
+- 压缩率 < 10% → 自动回退原文
+- 压后 > 原文 80% → 自动回退原文
+- 任何错误 → fail-safe 静默回退，armor 守护不退出
+- `MARK42_ALGO_USE_SCHEDCRUSHER=false` 可一键退回旧路径
+
+### 烟测最终 (mark42-tests.py)
+
+| 模块 | 测试 | 状态 |
+|------|------|------|
+| 模块导入 | 12 个模块 | ✅ 全绿 |
+| 语法检查 | compileall | ✅ 零错误 |
+| CLI 入口 | mark42.py --help / status | ✅ v2.3.0 |
+| 关键文件 | config.json / loops.json (5 Loop) | ✅ |
+| 日志路径 | 5 个状态目录 | ✅ |
+| Day 1 压缩 | SmartCrusher 单元测试 | ✅ |
+| Day 2 PII | PIIRedactor 13 个测试 | ✅ |
+| Day 3 调度 | Scheduler 10 个测试 | ✅ |
+| Session Fence | 4 个 fence 安全测试 | ✅ |
+| **Day 4 集成** | **7 个集成场景** | ✅ |
+| **总计** | **27 通过 / 0 失败** | **✅ 全绿** |
