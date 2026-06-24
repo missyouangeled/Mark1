@@ -73,3 +73,10 @@
 ### AI 模型路由终极修复
 详见 `docs/通用-AI模型路由问题排查与修复手册.md`
 
+
+---
+
+## 🟡 待硬件方案（2026-06-24）
+
+### ds4 本地大模型推理引擎（antirez）
+详见 `docs/plans/ds4-local-inference.md`
