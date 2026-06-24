@@ -24,6 +24,64 @@ WARN_THRESHOLD=300  # 5 分钟心跳超时视为异常
 need_restart=""
 reason=""
 
+# ── 告警通知函数（去重 + 推送到当前 dashboard） ──
+NOTIFY_COOLDOWN_DIR="/tmp/mark42-watchdog-notify"
+ALERT_FILE="/tmp/mark42-watchdog-alert.txt"
+mkdir -p "$NOTIFY_COOLDOWN_DIR" 2>/dev/null || true
+
+notify_alert() {
+    local key="$1"
+    local msg="$2"
+    local cooldown_file="$NOTIFY_COOLDOWN_DIR/$key"
+    local now_epoch=$(date +%s)
+    # 1 小时去重
+    if [ -f "$cooldown_file" ]; then
+        local last=$(cat "$cooldown_file" 2>/dev/null || echo 0)
+        if [ $((now_epoch - last)) -lt 3600 ]; then
+            return 0  # 静默
+        fi
+    fi
+    echo "$now_epoch" > "$cooldown_file" 2>/dev/null || true
+    # 推送到 dashboard (失败不影响主流程)
+    echo -n "$msg" > "$ALERT_FILE" 2>/dev/null || true
+    python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-proactive-inject.py \
+        --source "mark42-watchdog" --file "$ALERT_FILE" >/dev/null 2>&1 || true
+}
+
+# ── 0. L2.5 嵌入索引健康检查（只告警，不重启 service） ──
+EMBED_INDEX="/mnt/data/openclaw/scratch/memory-embed-index/embeddings.npy"
+EMBED_MIN_BYTES=100000  # 100 KB 以下视为异常（正常 ~10 MB）
+if [ ! -f "$EMBED_INDEX" ]; then
+    log "🚨 L2.5 嵌入索引缺失: $EMBED_INDEX 不存在"
+    notify_alert "embed-missing" "🚨 记忆系统 L2.5 嵌入索引丢失了。点点的语义搜索会变哑，关键词搜索 (L1) 还能用。需要跑：memory-embed-index.py --force 重建"
+elif [ ! -s "$EMBED_INDEX" ]; then
+    log "🚨 L2.5 嵌入索引为空: $EMBED_INDEX 是 0 字节文件"
+    notify_alert "embed-empty" "🚨 记忆系统 L2.5 嵌入索引变成了 0 字节空文件。需要跑：memory-embed-index.py --force 重建"
+else
+    size=$(stat -c%s "$EMBED_INDEX" 2>/dev/null || echo 0)
+    if [ "$size" -lt "$EMBED_MIN_BYTES" ]; then
+        log "🚨 L2.5 嵌入索引过小: $EMBED_INDEX 只有 ${size} 字节 (阈值 ${EMBED_MIN_BYTES})"
+        notify_alert "embed-tiny" "🚨 记忆系统 L2.5 嵌入索引只有 ${size} 字节 (正常 ~10MB)。可能重建失败中断了，需要跑：memory-embed-index.py --force 重建"
+    fi
+fi
+
+# ── 0b. L1 MEMORY_INDEX 健康检查（只告警，不重启 service） ──
+MEMORY_INDEX="/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.json"
+MEMORY_INDEX_MIN_BYTES=10000  # 10 KB 以下视为异常（正常 ~260 KB）
+if [ ! -f "$MEMORY_INDEX" ]; then
+    log "🚨 L1 关键词索引缺失: $MEMORY_INDEX 不存在"
+    notify_alert "l1-missing" "🚨 记忆系统 L1 关键词索引丢失了。点点的记忆快搜会完全失灵。需要跑：memory-index-builder.py 重建"
+elif [ ! -s "$MEMORY_INDEX" ]; then
+    log "🚨 L1 关键词索引为空: $MEMORY_INDEX 是 0 字节文件"
+    notify_alert "l1-empty" "🚨 记忆系统 L1 关键词索引变成了 0 字节空文件。需要跑：memory-index-builder.py 重建"
+else
+    size=$(stat -c%s "$MEMORY_INDEX" 2>/dev/null || echo 0)
+    if [ "$size" -lt "$MEMORY_INDEX_MIN_BYTES" ]; then
+        log "🚨 L1 关键词索引过小: $MEMORY_INDEX 只有 ${size} 字节 (阈值 ${MEMORY_INDEX_MIN_BYTES})"
+        notify_alert "l1-tiny" "🚨 记忆系统 L1 关键词索引只有 ${size} 字节 (正常 ~2.2MB)。需要跑：memory-index-builder.py 重建"
+    fi
+fi
+
 # ── 1. 心跳超时检查 ──
 if [ -f "$HEARTBEAT" ]; then
     last_tick=$(python3 -c "
