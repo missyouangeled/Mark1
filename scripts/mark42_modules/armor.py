@@ -15,11 +15,23 @@ from .config import (
     ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
     DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
+    # 阶段 1: 压缩算法常量 (2026-06-24)
+    ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
+    ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
 )
 from .utils import (
     _append_broker, _find_active_session, _get_context_window, _load_json,
     _now_iso, _now_ts, _save_json,
 )
+
+# 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
+# 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
+try:
+    from .compression_algorithms import smartcrush
+    _COMPRESSION_AVAILABLE = True
+except ImportError as e:
+    _COMPRESSION_AVAILABLE = False
+    _COMPRESSION_IMPORT_ERROR = str(e)
 
 
 def armor_check() -> dict[str, Any]:
@@ -240,6 +252,73 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         return None
 
 
+def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
+                            dry_run: bool = False) -> dict[str, Any]:
+    """压缩前 hook: 对 session 尾部消息跑借鉴算法
+    阶段 1 (2026-06-24): 只启用 SmartCrusher
+    - 默认 disabled, 需 env MARK42_ALGO_SMARTCRUSH=true 或 config 启用
+    - dry_run=True 永远不修改数据, 只报告能压缩多少
+    - 失败静默 (返回 stats with error)
+    """
+    stats = {
+        "enabled": False,
+        "ran": False,
+        "algorithm": None,
+        "filesProcessed": 0,
+        "totalOriginalBytes": 0,
+        "totalCrushedBytes": 0,
+        "overallRatio": 0.0,
+        "error": None,
+    }
+
+    # 1. 双重门: module 是否可用 + 配置是否启用 + 实验模式是否开启
+    if not _COMPRESSION_AVAILABLE:
+        return stats
+    if not ALGO_SMARTCRUSH_ENABLED:
+        return stats
+    if not ALGO_EXPERIMENT_MODE:
+        return stats
+    if dry_run:
+        # dry_run 模式总是跑, 报告会能压缩多少
+        pass
+
+    stats["enabled"] = True
+    stats["algorithm"] = "smartcrush"
+
+    try:
+        for msg in session_messages:
+            # 只处理 message 类型 + content 为字符串
+            if msg.get("type") != "message":
+                continue
+            content = msg.get("message", {}).get("content", "")
+            if not isinstance(content, str):
+                continue
+            if len(content.encode('utf-8')) < ALGO_SMARTCRUSH_MIN_CONTENT_SIZE:
+                continue
+
+            crushed, cstats = smartcrush(content)
+            stats["filesProcessed"] += 1
+            stats["totalOriginalBytes"] += cstats.get("original_bytes", 0)
+            stats["totalCrushedBytes"] += cstats.get("crushed_bytes", 0)
+
+        if stats["totalOriginalBytes"] > 0:
+            stats["overallRatio"] = 1.0 - (
+                stats["totalCrushedBytes"] / stats["totalOriginalBytes"]
+            )
+        stats["ran"] = True
+
+        if stats["filesProcessed"] > 0:
+            print(f"🧪 SmartCrusher 实验: {stats['filesProcessed']} 条消息 | "
+                  f"压缩率 {stats['overallRatio']*100:.1f}% | "
+                  f"节省 {stats['totalOriginalBytes'] - stats['totalCrushedBytes']} bytes")
+
+    except Exception as e:
+        stats["error"] = f"smartcrush failed: {e}"
+        print(f"⚠️ compression hook error: {e}")
+
+    return stats
+
+
 def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     """触发智能压缩 — LLM 优先，启发式回退。
     正常模式：usage < WARN 阈值时跳过。
@@ -251,6 +330,10 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         return {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {THRESHOLD_WARN}%", "check": check}
     active = _find_active_session()
     session_messages = _read_session_tail(active) if active else []
+
+    # 阶段 1: 压缩算法 hook (默认 disabled, 需 env 启用)
+    algo_stats = armor_pre_compact_hook(session_messages, dry_run=dry_run)
+
     llm_result = _llm_analyze(session_messages) if session_messages else None
     if llm_result:
         index = {
@@ -264,6 +347,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             "strategyUsed": "llm-analyze",
             "recommendedAction": llm_result.get("suggestedAction", "monitor"),
             "llmMeta": llm_result.get("_llm_meta", {}),
+            "algoStats": algo_stats,
         }
         print(f"🧠 LLM 分析完成 (model: {llm_result.get('_llm_meta', {}).get('model', '?')})")
     else:
@@ -294,6 +378,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             "degradationDetected": degradation,
             "strategyUsed": "heuristic-classify",
             "recommendedAction": "/compact" if usage >= THRESHOLD_ALERT else "monitor",
+            "algoStats": algo_stats,
         }
         print("⚠️ LLM 不可用，回退到启发式分析")
     index_path = ARMOR_STATE / "memory-index.json"

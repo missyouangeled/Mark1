@@ -69,6 +69,23 @@ MAX_ACTIONS_LINES = 500
 MAX_DAEMON_LOG_MB = 50  # 单个 daemon 日志最大 50MB，超额截尾
 MAX_DAEMON_LOG_LINES = 10000  # 单文件最大 10000 行
 
+# ── 压缩算法配置 (阶段 1, 借鉴 Headroom) ──────────
+# 2026-06-24 新增: 详见 docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
+# 默认全部 enabled=false (实验模式), 需手动开
+
+ALGO_SMARTCRUSH_ENABLED = os.environ.get("MARK42_ALGO_SMARTCRUSH", "false").lower() == "true"
+ALGO_SMARTCRUSH_MAX_ARRAY_LEN = 5
+ALGO_SMARTCRUSH_MAX_STRING_LEN = 200
+ALGO_SMARTCRUSH_MAX_DEPTH = 3
+ALGO_SMARTCRUSH_MAX_NUMERIC_ARRAY_LEN = 50
+ALGO_SMARTCRUSH_MIN_CONTENT_SIZE = 1024  # 只处理 > 1KB 的内容
+
+# 实验模式总开关: --experiment=true 才走压缩算法
+ALGO_EXPERIMENT_MODE = os.environ.get("MARK42_ALGO_EXPERIMENT", "false").lower() == "true"
+
+# 压缩算法历史记录 (与 armor/actions.jsonl 同目录)
+ALGO_HISTORY_DIR = ARMOR_STATE / "algo_history"
+
 # ── 统一模型配置表 ─────────────────────────────────────
 # Mark42 所有 AI 模型调用必须从此表读取，禁止在各模块硬编码模型名/参数。
 
