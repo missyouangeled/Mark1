@@ -84,3 +84,8 @@
 ### VoxCPM 本地 TTS（OpenBMB）
 详见 `docs/plans/voxcpm-tts.md`
 **状态**：🟢 可部署（点点电脑能跑但性能受限，建议先跑 0.5B INT8）
+
+### mattpocock/skills 集成
+详见 `docs/plans/mattpocock-skills.md`
+**状态**：🟢 部分实装（/grilling / /tdd / /to-prd 都装上，前 2 个可用，/to-prd publish 步骤残缺）
+**生态**：用 Vercel Labs `npx skills` CLI，但实际最干净的方式是直接 cp 到 workspace/skills/

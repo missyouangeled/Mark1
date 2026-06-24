@@ -18,6 +18,7 @@
 | 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物, #34 Trae Linux |
 | 本地推理/AI | ds4 (antirez DeepSeek V4 Flash)
 | TTS/语音合成 | VoxCPM (OpenBMB tokenizer-free)
+| Skill 库 / Agent 生态 | mattpocock/skills (Vercel Labs  生态)
 
 ## 文件结构
 
