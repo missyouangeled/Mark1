@@ -17,6 +17,7 @@
 | 视觉 | #21 视觉识别, #18 陪看片 |
 | 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物, #34 Trae Linux |
 | 本地推理/AI | ds4 (antirez DeepSeek V4 Flash)
+| TTS/语音合成 | VoxCPM (OpenBMB tokenizer-free)
 
 ## 文件结构
 

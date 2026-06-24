@@ -80,3 +80,7 @@
 
 ### ds4 本地大模型推理引擎（antirez）
 详见 `docs/plans/ds4-local-inference.md`
+
+### VoxCPM 本地 TTS（OpenBMB）
+详见 `docs/plans/voxcpm-tts.md`
+**状态**：🟢 可部署（点点电脑能跑但性能受限，建议先跑 0.5B INT8）
