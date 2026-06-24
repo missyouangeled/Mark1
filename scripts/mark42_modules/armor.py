@@ -411,23 +411,49 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                    f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
                    {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
                     "modelGenerated": index.get('modelGenerated', False)})
-    # ── 实际压缩：写入 /compact 消息到会话 transcript 触发 OpenClaw 内部压缩 ──
+    # ── 实际压缩：通过 OpenClaw 合法 CLI 通道触发 /compact ──
+    # 修复 (2026-06-24): 不再直接写 active session 文件！
+    # 直接写文件会触发 sessionFileFenceKey 检测 (EmbeddedAttemptSessionTakeoverError)，
+    # 因为 OpenClaw 进程内的 ownedSessionFileWrites map 不会记录外部写入，
+    # 接管时会判为 session 已被外部篡改 → 抛 takeover 错误。
+    # 改用 `openclaw agent --message /compact` 让 OpenClaw 自己处理。
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
             active_session = _find_active_session()
             if active_session:
-                compact_msg = json.dumps({
-                    "type": "message",
-                    "message": {"role": "user", "content": "/compact"},
-                    "ts": _now_iso()
-                }, ensure_ascii=False)
-                with open(active_session, "a") as sf:
-                    sf.write(compact_msg + "\n")
-                print(f"🧹 已注入 /compact 命令到会话: {active_session.name}")
-                index["compactTriggered"] = True
+                # 通过合法 CLI 通道触发 /compact 命令
+                # OpenClaw 会走标准 user message → 命令识别 → preflightCompaction 流程
+                result = subprocess.run(
+                    [
+                        "openclaw", "agent",
+                        "--message", "/compact",
+                        "--session-key", "agent:main:main",
+                        "--timeout", "120",
+                        "--json",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                )
+                if result.returncode == 0:
+                    print(f"🧹 通过 openclaw agent CLI 触发 /compact: {active_session.name}")
+                    index["compactTriggered"] = True
+                    index["compactMethod"] = "openclaw-cli"
+                else:
+                    print(f"⚠️ openclaw agent 调用失败 (rc={result.returncode}): {result.stderr[:200]}")
+                    index["compactTriggered"] = False
+                    index["compactError"] = result.stderr[:200]
             else:
                 print("⚠️ 未找到活跃会话，跳过 compact")
                 index["compactTriggered"] = False
+        except subprocess.TimeoutExpired:
+            print("⚠️ openclaw agent 调用超时（180s）")
+            index["compactTriggered"] = False
+            index["compactError"] = "timeout"
+        except FileNotFoundError:
+            print("⚠️ openclaw 命令未找到，回退到只生成记忆索引（OpenClaw 自动 preflightCompaction 会接管）")
+            index["compactTriggered"] = False
+            index["compactError"] = "openclaw-not-found"
         except Exception as e:
             print(f"⚠️ compact 触发失败: {e}")
             index["compactTriggered"] = False

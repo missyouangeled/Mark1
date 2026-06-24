@@ -180,3 +180,73 @@
 - 烟测：assemble 启动双守护 → 心跳文件 30s 写入 → SIGTERM 优雅关闭 → 零残留 ✅
 - 语法：全部 6 个修改文件通过 `ast.parse` ✅
 - 公共函数：`_list_project_files` 在 heavy 三处统一调用
+
+---
+
+## 2026-06-24 下午 · Session Fence 冲突修复 + 阶段 1 完整落地
+
+### 13:49 Session Fence 故障 ⚠️ → 14:30 修复 ✅
+
+**故障**：`Agent failed before reply: session file changed while embedded prompt lock was released`
+
+**根因**：`armor.py:413-427` 用 `open(active_session, "a")` + `write()` 直接向 active session 注入 `/compact` 命令。
+但 OpenClaw 用 `sessionFileFenceKey` + `fenceGeneration` + fingerprint 机制保护 active session，
+外部进程写入会触发 `EmbeddedAttemptSessionTakeoverError`——
+因为 OpenClaw 进程内的 `ownedSessionFileWrites` map（`globalThis` 单例）不会记录外部进程写入。
+
+**路径评估**：
+- ❌ 路径 A（lock file + owner flag）：`isOpenClawSessionOwnerArgv` 会拒绝非 OpenClaw 进程
+- ❌ 路径 B（HTTP/Unix socket IPC）：OpenClaw 未暴露 IPC server
+- ✅ 路径 C（合规 CLI 通道）：`openclaw agent --message "/compact" --session-key agent:main:main`
+
+**修复**：
+- `armor.py:413-435` 重写：移除 `open(active_session, "a")`，改用 `subprocess.run(["openclaw", "agent", "--message", "/compact", "--session-key", "agent:main:main", "--timeout", "120", "--json"])`
+- 新增 `scripts/mark42_modules/session_fence_safe.py` 提供：
+  - `trigger_compact_via_cli()`：合规 CLI 触发压缩
+  - `write_shadow_note()` / `append_shadow_log()`：shadow 文件写入（绝对不碰 active session）
+  - `fence_self_check()`：模块导入时自检，4 项检查全绿
+- 新增 `scripts/mark42_modules/test_session_fence.py` 专项测试 4 项全绿
+
+### 阶段 1 Day 2: PII 脱敏 ✅
+
+新增 `scripts/mark42_modules/pii_redactor.py`：
+- 13 种 PII 类型：email / 中国手机 / 身份证 / 信用卡 (Luhn) / OpenAI key / GitHub token / Anthropic key / JWT / IPv4 / 敏感路径 / URL with token / 弱中文姓名
+- Luhn 算法验证信用卡号真伪
+- 支持字符串 + dict/list 递归脱敏
+- `local IP` (127.x / 0.0.0.0) 不误伤
+- **13/13 单元测试全绿**
+
+### 阶段 1 Day 3: 算法调度策略 ✅
+
+新增 `scripts/mark42_modules/algo_scheduler.py`：
+- 大小分层：tiny (skip) / small (1KB-10KB) / medium (10KB-100KB) / large (>100KB review)
+- 内容类型分流：JSON → SmartCrusher；纯文本 → 保留
+- 安全护栏：
+  - 压缩率 < 10% → 视为无效，回退原文
+  - 压缩后 > 原文 80% → 视为失败，回退原文
+  - 错误 → fail-safe 永远返回原文
+- 大内容自动启用 PII 脱敏
+- **10/10 单元测试全绿**
+
+### 烟测最终结果 (mark42-tests.py)
+
+| 模块 | 测试 | 状态 |
+|------|------|------|
+| 模块导入 | 12 个模块 | ✅ 全绿 |
+| 语法检查 | compileall | ✅ 零错误 |
+| CLI 入口 | mark42.py --help / status | ✅ v2.3.0 |
+| 关键文件 | config.json / loops.json (5 Loop) | ✅ |
+| 日志路径 | 5 个状态目录 | ✅ |
+| Day 1 压缩 | SmartCrusher 单元测试 | ✅ |
+| Day 2 PII | PIIRedactor 13 个测试 | ✅ |
+| Day 3 调度 | Scheduler 10 个测试 | ✅ |
+| Session Fence | 4 个 fence 安全测试 | ✅ |
+| **总计** | **26 通过 / 0 失败** | **✅ 全绿** |
+
+### 关键修复要点 (供未来参考)
+
+1. **绝对禁止** `open(active_session, "a")` 直接写入 — 必触发 fence 冲突
+2. **合法通道**：CLI (`openclaw agent --message <cmd>`) / shadow 文件 / system event
+3. **PII 脱敏**：LLM 调用前必走 `redact_pii()`，默认启用
+4. **压缩护栏**：低压缩率 / 失败率都回退原文
+5. **fail-safe 原则**：所有压缩/脱敏错误都返回原文，永不让错误传播到 LLM

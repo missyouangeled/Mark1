@@ -60,6 +60,10 @@ def test_imports():
         "engine",
         "heavy",
         "cli",
+        "compression_algorithms",
+        "pii_redactor",
+        "algo_scheduler",
+        "session_fence_safe",
     ]
     for m in modules:
         code, out, stderr = run(
@@ -72,6 +76,58 @@ def test_imports():
             ok(f"mark42_modules.{m}")
         else:
             err(f"mark42_modules.{m}", stderr.strip() or out.strip())
+
+
+def test_compression_algorithms():
+    """阶段 1 Day 1: SmartCrusher 压缩算法专项测试"""
+    print("\n🧪 压缩算法专项 (Day 1)")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "compression_algorithms.py")],
+        timeout=30,
+    )
+    if code == 0 and "通过" in out:
+        ok("SmartCrusher 单元测试")
+    else:
+        err("SmartCrusher 单元测试", stderr.strip() or out.strip()[-300:])
+
+
+def test_pii_redactor():
+    """阶段 1 Day 2: PII 脱敏专项测试"""
+    print("\n🔒 PII 脱敏专项 (Day 2)")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "pii_redactor.py")],
+        timeout=30,
+    )
+    if code == 0 and "通过" in out:
+        ok("PIIRedactor 单元测试")
+    else:
+        err("PIIRedactor 单元测试", stderr.strip() or out.strip()[-300:])
+
+
+def test_algo_scheduler():
+    """阶段 1 Day 3: 算法调度器专项测试"""
+    print("\n📊 算法调度器专项 (Day 3)")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "algo_scheduler.py")],
+        timeout=30,
+    )
+    if code == 0 and "通过" in out:
+        ok("AlgorithmScheduler 单元测试")
+    else:
+        err("AlgorithmScheduler 单元测试", stderr.strip() or out.strip()[-300:])
+
+
+def test_session_fence():
+    """Session Fence 安全测试"""
+    print("\n🚧 Session Fence 安全测试")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "test_session_fence.py")],
+        timeout=60,
+    )
+    if code == 0 and "通过" in out and "0 失败" in out:
+        ok("session_fence 测试")
+    else:
+        err("session_fence 测试", stderr.strip() or out.strip()[-300:])
 
 
 def test_syntax():
@@ -283,6 +339,12 @@ def main():
     test_cli()
     test_config_files()
     test_log_paths()
+
+    # 阶段 1 专项 (2026-06-24 Day 1-3)
+    test_compression_algorithms()
+    test_pii_redactor()
+    test_algo_scheduler()
+    test_session_fence()
 
     if args.status:
         test_status()
