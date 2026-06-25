@@ -1068,3 +1068,75 @@ LLM 异步入口调用 (daemon tick 不阻塞):
 - P0-1 + P0-2 已完成 (Day 10)
 - P1-3 + P1-4 + P2-5 + P2-6 + P2-7 路线清晰, 等新会话开干
 - mark42-tests.py 40/40 全绿
+
+---
+
+## Day 12 — 2026-06-25 (P1-4 + P2-5 完成)
+
+### 目标
+
+完成 2 个后续目标:
+- **P1-4**: SmartCrusher 拆独立模块
+- **P2-5**: text_compressor 词典扩展
+
+### 实施
+
+#### P1-4: SmartCrusher 拆独立模块 ✅
+
+**改动**:
+- 新建 `scripts/mark42_modules/smart_crusher.py`
+  - 含 `SmartCrusher` 类
+  - 含 `get_smartcrusher()` / `smartcrush()` API
+  - 自带 3 个单元测试 (`结果: 3 通过 / 0 失败`)
+- 重写 `scripts/mark42_modules/compression_algorithms.py`
+  - 仅保留 `RAGRanker`
+  - 变成单一职责文件
+- 更新 import:
+  - `scripts/mark42_modules/algo_scheduler.py`: `from smart_crusher import smartcrush`
+  - `scripts/mark42_modules/armor.py`: `from .smart_crusher import smartcrush`
+
+**结果**:
+- SmartCrusher 从合居文件拆出
+- `compression_algorithms.py` 只剩 `RAGRanker`
+- 所有集成测试仍 40/40 全绿
+
+#### P2-5: text_compressor 词典扩展 ✅
+
+**扩展**:
+- `REDUNDANT_PHRASES` 新增大量中文/英文冗余短语
+  - 中文: `换言之` / `具体来说` / `需要说明的是` / `下面我们来` 等
+  - 英文: `in conclusion` / `it is worth noting that` / `first and foremost` / `for instance` 等
+- `SYNONYMS` 新增大量保守同义词
+  - 中文: `采用→用` / `创建→建` / `删除→删` / `获取→拿` / `继续→接着`
+  - 英文: `approximately→about` / `subsequently→then` / `commence→start` / `facilitate→help`
+- 新增测试 12 / 13:
+  - 扩展词典命中
+  - 英文 filler / synonym
+
+**结果**:
+- `text_compressor.py` 测试 27 → **35 通过 / 0 失败**
+- `mark42-tests.py` 仍 **40/40 全绿**
+
+### 修改文件
+
+| 文件 | 操作 |
+|---|---|
+| `scripts/mark42_modules/smart_crusher.py` | 新建 |
+| `scripts/mark42_modules/compression_algorithms.py` | 重写 (只留 RAGRanker) |
+| `scripts/mark42_modules/algo_scheduler.py` | import 更新 |
+| `scripts/mark42_modules/armor.py` | import 更新 |
+| `scripts/mark42_modules/text_compressor.py` | 词典扩展 + 新增 2 组测试 |
+
+### 测试
+
+- `python3 scripts/mark42_modules/smart_crusher.py` → 3/3 通过
+- `python3 scripts/mark42_modules/compression_algorithms.py` → RAGRanker 自测通过
+- `python3 scripts/mark42_modules/text_compressor.py` → **35/35 通过**
+- `python3 scripts/mark42-tests.py` → **40/40 全绿**
+
+### 当前状态
+
+- P1-3 已完成
+- P1-4 已完成
+- P2-5 已完成
+- Phase 2 剩余: P2-6 (性能基准) / P2-7 (Heavy 集成)

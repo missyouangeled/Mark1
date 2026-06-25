@@ -55,6 +55,45 @@ REDUNDANT_PHRASES = [
     "接下来让我们",
     "让我来",
     "我们可以",
+    # 中文
+    "综上所述，",
+    "综上所述 ",
+    "总的来说，",
+    "总的来说 ",
+    "总的来讲，",
+    "总的来讲 ",
+    "换句话说，",
+    "换句话说 ",
+    "换言之，",
+    "换言之 ",
+    "具体来说，",
+    "具体来说 ",
+    "具体而言，",
+    "具体而言 ",
+    "举个例子，",
+    "举个例子 ",
+    "举例来说，",
+    "举例来说 ",
+    "举例而言，",
+    "举例而言 ",
+    "比方说，",
+    "比方说 ",
+    "请注意，",
+    "请注意 ",
+    "需要说明的是，",
+    "需要说明的是 ",
+    "需要指出的是，",
+    "需要指出的是 ",
+    "可以看出，",
+    "可以看出 ",
+    "众所周知，",
+    "众所周知 ",
+    "正如我们所知，",
+    "正如我们所知 ",
+    "接下来我们来，",
+    "接下来我们来 ",
+    "下面我们来，",
+    "下面我们来 ",
     # 英文
     "in conclusion, ",
     "in summary, ",
@@ -65,6 +104,23 @@ REDUNDANT_PHRASES = [
     "that is to say, ",
     "basically, ",
     "essentially, ",
+    "to sum up, ",
+    "all in all, ",
+    "it is worth noting that ",
+    "it should be noted that ",
+    "as we know, ",
+    "as you can see, ",
+    "needless to say, ",
+    "generally speaking, ",
+    "first and foremost, ",
+    "having said that, ",
+    "that being said, ",
+    "moving forward, ",
+    "going forward, ",
+    "for example, ",
+    "for instance, ",
+    "specifically, ",
+    "in particular, ",
 ]
 
 # 同义词替换词典 (保守版, 不会改变语义)
@@ -99,10 +155,43 @@ SYNONYMS = {
     "in the event that": "if",
     "with regard to": "about",
     "in spite of": "despite",
+    "利用": "用",
+    "采用": "用",
+    "实现": "达成",
+    "完成": "做完",
+    "执行": "做",
+    "处理": "办",
+    "创建": "建",
+    "修改": "改",
+    "删除": "删",
+    "查询": "查",
+    "获取": "拿",
+    "设置": "设",
+    "返回": "回",
+    "发送": "发",
+    "接收": "收",
+    "展示": "显",
+    "确认": "认",
+    "启动": "开",
+    "停止": "停",
+    "继续": "接着",
+    "帮助": "帮",
+    "大量": "很多",
+    "高优先级": "高优",
+    "低优先级": "低优",
+    "approximately": "about",
+    "subsequently": "then",
+    "prior to": "before",
+    "in regards to": "about",
+    "commence": "start",
+    "terminate": "end",
+    "endeavor": "try",
+    "facilitate": "help",
+    "remainder": "rest",
+    "subsequent": "next",
+    "preceding": "previous",
     "with respect to": "about",
 }
-
-# 数字单位化 (按千进制, 简单粗暴版)
 _UNIT_PATTERN = re.compile(r"(\d{4,17})")
 
 
@@ -468,6 +557,31 @@ def _run_tests() -> bool:
     check("11.2 removed_phrase_count > 0", stats["removed_phrase_count"] > 0)
     check("11.3 number_unit_conversions > 0", stats["number_unit_conversions"] > 0)
     check("11.4 dedup_repeat_lines > 0", stats["dedup_repeat_lines"] > 0)
+
+    # ---- 测试 12: 新增扩展词典命中 ----
+    expanded = (
+        "换句话说，我们采用 Redis 来处理缓存。需要说明的是，这个方案非常重要。\n"
+        "具体来说，我们创建任务并且继续执行。换言之，这个工具能够帮助团队。\n"
+    ) * 5
+    out, stats = tc.compress(expanded)
+    print(f"\n[测试 12] 扩展词典命中")
+    check("12.1 删除换句话说", "换句话说" not in out)
+    check("12.2 删除需要说明的是", "需要说明的是" not in out)
+    check("12.3 删除具体来说", "具体来说" not in out)
+    check("12.4 同义词替换 > 0", stats["synonym_replacements"] > 0)
+
+    # ---- 测试 13: 英文 filler / synonym ----
+    english = (
+        "in conclusion, we utilize this tool in order to process logs. "
+        "it is worth noting that the system can facilitate debugging. "
+        "subsequently, the subsequent task will commence. "
+    ) * 8
+    out, stats = tc.compress(english)
+    print(f"\n[测试 13] 英文 filler / synonym")
+    check("13.1 删除 in conclusion", "in conclusion" not in out)
+    check("13.2 utilize → use", "utilize" not in out and "use" in out)
+    check("13.3 facilitate → help", "facilitate" not in out)
+    check("13.4 synonym_replacements > 0", stats["synonym_replacements"] > 0)
 
     print()
     print("=" * 60)
