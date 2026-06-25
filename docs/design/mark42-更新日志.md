@@ -1140,3 +1140,79 @@ LLM 异步入口调用 (daemon tick 不阻塞):
 - P1-4 已完成
 - P2-5 已完成
 - Phase 2 剩余: P2-6 (性能基准) / P2-7 (Heavy 集成)
+
+---
+
+## Day 13 — 2026-06-25 (P2-6 性能基准完成)
+
+### 目标
+
+完成 **P2-6: 压缩子系统性能基准**，输出可复跑脚本 + 自动生成报告。
+
+### 实施
+
+#### 新增 `scripts/mark42_modules/perf_bench.py`
+
+- 自动构造 5 类样本:
+  - text
+  - log
+  - code
+  - diff
+  - json
+- 每类样本按 4 档尺寸生成:
+  - 1KB
+  - 10KB
+  - 100KB
+  - 1MB
+- 测量指标:
+  - P50 / P95 / P99 延迟
+  - 内存 P50 (`tracemalloc`)
+  - 平均压缩率
+  - changed 命中率
+  - 错误数
+- 覆盖对象:
+  - `smartcrush`
+  - `text_compress`
+  - `logdedup`
+  - `codecrush`
+  - `diff_compress`
+  - `algo_scheduler.process()`（总链路）
+  - `compress_queue`（enqueue-only / enqueue+wait）
+  - `llm_text_compress()`（可选，仅有 key 时）
+
+#### 生成报告
+
+**新文件**: `docs/design/mark42-压缩方案-性能基准-20260625.md`
+
+- 环境信息（主机 / OS / Python）
+- 40 条算法结果（5 类样本 × 4 尺寸 × 纯算法/scheduler）
+- 2 条异步队列结果
+- LLM 路径是否测到
+- 自动结论与建议
+
+### 核心发现
+
+- 最慢总链路: `scheduler` / `code_1024kb`, **P95 = 4302.66ms**
+- 最高内存占用: `scheduler` / `code_1024kb`, **内存 P50 = 170201.2KB**
+- 异步队列 `enqueue-only` **P50 = 0.00ms**
+- 异步队列 `enqueue+wait` **P50 = 6.46ms**
+- 本次未测 LLM 路径（无 key）, 所以报告只覆盖 rule-based + queue
+
+### 关键决策
+
+1. scheduler 结果标明是“路由 + 压缩总链路”，避免被误读成纯算法耗时
+2. 报告由脚本自动生成，后续复跑只需重新执行 `perf_bench.py`
+3. 样本先用合成数据，后续如需更真实可补生产样本基准
+
+### 修改文件
+
+| 文件 | 操作 |
+|---|---|
+| `scripts/mark42_modules/perf_bench.py` | 新建 |
+| `docs/design/mark42-压缩方案-性能基准-20260625.md` | 新建（自动生成） |
+| `docs/design/mark42-更新日志.md` | 追加 |
+
+### 当前状态
+
+- P2-6 已完成
+- Phase 2 剩余: **P2-7 Heavy 层与压缩子系统集成**

@@ -148,3 +148,15 @@ export MARK42_LLM_AUTO_THRESHOLD=5120
 - **P2-7 更正**: Heavy 层已存在 427 行, 路线文档明确"集成"而非"实现"
 - **README §六/§七 指针更新**: 交接清单 5 → 6 文件, §六 加独立路线文档指针
 - **下次开机动作**: 无, 等用户决定是否开始 P1-4 (SmartCrusher 拆, 建议 1-2 小时)
+
+### 2026-06-25 12:35 — Day 13: P2-6 性能基准
+
+- 新增 `scripts/mark42_modules/perf_bench.py`
+- 自动生成 `docs/design/mark42-压缩方案-性能基准-20260625.md`
+- 结果覆盖: 5 类样本 × 4 尺寸 × 纯算法/scheduler + 2 条 queue 结果
+- 关键结论:
+  - `enqueue-only` P50 = 0.00ms
+  - 最慢链路为 `scheduler/code_1024kb`
+  - 最高内存也在 `scheduler/code_1024kb`
+- 本次未测 LLM（未检测到可用 key），下次如需可在有 key 环境重跑
+- 代码层面无运行时行为改动，仅新增基准与报告
