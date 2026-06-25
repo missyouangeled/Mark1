@@ -600,3 +600,76 @@ def armor_guard(interval_s: int = 300) -> None:
             time.sleep(interval_s)
     except KeyboardInterrupt:
         print("\n🛡️ 守护模式已退出")
+
+
+# ----------------------------------------------------------------------
+# Day 7: 异步压缩入口 (compress_queue.py 集成)
+# ----------------------------------------------------------------------
+def armor_compress_async(dry_run: bool = False, wait: bool = False,
+                         priority: int = 0) -> dict[str, Any]:
+    """异步版 armor_compress — 入队立即返回
+
+    Args:
+        dry_run: 当前未使用 (queue 内部直接调 process), 保留为接口对齐
+        wait: True=等结果 (同步语义, 兼容旧调用), False=立即返回
+        priority: 0=normal, 1=urgent, 2=low
+
+    Returns:
+        wait=True:  {"status": "completed", "result": {...}}
+        wait=False: {"status": "queued", "request_id": "req-xxx", "session_id": "..."}
+        队列满:     {"status": "dropped", "reason": "queue_full"}
+    """
+    try:
+        from compress_queue import CompressRequest, get_compress_queue
+    except ImportError as e:
+        return {"status": "error", "reason": f"queue module not available: {e}"}
+
+    # 读 session 尾部 (同步, 快, 不阻塞)
+    active = _find_active_session()
+    session_messages = _read_session_tail(active) if active else []
+
+    # 提取待压缩的"内容": 实际场景是 session_messages 序列化为 JSON
+    # 这里用最简方式: 把 messages 转成字符串作为 compress 输入
+    import json as _json
+    try:
+        content = _json.dumps(session_messages, ensure_ascii=False, default=str)
+    except Exception:
+        content = str(session_messages)
+
+    req = CompressRequest(
+        content=content,
+        session_id=active.name if active else "unknown",
+        content_type="auto",
+        priority=priority,
+    )
+
+    queue = get_compress_queue()
+    accepted = queue.enqueue(req)
+    if not accepted:
+        return {"status": "dropped", "reason": "queue_full",
+                "queue_size": queue.qsize()}
+
+    if not wait:
+        return {"status": "queued",
+                "request_id": req.request_id,
+                "session_id": req.session_id,
+                "queue_size": queue.qsize()}
+
+    # 同步等结果
+    completed = req.wait(timeout=30.0)
+    if not completed:
+        return {"status": "timeout", "request_id": req.request_id}
+
+    if req.error:
+        return {"status": "failed", "error": req.error, "request_id": req.request_id}
+
+    return {"status": "completed", "result": req.result, "request_id": req.request_id}
+
+
+def armor_compress_queue_stats() -> dict[str, Any]:
+    """查看压缩队列统计"""
+    try:
+        from compress_queue import get_compress_queue
+        return get_compress_queue().stats
+    except ImportError as e:
+        return {"error": f"queue module not available: {e}"}

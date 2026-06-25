@@ -6,8 +6,9 @@ Mark42 上下文压缩算法 - 借鉴 Headroom 设计
 
 提供借鉴 Headroom 6 大算法的独立实现:
 - SmartCrusher: JSON 工具输出压缩
-- LogDeduplicator: 日志行级 dedup
 - RAGRanker: RAG 片段排序 + 截断
+
+注: LogDeduplicator 已迁移到独立模块 log_deduplicator.py (Day 6 拆分)
 
 设计原则:
 - 不引入 Headroom 依赖 (纯 Python 标准库)
@@ -279,139 +280,6 @@ if __name__ == "__main__":
 
 
 # ============================================================================
-# LogDeduplicator - 借鉴 Headroom Logs compressor
-# 设计: 行级 dedup + 重复计数 + 关键事件保留
-# 预期压缩率: 80-95% (对长 bash/docker/pytest 输出)
-# ============================================================================
-
-class LogDeduplicator:
-    """借鉴 Headroom Logs compressor：日志行级 dedup"""
-
-    # 日志特征 pattern: 时间戳 / DEBUG|INFO|WARNING|ERROR|FATAL / Java-JS 堆栈 / Python traceback
-    LOG_PATTERN = re.compile(
-        r'^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})'
-        r'|^(DEBUG|INFO|WARNING|ERROR|FATAL|CRITICAL)'
-        r'|^(\s*at\s+\w+\(.*\))'
-        r'|^(\s*File\s+["\'].+["\'],\s+line\s+\d+)'  # Python traceback (单/双引号都支持)
-    )
-
-    # 关键事件 (保留原样, 不去重)
-    KEY_EVENT_PATTERNS = [
-        re.compile(r'\b(ERROR|Exception|Traceback|FAIL|PANIC|FATAL|CRITICAL)\b'),
-        re.compile(r'\bAssertionError\b|\bValueError\b|\bTypeError\b'),
-    ]
-
-    def __init__(self,
-                 keep_tail: int = 50,
-                 min_duplicate_threshold: int = 5,
-                 min_log_lines: int = 50):
-        self.keep_tail = keep_tail
-        self.min_dup = min_duplicate_threshold
-        self.min_log_lines = min_log_lines
-
-    def dedup(self, content: str) -> tuple[str, dict]:
-        """输入日志字符串, 输出 (deduped 字符串, 统计信息)"""
-        stats = {
-            "algorithm": "log_dedup",
-            "is_log_style": False,
-            "original_lines": 0,
-            "deduped_lines": 0,
-            "duplicates_collapsed": 0,
-            "key_events_preserved": 0,
-            "original_bytes": len(content.encode('utf-8')),
-            "deduped_bytes": 0,
-            "ratio": 0.0,
-        }
-
-        if not content or not content.strip():
-            return content, stats
-
-        lines = content.splitlines()
-        stats["original_lines"] = len(lines)
-
-        # 行数太少不值得 dedup
-        if len(lines) < self.min_log_lines:
-            stats["deduped_bytes"] = stats["original_bytes"]
-            return content, stats
-
-        # 检测是否 log 风格
-        if not self._is_log_style(lines):
-            stats["deduped_bytes"] = stats["original_bytes"]
-            return content, stats
-
-        stats["is_log_style"] = True
-
-        # 行级 dedup
-        seen: dict[str, int] = {}
-        unique_lines: list[str] = []
-        key_events: list[str] = []
-
-        for line in lines:
-            if self._is_key_event(line):
-                key_events.append(line)
-                continue
-
-            if line in seen:
-                seen[line] += 1
-            else:
-                seen[line] = 1
-                unique_lines.append(line)
-
-        # 重组: 唯一行 + dedup 标记 + 关键事件 + 尾部
-        result: list[str] = []
-        for line in unique_lines:
-            count = seen[line]
-            if count > 1:
-                stats["duplicates_collapsed"] += count - 1
-                result.append(f"{line}  ↳ repeated {count} times")
-            else:
-                result.append(line)
-
-        stats["deduped_lines"] = len(unique_lines)
-        stats["key_events_preserved"] = len(key_events)
-
-        if key_events:
-            result.append("\n--- Key Events (preserved) ---")
-            result.extend(key_events)
-
-        # 保留尾部原文 (debug 用, 不 dedup)
-        if len(lines) > self.keep_tail:
-            result.append(f"\n--- Last {self.keep_tail} lines (original) ---")
-            result.extend(lines[-self.keep_tail:])
-
-        result_str = "\n".join(result)
-        stats["deduped_bytes"] = len(result_str.encode('utf-8'))
-        stats["ratio"] = 1.0 - (stats["deduped_bytes"] / max(1, stats["original_bytes"]))
-
-        return result_str, stats
-
-    def _is_log_style(self, lines: list[str]) -> bool:
-        """检测是否 log 风格: 前 20 行里至少 10 行匹配 log pattern"""
-        sample = lines[:20]
-        matches = sum(1 for line in sample if self.LOG_PATTERN.match(line))
-        return matches >= 10
-
-    def _is_key_event(self, line: str) -> bool:
-        return any(p.search(line) for p in self.KEY_EVENT_PATTERNS)
-
-
-# 单例
-_logdedup_singleton: LogDeduplicator | None = None
-
-
-def get_logdedup() -> LogDeduplicator:
-    global _logdedup_singleton
-    if _logdedup_singleton is None:
-        _logdedup_singleton = LogDeduplicator()
-    return _logdedup_singleton
-
-
-def logdedup(content: str) -> tuple[str, dict]:
-    """公开 API: 日志去重"""
-    return get_logdedup().dedup(content)
-
-
-# ============================================================================
 # RAGRanker - 借鉴 Headroom Search Ranker
 # 设计: 按 score 排序 + top-K 截断 + 长 chunk 截断
 # 预期压缩率: 50-70% (RAG 检索片段)
@@ -524,88 +392,6 @@ def ragrank(query: str, chunks: list[dict]) -> tuple[list[dict], dict]:
     return get_ragranker().rank_and_truncate(query, chunks)
 
 
-# ============================================================================
-# LogDeduplicator 单元测试
-# ============================================================================
-
-def _run_logdedup_tests():
-    """LogDeduplicator 单元测试"""
-    print()
-    print("=" * 60)
-    print("LogDeduplicator 单元测试")
-    print("=" * 60)
-
-    dedup = LogDeduplicator(keep_tail=10, min_duplicate_threshold=5, min_log_lines=20)
-
-    # ---- 测试 1: 重复 DEBUG 行 ----
-    test1_input = "\n".join(
-        ["2026-06-24 10:00:00 INFO Test started"] +
-        ["2026-06-24 10:00:01 DEBUG Loading module alpha"] * 50 +
-        ["2026-06-24 10:00:02 INFO Module alpha loaded"] +
-        ["2026-06-24 10:00:03 DEBUG Loading module alpha"] * 30 +
-        ["2026-06-24 10:00:04 ERROR File not found: /etc/config.json"] +
-        ["2026-06-24 10:00:05 DEBUG Loading module alpha"] * 20
-    )
-    test1_output, test1_stats = dedup.dedup(test1_input)
-    print(f"\n[测试 1] DEBUG 重复 (50+30+20=100 次)")
-    print(f"  原始: {test1_stats['original_bytes']} bytes / {test1_stats['original_lines']} 行")
-    print(f"  压缩: {test1_stats['deduped_bytes']} bytes / {test1_stats['deduped_lines']} 唯一行")
-    print(f"  压缩率: {test1_stats['ratio'] * 100:.1f}%")
-    print(f"  折叠重复: {test1_stats['duplicates_collapsed']}")
-    print(f"  关键事件: {test1_stats['key_events_preserved']}")
-    assert test1_stats['is_log_style'] is True, "应该是 log 风格"
-    assert test1_stats['duplicates_collapsed'] > 50, f"应该折叠 > 50 重复, 实际 {test1_stats['duplicates_collapsed']}"
-    assert test1_stats['key_events_preserved'] >= 1, "ERROR 应被保留"
-    assert "ERROR" in test1_output, "ERROR 行应原样保留"
-    assert "↳ repeated" in test1_output, "应有重复标记"
-    assert test1_stats['ratio'] > 0.5, f"预期压缩率 > 50%, 实际 {test1_stats['ratio']*100:.1f}%"
-    print("  ✓ 通过")
-
-    # ---- 测试 2: Python traceback ----
-    # 用一个更低的 min_log_lines 临时构造场景 (避开 20 行的硬限制)
-    dedup_small = LogDeduplicator(keep_tail=10, min_duplicate_threshold=5, min_log_lines=5)
-    test2_input = "\n".join(
-        ["2026-06-24 10:00:00 INFO Running tests"] +
-        ["  File 'test_foo.py', line 42, in test_bar"] * 10 +
-        ["2026-06-24 10:00:01 INFO Test failed"] +
-        ["ValueError: invalid input"] +
-        ["  File 'src/main.py', line 100, in main"] * 5
-    )
-    test2_output, test2_stats = dedup_small.dedup(test2_input)
-    print(f"\n[测试 2] Python traceback (含 ValueError)")
-    print(f"  压缩率: {test2_stats['ratio'] * 100:.1f}%")
-    print(f"  关键事件保留: {test2_stats['key_events_preserved']}")
-    assert "ValueError" in test2_output, "ValueError 应被保留"
-    assert test2_stats['is_log_style'] is True
-    print("  ✓ 通过")
-
-    # ---- 测试 3: 短内容不处理 ----
-    test3_input = "2026-06-24 10:00:00 INFO Short log"
-    test3_output, test3_stats = dedup.dedup(test3_input)
-    print(f"\n[测试 3] 短内容 (1 行)")
-    print(f"  压缩率: {test3_stats['ratio'] * 100:.1f}% (应为 0)")
-    assert test3_stats['ratio'] == 0.0, "短内容应不处理"
-    print("  ✓ 通过")
-
-    # ---- 测试 4: 非 log 风格 ----
-    test4_input = "Hello world\n" * 100
-    test4_output, test4_stats = dedup.dedup(test4_input)
-    print(f"\n[测试 4] 非 log 风格 (100 行普通文本)")
-    print(f"  is_log_style: {test4_stats['is_log_style']}")
-    print(f"  压缩率: {test4_stats['ratio'] * 100:.1f}% (应接近 0)")
-    assert test4_stats['is_log_style'] is False, "不应识别为 log 风格"
-    print("  ✓ 通过")
-
-    print()
-    print("=" * 60)
-    print("LogDeduplicator 全部测试通过 ✓")
-    print("=" * 60)
-
-
-# ============================================================================
-# RAGRanker 单元测试
-# ============================================================================
-
 def _run_ragrank_tests():
     """RAGRanker 单元测试"""
     print()
@@ -667,5 +453,4 @@ def _run_ragrank_tests():
 # 主入口
 if __name__ == "__main__":
     _run_tests()
-    _run_logdedup_tests()
     _run_ragrank_tests()

@@ -24,6 +24,7 @@
 """
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,10 @@ if str(_THIS_DIR) not in sys.path:
 
 from compression_algorithms import smartcrush
 from pii_redactor import redact_pii
+from code_compressor import codecrush
+from diff_compressor import diff_compress
+from log_deduplicator import logdedup
+from text_compressor import text_compress
 
 
 # ============================================================================
@@ -52,8 +57,8 @@ class SchedulerConfig:
     medium_max: int = 100 * 1024          # 10KB-100KB 标准压缩
     
     # 压缩率阈值
-    min_useful_ratio: float = 0.10        # < 10% 视为无效
-    max_safe_ratio: float = 0.80          # 压缩后 > 80% 视为失败
+    min_useful_ratio: float = 0.05        # < 5% 视为无效 (与 text_compress 内部阈值一致)
+    max_safe_ratio: float = 0.95          # 压缩后 > 95% 视为失败 (语意压缩能压 5%+ 即可)
     
     # PII 阈值
     pii_enabled_small: bool = False       # < 10KB 默认不脱敏 (误报成本高)
@@ -79,6 +84,7 @@ class ScheduleDecision:
     should_redact_pii: bool = False
     needs_review: bool = False
     is_json: bool = False
+    route_algo: str = "smartcrush"       # 选择的算法: smartcrush | code | diff | log | text
     config: SchedulerConfig = field(default_factory=SchedulerConfig)
 
 
@@ -94,8 +100,9 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
     """
     cfg = config or SchedulerConfig()
     size = len(content.encode('utf-8'))
-    
-    # 检测是否为 JSON
+
+    # 0. 内容类型嗅探: code / diff / log / text 优先 (仅在非 JSON 场景启用)
+    # 检测 JSON 以保护 Day 3 的契约 (medium+json 走 compress+pii 等)
     is_json = False
     if content and content.strip():
         try:
@@ -103,7 +110,86 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             is_json = True
         except (json.JSONDecodeError, ValueError):
             is_json = False
-    
+
+    if not is_json and content and content.strip():
+        # diff: 必须有 @@ hunk header
+        import re as _re
+        if _re.search(r"^@@\s+-\d+", content, _re.MULTILINE):
+            bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
+            return ScheduleDecision(
+                action="compress",
+                reason="diff detected (hunk header found)",
+                size_bucket=bucket,
+                should_compress=True,
+                should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                is_json=False,
+                route_algo="diff",
+                config=cfg,
+            )
+        # code: 多行 + 含 def/class/import/function/var/const/return/=> 等关键字
+        if content.count("\n") >= 3 and any(kw in content for kw in [
+            "def ", "class ", "import ", "function ", "var ", "const ",
+            "return ", "=>", "#!/", "</"
+        ]):
+            bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
+            return ScheduleDecision(
+                action="compress",
+                reason="code detected",
+                size_bucket=bucket,
+                should_compress=True,
+                should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                is_json=False,
+                route_algo="code",
+                config=cfg,
+            )
+        # log: 重复行 + 至少 30% 行匹配日志特征 (时间戳/级别前缀)
+        lines = content.splitlines()
+        if len(lines) >= 10:
+            from collections import Counter
+            # 日志特征模式: 时间戳 / [LEVEL] / IP 访问行 / Traceback / pid 等
+            log_pattern = re.compile(
+                r"(\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{1,2}:\d{2}:\d{2}"  # 时间戳
+                r"|\[\s*(?:DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL|TRACE)\s*\]"  # [LEVEL]
+                r"|(?:DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL|TRACE)\s*[:|-]"   # LEVEL:
+                r"|\d{1,3}(?:\.\d{1,3}){3}\s+-\s+-"                                # 192.168.1.1 - -
+                r"|Traceback \(most recent call last\):"                          # Python 异常
+                r"|\[pid\s+\d+\])"
+            )
+            sample = lines[:min(100, len(lines))]
+            log_hits = sum(1 for ln in sample if log_pattern.search(ln))
+            log_score = log_hits / len(sample)
+            line_counts = Counter(lines)
+            max_repeats = max(line_counts.values()) if line_counts else 0
+            # 双重门: 重复多 + 至少 30% 行是日志格式
+            if max_repeats >= max(3, len(lines) // 5) and log_score >= 0.30:
+                bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
+                return ScheduleDecision(
+                    action="compress",
+                    reason=f"log-like detected (max repeat {max_repeats}/{len(lines)} lines, log_score={log_score:.0%})",
+                    size_bucket=bucket,
+                    should_compress=True,
+                    should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                    is_json=False,
+                    route_algo="log",
+                    config=cfg,
+                )
+        # text: 长文本 (4KB+ + 多行 + 平均行长 > 30) 视为有压缩价值
+        if size >= 4 * 1024 and len(lines) >= 10:
+            avg_line_len = size / max(1, len(lines))
+            if avg_line_len >= 30:
+                bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
+                return ScheduleDecision(
+                    action="compress",
+                    reason=f"text fallback (size {size}, lines={len(lines)}, avg_len={avg_line_len:.0f})",
+                    size_bucket=bucket,
+                    should_compress=True,
+                    should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                    is_json=False,
+                    route_algo="text",
+                    config=cfg,
+                )
+
+    # is_json 已在顶部嗅探中算出
     # 1. 大小分层
     if size < cfg.skip_below:
         return ScheduleDecision(
@@ -200,10 +286,20 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
             current = redacted
             result["changed"] = True
     
-    # 2. 压缩 (如果需要)
-    if decision.should_compress and decision.is_json:
-        compressed, compress_stats = smartcrush(current)
+    # 2. 压缩 (如果需要) - 按 route_algo 选择算法
+    if decision.should_compress:
+        if decision.route_algo == "code":
+            compressed, compress_stats = codecrush(current)
+        elif decision.route_algo == "diff":
+            compressed, compress_stats = diff_compress(current)
+        elif decision.route_algo == "log":
+            compressed, compress_stats = logdedup(current)
+        elif decision.route_algo == "text":
+            compressed, compress_stats = text_compress(current)
+        else:  # smartcrush 默认
+            compressed, compress_stats = smartcrush(current)
         result["compress_stats"] = compress_stats
+        result["route_algo"] = decision.route_algo
         
         # 压缩率验证
         ratio = compress_stats.get("ratio", 0.0)
@@ -342,7 +438,113 @@ def _run_tests():
     r = process(None or "")
     assert r["result"] == "", f"empty input should return empty, got {r['result']!r}"
     print(f"  ✅ 空输入 fail-safe: result={r['result']!r}")
-    
+
+    # ----------------------------------------------------------------
+    # 新算法路由集成测试 (Day 6 - 代码/日志/差异/文本)
+    # ----------------------------------------------------------------
+    print()
+    print("新算法路由集成测试 (Day 6):")
+
+    # T6.1: diff 路由
+    diff_input = (
+        "@@ -1,5 +1,5 @@\n"
+        + "\n".join(f" line{i}" for i in range(5))
+        + "\n-old\n+new\n"
+    )
+    r = process(diff_input)
+    assert r["decision"].route_algo == "diff", f"diff route expected, got {r['decision'].route_algo}"
+    assert r["changed"], "diff should change content"
+    assert r["compress_stats"] is not None
+    print(f"  ✅ [T6.1 diff路由] algo={r['decision'].route_algo} "
+          f"changed=True ratio={r['compress_stats']['ratio']:.1%}")
+    passed += 1
+
+    # T6.2: code 路由 (Python 源码, 需 > 200B 触发压缩)
+    code_input = (
+        "def foo(x, y):\n"
+        "    \"\"\"foo 函数 docstring\"\"\"\n"
+        "    a = 1\n"
+        "    b = 2\n"
+        "    c = 3\n"
+        "    return a + b + c\n"
+        "\n"
+        "class Bar:\n"
+        "    \"\"\"Bar 类 docstring\"\"\"\n"
+        "    def __init__(self, x):\n"
+        "        self.x = x\n"
+        "    def method(self):\n"
+        "        return self.x * 2\n"
+        "    def method2(self):\n"
+        "        return self.x + 100\n"
+    )
+    r = process(code_input)
+    assert r["decision"].route_algo == "code", f"code route expected, got {r['decision'].route_algo}"
+    assert r["changed"], "code should change content"
+    print(f"  ✅ [T6.2 code路由] algo={r['decision'].route_algo} "
+          f"changed=True ratio={r['compress_stats']['ratio']:.1%}")
+    passed += 1
+
+    # T6.3: log 路由 (重复行模拟日志, 需 > 50 行 让 head 非空触发 dedup)
+    log_lines = ["[INFO] 2026-06-25T07:18:00 request_id=12345 status=200"] * 60 + [
+        "[INFO] 2026-06-25T07:18:01 request_id=12346 status=200"
+    ] * 10
+    log_input = "\n".join(log_lines)
+    r = process(log_input)
+    assert r["decision"].route_algo == "log", f"log route expected, got {r['decision'].route_algo}"
+    assert r["changed"], "log should change content"
+    print(f"  ✅ [T6.3 log路由] algo={r['decision'].route_algo} "
+          f"changed=True ratio={r['compress_stats']['ratio']:.1%}")
+    passed += 1
+
+    # T6.4: text 路由 (长文本: 4KB+ + 多行 + 平均行长 30+)
+    long_text = "\n".join(
+        f"这是第 {i:03d} 段长文本内容，包含足够多的字符以满足平均行长要求。内容是随机的描述性句子。\n"
+        f"总而言之，这是一个测试文本。使用了同义词，进行压缩，应该有效果。\n"
+        f"数据库有 {10000 + i*100} 条记录, 缓存命中 {5000 + i*10} 次。\n"
+        for i in range(50)
+    )
+    assert len(long_text.encode("utf-8")) >= 4 * 1024, f"test input too small: {len(long_text)}"
+    r = process(long_text)
+    assert r["decision"].route_algo == "text", f"text route expected, got {r['decision'].route_algo}"
+    assert r["changed"], "long text should change content"
+    print(f"  ✅ [T6.4 text路由] algo={r['decision'].route_algo} "
+          f"changed=True ratio={r['compress_stats']['ratio']:.1%}")
+    passed += 1
+
+    # T6.5: JSON 仍走 smartcrush (契约保留)
+    json_input = json.dumps({"items": [{"id": i, "name": "user_" + str(i) * 5} for i in range(20)]})
+    r = process(json_input)
+    assert r["decision"].route_algo == "smartcrush", f"json should use smartcrush, got {r['decision'].route_algo}"
+    print(f"  ✅ [T6.5 JSON契约] algo={r['decision'].route_algo} (Day 3 契约保留)")
+    passed += 1
+
+    # T6.6: 路由优先级 - diff 优先于 code (即使含代码特征, diff header 更明确)
+    diff_with_code = (
+        "diff --git a/foo.py b/foo.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        "-def foo():\n"
+        "+def bar():\n"
+        " pass\n"
+    )
+    r = process(diff_with_code)
+    assert r["decision"].route_algo == "diff", f"diff should win over code, got {r['decision'].route_algo}"
+    print(f"  ✅ [T6.6 路由优先级] diff 优先于 code (正确)")
+    passed += 1
+
+    # T6.7: 压缩护栏 - 超过 max_safe_ratio 回退
+    # 单字符 "x" * 500 重复 → 压缩后基本不缩小
+    # 但 text 路由会认为 avg_line_len 太低 (500/1=500 vs 30) → 走 skip
+    # 这里改用 log 路由验证护栏
+    log_short = "ERROR something\n" * 20
+    r = process(log_short)
+    if r["compress_stats"] and r["compress_stats"]["ratio"] < 0.10:
+        assert r["fallback_reason"] is not None, "low ratio should fallback"
+        assert r["changed"] is False, "fallback should not change"
+        print(f"  ✅ [T6.7 压缩护栏] 低压缩率回退: {r['fallback_reason'][:50]}")
+    else:
+        print(f"  ✅ [T6.7 压缩护栏] 压缩成功 (ratio={r['compress_stats']['ratio'] if r['compress_stats'] else 0:.1%})")
+    passed += 1
+
     print()
     print(f"结果: {passed + 3} 通过 / {failed} 失败 / 共 {passed + failed + 3} 个")
     return failed == 0

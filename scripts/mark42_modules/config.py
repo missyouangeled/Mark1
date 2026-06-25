@@ -117,6 +117,19 @@ MARK42_MODEL_TABLE: dict[str, dict[str, Any]] = {
         "baseUrlFallback": "https://api.minimax.chat/v1",  # openclaw.json 中无 baseUrl 时回退
         "endpoint": "/chat/completions",
     },
+    # 用途：文本压缩时的 LLM 语义压缩（text_compressor method="llm" / llm_text_compressor）
+    # Day 8 新增: 语义压缩 — 不同于"全对话分析"，这里是"压缩一段文本"
+    # maxTokens 留大, 因为输出可能接近输入长度
+    # temperature 0.0 保稳定
+    "llmCompress": {
+        "model": "MiniMax-M3",
+        "provider": "minimax",
+        "maxTokens": 4000,
+        "temperature": 0.0,
+        "timeout": 60,
+        "baseUrlFallback": "https://api.minimax.chat/v1",
+        "endpoint": "/chat/completions",
+    },
     # 预留：未来新增 AI 用途时在此添加条目
     # "memoryIndex": { "model": "MiniMax-M3", ... },
     # "taskClassify": { "model": "MiniMax-M3", ... },

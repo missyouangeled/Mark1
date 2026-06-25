@@ -79,6 +79,31 @@ def test_imports():
             err(f"mark42_modules.{m}", stderr.strip() or out.strip())
 
 
+def test_day6_algorithms():
+    """阶段 1 Day 6: 三个新算法专项 (Code/Log/Diff Compressor)"""
+    print("\n🧬 Day 6 新算法专项 (Code/Log/Diff)")
+
+    for name, module in [
+        ("CodeCompressor", "code_compressor"),
+        ("LogDeduplicator", "log_deduplicator"),
+        ("DiffCompressor", "diff_compressor"),
+    ]:
+        code, out, stderr = run(
+            [sys.executable, str(SCRIPTS / "mark42_modules" / f"{module}.py")],
+            timeout=30,
+        )
+        if code == 0 and "通过" in out:
+            # 提取 "X 通过 / Y 失败" 数字
+            import re as _re
+            m = _re.search(r"(\d+)\s*通过\s*/\s*(\d+)\s*失败", out)
+            if m:
+                ok(f"{name} 单元测试 ({m.group(1)}/{int(m.group(1))+int(m.group(2))})")
+            else:
+                ok(f"{name} 单元测试")
+        else:
+            err(f"{name} 单元测试", stderr.strip() or out.strip()[-300:])
+
+
 def test_compression_algorithms():
     """阶段 1 Day 1: SmartCrusher 压缩算法专项测试"""
     print("\n🧪 压缩算法专项 (Day 1)")
@@ -90,6 +115,86 @@ def test_compression_algorithms():
         ok("SmartCrusher 单元测试")
     else:
         err("SmartCrusher 单元测试", stderr.strip() or out.strip()[-300:])
+
+
+def test_day7_async_queue():
+    """阶段 1 Day 7: 压缩子系统异步化"""
+    print("\n⚡ Day 7 异步化专项 (CompressQueue)")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "compress_queue.py")],
+        timeout=60,
+    )
+    if code == 0 and "通过" in out:
+        import re as _re
+        m = _re.search(r"(\d+)\s*通过\s*/\s*(\d+)\s*失败", out)
+        if m:
+            ok(f"CompressQueue 单元测试 ({m.group(1)}/{int(m.group(1))+int(m.group(2))})")
+        else:
+            ok("CompressQueue 单元测试")
+    else:
+        err("CompressQueue 单元测试", stderr.strip() or out.strip()[-300:])
+
+    # 集成: armor_compress_async 入口
+    print("\n⚡ Day 7 集成: armor_compress_async")
+    workspace = SCRIPTS.parent
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.armor import armor_compress_async, armor_compress_queue_stats; "
+         f"r1 = armor_compress_async(wait=False); "
+         f"assert r1.get('status') == 'queued', f'expected queued, got {{r1}}'; "
+         f"r2 = armor_compress_async(wait=True, priority=1); "
+         f"assert r2.get('status') == 'completed', f'expected completed, got {{r2}}'; "
+         f"assert r2['result']['route_algo'] in ('smartcrush', 'code', 'diff', 'log', 'text'); "
+         f"stats = armor_compress_queue_stats(); "
+         f"assert 'processed' in stats; "
+         f"print('PASS: async entry works')"
+        ],
+        timeout=30,
+    )
+    if code == 0 and "PASS" in out:
+        ok("armor_compress_async 集成 (queue + wait + priority)")
+    else:
+        err("armor_compress_async 集成", stderr.strip() or out.strip()[-300:])
+
+
+def test_day8_llm_compress():
+    """阶段 1 Day 8: LLM 语义压缩"""
+    print("\n🧠 Day 8 LLM 语义压缩专项")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "llm_text_compressor.py")],
+        timeout=120,
+    )
+    if code == 0 and "通过" in out:
+        import re as _re
+        m = _re.search(r"(\d+)\s*通过\s*/\s*(\d+)\s*失败", out)
+        if m:
+            ok(f"LLMTextCompressor 单元测试 ({m.group(1)}/{int(m.group(1))+int(m.group(2))})")
+        else:
+            ok("LLMTextCompressor 单元测试")
+    else:
+        err("LLMTextCompressor 单元测试", stderr.strip() or out.strip()[-300:])
+
+    # 集成: text_compressor method="llm" 走 LLM
+    print("\n🧠 Day 8 集成: text_compressor(method='llm')")
+    workspace = SCRIPTS.parent
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.text_compressor import TextCompressor; "
+         f"tc = TextCompressor(method='llm'); "
+         f"sample = ('这是一段长文本。' * 100); "
+         f"out, stats = tc.compress(sample); "
+         f"assert stats['mode'].startswith('llm_'), f\"mode should start with llm_, got {{stats['mode']}}\"; "
+         f"assert 'llm_info' in stats; "
+         f"print('PASS: LLM mode works, mode=' + stats['mode'])"
+        ],
+        timeout=60,
+    )
+    if code == 0 and "PASS" in out:
+        ok("text_compressor(method='llm') 集成")
+    else:
+        err("text_compressor(method='llm') 集成", stderr.strip() or out.strip()[-300:])
 
 
 def test_pii_redactor():
@@ -362,6 +467,9 @@ def main():
     test_compression_algorithms()
     test_pii_redactor()
     test_algo_scheduler()
+    test_day6_algorithms()
+    test_day7_async_queue()
+    test_day8_llm_compress()
     test_session_fence()
     # 阶段 1 Day 4 集成
     test_day4_integration()
