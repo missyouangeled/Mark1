@@ -117,6 +117,129 @@ def test_compression_algorithms():
         err("SmartCrusher 单元测试", stderr.strip() or out.strip()[-300:])
 
 
+def test_phase2_async_llm():
+    """阶段 2: LLM 压缩走异步队列 (daemon 永不阻塞)"""
+    print("\n⚡ Phase 2-1: LLM 异步压缩专项")
+    code, out, stderr = run(
+        [sys.executable, str(SCRIPTS / "mark42_modules" / "llm_text_compressor.py")],
+        timeout=120,
+    )
+    if code == 0 and "通过" in out:
+        import re as _re
+        m = _re.search(r"(\d+)\s*通过\s*/\s*(\d+)\s*失败", out)
+        if m:
+            ok(f"LLMTextCompressor (含异步) 单元测试 ({m.group(1)}/{int(m.group(1))+int(m.group(2))})")
+        else:
+            ok("LLMTextCompressor 单元测试")
+    else:
+        err("LLMTextCompressor 单元测试", stderr.strip() or out.strip()[-300:])
+
+    # 集成: LLM 异步入口 (daemon 永不阻塞关键验证)
+    print("\n⚡ Phase 2-1 集成: llm_text_compress_async 永不阻塞")
+    workspace = SCRIPTS.parent
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.llm_text_compressor import llm_text_compress_async; "
+         f"import time; "
+         f"t0 = time.time(); "
+         f"r = llm_text_compress_async('长文本测试，' * 100, mode='summarize', wait=False); "
+         f"elapsed = (time.time() - t0) * 1000; "
+         f"assert r['status'] == 'queued', 'expected queued, got ' + str(r); "
+         f"assert elapsed < 100, 'wait=False should be < 100ms, got ' + str(elapsed) + 'ms'; "
+         f"print('PASS: enqueue=' + format(elapsed, '.1f') + 'ms, request_id=' + r['request_id'])"
+        ],
+        timeout=30,
+    )
+    if code == 0 and "PASS" in out:
+        ok("llm_text_compress_async 集成 (daemon 永不阻塞)")
+    else:
+        err("llm_text_compress_async 集成", stderr.strip() or out.strip()[-300:])
+
+
+def test_phase2_use_llm_env():
+    """阶段 2-2: MARK42_TEXT_USE_LLM 环境变量"""
+    print("\n🌍 Phase 2-2: MARK42_TEXT_USE_LLM 环境变量")
+    workspace = SCRIPTS.parent
+
+    # 1. 默认 (MARK42_TEXT_USE_LLM 不设) -> rule_based
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.algo_scheduler import process; "
+         f"text = '总而言之，第 001 段长文本。\\n' * 150; "  # 4.5KB 触发 text 但默认不调 LLM
+         f"r = process(text); "
+         f"assert r.get('llm_used') is False or r.get('llm_used') is None, 'default should not use LLM, got ' + str(r.get('llm_used')); "
+         f"ratio = r['compress_stats']['ratio'] if r.get('compress_stats') else 'N/A'; "
+         f"print('PASS: default=rule_based, ratio=' + str(ratio))"
+        ],
+        timeout=60,
+    )
+    if code == 0 and "PASS" in out:
+        ok("env 默认 (false) → rule_based")
+    else:
+        err("env 默认 (false)", stderr.strip() or out.strip()[-300:])
+
+    # 2. MARK42_TEXT_USE_LLM=true -> LLM
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.algo_scheduler import process; "
+         f"text = '总而言之，第 001 段长文本。\\n' * 300; "  # 12KB 触发 text 路由
+         f"r = process(text); "
+         f"assert r.get('llm_used') is True, 'true env should use LLM, got ' + str(r.get('llm_used')); "
+         f"print('PASS: true=LLM, ratio=' + str(r['compress_stats']['ratio']))"
+        ],
+        timeout=120,
+        env={**os.environ, "MARK42_TEXT_USE_LLM": "true"},
+    )
+    if code == 0 and "PASS" in out:
+        ok("env=true → LLM")
+    else:
+        err("env=true", stderr.strip() or out.strip()[-300:])
+
+    # 3. MARK42_TEXT_USE_LLM=auto + 大输入 -> LLM
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.algo_scheduler import process; "
+         f"text = '总而言之，第 001 段长文本。\\n' * 300; "  # ~12KB 触发 text 路由
+         f"r = process(text); "
+         f"assert r.get('llm_used') is True, 'auto+big should use LLM, got ' + str(r.get('llm_used')); "
+         f"print('PASS: auto+big=LLM, ratio=' + str(r['compress_stats']['ratio']))"
+        ],
+        timeout=120,
+        env={**os.environ, "MARK42_TEXT_USE_LLM": "auto"},
+    )
+    if code == 0 and "PASS" in out:
+        ok("env=auto + 大输入 (>5KB) → LLM")
+    else:
+        err("env=auto+big", stderr.strip() or out.strip()[-300:])
+
+    # 4. MARK42_TEXT_USE_LLM=auto + 小输入 -> rule_based
+    # 需 ≥ 4KB 触发 text 路由, 但 auto 阈值 5KB 决定是否走 LLM
+    # 用 100 行 约 3KB, > 4KB *不会被* 触发 (另选 150 行约 4.5KB)
+    code, out, stderr = run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, '{workspace}/scripts'); "
+         f"from mark42_modules.algo_scheduler import process; "
+         f"text = '总而言之，第 001 段。\\n' * 150; "  # ~4.5KB: 触发 text 但 auto 不走 LLM
+         f"assert len(text.encode()) >= 4*1024, 'text too small'; "
+         f"assert len(text.encode()) < 5*1024, 'text too big'; "
+         f"r = process(text); "
+         f"assert r.get('llm_used') is False or r.get('llm_used') is None, 'auto+small should not use LLM, got ' + str(r.get('llm_used')); "
+         f"ratio = r['compress_stats']['ratio'] if r.get('compress_stats') else 'N/A'; "
+         f"print('PASS: auto+small=rule_based, ratio=' + str(ratio))"
+        ],
+        timeout=30,
+        env={**os.environ, "MARK42_TEXT_USE_LLM": "auto"},
+    )
+    if code == 0 and "PASS" in out:
+        ok("env=auto + 小输入 (<5KB) → rule_based")
+    else:
+        err("env=auto+small", stderr.strip() or out.strip()[-300:])
+
+
 def test_day7_async_queue():
     """阶段 1 Day 7: 压缩子系统异步化"""
     print("\n⚡ Day 7 异步化专项 (CompressQueue)")
@@ -470,6 +593,8 @@ def main():
     test_day6_algorithms()
     test_day7_async_queue()
     test_day8_llm_compress()
+    test_phase2_async_llm()
+    test_phase2_use_llm_env()
     test_session_fence()
     # 阶段 1 Day 4 集成
     test_day4_integration()

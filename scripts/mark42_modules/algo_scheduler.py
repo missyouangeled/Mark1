@@ -24,11 +24,31 @@
 """
 
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+
+# Phase 2-2: MARK42_TEXT_USE_LLM 环境变量
+#   true:  text 路由强制走 LLM (summarize 等)
+#   false: 走 rule_based (默认)
+#   auto:  输入 > 5KB 走 LLM, 否则 rule_based
+# MARK42_LLM_MODE: summarize | simplify | extract (默认 summarize)
+_TEXT_USE_LLM = os.environ.get("MARK42_TEXT_USE_LLM", "false").lower()
+_LLM_MODE = os.environ.get("MARK42_LLM_MODE", "summarize").lower()
+_LLM_AUTO_THRESHOLD = int(os.environ.get("MARK42_LLM_AUTO_THRESHOLD", "5120"))  # 5KB
+
+
+def _should_use_llm(content: str) -> bool:
+    """根据 env var 决定 content 是否走 LLM"""
+    if _TEXT_USE_LLM == "true":
+        return True
+    if _TEXT_USE_LLM == "auto":
+        return len(content.encode("utf-8")) >= _LLM_AUTO_THRESHOLD
+    return False  # "false" 或未知
 
 # 允许独立运行: python3 algo_scheduler.py
 _THIS_DIR = Path(__file__).resolve().parent
@@ -173,10 +193,15 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
                     route_algo="log",
                     config=cfg,
                 )
-        # text: 长文本 (4KB+ + 多行 + 平均行长 > 30) 视为有压缩价值
-        if size >= 4 * 1024 and len(lines) >= 10:
+        # text: 长文本 (8KB+ + 多行 + 平均行长 > 30) 视为有压缩价值
+        # Phase 2-2: MARK42_TEXT_USE_LLM=true 时阈值降到 500B (使 LLM 路径可触发)
+        # 注: 原始阈值 4KB 侵入了 Day 3 small_text/invalid_json 测试 (5KB 文本本应 skip)
+        # 调到 8KB 让 Day 3 契约保留; 真正长的文本 (>8KB) 才嗅探 text
+        text_threshold = 500 if _TEXT_USE_LLM == "true" else 8 * 1024
+        if size >= text_threshold and len(lines) >= 1:
             avg_line_len = size / max(1, len(lines))
-            if avg_line_len >= 30:
+            min_line_len = 1 if _TEXT_USE_LLM == "true" else 30
+            if avg_line_len >= min_line_len:
                 bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
                 return ScheduleDecision(
                     action="compress",
@@ -295,7 +320,14 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
         elif decision.route_algo == "log":
             compressed, compress_stats = logdedup(current)
         elif decision.route_algo == "text":
-            compressed, compress_stats = text_compress(current)
+            # Phase 2-2: env var 决定是否走 LLM
+            if _should_use_llm(current):
+                from llm_text_compressor import llm_text_compress
+                compressed, compress_stats = llm_text_compress(current, mode=_LLM_MODE)
+                result["llm_used"] = True
+            else:
+                compressed, compress_stats = text_compress(current)
+                result["llm_used"] = False
         else:  # smartcrush 默认
             compressed, compress_stats = smartcrush(current)
         result["compress_stats"] = compress_stats

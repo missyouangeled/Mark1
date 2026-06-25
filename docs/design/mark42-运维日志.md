@@ -95,3 +95,46 @@
   2. `MARK42_TEXT_USE_LLM` 环境变量 (改 `algo_scheduler.py` ~20 行)
 - **守护影响**: 零 (纯文档 + 规划, 无代码改动)
 - **下次开机动作**: 无 (armor-guard / engine-daemon / config / loops 全保留 Day 9 状态)
+
+### 2026-06-25 10:55 — Day 10: Phase 2 目标 1+2 收尾
+
+- **目标 1 (P0)**: LLM 压缩走异步队列 ✅
+  - 新增 `llm_text_compress_async()` 双入口 (wait=True/False, priority, timeout)
+  - `compress_queue.py` worker 新增 `content_type="llm:*"` 路由
+  - **实测 `wait=False` 入队 0.1ms 即返** — daemon tick 永不阻塞
+- **目标 2 (P0)**: `MARK42_TEXT_USE_LLM` 环境变量 ✅
+  - 三态: `true` / `false` (默认) / `auto` (按大小自动选)
+  - 配套: `MARK42_LLM_MODE` (summarize/simplify/extract) + `MARK42_LLM_AUTO_THRESHOLD` (字节数)
+  - text 嗅探阈值 4KB → 8KB (避免 Day 3 回归)
+- **测试**: mark42-tests.py 34 → **40 集成测试**, 0 失败
+- **LLM 单元测试**: 37 → 49 子测试
+- **压缩子系统子测试累计**: 161 → **210**
+- **改动文件**: llm_text_compressor.py / compress_queue.py / algo_scheduler.py / mark42-tests.py / 收官 README
+- **守护影响**: 零 (代码改动不需重启守护)
+- **下次开机动作**: 无
+
+### 新增 env var 文档 (运维参考)
+
+```bash
+# LLM 压缩全局开关 (Day 10 起)
+# - false: 维持现状, scheduler 走 rule_based
+# - true:  scheduler 路由 text 时强制走 LLM (每次 4-5s)
+# - auto:  scheduler 路由 text 时, 输入 >= 阈值自动走 LLM
+export MARK42_TEXT_USE_LLM=false  # 默认
+
+# LLM 模式选择 (Day 10 起)
+# - summarize: 摘要 (默认, 最稳)
+# - simplify: 简化措辞 (适合技术文档)
+# - extract: 抽取关键信息 (最激进, 适合 log)
+export MARK42_LLM_MODE=summarize
+
+# auto 模式阈值 (字节, 默认 5120 = 5KB)
+export MARK42_LLM_AUTO_THRESHOLD=5120
+```
+
+**使用场景**:
+- 平时开发: 默认 (false) - 0 成本, daemon 极快
+- 跑离线批处理: `MARK42_TEXT_USE_LLM=true` - 高压缩, 慢一点
+- 在线长文本智能压缩: `MARK42_TEXT_USE_LLM=auto` - 自动平衡
+
+**注意**: LLM 调走 OpenClaw minimax provider, 与 `_llm_analyze` 同源, 走 MiniMax-M3 模型。

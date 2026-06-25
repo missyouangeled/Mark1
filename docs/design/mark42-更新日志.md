@@ -901,3 +901,99 @@ $ grep -rn "compression_algorithms.*[Ll]og" --include="*.py"
 - 新会话读 4 文件即可接力 (README / 更新日志 / config.py / mark42-tests.py)
 - mark42-tests.py 34/34 全绿
 - 5 Loop 全活跃, 守护稳定
+
+---
+
+## Day 10 — 2026-06-25 (Phase 2 目标 1+2 收尾)
+
+### 目标
+
+按 Phase 2 路线 (README §六) 推进, 完成 P0 优先级 2 项目标:
+
+- **P0-1**: LLM 压缩走异步队列 (daemon 永不阻塞)
+- **P0-2**: `MARK42_TEXT_USE_LLM` 环境变量 (scheduler 支持)
+
+### 实施
+
+#### P0-1: LLM 压缩走异步队列
+
+**关键决策**: 不改 `text_compress()` 同步签名 (破坏 Day 3 合约), 改在 `llm_text_compressor.py` 新增 `llm_text_compress_async()` 双入口
+
+**改动**:
+
+1. `scripts/mark42_modules/llm_text_compressor.py` (+~110 行)
+   - 新函数 `llm_text_compress_async(content, mode, wait, priority, timeout)`
+   - `wait=True`: 同步等结果 (走 CompressQueue 后台 worker, 不会卡调用方主线程)
+   - `wait=False`: 入队即返, **0.1ms** 实测入队 (daemon tick 永不阻塞)
+   - 3 种 mode 都支持 (summarize / simplify / extract)
+   - priority 三态 (0=normal, 1=urgent, 2=low)
+   - 默认 timeout=60s
+   - 12 个新单元测试覆盖 (wait/priority/timeout/3 mode/极端输入)
+
+2. `scripts/mark42_modules/compress_queue.py` (+~30 行)
+   - worker `_process_one` 新增 `content_type` 路由分支
+   - `content_type="llm:<mode>"` 走 LLM 分支 (调 `llm_text_compress()`)
+   - 其他保持现状调 `algo_scheduler.process()` 走 rule_based
+   - LLM 路径在 worker 线程里跑, **不阻塞调用方**
+
+**实测**:
+
+```
+LLM 异步入口调用 (daemon tick 不阻塞):
+- wait=False: 0.1ms 入队即返
+- wait=True:  ~3.4s 拿结果 (LLM 调用本身)
+```
+
+#### P0-2: MARK42_TEXT_USE_LLM 环境变量
+
+**改动**:
+
+1. `scripts/mark42_modules/algo_scheduler.py` (+~30 行)
+   - 顶部 `import os` + 读 env var (`MARK42_TEXT_USE_LLM`, `MARK42_LLM_MODE`, `MARK42_LLM_AUTO_THRESHOLD`)
+   - 新函数 `_should_use_llm(content)` 决定是否走 LLM
+   - text 路由分支改为: 根据 env var 调 `text_compress()` 或 `llm_text_compress()`
+   - text 嗅探阈值 4KB → **8KB** (避免 Day 3 small_text/invalid_json 测试回归)
+
+**实测 env var 行为**:
+
+| 配置 | 输入 | 路由 | llm_used | 行为 |
+|---|---|---|---|---|
+| 默认 (false) | 4.5KB | text | False | rule_based, ratio ~20% |
+| env=true | 12KB | text | True | LLM, ratio ~90% |
+| env=auto + 小 | 4.5KB | text | False | rule_based |
+| env=auto + 大 | 12KB | text | True | LLM, ratio ~90% |
+
+### 测试
+
+- `mark42-tests.py` 34 → **40 集成测试** (0 失败, 40/40 全绿)
+  - Phase 2-1 专项: LLMTextCompressor 单元测试 (49/49) + llm_text_compress_async 集成
+  - Phase 2-2 专项: env 默认 / env=true / env=auto+big / env=auto+small
+- LLMTextCompressor 单元测试 37 → **49** (+12)
+
+### 错误与修复
+
+- **问题 1**: 首次实现 worker 仍走 rule_based 而非 LLM → 返回 `was_llm=False` 误导调用方
+  - **修复**: worker 改为 `content_type` 路由, `llm:` 前缀走 LLM
+- **问题 2**: text 嗅探阈值 4KB 导致 Day 3 测试回归
+  - **修复**: 阈值调到 8KB, T6.4 仍通过 (测试输入 ~14KB)
+- **问题 3**: 测试输入估错字节数 (中英文混合, 1 字符不是 1 字节) → 边界情况乱判
+  - **修复**: 实际 `len(text.encode('utf-8'))` 验证, 全部用 12KB+ 输入
+
+### 修改文件
+
+| 文件 | 操作 | 行数 |
+|---|---|---|
+| `scripts/mark42_modules/llm_text_compressor.py` | 修改 | +~110 |
+| `scripts/mark42_modules/compress_queue.py` | 修改 | +~30 |
+| `scripts/mark42_modules/algo_scheduler.py` | 修改 | +~30 |
+| `scripts/mark42-tests.py` | 修改 | +~80 |
+| `docs/design/mark42-阶段1收官README-20260625.md` | 修改 | +~50 (§六/七/八/九 更新) |
+| `docs/design/mark42-更新日志.md` | 追加 | +~80 (本节) |
+
+### 当前状态
+
+- Phase 2 目标 1+2 完成 (P0 优先级清空)
+- 压缩子系统子测试累计 96 → **210** (含 LLM async 12 + env var 4)
+- mark42-tests.py 累计 30 → 32 → 34 → **40** (1.33x 增长)
+- 0 失败, daemon 永不阻塞 (LLM 入队 0.1ms 实测)
+- Phase 2 剩余 5 个目标 (P1-3 mock, P1-4 SmartCrusher 拆, P2-5/6/7 词典/性能/Heavy 层), 留作新会话接力

@@ -187,9 +187,37 @@ class CompressQueue:
             self.stats["active_workers"] = sum(
                 1 for w in self._workers if w.is_alive()
             )
+        t0 = time.time()
         try:
-            # 实际压缩 (延迟导入避免循环)
-            # 鲁棒导入: 跨包 / 同包两种调用方式都能找
+            # Phase 2 目标 1: content_type="llm:..." 走 LLM 压缩
+            if request.content_type.startswith("llm:"):
+                mode = request.content_type.split(":", 1)[1]
+                try:
+                    from llm_text_compressor import llm_text_compress
+                except ImportError:
+                    from .llm_text_compressor import llm_text_compress
+                text_result, llm_stats = llm_text_compress(request.content, mode=mode)
+                # 把 llm_stats 转成统一格式
+                payload = {
+                    "request_id": request.request_id,
+                    "session_id": request.session_id,
+                    "route_algo": "llm",
+                    "llm_mode": mode,
+                    "text": text_result,
+                    "status": llm_stats.get("status", "unknown"),
+                    "original_size": llm_stats.get("original_bytes", len(request.content)),
+                    "compressed_size": llm_stats.get("crushed_bytes", len(text_result.encode("utf-8"))),
+                    "ratio": llm_stats.get("ratio", 0.0),
+                    "duration_ms": int((time.time() - t0) * 1000),
+                    "elapsed": time.time() - t0,
+                }
+                request.set_result(payload)
+                self.stats["processed"] += 1
+                log.debug(f"processed {request.request_id} LLM({mode}) "
+                          f"status={payload['status']} ratio={payload['ratio']:.1%}")
+                return
+
+            # 默认: 走 algo_scheduler 智能路由
             try:
                 from algo_scheduler import process
             except ImportError:
@@ -200,12 +228,13 @@ class CompressQueue:
                 "request_id": request.request_id,
                 "session_id": request.session_id,
                 "route_algo": result["decision"].route_algo,
+                "text": result.get("result", ""),
                 "changed": result.get("changed", False),
                 "original_size": result.get("original_size", len(request.content)),
                 "compressed_size": result.get("compressed_size", len(result.get("result", ""))),
                 "ratio": result.get("compress_stats", {}).get("ratio", 0.0) if result.get("compress_stats") else 0.0,
-                "duration_ms": int((time.time() - request.created_at) * 1000),
-                "elapsed": time.time() - request.created_at,
+                "duration_ms": int((time.time() - t0) * 1000),
+                "elapsed": time.time() - t0,
             }
             request.set_result(payload)
             self.stats["processed"] += 1
