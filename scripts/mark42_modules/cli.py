@@ -396,6 +396,8 @@ def main() -> None:
     armor_p.add_argument("--dry-run", action="store_true", help="压缩预览")
     armor_p.add_argument("--guard", action="store_true", help="启动守护模式")
     armor_p.add_argument("--interval", type=int, default=300, help="守护检查间隔秒数")
+    armor_p.add_argument("--queue-stats", action="store_true", help="查看压缩队列统计")
+    armor_p.add_argument("--smartcrush", action="store_true", help="对演示 JSON 跑一次 smartcrush 压测")
 
     # ── Engine ──
     engine_p = sub.add_parser("engine", help="🔄 循环引擎")
@@ -485,7 +487,8 @@ def main() -> None:
         return
 
     if args.module == "armor":
-        from .armor import armor_check, armor_compress, armor_guard
+        from .armor import armor_check, armor_compress, armor_guard, armor_compress_queue_stats
+        from .smart_crusher import smartcrush
         if args.check:
             result = armor_check()
             print(f"🛡️ 上下文铠甲")
@@ -499,6 +502,31 @@ def main() -> None:
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         elif args.guard:
             armor_guard(args.interval)
+        elif args.queue_stats:
+            stats = armor_compress_queue_stats()
+            print("📦 压缩队列统计")
+            if "error" in stats:
+                print(f"   ❌ {stats['error']}")
+                return
+            for k, v in stats.items():
+                print(f"   {k}: {v}")
+        elif args.smartcrush:
+            import json as _sj
+            demo = _sj.dumps({
+                "users": [
+                    {"id": i, "name": f"user_{i}", "bio": "x" * 300}
+                    for i in range(40)
+                ],
+                "meta": {"version": "2.3.3", "note": "smartcrush CLI 演示"},
+            }, ensure_ascii=False)
+            crushed, cstats = smartcrush(demo)
+            print("🧪 smartcrush 演示")
+            print(f"   原始: {cstats.get('original_bytes', len(demo.encode()))} bytes")
+            print(f"   压缩: {cstats.get('crushed_bytes', len(crushed.encode()))} bytes")
+            print(f"   压缩率: {cstats.get('ratio', 0) * 100:.1f}%")
+            print(f"   数组截断: {cstats.get('arrays_truncated', 0)}")
+            print(f"   字符串截断: {cstats.get('strings_truncated', 0)}")
+            print(f"   深度截断: {cstats.get('depth_truncated', 0)}")
         else:
             result = armor_check()
             print(f"🛡️ 上下文铠甲")
