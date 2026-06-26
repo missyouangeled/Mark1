@@ -826,3 +826,73 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 - `openclaw update` 必须在 gateway 进程树外运行（systemd-run / cron command payload 均可）
 - 每次大版本升级必须重新验证模型选择器补丁（JS bundle 函数名可能变更）
 - config 损坏的根本原因是 update 被 SIGKILL 打断；TimeoutStopSec 不够长是系统级隐患
+
+---
+
+## v2026.6.9 → v2026.6.10 升级（2026-06-26）
+
+### 背景
+- 6.10 发布日期：2026-06-24（4 天前）
+- 6.10 是"小发布"，官方说明主要改进：
+  1. Automatic fast mode for short talks（短对话自动走 fast mode）
+  2. More reliable model routing（模型路由更可靠）
+  3. Safer session state trusted policies（trusted policies 与 hook registry 一致化，PR #94545）
+  4. Better provider onboarding（PR #91786：managed npm root overrides 与 peer pins 调和）
+- 触发原因：常规版本跟进，6.10 距 6.9 仅 6 天
+
+### 操作步骤
+1. 备份：`openclaw.json` / `package.json` / `dist/` 到 `/tmp/upgrade-backups/2026-06-26-6.9to6.10/`
+2. 工作区清理：`git add -A && git commit && git push origin master`（f78f16e）
+3. `systemctl --user stop openclaw-gateway.service`（drop-in TimeoutStopSec=60 防止 SIGKILL）
+4. `npm update -g openclaw`（前台执行，npm 内部已处理好 deps 关系；exit=0；changed 297 packages in 29s）
+5. 验证：`openclaw --version` = `2026.6.10 (aa69b12)`
+6. `systemctl --user restart openclaw-gateway.service`
+7. gateway 自动以 6.10 启动，PID 45389，CRITICAL/ERROR 0 条
+8. `openclaw gateway install --force` 让 6.10 重写 service 文件（Description / OPENCLAW_SERVICE_VERSION 自动更新到 2026.6.10）
+9. daemon-reload，drop-in `timeout-fix.conf` 持续生效（TimeoutStopSec=60）
+
+### 发现的问题
+**本版本踩坑数：0（出乎意料地顺滑）**
+
+1. **Branding 脚本无 6.10 适配**——但**未失效**。原因：6.10 dist 文件名 hash 与 6.9 一致（`index-BEWaPr0D.js`），branding 脚本基于文件 hash + 函数存在性检测，不依赖硬编码的版本号分支。
+2. **Gateway service 仍指向 6.9**——`gateway install --force` 自动用 6.10 重写。但 drop-in（timeout-fix / branding / qmd-cpu / resource-limits）全部保留，未覆盖。
+3. **doctor 提示（非 ERROR）**：
+   - 8 个 orphan transcript 文件（包括之前 164% 那条 `e3908b0f-4b58-4d33-8855-4b0475d1b514.jsonl`）
+   - 1 个 session lock（当前主会话，9s 龄，not stale）
+   - 5 个 cron job 用了模型覆盖（有意配置）
+   - `mark42-3day-checkpoint` 连续 8 次 error（model-call timeout，与本次升级无关）
+
+### 修复详情
+1. Branding / model-selector 补丁：**未变更**（脚本无 6.10 分支，但 6.10 dist 兼容）
+2. Gateway service：6.10 自动重写，主文件 `OPENCLAW_SERVICE_VERSION=2026.6.10`
+3. Drop-in（timeout-fix 等 6 个 .conf）：保持原样
+
+### 联网搜索到的关键信息
+- OpenClaw 6.10 releasebot 公告：6.10 是 routine update，4 项改进如上
+- 6.11-beta.1 已在准备：包含 `configurable compaction waits`（与 6.10 之前对话中提到的"上下文铠甲自动巡检"间接相关）
+- PR #94545 `fix: keep trusted policies with hook registry` —— trusted policies 改动可能影响 hooks 注册顺序（待观察）
+- PR #91786 `fix(plugins): reconcile managed npm root overrides with managed peer pins` —— npm 全局安装路径变化（本次 npm update 已处理）
+
+### 验证结果
+- ✅ `openclaw --version` = `2026.6.10 (aa69b12)`
+- ✅ Gateway PID 46346 运行 6.10 代码（systemd Description 已自动同步）
+- ✅ Control UI HTTP 200
+- ✅ API `/health` = `{"ok":true,"status":"live"}`
+- ✅ Unified proxy `/healthz` HTTP 200
+- ✅ `openclaw post-upgrade-self-check.py` 全 PASS（21+ 项）
+- ✅ `openclaw doctor` 仅建议性提示，无 ERROR
+- ✅ Skills: 60 eligible / 0 missing / 0 blocked
+- ✅ Plugins: 10 loaded / 0 errors / 0 disabled (但 70 disabled by allowlist——正常)
+- ✅ Session lock 当前主会话 9s 龄不 stale
+- ✅ 现有 21 个 session jsonl 文件未丢失
+
+### 经验教训（增量）
+- **drop-in 优先于主文件**：`gateway install --force` 改主文件不会清空 drop-in，这是好事—— TimeoutStopSec=60 在 6.10 重装后依然生效。
+- **npm update 不一定要 systemd-run**：6.10 的 update 比想象中轻（29s 完成 297 包），systemctl stop 期间不会被 SIGKILL 打断（drop-in 救场）。下次同样轻量升级可以直接 `stop + npm update + restart`。
+- **Branding 脚本不必硬编码每个版本**：6.10 没适配但仍然成功——基于文件 hash + 函数存在性的检测比版本号分支更鲁棒。
+- **doctor 报告要分级处理**：orphan / 锁 / cron 模型覆盖是建议性，不阻塞升级；只有 ERROR 才必修。
+- **PR 改动前先看 manifest**：trusted policies 改动（#94545）可能影响后续 hook 写代码，今天没观察到问题，下次写新 hook 时警惕一下。
+
+### 待办（不阻塞，标留 Mark42 / OpenClaw 后续工作）
+- [ ] 清理 8 个 orphan transcript（含 164% 那条）—— `openclaw doctor --fix` 可一键归档
+- [ ] 修 `mark42-3day-checkpoint` cron 连续 8 次 error（model-call timeout）—— 与 6.10 升级无关，Mark42 范畴
