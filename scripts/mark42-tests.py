@@ -613,4 +613,12 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    finally:
+        try:
+            from mark42_modules.compress_queue import shutdown_compress_queue
+        except ImportError:
+            shutdown_compress_queue = None
+        if shutdown_compress_queue is not None:
+            shutdown_compress_queue()

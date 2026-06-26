@@ -62,6 +62,13 @@ def _run_script(name: str, *args: str, check: bool = True) -> subprocess.Complet
     cmd = [sys.executable, str(WORKSPACE / "scripts" / name), *args]
     return subprocess.run(cmd, capture_output=True, text=True, check=check)
 
+
+def _safe_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except FileNotFoundError:
+        return -1.0
+
 def _find_active_session() -> Path | None:
     """找当前活跃 session：优先用 .lock 文件，按 mtime 取最新。
     
@@ -74,10 +81,16 @@ def _find_active_session() -> Path | None:
     sessions_dir = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
     now = time.time()
     # 策略 A：.lock 文件
-    lock_files = sorted(sessions_dir.glob("*.jsonl.lock"),
-                       key=lambda p: p.stat().st_mtime, reverse=True)
+    lock_files = sorted(
+        sessions_dir.glob("*.jsonl.lock"),
+        key=_safe_mtime,
+        reverse=True,
+    )
     for lock in lock_files:
-        age = now - lock.stat().st_mtime
+        mtime = _safe_mtime(lock)
+        if mtime < 0:
+            continue
+        age = now - mtime
         if age > LOCK_MAX_AGE:
             continue  # 死 session
         jsonl_path = Path(str(lock).replace(".lock", ""))
@@ -89,7 +102,7 @@ def _find_active_session() -> Path | None:
         c for c in sessions_dir.glob("*.jsonl")
         if all(bad not in str(c) for bad in [".reset.", ".deleted.", ".bak-", ".trajectory."])
     ]
-    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    candidates.sort(key=_safe_mtime, reverse=True)
     return candidates[0] if candidates else None
 
 def _estimate_tokens(session_path: Path) -> dict[str, Any]:

@@ -36,6 +36,9 @@ from typing import Any
 log = logging.getLogger("mark42.compress_queue")
 
 
+QUEUE_POLL_TIMEOUT = 0.05
+
+
 @dataclass
 class CompressRequest:
     """压缩请求封装"""
@@ -172,7 +175,7 @@ class CompressQueue:
         """worker 主循环"""
         while self._running:
             try:
-                item = self._queue.get(timeout=1.0)
+                item = self._queue.get(timeout=QUEUE_POLL_TIMEOUT)
             except std_queue.Empty:
                 continue
             if item is None:  # poison pill

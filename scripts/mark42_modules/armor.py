@@ -29,7 +29,7 @@ from .utils import (
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
 try:
-    from .compression_algorithms import smartcrush
+    from .smart_crusher import smartcrush
     _COMPRESSION_AVAILABLE = True
 except ImportError as e:
     _COMPRESSION_AVAILABLE = False

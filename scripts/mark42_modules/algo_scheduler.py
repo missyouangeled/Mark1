@@ -55,7 +55,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from compression_algorithms import smartcrush
+from smart_crusher import smartcrush
 from pii_redactor import redact_pii
 from code_compressor import codecrush
 from diff_compressor import diff_compress

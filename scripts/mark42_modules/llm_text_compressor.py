@@ -173,9 +173,10 @@ class LLMTextCompressor:
         try:
             result_text = self._call_llm(prompt, resolved)
         except Exception as e:
-            stats["status"] = "error"
             stats["error"] = f"{type(e).__name__}: {e}"
             stats["llm_duration_ms"] = int((time.time() - t0) * 1000)
+            stats["status"] = "fallback_rule_based"
+            stats["fallback_reason"] = "llm_exception"
             log.warning(f"LLM call failed: {stats['error']}, falling back to rule_based")
             return self._fallback(text, stats)
         stats["llm_duration_ms"] = int((time.time() - t0) * 1000)
@@ -397,6 +398,26 @@ def _run_tests() -> bool:
     passed = 0
     failed = 0
 
+    class _MockHTTPResponse:
+        def __init__(self, payload: dict[str, Any]):
+            self._payload = json.dumps(payload).encode("utf-8")
+
+        def read(self) -> bytes:
+            return self._payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def make_mock_urlopen(payload: dict[str, Any] | Exception):
+        def _mock(req, timeout=None):
+            if isinstance(payload, Exception):
+                raise payload
+            return _MockHTTPResponse(payload)
+        return _mock
+
     def check(name: str, cond: bool):
         nonlocal passed, failed
         if cond:
@@ -459,27 +480,93 @@ def _run_tests() -> bool:
         check("5.2 有 model 字段 (openclaw)", False)
         print("  → 注意: 模型配置未找到, 实际 LLM 调用会回退")
 
-    # ---- 测试 6: 真实 LLM 调用 (可选, 有 key 就跑) ----
-    print("\n[测试 6] 真实 LLM 调用 (有 api key 时)")
+    # ---- 测试 6: Mock LLM 调用 (CI 必跑) ----
+    print("\n[测试 6] Mock LLM 调用 (CI 必跑)")
+    from unittest.mock import patch
+
+    long_text = (
+        "总而言之，这是一个非常长的测试文本，目的是验证 LLM 压缩的实际效果。\n"
+        "我们使用了多个段落来提供足够的内容供 LLM 摘要。\n"
+        "第一段：系统采用 Python 开发，提供了完整的 API 接口。\n"
+        "第二段：数据库采用 PostgreSQL，支持事务和 ACID 特性。\n"
+        "第三段：缓存层使用 Redis，性能表现优异。\n"
+        "第四段：监控系统接入 Prometheus + Grafana。\n"
+        "第五段：日志收集通过 Loki 实现统一查询。\n"
+    ) * 5
+
+    mock_resolved = {
+        "apiKey": "mock-key",
+        "baseUrl": "https://mock.local/v1",
+        "endpoint": "/chat/completions",
+        "model": "mock-llm-compress",
+        "maxTokens": 128,
+        "temperature": 0.0,
+        "timeout": 7,
+    }
+    mock_ok_payload = {
+        "choices": [{
+            "message": {"content": "项目采用 Python、PostgreSQL、Redis、Prometheus/Grafana、Loki，提供完整 API 与监控日志能力。"}
+        }]
+    }
+
+    c = LLMTextCompressor(mode="summarize")
+    captured: dict[str, Any] = {}
+
+    def capture_and_return(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        captured["auth"] = req.get_header("Authorization")
+        captured["content_type"] = req.get_header("Content-Type") or req.headers.get("Content-type")
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _MockHTTPResponse(mock_ok_payload)
+
+    with patch.object(c, "_resolve_model", return_value=mock_resolved):
+        with patch("urllib.request.urlopen", capture_and_return):
+            out, stats = c.compress(long_text)
+
+    check("6.1 调了 LLM", stats["llm_called"] is True)
+    check("6.2 status=compressed", stats["status"] == "compressed")
+    check("6.3 压缩率 >= 5%", stats["ratio"] >= 0.05)
+    check("6.4 model 传对", stats["llm_model"] == "mock-llm-compress")
+    check("6.5 URL 拼接正确", captured.get("url") == "https://mock.local/v1/chat/completions")
+    check("6.6 timeout 透传", captured.get("timeout") == 7)
+    check("6.7 Authorization 头存在", captured.get("auth") == "Bearer mock-key")
+    check("6.8 Content-Type 正确", captured.get("content_type") == "application/json")
+    check("6.9 body.model 正确", captured.get("body", {}).get("model") == "mock-llm-compress")
+    check("6.10 body.max_tokens 正确", captured.get("body", {}).get("max_tokens") == 128)
+    check("6.11 body.temperature 正确", captured.get("body", {}).get("temperature") == 0.0)
+    messages = captured.get("body", {}).get("messages", [])
+    check("6.12 messages 只有一条 user", len(messages) == 1 and messages[0].get("role") == "user")
+    check("6.13 prompt 含原文", "原文：\n" in (messages[0].get("content", "") if messages else ""))
+    print(f"  → 原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B ({stats['ratio']:.1%})")
+    print(f"  → mock 输出预览: {out[:120]!r}")
+
+    c = LLMTextCompressor(mode="summarize")
+    with patch.object(c, "_resolve_model", return_value=mock_resolved):
+        with patch("urllib.request.urlopen", make_mock_urlopen({"choices": []})):
+            out, stats = c.compress(long_text)
+    check("6.14 空 choices 回退", stats["status"] in ("fallback_rule_based", "fallback_low_ratio"))
+    check("6.15 空 choices 标记 error", "RuntimeError" in (stats["error"] or ""))
+
+    c = LLMTextCompressor(mode="summarize")
+    with patch.object(c, "_resolve_model", return_value=mock_resolved):
+        with patch("urllib.request.urlopen", make_mock_urlopen(urllib.error.URLError("mock timeout"))):
+            out, stats = c.compress(long_text)
+    check("6.16 HTTP 异常回退", stats["status"] in ("fallback_rule_based", "fallback_low_ratio"))
+    check("6.17 HTTP 异常写入 error", "URLError" in (stats["error"] or ""))
+
+    # ---- 测试 6R: 真实 LLM 调用 (可选补充) ----
+    print("\n[测试 6R] 真实 LLM 调用 (可选补充)")
     if not resolved or not resolved.get("apiKey"):
-        print("  ⚠️  无 api key, 跳过真实调用测试")
-        check("6.1 跳过 (无 key)", True)
+        print("  ⚠️  无 api key, 跳过真实调用补充测试")
+        check("6R.1 无 key 时允许跳过", True)
     else:
-        long_text = (
-            "总而言之，这是一个非常长的测试文本，目的是验证 LLM 压缩的实际效果。\n"
-            "我们使用了多个段落来提供足够的内容供 LLM 摘要。\n"
-            "第一段：系统采用 Python 开发，提供了完整的 API 接口。\n"
-            "第二段：数据库采用 PostgreSQL，支持事务和 ACID 特性。\n"
-            "第三段：缓存层使用 Redis，性能表现优异。\n"
-            "第四段：监控系统接入 Prometheus + Grafana。\n"
-            "第五段：日志收集通过 Loki 实现统一查询。\n"
-        ) * 5  # 重复 5 次让总长度 > 500
         c = LLMTextCompressor(mode="summarize")
         out, stats = c.compress(long_text)
-        check("6.1 调了 LLM", stats["llm_called"] is True)
-        check("6.2 status=compressed", stats["status"] == "compressed")
-        check("6.3 压缩率 >= 5%", stats["ratio"] >= 0.05)
-        check("6.4 duration < 60s", stats["llm_duration_ms"] < 60_000)
+        check("6R.1 调了 LLM", stats["llm_called"] is True)
+        check("6R.2 status=compressed", stats["status"] == "compressed")
+        check("6R.3 压缩率 >= 5%", stats["ratio"] >= 0.05)
+        check("6R.4 duration < 60s", stats["llm_duration_ms"] < 60_000)
         print(f"  → 原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B "
               f"({stats['ratio']:.1%}), 用时 {stats['llm_duration_ms']}ms")
         print(f"  → 输出预览: {out[:200]!r}")

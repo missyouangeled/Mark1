@@ -5,6 +5,83 @@
 
 ---
 
+## 2026-06-26 #2 — v2.3.3 Phase 2 收口：P2-5 词典扩展 + P2-6 性能基准 + 运行时竞态修复
+
+**背景**：继续推进 Phase 2 时，先完成 `text_compressor` 词典扩展与性能基准脚本，再对已完成部分做严格复审。复审中实际发现了 3 类问题：过激词典替换误伤语义、性能基准口径/方法不严谨、Mark42 session 发现逻辑存在文件锁竞态。以上均已修正并重新烟测。
+
+### 变更清单
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | feat | `text_compressor.py` 扩展词典规模：`SYNONYMS` → **133**、`REDUNDANT_PHRASES` → **93**，覆盖中英技术文档 / API / 日志高频冗余模式 |
+| A | fix | `text_compressor.py` 修复 `fallback_low_ratio` 统计口径：回退原文时同步写回 `crushed_bytes` / `crushed_lines` |
+| A | fix | `text_compressor.py` 英文同义词替换改为**整词边界**，避免误伤长词 |
+| A | fix | 严格复审后移除过激中文短词映射（如 `通过→经` / `提供→给` / `包含→含`），并补防误伤测试 |
+| B | feat | 新建 `scripts/mark42_modules/perf_bench.py`，分层测 **裸算法 / 调度层 / 异步层**，自动生成 `mark42-压缩方案-性能基准-20260626.md` |
+| B | fix | `perf_bench.py` 样本生成改为**严格按 UTF-8 字节截断**，避免中文样本尺寸失真 |
+| B | fix | `perf_bench.py` 加 warmup，并把 `tracemalloc` 从主计时区间拆出，减少基准污染 |
+| B | fix | `perf_bench.py` / 性能报告补充口径说明：`async_entry-*` 是 `llm_text_compress_async()` **单次封装入口总成本**，不等同于常驻吞吐 |
+| C | fix | `compress_queue.py` worker 取队列轮询从 `1.0s` 调整到 `0.05s`，降低异步压缩尾延迟 |
+| C | fix | `utils.py::_find_active_session()` 增加 `_safe_mtime()`，修复 `.jsonl.lock` 在扫描过程中被删除导致的 `FileNotFoundError` 竞态 |
+
+### 验证
+
+- `python3 scripts/mark42_modules/text_compressor.py` → **49/49 全绿**
+- `python3 scripts/mark42_modules/compress_queue.py` → **28/28 全绿**
+- `python3 scripts/mark42_modules/llm_text_compressor.py` → **66/66 全绿**
+- `python3 scripts/mark42_modules/perf_bench.py` → 报告生成成功
+- `python3 scripts/mark42-tests.py` → **40/40 全绿**
+
+### 融合结论
+
+- `smart_crusher.py`、`text_compressor.py`、`compress_queue.py` 与 Mark42 主链路兼容
+- `perf_bench.py` 为独立基准工具，不侵入运行时
+- Mark42 运行与日志链路正常：`armor/actions.jsonl`、`engine/loops.json`、`watchdog.log` 均有有效更新
+
+### 修改文件
+
+- `scripts/mark42_modules/text_compressor.py`
+- `scripts/mark42_modules/perf_bench.py`
+- `scripts/mark42_modules/compress_queue.py`
+- `scripts/mark42_modules/utils.py`
+- `docs/design/mark42-压缩方案-性能基准-20260626.md`
+
+---
+
+## 2026-06-26 — v2.3.2 Phase 2 稳定化：LLM Mock 必跑 + SmartCrusher 拆分
+
+**背景**：Phase 2 前两项收尾时，需要把 LLM 压缩测试从“有 key 才跑”改成 CI 可稳定执行，同时完成 `SmartCrusher` 的独立模块拆分，并严格排查兼容层回归风险。
+
+### 变更清单
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | test | `llm_text_compressor.py` 测试 6 改为 **Mock 必跑**，真实 LLM 改为测试 6R 可选补充 |
+| A | fix | `LLMTextCompressor.compress()` 在 LLM 异常回退时，`status` 修正为 `fallback_rule_based`，并记录 `fallback_reason="llm_exception"` |
+| B | refactor | 新建 `scripts/mark42_modules/smart_crusher.py`，独立承载 `SmartCrusher / get_smartcrusher / smartcrush` |
+| B | refactor | `compression_algorithms.py` 改为 `RAGRanker` + `SmartCrusher` 兼容导出 shim，并补独立运行兼容 |
+| B | refactor | `algo_scheduler.py` / `armor.py` 调用点切到 `smart_crusher.py` |
+| C | fix | 严格回查中发现 `RAGRanker` 一度为手工回填实现，已从 Git 历史恢复原版逻辑，消除隐藏回归风险 |
+
+### 验证
+
+- `python3 scripts/mark42_modules/llm_text_compressor.py` → **66/66 全绿**
+- `python3 scripts/mark42_modules/smart_crusher.py` → 通过
+- `python3 scripts/mark42_modules/compression_algorithms.py` → 通过
+- `python3 -m py_compile scripts/mark42_modules/*.py scripts/mark42-tests.py` → 通过
+- `python3 scripts/mark42-tests.py` → **40/40 全绿**
+
+### 修改文件
+
+- `scripts/mark42_modules/llm_text_compressor.py`
+- `scripts/mark42_modules/smart_crusher.py`
+- `scripts/mark42_modules/compression_algorithms.py`
+- `scripts/mark42_modules/algo_scheduler.py`
+- `scripts/mark42_modules/armor.py`
+
+
+---
+
 ## 2026-06-18 — v2.3.1 LLM 压缩链路修复
 
 **背景**：铠甲 LLM 压缩需指定 provider/模型。先切到公司 DeepSeek，后改为 MiniMax M3（DeepSeek 留给主会话）。
