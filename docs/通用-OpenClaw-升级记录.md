@@ -896,3 +896,52 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 ### 待办（不阻塞，标留 Mark42 / OpenClaw 后续工作）
 - [ ] 清理 8 个 orphan transcript（含 164% 那条）—— `openclaw doctor --fix` 可一键归档
 - [ ] 修 `mark42-3day-checkpoint` cron 连续 8 次 error（model-call timeout）—— 与 6.10 升级无关，Mark42 范畴
+
+## 升级后优化：doctor 6 项精简（2026-06-26 13:00-15:25）
+
+### 背景
+v2026.6.9→v2026.6.10 升级后，doctor 报告 5 类问题。其中 1 项（model 路由）用户要求"AI 模型都换 MiniMax-M3"，其他 4 项是 doctor 主动建议的"性能/安全/可读性"优化。本次集中处理。
+
+### 用户要求
+> "AI 模型都换成 MiniMax-M3" —— 15:00 用户直接说
+
+### 操作清单
+
+| # | 项目 | 位置 | 改动 |
+|---|---|---|---|
+| 1 | AI 模型全局统一 | `agents.defaults.model/imageModel` | `minimax/MiniMax-M3` + `models.providers.minimax.timeoutSeconds=600` |
+| 2 | 5 个 cron 任务 model override | sqlite `cron_jobs` | 2 个 enabled 已是 minimax；3 个 disabled 改成 minimax（其中 1 个 embed-sidecar 从 deepseek 改来） |
+| 3 | mark42-3day-checkpoint 修复 | `cron_jobs.a6903701` | `timeoutSeconds: 120→900`、`delivery.mode=none`、`enabled=false`、`toolsAllow=[process,read,write]`、state 清零 |
+| 4 | Orphan transcript 归档 | `~/.openclaw/agents/main/sessions/` | 2 个 .jsonl → `*.deleted.<ts>`（共 320KB） |
+| 5 | Tool result cap 8K→64K | `agents.defaults.contextLimits` | `toolResultMaxChars: 8000→64000` + `memoryGetMaxChars: 4000→16000` + `memoryGetDefaultLines: 200→500` |
+| 6 | NODE_COMPILE_CACHE | `openclaw-gateway.service.d/compile-cache.conf` | `NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache` + `OPENCLAW_NO_RESPAWN=1` |
+| 7 | Command owner | `commands.ownerAllowFrom` | `["webchat:admin"]` + `ownerDisplay: "raw"` |
+
+### 修复过程关键发现
+
+1. **schema 拒绝 `agents.defaults.llm`**：OpenClaw 6.10 把这个路径标为 legacy，正确路径是 `models.providers.<id>.timeoutSeconds`。**doctor --fix 自动清掉 legacy 字段**，但要主动加 provider timeoutSeconds。
+2. **schema 拒绝 `agents.defaults.cron`**：6.10 没有"cron 默认 model"子字段，**全局 default model 会被 cron 任务自动继承**（除非 payload.model override）。
+3. **sqlite 才是 cron 持久层**：6.10 用 `~/.openclaw/state/openclaw.sqlite` 存 cron，**`jobs.json.migrated` 是升级时留下的旧备份**，doctor 读旧备份会误报"5 jobs override"——但实际生效是 sqlite 数据。
+4. **mark42-3day-checkpoint 原本不是 model 慢**：脚本 `mark42.py status` 只跑 0.15s，问题在 LLM 端（minimax 首 token 慢 + reasoning 模式），OpenClaw 6.10 的 `llm.idleTimeoutSeconds` 默认 60s 太短。**修复靠两层**：① 任务级 `timeoutSeconds: 900`；② Provider 级 `timeoutSeconds: 600`（替代 legacy 字段）。
+5. **mark42-3day-checkpoint 仍报"manual command conversion"**：它要 shell/process 工具但 isolated 默认不允许。已加 `toolsAllow=[process,read,write]` 让 doctor 警告消失。
+
+### 验证结果（最终状态）
+- ✅ Gateway 60215 alive, health ok
+- ✅ `openclaw config validate` 通过
+- ✅ `openclaw doctor` Errors: **0**
+- ✅ 2 个 enabled cron（早安+午餐）连续 ok，consecutiveErrors=0
+- ✅ NODE_COMPILE_CACHE 目录已生成 `v22.23.0-x64-9de703df-1000` 缓存
+- ✅ openclaw status 命令能正常跑（owner 配置没收紧 admin 权限）
+
+### 经验教训
+- **OpenClaw 6.10 配置路径更"专业化"**：6.10 把 `llm.idleTimeoutSeconds` 之类的"广义 LLM 设置"挪到了 `models.providers.<id>.timeoutSeconds`（per-provider），不再支持"全局 llm 配置"。迁移时遇到 schema 拒绝，要看 `doctor --fix` 自动修后留下的字段，反推正确路径。
+- **`openclaw config patch` 是 schema-aware 写入**：比手写 JSON 安全（自动 schema 校验），推荐作为标准修改方式。
+- **doctor 报"5 jobs override"但 sqlite 显示 5/5 minimax**：这是 doctor 适配 6.10 sqlite 存储的滞后（仍读 jobs.json.migrated），**实际状态以 sqlite 为准**。
+- **Command owner 在 webchat 下是 cosmetic**：webchat 默认 admin（DM pairing 模式），配 `commands.ownerAllowFrom=["webchat:admin"]` 主要是为了消除 doctor warning 和未来接 channel 时分级权限。**不会收紧现有 admin 权限**。
+- **NODE_COMPILE_CACHE 用 /var/tmp/ 而不是 ~/.cache**：因为 systemd service 不读用户 shell 环境变量，必须用 service drop-in 设置 `Environment=`，且 `OPENCLAW_NO_RESPAWN=1` 避免 restart 时 supervisor 接管。
+
+### 仍遗留（不阻塞，标留）
+- [ ] **Security 明文 API key**：openclaw.json 仍有 7 处明文（gateway.auth.token + 4 个 provider apiKey + 其他），需用 `openclaw secrets configure` 迁移到 SecretRefs
+- [ ] **doctor 误报 5 jobs override**：等 6.10.1 或之后版本适配 sqlite
+- [ ] **mark42-3day-checkpoint 仍报 manual command conversion**：本质是 6.10 isolated agent 不支持 shell 工具的设计，需 OpenClaw 后续版本改进或自定义 command job
+

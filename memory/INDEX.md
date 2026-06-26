@@ -24,6 +24,7 @@
 | 项目索引入口 | `PROJECT_INDEX.md` | 项目名、目录、别名统一从这里跳 |
 | 记忆 L2.5 索引丢失 + 重建 | `memory/daily/2026-06-24.md` | scratch 索引空、sidecar 加载空索引、强制 rebuild 6245 段 |
 | 跨模型行为对比（点点 vs DeepSeek） | `memory/daily/2026-06-24.md` | 主动记录 / 全链路留痕 / 修后反思 等习惯差异 |
+| OpenClaw 6.9→6.10 升级 + 6 项 doctor 精简 | `memory/daily/2026-06-26.md`, `docs/通用-OpenClaw-升级记录.md` | AI 模型统一到 MiniMax-M3、mark42-3day 修复、orphan 归档、tool cap 8K→64K、NODE_COMPILE_CACHE、Command owner |
 
 ## 常见问法怎么找
 
@@ -62,3 +63,6 @@
 - [2026-06-25] 今日摘要
 - [2026-06-25] 重要事项
 - [2026-06-25] 后续待办
+- [2026-06-26] 今日摘要
+- [2026-06-26] 重要事项
+- [2026-06-26] 后续待办
