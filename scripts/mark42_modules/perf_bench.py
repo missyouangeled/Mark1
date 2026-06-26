@@ -23,6 +23,11 @@ from pathlib import Path
 from statistics import median, quantiles
 from typing import Callable, Any
 
+
+def _flush():
+    """确保 stdout 立即刷出（尤其在被 pipe/tail 时）。"""
+    sys.stdout.flush()
+
 _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
@@ -198,8 +203,15 @@ def bench_async_queue(samples: list[str]) -> BenchResult:
             accepted = q.enqueue(req)
             if not accepted:
                 raise RuntimeError("queue enqueue failed during benchmark")
+            _flush()
+            print(f"  [{idx+1}/{len(samples)}] queued", file=sys.stderr)
             done = req.wait(timeout=30.0)
             elapsed_ms = (time.perf_counter() - t0) * 1000
+            _flush()
+            if done:
+                print(f"  [{idx+1}/{len(samples)}] done ({elapsed_ms:.0f}ms)", file=sys.stderr)
+            else:
+                print(f"  [{idx+1}/{len(samples)}] TIMEOUT", file=sys.stderr)
             peak = _measure_peak_kb(lambda: _queue_roundtrip(q, sample, f"bench-mem-{idx}"))
 
             if not done:
@@ -217,7 +229,9 @@ def bench_async_queue(samples: list[str]) -> BenchResult:
             if req.result.get("changed") is True:
                 changed_hits += 1
     finally:
-        q.shutdown()
+        # shutdown 带超时，避免 worker 线程永久阻塞主线程
+        q.shutdown(timeout=15.0)
+    _flush()
 
     return BenchResult(
         runs=len(samples),
@@ -238,11 +252,13 @@ def bench_async_entry(samples: list[str]) -> BenchResult:
     ratios: list[float] = []
     changed_hits = 0
 
-    for sample in samples:
+    for idx, sample in enumerate(samples):
         _warmup(lambda s: llm_text_compress_async(s, timeout=30.0), sample)
         t0 = time.perf_counter()
         result = llm_text_compress_async(sample, timeout=30.0)
         elapsed_ms = (time.perf_counter() - t0) * 1000
+        _flush()
+        print(f"  [{idx+1}/{len(samples)}] async_entry done ({elapsed_ms:.0f}ms)", file=sys.stderr)
         peak = _measure_peak_kb(lambda: llm_text_compress_async(sample, timeout=30.0))
 
         latencies.append(elapsed_ms)
@@ -439,6 +455,12 @@ def format_report(sync_results: dict[str, dict[int, BenchResult]],
     return "\n".join(lines)
 
 
+def _progress(label: str, done: int, total: int):
+    """进度提示，打到 stderr 避免混入 stdout 管道。"""
+    print(f"[{label}] {done}/{total}", file=sys.stderr)
+    _flush()
+
+
 def main() -> None:
     sizes = [1, 10, 100, 1024]
     sync_runs = {1: 12, 10: 12, 100: 8, 1024: 4}
@@ -454,6 +476,7 @@ def main() -> None:
 
     sync_results: dict[str, dict[int, BenchResult]] = {}
     print("=== 本地算法层基准 ===")
+    _flush()
     for algo_name, (fn, kind) in sync_algos.items():
         sync_results[algo_name] = {}
         for size_kb in sizes:
@@ -464,6 +487,7 @@ def main() -> None:
 
     scheduler_results: dict[int, BenchResult] = {}
     print("\n=== 调度层基准 ===")
+    _flush()
     for size_kb in sizes:
         samples = make_samples("mixed", size_kb, async_runs[size_kb])
         result = bench_scheduler(samples)
@@ -472,6 +496,7 @@ def main() -> None:
 
     async_results: dict[str, dict[int, BenchResult]] = {"queue": {}, "async_entry": {}}
     print("\n=== 异步层基准 ===")
+    _flush()
     for size_kb in sizes:
         samples = make_samples("text", size_kb, async_runs[size_kb])
         queue_result = bench_async_queue(samples)
@@ -481,6 +506,7 @@ def main() -> None:
         entry_result = bench_async_entry(samples)
         async_results["async_entry"][size_kb] = entry_result
         print(f"async_entry   {size_kb:4d}KB  P50={entry_result.p50_ms:8.2f}ms  P95={entry_result.p95_ms:8.2f}ms  Mem={entry_result.peak_mem_kb_p50:8.0f}KB")
+        _flush()
 
     report = format_report(sync_results, scheduler_results, async_results)
     out_path = Path("docs/design/mark42-压缩方案-性能基准-20260626.md")
