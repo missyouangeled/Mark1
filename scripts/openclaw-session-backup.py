@@ -14,7 +14,7 @@
 用途：
 - Gateway 重启 / session 压缩 / 意外清理后快速恢复上下文
 - 独立于 workspace 仓库，不受 git 操作影响
-- 默认保留 14 天
+- 默认保留 14 天 (代码常量 RETENTION_DAYS)
 
 用法：
   python3 scripts/openclaw-session-backup.py                 # 执行一次快照
@@ -41,7 +41,7 @@ MEMORY_FILE = WORKSPACE / "MEMORY.md"
 SOUL_FILE = WORKSPACE / "SOUL.md"
 USER_FILE = WORKSPACE / "USER.md"
 SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
-RETENTION_DAYS = 7
+RETENTION_DAYS = 14
 MANIFEST_FILE = BACKUP_ROOT / "backup-manifest.json"
 
 # 磁盘安全检查阈值：workspace 所在盘余量低于此值（GB），只写数据盘

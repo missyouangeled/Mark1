@@ -89,5 +89,4 @@
 - **子 agent（dashboard/coder/researcher）默认**：`minimax/MiniMax-M3`（免费）
 - **fallback**：`litellm/agnes-2.0-flash`（免费）
 - **当前会话模型**：由 Control UI 模型选择列表决定（sH 函数写 modelOverride 钉死当前会话）
-- **个人 DeepSeek**：provider 名 `deepseek-company`（apiKey: `sk-da159...912e`, key 名 `OpenClawtalk_`），仅手动选择时使用，余额约 ¥6.60
 - **所有 cron 定时任务**：统一使用 MiniMax-M3
