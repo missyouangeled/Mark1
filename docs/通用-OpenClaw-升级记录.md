@@ -945,3 +945,49 @@ v2026.6.9→v2026.6.10 升级后，doctor 报告 5 类问题。其中 1 项（mo
 - [ ] **doctor 误报 5 jobs override**：等 6.10.1 或之后版本适配 sqlite
 - [ ] **mark42-3day-checkpoint 仍报 manual command conversion**：本质是 6.10 isolated agent 不支持 shell 工具的设计，需 OpenClaw 后续版本改进或自定义 command job
 
+## 收尾：联网核实 + 彻底消除 doctor cron 误报（2026-06-26 15:33）
+
+### 背景
+首次升级后，doctor 仍报 2 个 cron warning：
+- "5 jobs set payload.model" —— 初判是 doctor 读 .migrated 旧文件的误报
+- "1 job asks an isolated agent for shell/process tools" —— mark42-3day-checkpoint
+
+用户要求"不管是不是问题，解决一下"。
+
+### 联网核实结果
+搜索 OpenClaw GitHub 仓库，找到 4 个相关 issue：
+- **#43855 / #44047 / #44054 / #44384 / #44425 / #44674**：`normalizePayloadKind` 函数 bug，lower-cases `'agentTurn'` → 写入相同值但仍计数为"需要规范化"，`doctor --fix` 无法清除
+- **#92683**：医生在 cron JSON-to-SQLite migration 后仍报"Legacy cron storage detected"，即便文件已被 archive
+
+### 源码验证（6.10 dist）
+查 `cron-BPwqOmBa.js` 实际逻辑：
+- **`legacyStoreDetected = await legacyCronStoreFilesExist(storePath)`** —— 检查 `jobs.json`/`jobs-state.json` 是否存在
+- **当 `.migrated` 存在但原 `jobs.json` 已被 archive，`legacyStoreDetected = false`** —— **这意味着"5 jobs override" warning 不是来自 .migrated！**
+- **`rawJobs = currentJobs`** —— 直接从 sqlite 读
+- **"5 jobs override" 真实原因**：`noteCronModelOverrides` 遍历 `params.jobs`，对所有 `payload.model` 非空 job 计数（`overrideCount=5`），并跟 `agents.defaults.model` 比对计算 `mismatchCount`（5 个全部 minimax = 0 mismatch）
+- **"1 job manual command conversion" 真实原因**：`hasUnresolvedAgentTurnShellToolPrompt` 判断：① payload.kind==agentTurn ✓ ② message 含 `python3 xxx` 等 shell 关键字（`SHELL_COMMAND_MESSAGE_RE`）✓ ③ toolsAllow 含 process/exec/shell 类（`hasShellToolAccess`）✓ —— **三者全中**
+
+### 确定方案
+不是"等 6.10.1"，**直接修配置**：
+
+| 行动 | 命令 | 效果 |
+|---|---|---|
+| 5 个 cron --clear-model | `openclaw cron edit <id> --clear-model` | payload.model 清空，job 继承 `agents.defaults.model = minimax/MiniMax-M3`，"5 jobs override" warning 消失 |
+| 删除 mark42-3day-checkpoint | `openclaw cron remove a6903701-...` | 任务已禁用 + 目标已达成，删除彻底消除"manual command conversion" warning |
+
+### 验证结果
+```
+openclaw doctor:
+- Cron 段完全消失
+- Session lock 正常
+- Security 明文 key 仍报（user 暂不要求修）
+- Errors: 0
+```
+
+### 经验教训
+- **联网核实优先于猜测**：初判"doctor 读 .migrated 误报"是错的——查源码才发现 `legacyStoreDetected = false` 时 warning 来自 sqlite `rawJobs` 本身。
+- **`openclaw cron edit --clear-model` 是官方解药**：6.10 专门为 "payload.model == default" 情况设计——移除冗余 override，让 job 继承 default，warning 消失。
+- **删 mark42-3day-checkpoint 是最优解**：任务设计目的（3 天守护 v2.3 稳定性观察）已达成 + 6.10 isolated agent 不支持 shell 工具是设计限制，**保留=持续 warning，删除=彻底干净**。
+- **绝对不要瞎猜 doctor 报的是什么**：源码 30 行就能看明白 `hasUnresolvedAgentTurnShellToolPrompt` 的判断条件，不要凭"应该这样"行动。
+
+
