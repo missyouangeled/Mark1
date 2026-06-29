@@ -313,9 +313,19 @@ def heavy_finish(task_name: str) -> None:
     print(f"✅ 任务 '{task_name}' 已归档")
 
 
-def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None) -> None:
-    """自动执行大工程子任务 — 将 batch 分配给后台分身。
-    不传 batch_id 则按序执行第一个 pending batch。
+def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None,
+                   execute_now: bool = False) -> dict[str, Any]:
+    """准备并（可选）执行大工程子任务 — 将 batch 分配给后台分身。
+    不传 batch_id 则按序处理第一个 pending batch。
+
+    【安全原则】（2026-06-30 审查后加强）：
+      - 默认 execute_now=False：只生成脚本 + 标记为 running + 入队，**不真跑**
+      - execute_now=True 显式才能真启动 bash 后台进程
+      - 不传 --command → 脚本仅 echo 列出文件（no-op，不做任何修改）
+      - 防“AI 忘了状态而误触” (“怕什么意外或自动压缩 你又不记得了”)
+
+    Returns:
+        dict 包含 action/script/queued/dry_run/started_pid 字段
     """
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
@@ -371,7 +381,8 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
             # 用户提供的命令，{f} 会被替换为实际文件路径
             script_lines.append(command.replace("{f}", safe_path))
         else:
-            script_lines.append(f"# TODO: replace with actual file operation")
+            # 默认仅 echo 列出文件，不真做任何修改
+            script_lines.append(f"echo '  [no-op] would process: {f}'")
     script_lines.append(f"echo '✅ {target_id} done'")
     with open(script_path, "w") as sf:
         sf.write("\n".join(script_lines) + "\n")
@@ -384,34 +395,84 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
         "script": str(script_path),
         "files": files,
         "targetPath": str(target_full),
+        "command": command,
         "timestamp": _now_iso(),
+        "dryRun": not execute_now,
     }
     with open(queue_file, "a") as qf:
         qf.write(json.dumps(exec_cmd, ensure_ascii=False) + "\n")
     _append_broker("tasks", "heavy.batch.queued", f"批次入队: {target_id}", "ok",
-                   f"{task_name}: {target_id} 已加入执行队列",
-                   {"taskName": task_name, "batchId": target_id, "fileCount": len(files)})
-    print(f"   📤 已入队: {queue_file}")
-    print(f"   执行脚本: {script_path}")
-    print(f"   运行: bash {script_path}")
+                   f"{task_name}: {target_id} 已加入执行队列 (dry_run={not execute_now})",
+                   {"taskName": task_name, "batchId": target_id, "fileCount": len(files),
+                    "dryRun": not execute_now})
+    result: dict[str, Any] = {
+        "action": "queued",
+        "batchId": target_id,
+        "script": str(script_path),
+        "queued": True,
+        "dryRun": not execute_now,
+        "startedPid": None,
+    }
+    if execute_now:
+        # 【真执行】仅在显式传 execute_now=True 才启动后台进程
+        import subprocess
+        try:
+            log_path = task_dir / f"{target_id}-exec.log"
+            log_fh = open(log_path, "a")
+            proc = subprocess.Popen(
+                ["/bin/bash", str(script_path)],
+                stdout=log_fh, stderr=subprocess.STDOUT,
+                start_new_session=True,  # detach: 守护退出不影响子进程
+            )
+            result["action"] = "started"
+            result["startedPid"] = proc.pid
+            result["logPath"] = str(log_path)
+            batch["pid"] = proc.pid
+            batch["logPath"] = str(log_path)
+            batch["dryRun"] = False
+            st["lastUpdate"] = _now_iso()
+            _save_json(status_file, st)
+            _append_broker("tasks", "heavy.batch.started",
+                           f"批次启动: {target_id} (PID {proc.pid})", "ok",
+                           f"任务: {task_name} | 脚本: {script_path.name} | 日志: {log_path.name}",
+                           {"taskName": task_name, "batchId": target_id, "pid": proc.pid,
+                            "dryRun": False})
+            print(f"   🚀 启动后台进程 PID={proc.pid}")
+            print(f"   📄 日志: {log_path}")
+        except Exception as e:
+            result["action"] = "start_failed"
+            result["error"] = str(e)
+            print(f"   ❌ 启动失败: {e}")
+    else:
+        print(f"   📤 已入队: {queue_file}")
+        print(f"   执行脚本: {script_path}")
+        if not command:
+            print(f"   ⚠️ 未传 --command，脚本仅 echo 列出文件（默认 no-op）")
+        print(f"   💡 仅入队，未启动。需 --execute-now 才真跑")
+    return result
 
 
-def heavy_execute_all(task_name: str) -> None:
-    """自动执行所有 pending 子任务。"""
+def heavy_execute_all(task_name: str, command: str | None = None,
+                       execute_now: bool = False) -> list[dict[str, Any]]:
+    """自动准备所有 pending 子任务。默认仅入队，不传 execute_now 不真跑。"""
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
         print(f"❌ 任务 '{task_name}' 未开工")
-        return
+        return []
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
     pending = [bid for bid, bt in subtasks.items() if bt.get("status") == "pending"]
     if not pending:
         print(f"✅ 无 pending 子任务")
-        return
-    print(f"⚙️ 执行全部 {len(pending)} 个 pending 批次: {', '.join(pending)}")
+        return []
+    print(f"⚙️ 处理全部 {len(pending)} 个 pending 批次: {', '.join(pending)}")
+    print(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
+    results = []
     for bid in pending:
-        heavy_execute(task_name, bid)
+        r = heavy_execute(task_name, bid, command=command, execute_now=execute_now)
+        results.append(r)
+    return results
 
 
 def heavy_cleanup(task_name: str) -> None:

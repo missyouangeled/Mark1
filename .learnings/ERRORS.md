@@ -25507,3 +25507,45 @@ mocker.patch.object(armor, "armor_check", return_value={
 - **不要靠"大 mock session"绕过阈值** — simple 模式 1GB 才 48%,< 70% 还是不够
 - **不要用 dry_run=True 触发 compact 流程** — 实际代码里 `if not dry_run and usage >= THRESHOLD_WARN:` 跳过整个块
 - 写 armor_compress 测试时,第一件事想:`armor_check()` 怎么让它返我想要的值?
+
+---
+
+## [ERR-20260630-006] heavy_execute 假执行 — 写脚本不跑脚本
+
+**Logged**: 2026-06-30T07:50:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: design-vs-implementation, safety
+
+### Summary
+`heavy_execute` 写完 `task_dir/{batch_id}-exec.sh` + 标记 status=running + 写入队列,**但从不自动调用 `bash {script_path}`**。
+脚本内容是 `# TODO: replace with actual file operation` 占位。
+
+### 根因
+1. **重构 "重型战甲" 时,heavy_execute 被当成"占位生成器"实现**
+2. **daemon 真执行的后续代码从来没人写** — 链路断了
+3. **没有 e2e 测试** — 谁都没发现
+
+### 影响
+- 设计 4.2 期望"自动分批 + 后台执行"
+- 实际: 用户必须手动 `bash {script_path}` — 整个"重型战甲"名不副实
+- 历史 actions.jsonl 显示 78 次 compress,但 history 文件 50 个 limit,实际上很多没真截短
+
+### 修复(2026-06-30)
+1. `heavy_execute()` 加 `execute_now=False` 默认参数 → 默认仅入队不启动
+2. `cli.py` 加 `--execute-now` flag → 显式传才真启 bash 后台进程
+3. 启动后记录 PID + logPath 到 status.json
+4. 不传 `--command` → 脚本默认 no-op(仅 echo 列出文件,不做任何修改)
+5. broker 事件多一个 `heavy.batch.started` (区分 queued vs started)
+6. 加 6 个新测试覆盖 dry-run / execute_now / no-op / 真启 / Popen 异常 / execute_all
+
+### 防御原则（"怕什么意外或自动压缩 你又不记得了"）
+- 任何"自动执行"链路(执行脚本/杀进程/清理/重启)必须 **默认 dry-run + 显式 --execute-now**
+- 默认 dry-run **不是建议** — 是不传 flag 永远不会跳到子进程的硬护栏
+- 每次自动执行后必须留痕:status.json / actions.jsonl / broker event
+
+### Prevention rule
+- 写"自动执行"函数前先列**端到端调用链**:CLI → 主函数 → 后台执行 → 状态更新 → 通知用户
+- 每一步都要问"这步是干啥的?有谁在调?"
+- 如果任何一步是 `# TODO` / `pass` / silent noop → 整条链路都是死的
+- 写一个 **e2e 集成测试**,真跑真后台真状态更新,跑通了再 commit

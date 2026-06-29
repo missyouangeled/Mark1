@@ -414,6 +414,181 @@ class TestHeavyExecute:
         out = capsys.readouterr().out
         assert "无 pending" in out
 
+    # ── 2026-06-30 安全加强：默认 dry-run + 显式 execute_now 才真跑 ──
+
+    def test_default_dry_run_does_not_start_process(self, tmp_path, scratch_dir, mocker):
+        """默认不传 execute_now → 不启动任何 subprocess，但生成脚本 + 入队。"""
+        task_name = "exec-default-dry"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {
+                    "status": "pending",
+                    "files": ["f1.txt"],
+                    "count": 1,
+                    "sizeMB": 0.01,
+                },
+            },
+        }))
+        (tmp_path / "project").mkdir()
+
+        mock_popen = mocker.patch("subprocess.Popen")
+        result = heavy.heavy_execute(task_name)
+
+        mock_popen.assert_not_called()
+        assert result["dryRun"] is True
+        assert result["action"] == "queued"
+        assert result["startedPid"] is None
+        assert (task_scratch / "batch-001-exec.sh").exists()
+        assert (task_scratch / "execute-queue.jsonl").exists()
+
+    def test_execute_now_starts_subprocess(self, tmp_path, scratch_dir, mocker):
+        """传 execute_now=True → 启动后台 bash 进程，PID 记录到 status.json。"""
+        task_name = "exec-real"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {
+                    "status": "pending",
+                    "files": ["a.txt", "b.txt"],
+                    "count": 2,
+                    "sizeMB": 0.02,
+                },
+            },
+        }))
+        (tmp_path / "project").mkdir()
+
+        mock_proc = MagicMock()
+        mock_proc.pid = 99999
+        mock_popen = mocker.patch("subprocess.Popen", return_value=mock_proc)
+        result = heavy.heavy_execute(task_name, execute_now=True)
+
+        mock_popen.assert_called_once()
+        call_args = mock_popen.call_args[0][0]
+        assert call_args[0] == "/bin/bash"
+        assert result["dryRun"] is False
+        assert result["action"] == "started"
+        assert result["startedPid"] == 99999
+        updated = json.loads((task_scratch / "status.json").read_text())
+        assert updated["subtasks"]["batch-001"]["pid"] == 99999
+        assert updated["subtasks"]["batch-001"]["dryRun"] is False
+        assert "logPath" in updated["subtasks"]["batch-001"]
+
+    def test_no_command_means_noop_script(self, tmp_path, scratch_dir):
+        """不传 --command 时脚本仅 echo，不真做任何文件修改。"""
+        task_name = "exec-noop-script"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {
+                    "status": "pending",
+                    "files": ["a.txt", "b.txt"],
+                    "count": 2,
+                    "sizeMB": 0.01,
+                },
+            },
+        }))
+        (tmp_path / "project").mkdir()
+
+        heavy.heavy_execute(task_name)
+        script_content = (task_scratch / "batch-001-exec.sh").read_text()
+        assert "no-op" in script_content
+        assert "a.txt" in script_content
+        assert "b.txt" in script_content
+        for dangerous in ["rm ", "mv ", "sed ", "dd ", ">>", "writelines(", "open("]:
+            assert dangerous not in script_content, f"脚本不应含 {dangerous}"
+
+    def test_execute_now_with_command_runs_real_command(self, tmp_path, scratch_dir, mocker):
+        """传 execute_now=True + --command 才会真跑 user-provided 命令。"""
+        task_name = "exec-real-cmd"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {
+                    "status": "pending",
+                    "files": ["x.txt"],
+                    "count": 1,
+                    "sizeMB": 0.01,
+                },
+            },
+        }))
+        (tmp_path / "project").mkdir()
+        (tmp_path / "project" / "x.txt").write_text("original")
+
+        mock_proc = MagicMock()
+        mock_proc.pid = 12345
+        mocker.patch("subprocess.Popen", return_value=mock_proc)
+        result = heavy.heavy_execute(
+            task_name,
+            command="cat {f} > {f}.bak",
+            execute_now=True,
+        )
+        assert result["action"] == "started"
+        assert result["startedPid"] == 12345
+        script = (task_scratch / "batch-001-exec.sh").read_text()
+        assert "x.txt" in script
+
+    def test_execute_now_subprocess_failure_handled(self, tmp_path, scratch_dir, mocker, capsys):
+        """subprocess.Popen 报 OSError → 返回 start_failed, 不哭。"""
+        task_name = "exec-fail"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {
+                    "status": "pending",
+                    "files": ["x.txt"],
+                    "count": 1,
+                    "sizeMB": 0.01,
+                },
+            },
+        }))
+        (tmp_path / "project").mkdir()
+
+        mocker.patch("subprocess.Popen", side_effect=OSError("bash not found"))
+        result = heavy.heavy_execute(task_name, execute_now=True)
+        out = capsys.readouterr().out
+        assert result["action"] == "start_failed"
+        assert "bash not found" in result["error"]
+        assert "❌" in out
+
+    def test_execute_all_default_dry_run(self, tmp_path, scratch_dir, mocker):
+        """heavy_execute_all 默认 dry-run，不启任何进程。"""
+        task_name = "exec-all-dry"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {"status": "pending", "files": ["a.txt"], "count": 1, "sizeMB": 0.01},
+                "batch-002": {"status": "pending", "files": ["b.txt"], "count": 1, "sizeMB": 0.01},
+            },
+        }))
+        (tmp_path / "project").mkdir()
+
+        mock_popen = mocker.patch("subprocess.Popen")
+        results = heavy.heavy_execute_all(task_name)
+        mock_popen.assert_not_called()
+        assert len(results) == 2
+        for r in results:
+            assert r["dryRun"] is True
+            assert r["action"] == "queued"
+
 
 # ─────────────────────── heavy_cleanup ───────────────────────
 

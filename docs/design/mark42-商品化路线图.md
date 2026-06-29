@@ -83,6 +83,23 @@
 
 ---
 
+### 🟠 H. heavy_execute 假执行 [已修复 2026-06-30]
+
+**现状**（2026-06-30 全面审查发现）：`heavy_execute` 写好脚本 + 入队 + 状态为 running,**但从不自动调 bash 执行**。脚本里还是 `# TODO: replace with actual file operation` 占位。这与设计 4.2 “Heavy 战甲自动分批 + 后台执行” 不符。
+
+**修复**（已 commit）：
+1. `heavy_execute()` 新增 `execute_now=False` 默认参数 → 默认仅入队不启动
+2. `cli.py` 加 `--execute-now` flag → 显式传才真启 bash 后台进程
+3. 启动后记录 PID + logPath 到 status.json
+4. 不传 `--command` → 脚本默认 no-op（仅 echo 列出文件）
+5. broker 事件多一个 `heavy.batch.started` (区分 queued vs started)
+6. 加 6 个新测试覆盖 dry-run / execute_now / no-op / 真启 / Popen 异常 / execute_all
+7. 测试数 127 → 133，整体覆盖 39.1% → 40.1%
+
+**为防“AI 忘状态误触”**：默认 dry-run 是护栏，不是建议 — 不传 `--execute-now` 永远不会跳到子进程
+
+---
+
 ### 🟠 F. 上下文 97.7% — 铠甲只检测不行动
 
 **现状**：当前正在运行的 Mark42 `status` 直接报 🔴 97.7%。但铠甲只是检测到了，完全没有触发任何压缩/处理。这正好是 Armor 核心能力缺失的直接体现。
@@ -133,6 +150,33 @@
 | 12 | **无 CI/CD + 发布管道** | 🟠 | 没有自动构建、版本管理、changelog、release notes |
 | 13 | **无用户验证** | 🔴 | 至今只有点点一个人在 Mark1 上用过。需要至少 3-5 个早期用户真实跑过并反馈 |
 | 14 | **无性能基准** | 🟠 | 不知道铠甲守护模式吃多少 CPU/内存，Loop 轮询对 Gateway 的影响有多大 |
+
+---
+
+## 1.5、2026-06-30 全面审查发现的 12 个问题
+
+> 全面审查报告: `docs/design/mark42-全面审查-20260630.md` (237 行)
+> 审查范围: 21 个模块 / 9802 行 Python / 127 测试 / 真生产状态
+
+| # | 问题 | 严重度 | 状态 |
+|---|------|:---:|:---:|
+| H | heavy_execute 假执行 | 🔴 | ✅ **已修复** (上面 H 项) |
+| I | broker 文件临界 9.99MB | 🟠 | ⏳ 待修(`<=` 改成 `<`) |
+| J | actions.jsonl 不记 preBytes/postBytes | 🟠 | ⏳ 待修(添加字段) |
+| K | 文档说"4 守护"、实际 2 daemon+bootstrap+watchdog | 🟠 | ⏳ 待修(文档/服务不齐) |
+| L | engine.py 死代码 | 🟡 | ⏳ 可选 |
+| M | compress_queue 测试 3 优先级断言无效 | 🟡 | ⏳ 可选 |
+| N | utils.py 死 import / 死函数 | 🟡 | ⏳ 可选 |
+| O | event 命名与设计 6.1 不一致 | 🟡 | ⏳ 可选 |
+| P | heavy.py batch_size 公式对单文件不友好 | 🟡 | ⏳ 可选 |
+| Q | heavy.py `.keep` 命名反了 | 🟡 | ⏳ 可选 |
+| R | cli.py assemble 重复 import | 🟡 | ⏳ 可选 |
+| S | `_find_active_session` 排除后缀不一致 | 🟡 | ⏳ 可选 |
+
+**修复优先级**（本次决定）：
+- 🔴 1  已修 (H)
+- 🟠 3  下次会话 / Phase 2 一起修 (I/J/K)
+- 🟡 8  抽空修 (L~S)
 
 ---
 

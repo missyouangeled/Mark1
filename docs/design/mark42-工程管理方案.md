@@ -152,4 +152,42 @@ master  ─── 永远可部署、永远干净
 
 ---
 
+## 八、自动行为守则（2026-06-30 补充，点点提出）
+
+> **点点原话**：“怕有什么意外或者自动压缩 你又不记得了”
+> **原则**：“写下来 > 记着”，“自动 ＝ 默认不跳”。
+
+### 8.1 默认 dry-run 是硬护栏
+
+- 任何"自动执行"函数（脚本执行 / 进程控制 / 清理 / 重启）**默认不跳** + 需 `execute_now` flag
+- `heavy_execute` 修了同款问题（ERR-20260630-006）后，后续所有同类函数都这么写
+- 增量检查项（追加到上表六、）：
+  9. “自动执行”函数默认 dry-run（调用者未传 `execute_now` 不会启动任何子进程）
+  10. 启动后状态有 PID / logPath 记入 status.json
+  11. broker 事件区分 queued vs started（供其他模块决策）
+
+### 8.2 自动行为每次必留痕
+
+| 触发 | 留痕位置 | 谁看 |
+|---|---|---|
+| `armor.compress` | `armor/actions.jsonl` + `armor/memory-index.json` | 人 / 审查 |
+| `heavy.batch.started` | broker `mark42-events.jsonl` | 人 / engine daemon |
+| `log_rotate` | `mark42/log-rotation.json` | 人 / watchdog |
+| 任何 daemon 启停 | journalctl + bootstrap.log | 人 / watchdog |
+| 修改 systemd service | commit message + bootstrap.log | 人 |
+
+### 8.3 动作 / 副作用必告知
+
+- 自动做事之前：打印 ⚠️ 告知下一步
+- 做完：打印 + 写 broker event + 写 status.json（三重留痕）
+- 跨日 / 重启后：读 log-rotation.json / bootstrap.log 了解上次动作
+
+### 8.4 审查周期
+
+- 每 1-2 周：文档 vs 代码 vs 真生产 三方对照审查
+- 审查报告档： `docs/design/mark42-全面审查-YYYYMMDD.md`
+- 审查后：商品化路线图更新 H/I/J 等诊断项，标记 ✅ / ⏳ 状态
+
+---
+
 *此文件随工程管理流程迭代同步更新。*

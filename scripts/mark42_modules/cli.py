@@ -423,10 +423,11 @@ def main() -> None:
     heavy_p.add_argument("--task-name", type=str, help="任务名")
     heavy_p.add_argument("--no-context-aware", action="store_true", help="禁用上下文感知")
     heavy_p.add_argument("--finish", action="store_true", help="大工程收工")
-    heavy_p.add_argument("--execute", action="store_true", help="执行下一批次")
-    heavy_p.add_argument("--execute-all", action="store_true", help="执行所有 pending 批次")
+    heavy_p.add_argument("--execute", action="store_true", help="执行下一批次 (默认 dry-run)")
+    heavy_p.add_argument("--execute-all", action="store_true", help="执行所有 pending 批次 (默认 dry-run)")
     heavy_p.add_argument("--batch", type=str, default="", help="指定批次ID (配合 --execute)")
     heavy_p.add_argument("--command", type=str, default="", help="每个文件执行的自定义命令，{f} 替换为文件路径")
+    heavy_p.add_argument("--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动")
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
@@ -580,9 +581,13 @@ def main() -> None:
             heavy_start(args.start, task_name,
                        context_aware=not args.no_context_aware)
         elif args.execute and task_name:
-            heavy_execute(task_name, args.batch or None, command=args.command or None)
+            heavy_execute(task_name, args.batch or None,
+                          command=args.command or None,
+                          execute_now=getattr(args, 'execute_now', False))
         elif args.execute_all and task_name:
-            heavy_execute_all(task_name)
+            heavy_execute_all(task_name,
+                              command=args.command or None,
+                              execute_now=getattr(args, 'execute_now', False))
         elif args.finish and task_name:
             heavy_finish(task_name)
         elif args.cleanup and task_name:
