@@ -121,3 +121,42 @@
 ### 下一步
 - 阶段 1 续：补 armor_compress / engine_daemon / heavy / cli 单测
 - 预计 2 周内整体覆盖 ≥ 70%
+
+## Mark42 测试体系 — Phase 1 收尾（2026-06-29）
+
+> 接 Phase 1 续。背景：`docs/design/mark42-测试体系设计方案-20260629.md`
+
+### 完成项
+- ✅ test_engine.py（22 测试）：start/kill/list/run_loop 5 个模板分支 + daemon 守护
+- ✅ test_heavy.py（29 测试）：detect 4 判定标准 + 3 种 auto_mode + start/finish/execute/cleanup
+- ✅ test_cli.py（16 测试）：status_dashboard JSON/human 模式 + main argparse 分发 + assemble
+- ✅ conftest 增强：SCRATCH 重定向 + scratch_dir fixture + 模块级 hard-code path 重新 monkeypatch
+- ✅ 磁盘清理：删 .bak 备份（2 个）/tmp 调试脚本/pycache
+
+### 关键设计收获
+- **status_dashboard 函数体内 import**：mock target 用完整模块路径（如 `mark42_modules.armor.armor_check`）
+- **hard-code 路径陷阱**：`SCRATCH = Path("/mnt/...")` 不会被 XDG_STATE 派生，conftest 要单独 monkeypatch 依赖模块
+- **`from .X import Y` 缓存**：reload config 后 `heavy.SCRATCH` 仍是旧值，必须 reload 后再 monkeypatch
+- **MagicMock 路径标识**：用 `_mock_kind` 属性让 `_load_json` side_effect 区分不同文件
+
+### 指标
+| 指标 | Phase 1 起步 | Phase 1 收尾 |
+|---|---|---|
+| 测试数 | 24 | **111**（+87）|
+| 串行耗时 | 0.6s | 7s（daemon thread 拖累）|
+| 并行耗时 | 1.1s | 6.9s |
+| armor.py 覆盖 | 100% (armor_check) | 50%+ |
+| engine.py 覆盖 | 0% | 56.7% |
+| heavy.py 覆盖 | 0% | **85.9%** |
+| cli.py 覆盖 | 0% | 39.7% |
+| **整体覆盖** | 22.2% | **37.8%** |
+
+### 真生产零污染
+- ✅ mtime 验证 5 次通过
+- ✅ mark42 status 正常返回（91.4% armor usage）
+- ✅ 所有 systemd 服务仍然 active
+
+### 下一步（Phase 2）
+- 阶段 2：压缩子模块 + logs 单测（~25 测试）
+- 阶段 3：集成测试（armor → engine → broker 端到端）
+- 阶段 4：CI 接入 + 覆盖率门禁（目标 ≥ 70%）

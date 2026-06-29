@@ -54,10 +54,13 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
     # 1. 准备假目录
     fake_state = tmp_path / "state"
     fake_data = tmp_path / "data"
+    fake_scratch = fake_data / "openclaw" / "scratch"
     fake_state.mkdir()
     fake_data.mkdir()
     (fake_state / "openclaw" / "mark42").mkdir(parents=True)
+    (fake_state / "openclaw" / "broker").mkdir(parents=True)
     (fake_data / "openclaw" / "mark42" / "logs").mkdir(parents=True)
+    fake_scratch.mkdir(parents=True, exist_ok=True)
 
     # 2. 改环境变量
     monkeypatch.setenv("XDG_STATE_HOME", str(fake_state))
@@ -70,6 +73,17 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
     # 4. 覆盖 DATA_ROOT（/mnt/data 检测逻辑只在 import 时跑一次）
     monkeypatch.setattr(_cfg, "DATA_ROOT", fake_data / "openclaw" / "mark42")
     monkeypatch.setattr(_cfg, "LOG_DIR", fake_data / "openclaw" / "mark42" / "logs")
+    monkeypatch.setattr(_cfg, "SCRATCH", fake_scratch)
+    # BROKER_DIR 可能也被 armor_compress 写入事件，重定向
+    monkeypatch.setattr(_cfg, "BROKER_DIR", fake_state / "openclaw" / "broker")
+
+    # 关键：config.SCRATCH 改了但 heavy.SCRATCH 还是旧的（heavy.py 用
+    # `from .config import SCRATCH` 拿到了 hard-code 的 Path 引用）。
+    # 需要直接对每个依赖模块 monkeypatch SCRATCH。
+    # 注意：这种 patch 在 reload 会被覆盖，但既然 reload 在 monkeypatch 之后
+    # 执行，下面的 reload 仍会重新导入 SCRATCH（指向 cfg.SCRATCH）。
+    # 所以这里要做的是 reload **之后** 再 patch 依赖模块。
+    # （先标记，reload 后会再处理）
 
     # 5. ⚠️ 关键 reload 顺序：按依赖图从底层到顶层
     reload_order = [
@@ -105,6 +119,19 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
                     stacklevel=2,
                 )
 
+    # ⚠️ reload 之后还需对依赖 hard-code 路径的模块额外 monkeypatch
+    # （因为 reload 时 config.SCRATCH 已经变成 fake，但依赖模块用 `from .config import X`
+    # 拿到的是当时的绑定值，必须在 reload 后再 patch 一次才能生效）
+    modules_with_hard_paths = [
+        ("mark42_modules.heavy", "SCRATCH"),
+        ("mark42_modules.cli", "SCRATCH"),
+    ]
+    for mod_name, attr in modules_with_hard_paths:
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, attr):
+                monkeypatch.setattr(mod, attr, fake_scratch)
+
     yield fake_state
     # pytest 自动清理 tmp_path
 
@@ -130,7 +157,10 @@ def engine_state(state_dir):
 
 @pytest.fixture
 def heavy_state(state_dir):
-    return state_dir / "heavy"
+    """重型战甲状态目录：<tmp>/state/openclaw/mark42/heavy（自动创建）。"""
+    path = state_dir / "heavy"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @pytest.fixture
@@ -155,6 +185,19 @@ def log_dir(_isolate_mark42_state):
     """数据盘日志目录：<tmp>/data/openclaw/mark42/logs"""
     from mark42_modules import config
     return config.LOG_DIR
+
+
+@pytest.fixture
+def scratch_dir(_isolate_mark42_state):
+    """SCRATCH 临时目录: <tmp>/data/openclaw/scratc
+
+    注意：测试代码不要直接 `from mark42_modules.config import SCRATCH`，
+    而应使用这个 fixture（或 `from mark42_modules.heavy import SCRATCH`
+    也能拿到 mock 后的值，因为 conftest 会在 reload 后对依赖模块
+    monkeypatch SCRATCH）。
+    """
+    from mark42_modules import config
+    return config.SCRATCH
 
 
 # ── 3. CLI runner（集成测试用）──
