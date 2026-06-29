@@ -45,3 +45,4 @@ skills/web-claude/
 memory/.????-??-??-*.fallback.tmp
 memory/daily/*-transcript.md
 openclaw-workspace-state.json
+.coverage

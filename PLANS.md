@@ -89,3 +89,35 @@
 详见 `docs/plans/mattpocock-skills.md`
 **状态**：🟢 部分实装（/grilling / /tdd / /to-prd 都装上，前 2 个可用，/to-prd publish 步骤残缺）
 **生态**：用 Vercel Labs `npx skills` CLI，但实际最干净的方式是直接 cp 到 workspace/skills/
+
+## Mark42 测试体系 — Phase 1（2026-06-29）
+
+> 决策快照。背景：`docs/design/mark42-测试体系设计方案-20260629.md`  
+> 状态：✅ **24/24 测试通过**，0.48s 跑完，真生产零污染
+
+### 完成项
+- ✅ 装 pytest + 5 个插件（pytest-cov / xdist / subprocess / mock）
+- ✅ conftest.py（235 行）：autouse 环境隔离 + 7 个共享 fixture + markers
+- ✅ pyproject.toml（60 行）：pytest + coverage 配置
+- ✅ test_conftest.py（9 个）：自检环境隔离真生效
+- ✅ test_armor_check.py（15 个）：armor_check() 100% 覆盖
+
+### 关键设计收获（审查阶段挖出）
+- **conftest reload 顺序必须按依赖图**：先 utils → 压缩子模块 → armor → engine/heavy
+- **`_sp` 是函数内 import**：patch 要用全局 `subprocess.run`
+- **token 公式有 ~0.6% 整数除法偏差**：边界 case 要留余量
+- **monkeypatch.undo() 撤销所有来源**：测试逻辑要小心
+
+### 指标
+| 指标 | 值 |
+|---|---|
+| 测试数 | 24 |
+| 串行耗时 | 0.48s |
+| 并行耗时（-n auto）| 1.12s |
+| armor_check 覆盖 | 100% |
+| 整体覆盖 | 22.2%（阶段 0/1 起步，符合预期）|
+| 真生产零污染 | ✅ mtime 验证通过 |
+
+### 下一步
+- 阶段 1 续：补 armor_compress / engine_daemon / heavy / cli 单测
+- 预计 2 周内整体覆盖 ≥ 70%

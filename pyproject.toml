@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openclaw-workspace"
+version = "0.1.0"
+description = "OpenClaw workspace - host for Mark42 + tools"
+requires-python = ">=3.10"
+
+# 测试依赖（开发时安装）
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "pytest-xdist>=3.5",
+    "pytest-subprocess>=1.5",
+    "pytest-mock>=3.14",
+]
+
+# ── Pytest 配置 ───────────────────────────────────────────
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["scripts/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",                     # 显示所有失败摘要
+    "--strict-markers",        # 严格 marker
+    "--tb=short",              # 短 traceback
+    "--cov=mark42_modules",    # 自动覆盖率
+    "--cov-report=term-missing",
+]
+# markers 定义在 scripts/tests/conftest.py 里（pytest_configure）
+# 不要在这里重复定义，否则 pytest 会报 "duplicate marker" 警告
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# ── 覆盖率配置 ───────────────────────────────────────────
+
+[tool.coverage.run]
+source = ["mark42_modules"]
+omit = [
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/scripts/mark42_modules/.bak*",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
