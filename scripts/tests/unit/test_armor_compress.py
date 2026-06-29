@@ -572,6 +572,148 @@ class TestArmorCompressQueueStats:
                 assert key in result, f"queue stats 缺少字段: {key}"
 
 
+# ─────────────────────── armor_compress_async（P1.2） ───────────────────────
+
+class TestArmorCompressAsync:
+    """P1.2: armor_compress_async 异步链路单测覆盖。
+
+    设计考虑:
+      armor_compress_async 函数体内 'from compress_queue import CompressRequest' 创建
+      模块局部 binding, patch 'compress_queue.CompressRequest' 不生效。
+      解决: patch 整个 queue 路径 (get_compress_queue), 让 armor 走真实流程,
+      然后验证 queue 交互行为 (enqueue 被调, 返 dropped, status 字段)
+
+    覆盖场景:
+      1. wait=False 返回 queued 状态 + session_id 正确
+      2. 队列满时 (enqueue=False) 返回 dropped
+      3. priority 参数不报错
+      4. 无活跃 session 时 session_id=unknown
+      5. queue_stats 报告队列统计
+      6. 真入队后 queue.enqueue 被调 + queue_size 增加
+    """
+
+    def _mock_queue(self, mocker, enqueue_returns=True, qsize_value=1):
+        """mock get_compress_queue 返 mock 队列。"""
+        from mark42_modules import compress_queue
+
+        # 用真实 CompressRequest 实例 (不要 patch 类), 只 mock queue
+        mock_queue = MagicMock()
+        mock_queue.enqueue.return_value = enqueue_returns
+        mock_queue.qsize.return_value = qsize_value
+        mock_queue.stats = {"enqueued": 0, "processed": 0, "failed": 0,
+                            "dropped_queue_full": 0, "dropped_low_priority": 0}
+
+        # patch get_compress_queue 返回 mock queue
+        mocker.patch.object(compress_queue, "get_compress_queue", return_value=mock_queue)
+        return mock_queue
+
+    def test_enqueue_returns_queued_status(self, mocker):
+        """默认 wait=False 应返回 queued status + request_id。"""
+        fake_session = MagicMock()
+        fake_session.name = "test.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[
+            {"role": "user", "content": "测试"}
+        ])
+        self._mock_queue(mocker, enqueue_returns=True, qsize_value=2)
+
+        result = armor.armor_compress_async(wait=False)
+
+        assert result["status"] == "queued"
+        assert "request_id" in result
+        assert result["session_id"] == "test.jsonl"
+        assert result["queue_size"] == 2
+
+    def test_wait_true_returns_status(self, mocker):
+        """wait=True 返回 status 字段 (不一定 completed, 取决于队列实现)。"""
+        fake_session = MagicMock()
+        fake_session.name = "test.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[
+            {"role": "user", "content": "hi"}
+        ])
+        self._mock_queue(mocker, enqueue_returns=True)
+
+        result = armor.armor_compress_async(wait=True)
+
+        # wait=True 可能 completed/timeout/failed, 但应不是 queued
+        assert "status" in result
+        assert result["status"] != "queued", "wait=True 不应立即返回 queued"
+
+    def test_priority_argument_accepted(self, mocker):
+        """priority 参数不报错 (验证任何合法 priority 都能传过)。"""
+        fake_session = MagicMock()
+        fake_session.name = "urgent.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[])
+        mock_queue = self._mock_queue(mocker)
+
+        for prio in [0, 1, 2, 9]:
+            result = armor.armor_compress_async(wait=False, priority=prio)
+            assert result["status"] == "queued", f"priority={prio} 应能入队"
+
+    def test_queue_full_returns_dropped(self, mocker):
+        """enqueue 返回 False (队列满) → 返回 dropped + queue_size。"""
+        fake_session = MagicMock()
+        fake_session.name = "flood.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[])
+        self._mock_queue(mocker, enqueue_returns=False, qsize_value=100)
+
+        result = armor.armor_compress_async(wait=False)
+
+        assert result["status"] == "dropped"
+        assert result["reason"] == "queue_full"
+        assert result["queue_size"] == 100
+
+    def test_no_active_session_uses_unknown_session_id(self, mocker):
+        """无活跃 session 时，session_id 字段应为 unknown。"""
+        mocker.patch.object(armor, "_find_active_session", return_value=None)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[])
+        self._mock_queue(mocker)
+
+        result = armor.armor_compress_async(wait=False)
+
+        assert result["status"] == "queued"
+        assert result["session_id"] == "unknown"
+
+    def test_real_enqueue_called_with_session_messages(self, mocker):
+        """入队应真调用 queue.enqueue (拿真实 CompressRequest 实例)。"""
+        fake_session = MagicMock()
+        fake_session.name = "session.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        sample_msgs = [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "world"},
+        ]
+        mocker.patch.object(armor, "_read_session_tail", return_value=sample_msgs)
+        mock_queue = self._mock_queue(mocker)
+
+        armor.armor_compress_async(wait=False, priority=2)
+
+        # enqueue 应被调用一次, 传入一个 CompressRequest
+        assert mock_queue.enqueue.call_count == 1
+        req = mock_queue.enqueue.call_args[0][0]
+        # CompressRequest 应包含我们的内容
+        assert hasattr(req, "content")
+        assert hasattr(req, "session_id")
+        assert hasattr(req, "priority")
+        assert req.session_id == "session.jsonl"
+        assert req.priority == 2
+        # content 应是 JSON 序列化的消息
+        import json
+        assert json.loads(req.content) == sample_msgs
+
+    def test_queue_stats_callable(self):
+        """armor_compress_queue_stats 应返回 dict (真队列 or error 状态)。"""
+        result = armor.armor_compress_queue_stats()
+        assert isinstance(result, dict)
+        # 真队列会返回 stats, 不存在时会返回 {"error": ...}
+        if "error" not in result:
+            for key in ["enqueued", "processed", "failed", "dropped_queue_full"]:
+                assert key in result, f"queue stats 缺少字段: {key}"
+
+
 # ─────────────────────── armor_pre_compact_hook ───────────────────────
 
 class TestArmorPreCompactHook:

@@ -290,6 +290,44 @@ fake_path._mock_kind = "config"  # ← 让 side_effect 区分
 mocker.patch("mark42_modules.config.CONFIG_PATH", fake_path)
 ```
 
+### 9. 集成测试触发 armor_compress 完整流程 (P1.3 教训)
+
+**陷阱**:`armor_compress` 开头 `armor_check()` 然后判断 `if usage < THRESHOLD_WARN and not dry_run: return skip`。
+如果 mock 不到 `armor_check` 让它返高 usage,armor 会**直接 skip,根本不调 compact 流程**。
+
+**两个误区的诱骗**:
+
+1. **降阈值不可行**:`THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))` — 这是 **int**!
+   传 `"0.01"` 会 ValueError,env var 不生效。
+
+2. **大 mock session 也不一定够**:
+   - 1GB session + simple 模式 = 488K tokens / 131K 窗口 (1M 假定) = 48%
+   - 48% < 70% 阈值 — **还是 skip**
+   - 零下 simple 模式限定下,需要 > 1.4GB session 才能过 70%
+
+3. **dry_run=True 也不行**:`if not dry_run and usage >= THRESHOLD_WARN:` — dry_run 跳过整个 compact 块。
+
+**正解**:**直接 mock `armor_check` 返高 usage**。
+
+```python
+# ✅ 正确:mock armor_check 跳过阈值检查
+mocker.patch.object(armor, "armor_check", return_value={
+    "usagePercent": 90,
+    "status": "critical",
+    "summary": "mocked",
+    "activeSession": "agent.jsonl",
+    "activeFileMB": 1024.0,
+})
+
+# 配套 mock session (1GB 让 pre_bytes 合理)
+fake_session = MagicMock()
+fake_session.name = "agent.jsonl"
+fake_session.stat.return_value.st_size = 1024 * 1024 * 1024
+mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+```
+
+详细错误记录见 `.learnings/ERRORS.md ERR-20260630-005`。
+
 ## 跑覆盖率
 
 ```bash

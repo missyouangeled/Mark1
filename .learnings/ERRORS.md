@@ -25451,3 +25451,59 @@ conftest 重定向 `XDG_STATE_HOME` 后 `config.MARK42_STATE` 跟着变，但 `c
 - 凡 conftest 重定向环境变量后，**必须 reload 后再 patch hard-code 路径的依赖模块**
 - 写测试 fixture 时**不要**直接 `from .config import SCRATCH`，要用 conftest fixture
 
+
+---
+
+## [ERR-20260630-005] armor_compress 在低 usage 时直接 skip,集成测试未触发 compact 流程
+
+**Logged**: 2026-06-30T07:30:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: test-design
+
+### Summary
+P1.3 集成测试 `test_armor_compress_subprocess_failure_marked_in_index` 验证:
+openclaw sessions.compact 失败时 armor 应写 memory-index.json + 记 compactError。
+测试**未通过** —— `memory-index.json` 不存在。
+
+### Root cause
+多重叠加问题:
+
+1. **THRESHOLD_WARN 是 int**:`config.py:54` 写
+   `THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))`
+   → 测试设 `"0.01"` 会 ValueError,env var 不生效,默认 70% 阈值
+2. **armor_compress 提前 skip**:`if usage < THRESHOLD_WARN and not dry_run: return {"action": "skip"}`
+   - 1MB mock session + simple 模式 = 488 tokens / 1M 窗口 = 0.05%
+   - 0.05% < 70% 阈值 → skip,根本不走 compact 流程
+   - 即便把 mock session 调到 1GB = 488K tokens = 48%,**还是不到 70% 阈值**
+3. **subprocess.run mock 顺序无关**:即使 mock 完美,armor_compress 在 line 437 直接 return,
+   不会调 subprocess,也不会写 memory-index
+
+### Fix
+**最干净的修法**:`mock armor_check` 直接返高 usage,跳过真实估算逻辑:
+
+```python
+mocker.patch.object(armor, "armor_check", return_value={
+    "usagePercent": 90,  # 任意 > 70% 的值都触发
+    "status": "critical",
+    "summary": "mocked",
+    "activeSession": "agent.jsonl",
+    "activeFileMB": 1024.0,
+})
+```
+
+为什么这比降阈值好:
+- 不用动 env var
+- 不用纠结 1GB 还是 50MB 还是 1TB session
+- 不用纠结 smart/simple 模式
+- 测试只关心"如果 usage 高了,armor_compress 走完 compress 流程"这条路径
+
+**配套改 mock session**:`fake_session.stat.return_value.st_size = 1024 * 1024 * 1024` (1GB)
+确保 compact 前的 `pre_bytes` 是合理值,不会被读成 0 触发奇怪的除零逻辑。
+
+### Prevention rule
+- **集成测试触发 armor_compress 走完整流程**:mock `armor_check` 返高 usage + mock session 返大文件
+- **不要用 MARK42_CTX_WARN_PCT 试图降阈值** — 它是 int,不是 float
+- **不要靠"大 mock session"绕过阈值** — simple 模式 1GB 才 48%,< 70% 还是不够
+- **不要用 dry_run=True 触发 compact 流程** — 实际代码里 `if not dry_run and usage >= THRESHOLD_WARN:` 跳过整个块
+- 写 armor_compress 测试时,第一件事想:`armor_check()` 怎么让它返我想要的值?
