@@ -33,11 +33,19 @@ def _high_usage_session(target_pct: float):
     return fake_session
 
 
-def _dual_subprocess_mock(du_size_kb: int, cli_result: MagicMock = None):
-    """构造同时 mock du 和 openclaw agent 两种调用的 side_effect 函数。
+def _dual_subprocess_mock(du_size_kb: int, cli_result: MagicMock = None,
+                          compact_bytes_after: int = None):
+    """构造同时 mock du 和 openclaw 两种调用的 side_effect 函数。
 
     用法：
         mocker.patch("subprocess.run", side_effect=_dual_subprocess_mock(...))
+
+    参数:
+      du_size_kb: armor_check 内部 du 命令返回的 KB 数
+      cli_result: 自定义 openclaw 返回（覆盖默认成功）
+      compact_bytes_after: 模拟 sessions.compact 后 session 文件新大小（字节）
+                          默认 = 不模拟变小 (返回原大小), 会触发 compressionEffective=False
+                          设置为具体值（小于原大小）= 模拟真压缩生效
     """
     def side_effect(args, **kwargs):
         if isinstance(args, (list, tuple)) and args and args[0] == "du":
@@ -45,16 +53,38 @@ def _dual_subprocess_mock(du_size_kb: int, cli_result: MagicMock = None):
             fake.stdout = f"{du_size_kb}\t/sessions"
             return fake
         elif isinstance(args, (list, tuple)) and args and args[0] == "openclaw":
-            # 默认返回成功
-            if cli_result is not None:
-                return cli_result
-            fake = MagicMock()
-            fake.returncode = 0
-            fake.stdout = '{"ok":true}'
-            fake.stderr = ""
-            return fake
+            # 区分 openclaw agent / openclaw sessions compact
+            if len(args) >= 2 and args[1] == "agent":
+                # 老路径（理论上不再调, 但保留兼容）
+                if cli_result is not None:
+                    return cli_result
+                fake = MagicMock()
+                fake.returncode = 0
+                fake.stdout = '{"ok":true}'
+                fake.stderr = ""
+                return fake
+            elif len(args) >= 2 and args[1] == "sessions":
+                # 新路径: sessions compact
+                # 修改 active_session 的 stat().st_size 返回值 (实现 "session 变小")
+                # 查找上次传给 stat() 的 size 路径: 通过 _high_usage_session.set_size
+                if compact_bytes_after is not None and hasattr(side_effect, 'active_session_mock'):
+                    side_effect.active_session_mock.stat.return_value.st_size = compact_bytes_after
+                if cli_result is not None:
+                    return cli_result
+                fake = MagicMock()
+                fake.returncode = 0
+                fake.stdout = '{"ok":true}'
+                fake.stderr = ""
+                return fake
+            else:
+                if cli_result is not None:
+                    return cli_result
+                fake = MagicMock()
+                fake.returncode = 0
+                fake.stdout = '{"ok":true}'
+                fake.stderr = ""
+                return fake
         else:
-            # 未预期的调用，返回默认成功 mock
             fake = MagicMock()
             fake.returncode = 0
             fake.stdout = ""
@@ -62,6 +92,32 @@ def _dual_subprocess_mock(du_size_kb: int, cli_result: MagicMock = None):
             return fake
 
     return side_effect
+
+
+def _high_usage_session_with_compactable(target_pct: float, compact_to_pct: float = 30.0):
+    """构造一个高使用率 session mock，且 sessions.compact 后可以模拟“变小”。
+
+    返回 (session_mock, bytes_needed_before, bytes_after_compact):
+      - bytes_needed_before: 初始字节数 (用于 _high_usage_session)
+      - bytes_after_compact: 压缩后字节数（小于初始 → 会触发 compressionEffective=True）
+    """
+    # 初始 session 字节
+    initial_bytes = int(target_pct / 100 * 131072 / 1000 * armor.BYTES_PER_KTOKEN)
+    compact_bytes = int(compact_to_pct / 100 * 131072 / 1000 * armor.BYTES_PER_KTOKEN)
+
+    fake_session = MagicMock()
+    fake_session.name = "agent.jsonl"
+
+    # 使用可变容器包裹 size 以便 mock 能在 sessions.compact 后修改
+    state = {"size": initial_bytes}
+    fake_session.stat.return_value.st_size = initial_bytes
+
+    # 提供 set_size 让 mock side_effect 可以调
+    def set_size(new_size):
+        state["size"] = new_size
+        fake_session.stat.return_value.st_size = new_size
+    fake_session.set_size = set_size
+    return fake_session, initial_bytes, compact_bytes
 
 
 def _setup_high_usage(mocker, target_pct: float = 80.0, with_messages: bool = True):
@@ -244,14 +300,99 @@ class TestArmorCompress:
         assert index["modelGenerated"] is False
 
     def test_cli_trigger_success_sets_compact_triggered_true(self, mocker, armor_state):
-        """openclaw agent CLI 调用成功 → compactTriggered=True。"""
-        _setup_high_usage(mocker, target_pct=80.0)
+        """openclaw sessions compact 成功且 session 真变小 → compactTriggered=True + compressionEffective=True。"""
+        # mock session: 初始 80MB 等效字节数，压缩后变成 30MB 等效
+        fake_session, before_b, after_b = _high_usage_session_with_compactable(80.0, 30.0)
+        mocker.patch.object(
+            armor, "armor_check",
+            return_value={"usagePercent": 80.0, "severity": "warn", "summary": "x"},
+        )
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
+        _mock_read_tail(mocker)
+        mocker.patch.object(
+            armor, "_llm_analyze",
+            return_value={"preserved": {}, "discarded": {}, "degradationDetected": None},
+        )
+        # mock subprocess.run: sessions.compact 后改 size
+        def mock_run(args, **kwargs):
+            # du 调用
+            if args and args[0] == "du":
+                f = MagicMock()
+                f.stdout = "80000\t/sessions"
+                return f
+            # openclaw sessions compact - 模拟后会让 session 变小
+            if args and args[0] == "openclaw" and len(args) > 1 and args[1] == "sessions":
+                fake_session.set_size(after_b)
+                f = MagicMock()
+                f.returncode = 0
+                f.stdout = '{"ok":true}'
+                f.stderr = ""
+                return f
+            # 其他 openclaw 调用（老路径 agent）
+            f = MagicMock()
+            f.returncode = 0
+            f.stdout = '{"ok":true}'
+            f.stderr = ""
+            return f
+        mocker.patch("subprocess.run", side_effect=mock_run)
 
         armor.armor_compress()
 
         index = json.loads((armor_state / "memory-index.json").read_text())
         assert index.get("compactTriggered") is True
-        assert index.get("compactMethod") == "openclaw-cli"
+        assert index.get("compactMethod") == "openclaw-sessions-compact"
+        # 验证压缩有效的字段
+        assert index.get("compressionEffective") is True
+        assert index.get("preCompactBytes") == before_b
+        assert index.get("postCompactBytes") == after_b
+        assert index.get("bytesSaved") == before_b - after_b
+
+    def test_cli_trigger_but_session_did_not_shrink_marks_ineffective(self, mocker, armor_state):
+        """openclaw sessions compact 返回成功但 session 未变小 → compressionEffective=False。"""
+        _setup_high_usage(mocker, target_pct=80.0)
+        # 不传 compact_bytes_after，session size 不会变
+
+        armor.armor_compress()
+
+        index = json.loads((armor_state / "memory-index.json").read_text())
+        assert index.get("compactTriggered") is True  # subprocess 成功
+        assert index.get("compressionEffective") is False  # 但 session 没变小
+        assert index.get("compactError") == "no-bytes-saved"
+
+    def test_ineffective_history_triggers_escalation_event(self, mocker, armor_state):
+        """连续 ≥3 次压缩无效 → broker 发出 mark42.armor.compact.ineffective 事件。"""
+        # 先跑一次让 history/ 创建
+        _setup_high_usage(mocker, target_pct=80.0)
+        armor.armor_compress()
+
+        # 现在 history/ 已创建，改写为“连续无效”场景
+        history_dir = armor_state / "history"
+        for hf in history_dir.glob("memory-index-*.json"):
+            entry = json.loads(hf.read_text())
+            entry["compressionEffective"] = False
+            hf.write_text(json.dumps(entry))
+
+        # 还需要 ≥3 个历史文件, 如果只有 1 个, 复制补充
+        existing = sorted(history_dir.glob("memory-index-*.json"))
+        while len(existing) < 3:
+            src = existing[0]
+            new_path = history_dir / f"{src.stem}-extra.json"
+            new_path.write_text(src.read_text())
+            existing = sorted(history_dir.glob("memory-index-*.json"))
+
+        # 再跑一次
+        _setup_high_usage(mocker, target_pct=80.0)
+        armor.armor_compress()
+
+        # 检查 broker 事件
+        from mark42_modules.config import MARK42_BROKER_EVENTS
+        events = []
+        if MARK42_BROKER_EVENTS.exists():
+            with open(MARK42_BROKER_EVENTS) as f:
+                events = [json.loads(line) for line in f]
+        escalation_events = [e for e in events if "ineffective" in e.get("sourceEventType", "")]
+        assert len(escalation_events) >= 1, f"应至少 1 条升级事件, 实际: {events}"
+        assert "连续" in escalation_events[-1]["label"]
 
     def test_cli_trigger_failure_marks_compact_failed(self, mocker, armor_state):
         """CLI 失败 → compactTriggered=False + compactError 有内容。"""

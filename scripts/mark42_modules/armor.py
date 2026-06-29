@@ -536,7 +536,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 直接写文件会触发 sessionFileFenceKey 检测 (EmbeddedAttemptSessionTakeoverError)，
     # 因为 OpenClaw 进程内的 ownedSessionFileWrites map 不会记录外部写入，
     # 接管时会判为 session 已被外部篡改 → 抛 takeover 错误。
-    # 改用 `openclaw agent --message /compact` 让 OpenClaw 自己处理。
+    #
+    # 修复 (2026-06-29): 改用 `openclaw sessions compact` 而非 `openclaw agent --message /compact`
+    # 原因：`/compact` 是主会话的斜杠命令识别，从外部 --message 注入永远被视为普通消息
+    # （OpenClaw 官方: "Slash commands cannot be executed via --message from the CLI"）。
+    # 正确路径: `openclaw sessions compact <session-key>` 调用 sessions.compact gateway RPC。
+    # --max-lines 模式不调 LLM, 直接截短, 秒级完成 (LLM 模式可能 60-180s 超时)。
     #
     # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
     # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
@@ -545,47 +550,147 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         try:
             active_session = _find_active_session()
             if active_session:
-                # 通过合法 CLI 通道触发 /compact 命令
-                # OpenClaw 会走标准 user message → 命令识别 → preflightCompaction 流程
-                result = subprocess.run(
+                pre_bytes = active_session.stat().st_size
+                # 调 OpenClaw sessions.compact RPC 截短会话
+                # --max-lines 200: 保留最后 200 行 (合理默认)，不走 LLM summary
+                # --timeout 180000: 3 分钟超时 (LLM 模式可能慢)
+                compact_proc = subprocess.run(
                     [
-                        "openclaw", "agent",
-                        "--message", "/compact",
-                        "--session-key", "agent:main:main",
-                        "--timeout", "120",
+                        "openclaw", "sessions", "compact",
+                        "agent:main:main",
+                        "--max-lines", "200",
+                        "--timeout", "180000",
                         "--json",
                     ],
                     capture_output=True,
                     text=True,
-                    timeout=180,
+                    timeout=200,
                 )
-                if result.returncode == 0:
-                    print(f"🧹 通过 openclaw agent CLI 触发 /compact: {active_session.name}")
-                    index["compactTriggered"] = True
-                    index["compactMethod"] = "openclaw-cli"
+                if compact_proc.returncode == 0:
+                    # 验证压缩是否真的生效
+                    post_bytes = active_session.stat().st_size
+                    bytes_saved = pre_bytes - post_bytes
+                    pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
+                    # 验证是否真变小 (0% = 无效, 才不会重复失败)
+                    if bytes_saved > 0:
+                        index["compactTriggered"] = True
+                        index["compactMethod"] = "openclaw-sessions-compact"
+                        index["preCompactBytes"] = pre_bytes
+                        index["postCompactBytes"] = post_bytes
+                        index["bytesSaved"] = bytes_saved
+                        index["compressionEffective"] = True
+                        print(
+                            f"🧹 会话截短成功: {pre_bytes//1024}KB → {post_bytes//1024}KB "
+                            f"(节省 {pct_saved}%)"
+                        )
+                        # 报 broker 成功事件
+                        _append_broker(
+                            "armor", "mark42.armor.compact.success",
+                            f"会话截短: {pct_saved}% 节省",
+                            "ok",
+                            f"压缩前 {pre_bytes//1024}KB → 压缩后 {post_bytes//1024}KB "
+                            f"({bytes_saved} bytes)",
+                            {
+                                "preBytes": pre_bytes,
+                                "postBytes": post_bytes,
+                                "bytesSaved": bytes_saved,
+                                "pctSaved": pct_saved,
+                                "method": "openclaw-sessions-compact",
+                            },
+                        )
+                    else:
+                        # 返回 0 但 session 没变 (极少见, 可能已压缩)
+                        index["compactTriggered"] = True
+                        index["compactMethod"] = "openclaw-sessions-compact"
+                        index["compressionEffective"] = False
+                        index["compactError"] = "no-bytes-saved"
+                        print(f"⚠️ sessions.compact 返回成功但 session 未变小")
                 else:
-                    print(f"⚠️ openclaw agent 调用失败 (rc={result.returncode}): {result.stderr[:200]}")
+                    err = (compact_proc.stderr or compact_proc.stdout)[:300]
                     index["compactTriggered"] = False
-                    index["compactError"] = result.stderr[:200]
+                    index["compactError"] = err
+                    index["compressionEffective"] = False
+                    print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
+                    _append_broker(
+                        "armor", "mark42.armor.compact.failed",
+                        f"sessions.compact 失败 rc={compact_proc.returncode}",
+                        "error",
+                        err,
+                        {"rc": compact_proc.returncode, "preBytes": pre_bytes},
+                    )
             else:
                 print("⚠️ 未找到活跃会话，跳过 compact")
                 index["compactTriggered"] = False
+                index["compressionEffective"] = False
         except subprocess.TimeoutExpired:
-            print("⚠️ openclaw agent 调用超时（180s）")
+            print("⚠️ sessions.compact 调用超时（200s）")
             index["compactTriggered"] = False
+            index["compressionEffective"] = False
             index["compactError"] = "timeout"
         except FileNotFoundError:
-            print("⚠️ openclaw 命令未找到，回退到只生成记忆索引（OpenClaw 自动 preflightCompaction 会接管）")
+            print("⚠️ openclaw 命令未找到，回退到只生成记忆索引")
             index["compactTriggered"] = False
+            index["compressionEffective"] = False
             index["compactError"] = "openclaw-not-found"
         except Exception as e:
             print(f"⚠️ compact 触发失败: {e}")
             index["compactTriggered"] = False
+            index["compressionEffective"] = False
             index["compactError"] = str(e)
     # ⚠️ 必须在所有字段（含 compactTriggered/compactError）设置完后再写文件
     _save_json(index_path, index)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     _save_json(history_dir / f"memory-index-{ts}.json", index)
+
+    # ── P0 补充: 连续压缩无效升级报 ──
+    # 读 actions.jsonl 最近 5 条, 如果全部 compressionEffective=False 且本次也是 False,
+    # 说明 sessions.compact 调用一直不能压下 session, 可能是配置文件不一致、LLM 失败、
+    # 或上下文估计偏差。则发升级事件到 broker, 提醒人工干预。
+    try:
+        recent_ineffective = 0
+        if actions_log.exists():
+            with open(actions_log) as f:
+                recent_lines = f.readlines()[-10:]  # 最近 10 条
+            # 检查最近 5 条非 dry-run 中是否有 compressionEffective=False
+            for line in recent_lines[-5:]:
+                try:
+                    entry = json.loads(line.strip())
+                    if entry.get("action") == "compress":
+                        # 检查本次压缩是否有效 (粗略依据: 读 memory-index.json)
+                        # 精确方式要查 history/*，但简单点：只看本次
+                        pass
+                except Exception:
+                    continue
+        # 本次判断: index 里是否有 compressionEffective=False 且已生成
+        if index.get("compressionEffective") is False:
+            # 查 history 里最近 5 次 compressionEffective 字段
+            hist_files = sorted(history_dir.glob("memory-index-*.json"))[-5:]
+            ineffective_count = 0
+            total_count = 0
+            for hf in hist_files:
+                try:
+                    h = json.loads(hf.read_text())
+                    if "compressionEffective" in h:
+                        total_count += 1
+                        if h["compressionEffective"] is False:
+                            ineffective_count += 1
+                except Exception:
+                    continue
+            if total_count >= 3 and ineffective_count == total_count:
+                # 连续 ≥3 次压缩全部无效, 升级 broker
+                _append_broker(
+                    "armor", "mark42.armor.compact.ineffective",
+                    f"连续 {ineffective_count}/{total_count} 次压缩未生效",
+                    "warn",
+                    f"建议检查 contextWindow 配置 / LLM 可用性 / session fence 状态",
+                    {"ineffectiveCount": ineffective_count, "totalCount": total_count,
+                     "preUsage": usage},
+                )
+                print(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件")
+    except Exception as e:
+        # 升级逻辑本身的错误不能影响主流程
+        print(f"⚠️ 连续无效检查失败 (非致命): {e}")
+
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 
