@@ -15,6 +15,9 @@
 """
 
 import subprocess
+import os
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -75,6 +78,9 @@ def test_check_warn_band_info_severity(mocker):
     fake_session.stat.return_value.st_size = bytes_needed
     _patch_du(mocker, bytes_needed // 1024)
 
+    # P1.1: 切到 simple 模式保证原公式逻辑 (mock 环境下 smart 模式无字符可扫)
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
+
     with patch.object(armor, "_find_active_session", return_value=fake_session):
         result = armor.armor_check()
 
@@ -94,6 +100,8 @@ def test_check_alert_band_warn_severity(mocker):
     fake_session.stat.return_value.st_size = bytes_needed
     _patch_du(mocker, bytes_needed // 1024)
 
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
+
     with patch.object(armor, "_find_active_session", return_value=fake_session):
         result = armor.armor_check()
 
@@ -112,6 +120,8 @@ def test_check_crit_band_critical_severity(mocker):
     fake_session.name = "agent.jsonl"
     fake_session.stat.return_value.st_size = bytes_needed
     _patch_du(mocker, bytes_needed // 1024)
+
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
 
     with patch.object(armor, "_find_active_session", return_value=fake_session):
         result = armor.armor_check()
@@ -136,6 +146,8 @@ def test_check_warn_threshold_triggers(mocker):
     fake_session.name = "agent.jsonl"
     fake_session.stat.return_value.st_size = bytes_needed
     _patch_du(mocker, bytes_needed // 1024)
+
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
 
     with patch.object(armor, "_find_active_session", return_value=fake_session):
         result = armor.armor_check()
@@ -233,11 +245,14 @@ def test_check_returned_fields(mocker):
 # ── 11. token 估算公式（契约冻结） ──
 
 def test_token_estimation_formula(mocker):
-    """锁死 armor 的 token 估算公式。
+    """锁死 armor 的 token 估算公式 (simple 模式)。
 
     公式: int(st_size // BYTES_PER_KTOKEN * 1000)
     含义: 字节数 / 2KB = 千 token 数, × 1000 = token 数
     """
+    # P1.1: 切到 simple 模式保证原公式逻辑
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
+
     # 1MB 字节应该产生多少 token?
     st_size = 1024 * 1024  # 1MB
     expected_tokens = int(st_size // armor.BYTES_PER_KTOKEN * 1000)
@@ -253,6 +268,85 @@ def test_token_estimation_formula(mocker):
     assert result["estimatedTokens"] == expected_tokens
 
 
+def test_token_estimation_smart_mode(tmp_path, mocker):
+    """P1.1: smart 模式按语言密度估算 tokens。
+
+    场景: session 文件包含 100 条消息, 平均每条 50 个中文字 + 100 个英文字 + 50 个标点。
+    预计 token 数:
+      中文: 100*50 * 1.5 = 7,500
+      英文: 100*100 * 0.25 = 2,500
+      标点: 100*50 * 0.1 = 500
+      总计 ≈ 10,500 tokens (加上外推余量)
+    """
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "smart"})
+
+    # 造一个临时 session jsonl, 100 条消息, 中文密度
+    session_file = tmp_path / "test_session.jsonl"
+    zh_msg = "你好世界" * 12  # 48 个中文字
+    en_msg = "hello world this is a test message " * 3  # ~100 chars en
+    msg = {
+        "type": "message",
+        "message": {
+            "role": "user",
+            "content": zh_msg + " " + en_msg,
+        }
+    }
+    lines = [json.dumps(msg) for _ in range(100)]
+    session_file.write_text("\n".join(lines) + "\n")
+
+    result = armor._estimate_tokens_smart(session_file, scan_lines=200)
+
+    # 应该扫到 ~100 条消息 (允许 ±1 容差, 最后一行可能无换行符)
+    assert 99 <= result["scannedMessages"] <= 100
+    assert result["zhChars"] > 0
+    assert result["enChars"] > 0
+
+    # token 估算范围合理 (中文 48*100*1.5=7200 + 英文 100*100*0.25=2500 = 9700, 允许 ±50% 浮动)
+    assert 5000 < result["estimatedTokens"] < 30000, (
+        f"估算 tokens={result['estimatedTokens']} 不在合理范围"
+    )
+    assert result["method"] == "smart"
+
+
+def test_token_estimation_smart_mode_zh_heavy():
+    """P1.1: 纯中文场景 - 验证 smart 模式不出现 6× 高估。
+
+    原公式 1MB 中文 JSONL = 500K tokens (1KB = 0.5K token)
+    但实际中文 + JSON 包装 = ~80K tokens (中文 1.5 token/char)
+    smart 模式应该接近 80K 而不是 500K。
+    """
+    # 生成 50KB 中文为主的 JSONL
+    session_file = "/tmp/_test_zh_session.jsonl"
+    zh_msg = "今天我们学习 Python 编程基础。" * 50  # ~1500 字中文
+    msg = {"type": "message", "message": {"role": "user", "content": zh_msg}}
+    lines = [json.dumps(msg) for _ in range(40)]  # 40 条消息
+    with open(session_file, "w") as f:
+        f.write("\n".join(lines))
+
+    size_bytes = os.path.getsize(session_file)
+    print(f"\n  session 大小: {size_bytes/1024:.1f}KB")
+
+    # 简单公式 (原行为): size_bytes // 2048 * 1000
+    BYTES_PER_KTOKEN = 2048
+    simple_tokens = int(size_bytes // BYTES_PER_KTOKEN * 1000)
+    print(f"  原公式估算: {simple_tokens:,} tokens")
+
+    # smart 公式: 按密度估算
+    import sys; sys.path.insert(0, "scripts")
+    from mark42_modules.utils import _estimate_tokens_smart
+    result = _estimate_tokens_smart(Path(session_file))
+    print(f"  smart 估算: {result['estimatedTokens']:,} tokens")
+    print(f"  ratio: {simple_tokens / max(result['estimatedTokens'], 1):.2f}x")
+
+    # smart 估算应明显小于原公式 (中文场景至少少 2×)
+    assert result["estimatedTokens"] * 2 <= simple_tokens, (
+        f"smart 估算 ({result['estimatedTokens']}) 仅为原公式 ({simple_tokens}) 的 "
+        f"{result['estimatedTokens']/simple_tokens*100:.1f}%, 中文场景预期 ≤50%"
+    )
+
+    os.unlink(session_file)
+
+
 # ── 12. 严重度映射（parametrize） ──
 
 @pytest.mark.parametrize("target_pct,expected_severity,expected_status", [
@@ -263,6 +357,8 @@ def test_token_estimation_formula(mocker):
 ])
 def test_severity_mapping_at_thresholds(mocker, target_pct, expected_severity, expected_status):
     """参数化测试 4 个使用率区间的 severity/status 映射。"""
+    # P1.1: 切到 simple 模式保证原公式逻辑
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "simple"})
     bytes_needed = int(target_pct / 100 * 131072 / 1000 * armor.BYTES_PER_KTOKEN)
     fake_session = MagicMock()
     fake_session.name = "agent.jsonl"

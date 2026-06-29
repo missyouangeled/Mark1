@@ -22,8 +22,8 @@ from .config import (
     ALGO_USE_SCHEDULER, ALGO_PII_ENABLED, ALGO_FAIL_SAFE,
 )
 from .utils import (
-    _append_broker, _find_active_session, _get_context_window, _load_json,
-    _now_iso, _now_ts, _save_json,
+    _append_broker, _estimate_tokens_smart, _find_active_session,
+    _get_context_window, _load_json, _now_iso, _now_ts, _save_json,
 )
 
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
@@ -72,10 +72,16 @@ def armor_check() -> dict[str, Any]:
     }
     est = {}
     try:
-        # 用文件字节数直接估算 token 数
-        # JSONL 每字节 ≈ 0.25 token（中文约2-3 chars/token + JSON 控制字符）
-        # 14 KB/1000 tokens 是 DeepSeek 模型的经验值
-        est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
+        # P1.1 修复: 按语言密度智能估算 token 数, 避免中文场景下 6× 高估
+        # 原公式: size_bytes // BYTES_PER_KTOKEN * 1000 (以英文 / 代码为主)
+        # 新公式: 扫描真实字符, 按 zh=1.5 en=0.25 other=0.1 token/char 估算
+        # 环境变量:
+        #   MARK42_TOKEN_ESTIMATE_MODE=simple (沿用原公式) | smart (默认, 推荐)
+        est_mode = os.environ.get("MARK42_TOKEN_ESTIMATE_MODE", "smart").lower()
+        if est_mode == "smart":
+            est = _estimate_tokens_smart(active)
+        else:
+            est = {"estimatedTokens": int(active.stat().st_size // BYTES_PER_KTOKEN * 1000)}
     except OSError:
         est = {"estimatedTokens": 0}
     context_window = _get_context_window()
@@ -106,6 +112,15 @@ def armor_check() -> dict[str, Any]:
         "contextWindow": context_window,
         **tokens_info,
     }
+    # P1.1 补丁: 智能估算模式下, 输出详细密度信息供 debug
+    if est.get("method") == "smart":
+        result["estimateDetail"] = {
+            "method": "smart",
+            "zhChars": est.get("zhChars", 0),
+            "enChars": est.get("enChars", 0),
+            "otherChars": est.get("otherChars", 0),
+            "scannedMessages": est.get("scannedMessages", 0),
+        }
     return result
 
 
