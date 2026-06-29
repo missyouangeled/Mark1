@@ -25,6 +25,7 @@
 | 记忆 L2.5 索引丢失 + 重建 | `memory/daily/2026-06-24.md` | scratch 索引空、sidecar 加载空索引、强制 rebuild 6245 段 |
 | 跨模型行为对比（点点 vs DeepSeek） | `memory/daily/2026-06-24.md` | 主动记录 / 全链路留痕 / 修后反思 等习惯差异 |
 | OpenClaw 6.9→6.10 升级 + 6 项 doctor 精简 | `memory/daily/2026-06-26.md`, `docs/通用-OpenClaw-升级记录.md` | AI 模型统一到 MiniMax-M3、mark42-3day 修复、orphan 归档、tool cap 8K→64K、NODE_COMPILE_CACHE、Command owner |
+| **Mark42 测试体系 Phase 1 收尾** | `memory/daily/2026-06-29.md`, `docs/design/mark42-测试体系-Phase1收官-20260629.md`, `docs/design/mark42-测试手册.md` | 0→111 测试、37.8% 覆盖、修 armor.py 写文件顺序 bug、装正式 pytest 体系 |
 
 ## 常见问法怎么找
 
@@ -66,3 +67,10 @@
 - [2026-06-26] 今日摘要
 - [2026-06-26] 重要事项
 - [2026-06-26] 后续待办
+- [2026-06-26] 15:33 收尾
+- [2026-06-29] 今日摘要
+- [2026-06-29] 重要事项
+- [2026-06-29] 后续待办
+- [2026-06-28] 今日摘要
+- [2026-06-28] 重要事项
+- [2026-06-28] 后续待办

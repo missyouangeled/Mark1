@@ -25358,3 +25358,96 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 
 ### Commit
 "Mark42 测试体系 Phase 1 续 + armor.py 写文件顺序 bug 修复"
+
+## [ERR-20260629-002] pytest mock `cli.X` 失败 — 模块属性必须用完整路径
+
+**Logged**: 2026-06-29T10:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: test-design
+
+### Summary
+`status_dashboard` 等函数在函数体内 `from .config import ARMOR_STATE`，
+测试代码 `mocker.patch.object(cli, "ARMOR_STATE", mock)` 失败
+（`module 'cli' has no attribute 'ARMOR_STATE'`）。同样问题：armor_check、
+mark42_init、_load_json 等。
+
+### Root cause
+- `from .X import Y` 创建本地绑定 `Y` 在 `cli` 模块的 globals()
+- 但 `cli` 模块顶层只有 `import argparse` + `import sys`，没有这些属性
+- patch 必须针对原始模块：`mocker.patch("mark42_modules.armor.armor_check")`
+
+### Fix
+- 规则：mock 任何函数体内 import 的对象，target 用完整路径 `mark42_modules.X.Y`
+- 规则：mock 顶层 import 的对象，可以直接 `patch.object(module, "X")`
+
+### Prevention rule
+- 写测试前先看代码：Y 是 `from .X import Y` 还是顶层 import？
+- 后者（函数体内）：用 `patch("mark42_modules.X.Y")`
+- 前者（顶层）：用 `patch.object(module, "Y")`
+
+---
+
+## [ERR-20260629-003] fcntl.flock 锁 + mock file handle = 测试崩溃
+
+**Logged**: 2026-06-29T10:05:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: test-design
+
+### Summary
+`engine._save_loops()` 用 `fcntl.flock(lf.fileno(), fcntl.LOCK_EX)` 文件锁。
+测试 mock 了 `_save_loops` 的所有调用都没问题，但 `engine_run_loop` 函数末尾
+**没被 mock 的 `_save_loops`** 触发 fcntl 报错：`fileno() returned a non-integer`。
+
+### Root cause
+- mock `subprocess.run` 时 MagicMock 返回的文件对象不能 fileno()
+- `_save_loops` 用 `with open(...) as lf` 创建真文件，但 **Mock 替换后整个流程跑的是 mock 对象**
+
+### Fix
+- 测试里如果代码路径会走到 `_save_loops`，**必须 mock 掉它**：
+  ```python
+  mocker.patch.object(engine, "_save_loops")
+  ```
+- 否则用 `monkeypatch.setattr(engine, "_save_loops", lambda *a, **k: None)`
+
+### Prevention rule
+- 测试涉及文件锁/文件 IO 的代码，先 mock 写文件的函数
+- 真跑 daemon thread 测试时，要么 mock 整个写函数，要么用真 tmp_path
+
+---
+
+## [ERR-20260629-004] hard-code 路径不被 XDG_STATE 派生
+
+**Logged**: 2026-06-29T10:10:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: test-design
+
+### Summary
+`config.py` 第 32 行 `SCRATCH = Path("/mnt/data/openclaw/scratch")` 是 hard-code，
+不像 `MARK42_STATE` 从 `XDG_STATE_HOME` 派生。
+conftest 重定向 `XDG_STATE_HOME` 后 `config.MARK42_STATE` 跟着变，但 `config.SCRATCH` 不变。
+更糟的是 `heavy.SCRATCH` 是 reload 之前的旧引用，仍然指向 `/mnt/data/...`，
+**导致测试去真生产创建目录**（差点污染！）。
+
+### Root cause
+- hard-code 路径在 import 时绑定，reload 不会变
+- `from .config import SCRATCH` 在 heavy 模块拿到的是 hard-code 的值
+
+### Fix
+- conftest 在 reload **之后** 额外 monkeypatch 依赖模块：
+  ```python
+  modules_with_hard_paths = [
+      ("mark42_modules.heavy", "SCRATCH"),
+      ("mark42_modules.cli", "SCRATCH"),
+  ]
+  for mod_name, attr in modules_with_hard_paths:
+      monkeypatch.setattr(sys.modules[mod_name], attr, fake_scratch)
+  ```
+- 长期方案：把 `SCRATCH` 改成 `MARK42_STATE.parent.parent / "scratch"` 或从 env 派生
+
+### Prevention rule
+- 凡 conftest 重定向环境变量后，**必须 reload 后再 patch hard-code 路径的依赖模块**
+- 写测试 fixture 时**不要**直接 `from .config import SCRATCH`，要用 conftest fixture
+

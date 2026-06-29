@@ -1145,3 +1145,98 @@ LLM 异步入口调用 (daemon tick 不阻塞):
 - P0-1 + P0-2 已完成 (Day 10)
 - P1-3 + P1-4 + P2-5 + P2-6 + P2-7 路线清晰, 等新会话开干
 - mark42-tests.py 40/40 全绿
+
+---
+
+## 2026-06-29 — 测试体系 Phase 1 收尾
+
+### Phase 1: 测试基础设施（commit 57c965e）
+
+**目标**: 给 Mark42 装正式 pytest 测试体系，告别 mark42-tests.py 烟测脚本独苗
+
+**完成项**:
+- 装 pytest + 5 个插件（pytest-cov / xdist / subprocess / mock）
+- `scripts/tests/conftest.py`（244 行）autouse 环境隔离
+- `scripts/tests/unit/test_conftest.py`（9 测试）自检隔离生效
+- `scripts/tests/unit/test_armor_check.py`（15 测试）armor_check 100% 覆盖
+- `pyproject.toml`（60 行）pytest + coverage 统一配置
+
+**关键设计**:
+- autouse fixture 用 monkeypatch + tmp_path 隔离
+- config reload 顺序按依赖图（utils → 压缩 → armor → engine）
+- 真生产零污染 5 次 mtime 验证
+
+### Phase 1 续: armor.py bug 修复（commit 79a26e9）
+
+**测试发现真 bug**: `armor.py` 第 508 行 `_save_json` 在 `compactTriggered` 字段
+**之前**调用，导致这两个字段永远丢失到文件。
+
+**修复**: 把 `_save_json` 移到 return 之前。
+
+**修复前**: 5 个红测试标记 bug 位置
+**修复后**: 5 红 → 5 绿，armor.py 覆盖 16.6% → 37.1%
+
+### Phase 1 收尾: engine/heavy/cli + 磁盘清理（commit 4d69b00）
+
+**新增测试**:
+- `test_engine.py`（22 测试）start/kill/list + 5 个模板分支 + daemon thread
+- `test_heavy.py`（29 测试）detect 4 判定 + start/finish/execute/cleanup
+- `test_cli.py`（16 测试）status_dashboard JSON/human + main argparse + assemble
+
+**conftest 增强**:
+- SCRATCH 重定向（hard-code 路径的依赖模块单独 monkeypatch）
+- scratch_dir fixture
+- 删 compaction_diag.py.bak.20260616
+
+**磁盘清理**:
+- /tmp 调试脚本 6 个文件
+- /tmp/pytest-of-missyouangeled/ 旧 session（214M → 72M）
+- __pycache__/ + .pytest_cache + .coverage
+
+### Phase 1 累计指标
+
+| 指标 | 起步 | Phase 1 收尾 | 增量 |
+|---|---|---|---|
+| 测试数 | 0 | **111** | +111 |
+| armor.py 覆盖 | 0% | 50%+ | +50 pp |
+| engine.py 覆盖 | 0% | 56.7% | +56.7 pp |
+| heavy.py 覆盖 | 0% | **85.9%** | +85.9 pp |
+| cli.py 覆盖 | 0% | 39.7% | +39.7 pp |
+| **整体覆盖** | 0% | **37.8%** | +37.8 pp |
+| 串行耗时 | — | 7s | — |
+| 并行耗时 | — | 6.9s | — |
+
+### 修改文件清单
+
+| 文件 | 操作 | 备注 |
+|---|---|---|
+| `scripts/tests/conftest.py` | 新建→增强 | 环境隔离 + 8 fixture |
+| `scripts/tests/unit/test_armor_check.py` | 新建 | 15 测试 |
+| `scripts/tests/unit/test_armor_compress.py` | 新建 | 20 测试（含 bug 标记） |
+| `scripts/tests/unit/test_engine.py` | 新建 | 22 测试 |
+| `scripts/tests/unit/test_heavy.py` | 新建 | 29 测试 |
+| `scripts/tests/unit/test_cli.py` | 新建 | 16 测试 |
+| `scripts/tests/unit/test_conftest.py` | 新建 | 9 测试 |
+| `pyproject.toml` | 新建 | pytest 配置 |
+| `scripts/mark42_modules/armor.py` | 修改 | 修 _save_json 顺序 bug |
+| `scripts/mark42_modules/armor.py.bugfix_backup_20260629` | 新建 | 修复前备份 |
+| `scripts/mark42_modules/compaction_diag.py.bak.20260616` | 删除 | 旧备份清理 |
+| `.gitignore` | 修改 | 加 .coverage / __pycache__/ |
+| `.learnings/ERRORS.md` | 追加 | 4 个 ERR 条目（BUG-001~004） |
+| `PLANS.md` | 追加 | Phase 1 三阶段快照 |
+| `docs/design/mark42-测试体系设计方案-20260629.md` | 新建 | 14.7KB 设计方案 |
+| `docs/design/mark42-更新日志.md` | 追加 | 本节 |
+
+### 真生产状态
+
+- ✅ mtime 验证 5 次零污染
+- ✅ mark42 status 命令正常（91.4% armor usage）
+- ✅ 4 个 systemd 服务 active
+- ✅ 4 个 Loop 全部 registered（context-guard / health-watch / model-fallback / memory-index）
+
+### 下一步（Phase 2）
+
+- 压缩子模块 + logs 单测（~25 测试）
+- 集成测试（armor → engine → broker 端到端）
+- CI 接入 + 覆盖率门禁
+- 预计 1 周内整体覆盖 ≥ 60-70%
