@@ -3,7 +3,16 @@
 > 设计日期：2026-06-24
 > 设计人：贾维斯
 > 触发原因：点点要求"学习 Headroom 的压缩技术，用于 Mark42 项目上"
-> 状态：🟡 设计方案，未实施
+> **状态（2026-06-29 更新）**：✅ **已全部落地**
+> - SmartCrusher → `scripts/mark42_modules/smart_crusher.py`
+> - CodeCompressor → `scripts/mark42_modules/code_compressor.py`
+> - LogDeduplicator → `scripts/mark42_modules/log_deduplicator.py`
+> - RAGRanker → `scripts/mark42_modules/compression_algorithms.py` 中 `ragrank()`
+> - ModernBERT → `scripts/mark42_modules/llm_text_compressor.py`
+> - Git-Diff → `scripts/mark42_modules/diff_compressor.py`
+> - 落地详细：[开发手册-压缩子系统](./mark42-开发手册-压缩子系统.md)
+
+> 本文档保留作为**设计灵感来源**，不重复实现细节。
 
 ---
 

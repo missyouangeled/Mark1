@@ -121,3 +121,64 @@
 ---
 
 *此文件由 Mark42 v2.3 全线审查驱动创建，今后每次修复 bug 或审查发现新问题后更新。*
+
+---
+
+## 五、Phase 1 测试体系教训（2026-06-29）
+
+> 继 v2.3 之后的第 5 节。装正式 pytest 体系时挖出的 4 个新坑。
+
+### 第 7 类：写文件顺序错（导致字段永久丢失）[BUG-001]
+
+**v3 Phase 1**：`armor.py:508` `_save_json(...)` 在 `compactTriggered` 字段**之前**调用，导致这两个字段永远丢失到 `actions.jsonl`。
+
+**根因**：函数内多个字段赋值 + 1 个集中"保存"动作，写代码时按"代码顺序"想，但 IDE 拖动位置时把 `_save_json` 拖到了错误位置。
+
+**教训**：
+- "保存"动作必须放 return 前最后一步
+- 写"命令式"代码（`X = Y; save()`）比"声明式"（`save({all_fields})`）脆弱
+- 5 个红测试精确标记位置，**修后立刻转绿**
+
+### 第 8 类：`from .X import Y` 缓存陷阱 [BUG-002]
+
+**v3 Phase 1**：reload `config` 后 `heavy.SCRATCH` 仍是 reload 前的旧值。
+
+**根因**：Python `from .config import SCRATCH` 是 import 时绑定，对 reload 不感知。
+
+**教训**：
+- conftest 重定向环境变量后，**必须 reload 后再 monkeypatch 依赖模块**
+- 避免 `from .X import Y`，改用 `from . import X` + `X.Y` 访问
+
+### 第 9 类：函数体内 import 的 mock 路径 [BUG-003]
+
+**v3 Phase 1**：`status_dashboard` 函数体内 `from .armor import armor_check`，mock `cli.X` 失败。
+
+**根因**：函数体内 import 创建本地绑定，不在模块顶层 globals。
+
+**教训**：
+- mock 函数体内 import，必须用完整路径 `mock.patch("mark42_modules.armor.armor_check")`
+- 不能用 `patch.object(cli, "armor_check")`
+
+### 第 10 类：fcntl 文件锁 + MagicMock [BUG-004]
+
+**v3 Phase 1**：`engine._save_loops()` 用 `fcntl.flock()`，测试调到最后崩 `fileno() returned a non-integer`。
+
+**根因**：Mock 的 file handle 不支持 `fileno()`。
+
+**教训**：
+- 测试设计要考虑 fcntl，写文件函数要么 mock 掉，要么用真 tmp_path
+- **新方案**：conftest 加 `autouse fixture` 全局禁用 fcntl.flock（仅测试期）
+
+### 自检清单补充
+
+| # | 检查项 | 触发场景 |
+|:---:|:---|:---|
+| 11 | **`_save_*` 函数在 return 之前** | 改字段持久化逻辑 |
+| 12 | **`reload X` 后又 monkeypatch X** | conftest 改了环境变量 |
+| 13 | **mock 函数体内 import 用完整路径** | 写测试 mock 任何函数 |
+| 14 | **fcntl 在测试里会被禁** | 测试涉及文件锁 |
+| 15 | **`@pytest.fixture(autouse=True)` 全局禁用 fcntl** | 写 conftest |
+
+---
+
+*本节由 2026-06-29 Phase 1 收官驱动。完整 ERR-001~004 见 `.learnings/ERRORS.md`。*

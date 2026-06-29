@@ -1,8 +1,52 @@
 # Mark42 模块化智能铠甲系统 — 初步设计
 
-> 设计日期：2026-06-15
+> 设计日期：2026-06-15（原始设计） / 2026-06-29（资产对齐更新）
 > 代号：Mark42
 > 原则：每一块拆开能独立战斗，拼在一起是完整战甲 —— 就像钢铁侠 Mark42
+
+---
+
+## 〇、当前实际资产（2026-06-29）
+
+> 本文档为 2026-06-15 原始设计，架构哲学仍适用。
+> 代码状态以 `scripts/mark42_modules/` 为准。**设计 = 代码 +1**。
+
+### 代码体量
+
+- **22 个模块** / **9526 行** Python
+- **1 个 CLI 入口** `scripts/mark42.py`
+- **111 个测试** / **37.8% 覆盖**（待 Phase 2 提升至 50%+）
+- 四个守护服务（armor-guard / engine-daemon / memory-index / task-watch）
+
+### 模块清单（按职责分组）
+
+| 分类 | 模块 | 说明 |
+|:---|:---|:---|
+| **核心三模块** | `armor.py` | 上下文铠甲（LLM 智能分析 + 启发式压压） |
+|  | `engine.py` | 循环引擎（Loop 编排 + daemon 守护） |
+|  | `heavy.py` | 重型战甲（大任务拆 + 后台跑 + 隔离执行） |
+| **压缩子系统** | `algo_scheduler.py` | 算法调度器（决定 LLM/规则） |
+|  | `smart_crusher.py` | 智能压缩调度 |
+|  | `text_compressor.py` | 文本压缩（同义词 + 填充词） |
+|  | `code_compressor.py` | 代码压缩（去注 + AST） |
+|  | `diff_compressor.py` | git diff 压缩 |
+|  | `llm_text_compressor.py` | LLM 语义压缩（同步 + 异步） |
+|  | `compression_algorithms.py` | RAGRanker |
+|  | `compress_queue.py` | 压缩线程队列 |
+|  | `compaction_diag.py` | 压缩诊断 + 修复 |
+|  | `pii_redactor.py` | PII 脱敏 |
+|  | `log_deduplicator.py` | 日志去重 |
+| **支撑模块** | `cli.py` | argparse + status dashboard |
+|  | `config.py` | XDG 路径 + 配置初始化 |
+|  | `utils.py` | JSON 加载、文件锁 |
+|  | `session_fence_safe.py` | 会话安全写入 |
+|  | `logs.py` | 日志轮转 |
+| **性能 / 调试** | `perf_bench.py` | 性能基准 |
+| **原型期脚本** | `test_day4_integration.py` | Day 4 集成脚本（保留供调试） |
+|  | `test_session_fence.py` | Day 2 会话栅栏测试 |
+
+> **怎么说**：Mark42 从 2026-06-15 原始设计到现在，**多了 16 个模块**。
+> 设计哲学（三层架构 / 独立可用 / 事件总线）未变。
 
 ---
 

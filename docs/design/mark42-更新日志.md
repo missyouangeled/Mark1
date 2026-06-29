@@ -919,7 +919,9 @@ $ grep -rn "compression_algorithms.*[Ll]og" --include="*.py"
 
 ### 阶段 1 收官 README
 
-新文件: `docs/design/mark42-阶段1收官README-20260625.md` (~280 行)
+> ⚠️ 本文件已于 2026-06-29 归档至 `_archive/`（已取代于 `mark42-测试体系-Phase1收官-20260629.md`）。
+
+新文件: `docs/design/mark42-阶段1收官README-20260625.md` (~280 行)（已归档）
 
 **包含**:
 - Mark42 三层架构图
@@ -1064,7 +1066,7 @@ LLM 异步入口调用 (daemon tick 不阻塞):
 | `scripts/mark42_modules/compress_queue.py` | 修改 | +~30 |
 | `scripts/mark42_modules/algo_scheduler.py` | 修改 | +~30 |
 | `scripts/mark42-tests.py` | 修改 | +~80 |
-| `docs/design/mark42-阶段1收官README-20260625.md` | 修改 | +~50 (§六/七/八/九 更新) |
+| `docs/design/mark42-阶段1收官README-20260625.md`（已归档）| 修改 | +~50 (§六/七/八/九 更新) |
 | `docs/design/mark42-更新日志.md` | 追加 | +~80 (本节) |
 
 ### 当前状态
@@ -1135,8 +1137,8 @@ LLM 异步入口调用 (daemon tick 不阻塞):
 
 | 文件 | 操作 | 行数 |
 |---|---|---|
-| `docs/design/mark42-Phase2路线-20260625.md` | **新建** | +947 |
-| `docs/design/mark42-阶段1收官README-20260625.md` | 修改 | +5 (指针) |
+| `docs/design/mark42-Phase2路线-20260625.md`（已归档 → `mark42-Phase2路线-20260629.md`）| **新建** | +947 |
+| `docs/design/mark42-阶段1收官README-20260625.md`（已归档）| 修改 | +5 (指针) |
 | `docs/design/mark42-更新日志.md` | 追加 | +~60 (本节) |
 
 ### 当前状态
