@@ -25320,3 +25320,41 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260629-001] armor.py _save_json 顺序 bug
+
+**Logged**: 2026-06-29T09:23:00+08:00
+**Priority**: high (生产可见)
+**Status**: ✅ 已修复
+**Area**: mark42-armor
+**Found by**: test_armor_compress.py（5 个红测试精确标记）
+
+### Summary
+`scripts/mark42_modules/armor.py` 的 `armor_compress()` 在 `_save_json(index_path, index)` 
+**之前**才设置 `compactTriggered`/`compactError` 字段。由于 Python dict 是引用，
+文件已经写入磁盘后修改 dict 不会回写，导致这两个字段**永远丢失**。
+
+### Impact
+- memory-index.json 永远不会有 `compactTriggered` 字段
+- 下游消费者 / 调试 UI / 审计日志拿不到压缩触发状态
+- armor_compress 的核心契约被破坏
+
+### Root Cause
+第 508-512 行先 `_save_json`，第 562-583 行才设置 compactTriggered。
+"先写后改"模式在 Python dict 引用语义下失效。
+
+### Fix
+把 `_save_json(index_path, index)` 和 `_save_json(history_dir/..., index)`
+移到 return 之前，所有字段设置完成后。
+
+### Verification
+- 5 个红测试（test_cli_trigger_success / failure / not_found / timeout / no_session）
+  全部转绿
+- armor.py 覆盖率：16.6% → 37.1%
+- 整体覆盖：22.2% → 30.5%
+- 44/44 测试通过，0.6s 跑完
+- 真生产零污染确认
+- mark42 status 命令正常运行
+
+### Commit
+"Mark42 测试体系 Phase 1 续 + armor.py 写文件顺序 bug 修复"

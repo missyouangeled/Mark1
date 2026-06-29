@@ -505,9 +505,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         }
         print("⚠️ LLM 不可用，回退到启发式分析")
     index_path = ARMOR_STATE / "memory-index.json"
-    actions_log = ARMOR_STATE / "actions.jsonl"
+    _save_json(index_path, index)
     history_dir = ARMOR_STATE / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    _save_json(history_dir / f"memory-index-{ts}.json", index)
+    actions_log = ARMOR_STATE / "actions.jsonl"
     action_entry = {
         "ts": _now_iso(),
         "action": "compress" if not dry_run else "compress-dryrun",
@@ -537,10 +540,6 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 因为 OpenClaw 进程内的 ownedSessionFileWrites map 不会记录外部写入，
     # 接管时会判为 session 已被外部篡改 → 抛 takeover 错误。
     # 改用 `openclaw agent --message /compact` 让 OpenClaw 自己处理。
-    #
-    # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
-    # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
-    # _save_json 后修改 dict 不会回写到已写入的文件）。
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
             active_session = _find_active_session()
@@ -582,10 +581,6 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             print(f"⚠️ compact 触发失败: {e}")
             index["compactTriggered"] = False
             index["compactError"] = str(e)
-    # ⚠️ 必须在所有字段（含 compactTriggered/compactError）设置完后再写文件
-    _save_json(index_path, index)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    _save_json(history_dir / f"memory-index-{ts}.json", index)
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 

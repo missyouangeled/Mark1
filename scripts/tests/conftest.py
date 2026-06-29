@@ -141,6 +141,16 @@ def broker_dir(state_dir):
 
 
 @pytest.fixture
+def session_messages():
+    """为 armor_compress 提供标准的 10 条 session 消息。
+
+    armor_compress 会在 _read_session_tail 返回空列表时跳过 LLM 调用。
+    多数压缩路径的测试需要让 _read_session_tail 返回非空。
+    """
+    return [{"role": "user", "content": f"msg {i}"} for i in range(10)]
+
+
+@pytest.fixture
 def log_dir(_isolate_mark42_state):
     """数据盘日志目录：<tmp>/data/openclaw/mark42/logs"""
     from mark42_modules import config
