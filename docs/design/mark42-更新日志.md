@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-06-30 #5 — Phase 3 路线 + 执行手册 写定
+
+**背景**：Phase 2 收官 (53.7% 覆盖, 315 测试) 后, 为便于未来开 Phase 3 能随时查到, 写定 2 份文档。
+
+**范围 (估计)**:
+- 测试数: 315 → ~395 (+80)
+- 整体覆盖: 53.7% → ~63% (+9.3pp)
+- 4 大目标 + 预计工时 15-22h
+
+**变更清单**:
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | docs | 新建 `docs/design/mark42-Phase3路线-20260630.md` (5.5KB) — 战略层, 范围 + 风险 + DoD + 接手清单 |
+| A | docs | 新建 `docs/design/mark42-Phase3执行手册-20260630.md` (38KB) — 战术层, 4 大目标, 80+ 个复制粘贴可用测试 |
+| A | docs | 路线含 4 大目标细节: #1 algo_scheduler P0 / #2 llm_text_compressor P0 / #3 cli+armor+engine 业务 / #4 小模块扫尾 |
+| A | docs | 执行手册含: 3 个新 conftest fixture / 12 个 process 测试 / 10 个 async 测试 / 4 个 HTTP 错误测试 / 10 个 CLI 集成测试 / 5 个目标详细步骤 |
+| A | docs | Phase 3 不做清单 (E2E / fuzz / static analysis / 80%+) 明确写出 |
+| A | docs | Phase 4 候选 (A: 70% / B: 集成 / C: 性能回归 / D: 故障注入) 列出 |
+
+**Phase 3 重点**:
+
+| 目标 | 起点 | 目标 | 模块 | 预计工时 |
+|---|---:|---:|---|---:|
+| #1 | 38.8% | 65% | algo_scheduler | 4-6h |
+| #2 | 40.1% | 55% | llm_text_compressor | 4-6h |
+| #3 | 47-62% | 60-70% | cli + armor + engine | 6-8h |
+| #4 | 41-45% | 55-60% | logs + queue + config | 3-4h |
+
+**风险记录**: 路线文档 §四详述 5 大风险与缓解 (LLM 超时 / CLI subprocess 慢 / 状态污染 / armor 路径太多 / mock stale)。
+
+**Phase 3 收官 DoD** (路线 §六):
+- 整体覆盖 ≥ 60%
+- 4 大目标全部完成
+- 全套测试 < 60s
+- 0 失败 / 0 跳过 (除 --runslow 显式)
+- 5 处 ERR 记录
+- 新会话 30 分钟内可接手
+
+**相关链接**:
+- 路线: `docs/design/mark42-Phase3路线-20260630.md`
+- 执行手册: `docs/design/mark42-Phase3执行手册-20260630.md`
+- Phase 2 路线: `docs/design/mark42-Phase2路线-20260629.md`
+- Phase 2 执行手册: `docs/design/mark42-Phase2执行手册-20260629.md`
+
+---
+
 ## 2026-06-30 #4 — Phase 2 拖后腿模块补完 + 手册修正
 
 **背景**：上条 (#3) 留下 compaction_diag 13.3% + llm_text_compressor 20.9% 两个拖后腿, 本次补到目标。同期修手册 5 处 vs 实现不符。
