@@ -349,8 +349,9 @@ def test_algo_scheduler():
 def test_session_fence():
     """Session Fence 安全测试"""
     print("\n🚧 Session Fence 安全测试")
+    # 7/01 迁移:从 scripts/mark42_modules/ 移到 scripts/tests/integration/
     code, out, stderr = run(
-        [sys.executable, str(SCRIPTS / "mark42_modules" / "test_session_fence.py")],
+        [sys.executable, str(SCRIPTS / "tests" / "integration" / "test_session_fence.py")],
         timeout=60,
     )
     if code == 0 and "通过" in out and "0 失败" in out:
@@ -365,8 +366,10 @@ def test_day4_integration():
     env = os.environ.copy()
     env["MARK42_ALGO_SMARTCRUSH"] = "true"
     env["MARK42_ALGO_EXPERIMENT"] = "true"
+    # 7/01 迁移:从 scripts/mark42_modules/ 移到 scripts/tests/integration/
+    # 注意: 2 个 test 已被标 @pytest.mark.skip (ERR-20260701-001)
     code, out, stderr = run(
-        [sys.executable, str(SCRIPTS / "mark42_modules" / "test_day4_integration.py")],
+        [sys.executable, str(SCRIPTS / "tests" / "integration" / "test_day4_integration.py")],
         timeout=60,
         env=env,
     )

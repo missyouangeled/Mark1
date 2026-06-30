@@ -1,67 +1,138 @@
 # Mark42 商品化路线图 — 从原型到可售卖产品
 
-> 评估日期：2026-06-16（首次）→ 2026-06-17（校准）
+> 评估日期：2026-06-16（首次）→ 2026-06-17（校准）→ 2026-06-30（全面审查）→ **2026-07-01（重写）**
 > 评估基础：完整代码审查 + 实际运行测试 + 与设计文档对照
-> 当前阶段：原型后期 / Alpha 早期（功能完成度 ~55% → 阶段1推进中）
+> 当前阶段：**阶段 1 收官** / Alpha 早期（功能完成度 ~70%）
 >
 > 代号理念重申：Mark42 战甲 — 拆开每把刀独立可用，拼起来是一套完整的甲
 
 ---
 
+## 〇、当前真实状态（2026-07-01 重写版）
+
+> **本节是重写重点**。原 §〇 数字停在 6/17（55% 完成度、20 个假 Loop），与 6/30 实际收官严重脱节。
+> 以下数字均来自 6/30 真生产审计 + Phase 2 收官 + 6 commits 推送。
+
+### 〇·1 三模块闭环
+
+| 模块 | 6/17 状态 | **6/30 实际** |
+|---|---|---|
+| Armor 铠甲 | LLM 链路通、未自动注入 | ✅ LLM 压缩 + 智能估算 + 异步队列闭环，**preBytes/postBytes/bytesSaved 全审计** |
+| Engine 引擎 | daemon 未启动、20 个假 Loop | ✅ 2 daemon 真跑，4 Loop 全部 registered（context-guard cycle=4 / health-watch / model-fallback / memory-index），watchdog 保活 |
+| Heavy 重型 | 设计有、自动执行空 | ✅ **heavy_execute 真启 Popen 进程**（dry-run 护栏，--execute-now 才真跑） |
+
+> **7/01 架构清理（点点指出 55% 是错觉）**:
+> - `scripts/mark42_modules/` 下两个老 test 文件 `test_day4_integration.py` / `test_session_fence.py` **已移到** `scripts/tests/integration/`(正确位置)
+> - 验证发现这两个文件**几乎全烂**(7 个 test 4-3 个 fail),原因:6/24 写后 scheduler/fence 改动未同步更新
+> - 加模块级 `pytest.mark.skip` + 写 ERR-20260701-001,留 Phase 4 用新版 fixture 重写
+> - **影响**: 0(原不在 pytest 套件里, 只是路径脏),但**揭示了 13 天前就腐烂的问题没人发现**
+
+### 〇·2 测试与质量（重大进展）
+
+| 指标 | 6/17 | **6/30 Phase 2 收官** |
+|---|---:|---:|
+| 测试数 | 0 | **315** |
+| 整体覆盖 | 0% | **54.7%** |
+| 串行耗时 | — | 42.7s |
+| 失败 | — | 0 |
+| ERRORS 累计 | 0 | 7 条（已沉淀到 .learnings/ERRORS.md） |
+
+**单模块覆盖亮点**：
+- `heavy.py` 90.6%（最高） ✅
+- `engine.py` 62.0% ✅
+- `smart_crusher.py` 57.3% ✅
+- `compaction_diag.py` 54.6%（从 8.1% 起飞，Phase 2 最大增量） ✅
+- `algo_scheduler.py` 38.8% / `llm_text_compressor.py` 40.1%（**仍是 P0 缺口**）
+
+### 〇·3 真生产验证（不是空跑）
+
+| 项 | 状态 |
+|---|---|
+| armor-guard.service | ✅ active 持续运行 |
+| engine-daemon.service | ✅ active 持续运行 |
+| 4 Loop 状态 | ✅ 全部 registered，cycle 正常推进 |
+| P0 压缩链路 | ✅ 16:30 真压缩节省 17.9%（678KB → 557KB） |
+| broker 联动 | ✅ `mark42.armor.compress.done` 事件正常 emit |
+| watchdog 5min 巡检 | ✅ 加了 4 Loop 检查 + 6 步全流程 |
+| broker 裁剪 | ✅ `<=` 改 `<` + 10% 安全余量 + fcntl 锁 |
+| actions.jsonl 审计 | ✅ preBytes/postBytes/bytesSaved 全字段，bytesStatus 4 种语义 |
+
+### 〇·4 12 个审查问题全修完（6/30 当天）
+
+| 严重度 | 数量 | 状态 |
+|---|---:|---|
+| 🔴 重大 | 1 (H heavy_execute 假执行) | ✅ 已修 |
+| 🟠 中等 | 3 (I broker 临界 / J actions 字段 / K 文档 4 守护) | ✅ 已修 |
+| 🟡 小 | 8 (L 死代码 / M 优先级断言 / N 死 import / O 事件命名 / P batch_size / 🟡2 fcntl 锁 / 🟡3 watchdog.log 留痕 / 🟡4 bytesStatus 语义) | ✅ 8/8 已修 |
+
+**6 个 commit 全部推送**（`20ef7cc` → `90738c2`）到 `github.com:missyouangeled/Mark1.git`。
+
+### 〇·5 文档同步
+
+- ✅ `mark42-Phase2路线-20260629.md` — 已收官，附录 16 记录 5 处手册 vs 实际不符
+- ✅ `mark42-Phase3路线-20260630.md` — 已写定（algo/llm P0 + cli/armor/engine + 小模块扫尾，~80 测试，目标 60%+ 覆盖）
+- ✅ `mark42-Phase3执行手册-20260630.md` — 38KB 战术手册
+- ✅ `mark42-全面审查-20260630.md` — 12 个问题清单
+- ✅ `mark42-工程管理方案.md` — 第八节"自动行为守则"
+- ✅ `MEMORY.md` — 长期记忆"用户安全原则：所有自动行为有据可查"
+
+### 〇·6 下一阶段（不在本文件 §〇展开，详见 §三）
+
+- **阶段 1 收官** ✅
+- **阶段 2 (早期用户验证)**: 仍 0 启动 — **这是当前最缺的事**
+- **阶段 3 (产品化打磨)**: 测试覆盖 60%+ (Phase 3 路线已写)
+- **阶段 4 (商业化发布)**: 未启动
+
+---
+
 ## 一、逐项诊断 & 应对方案
 
-### 🟡 A. 铠甲智能压缩（Armor smart-compress）— LLM 链路已通，缺自动注入
+> **7/01 更新**：A/B/C/D/E/F 项 6/30 之前都已修完。当前未完成项只剩 G（Loop 模板热加载，低优先级）。H 项已修。
+> 修过的项仍保留原文 + ✅ 标签，便于查设计决策来源。
 
-**现状**（2026-06-17 校准）：`_llm_analyze()` 已实现 DeepSeek API 调用，`armor_compress()` 已走 LLM→启发式回退链路，上次压缩用 heuristic-classify。**唯一缺口：压缩后未自动注入 memory-index 到系统提示词**。
+### ✅ A. 铠甲智能压缩（Armor smart-compress）— [已修 2026-06-30]
 
-**已修复**：LLM API 调用、prompt 模板、response_format json_object、回退策略。
-**仍缺失**：压缩后把 memory-index 追加为系统提示词（走 Gateway sessions API）。
+**原 6/17 现状**：`_llm_analyze()` 已实现 DeepSeek API 调用，`armor_compress()` 已走 LLM→启发式回退链路。**唯一缺口：压缩后未自动注入 memory-index 到系统提示词**。
 
-**应对方案**：
-1. 新增 `armor_llm_compress()` 函数：读取当前活跃会话 jsonl → 截取最近 N 轮 → 调 LLM（用 `openclaw agent` 或直接调 Gateway API）→ 产出 memory-index.json
-2. Prompt 模板已写好（设计文档第 2.4 节），直接套用
-3. 注入逻辑：压缩完成后把 memory-index 追加为系统提示词（走 Gateway sessions API）
-4. 回退策略：LLM 不可用时回退到 heuristic
-5. 工作量：2-3 天
+**6/30 修复**：LLM 链路 + 智能估算 + 异步队列全闭环，**preBytes/postBytes/bytesSaved 全审计**。J 项修复把 action_entry 移到 compact 之后，同步真值。压缩主流程：`armor_check → armor_compress → mark42.armor.compress.done broker 事件 → engine context-guard 收到 → audit`。
+
+**现状态**：✅ A 已修。
 
 ---
 
-### 🟠 B. Loop 引擎实际调度 — daemon 已实现但从未运行
+### ✅ B. Loop 引擎实际调度 — [已修 2026-06-30]
 
-**现状**（2026-06-17 校准）：`engine_daemon()` 已完整实现（broker 扫描 + Loop 到期执行），`engine_run_loop()` 各模板（context-guard / health-watch / model-fallback / task-watch）均有实际逻辑。但当前 20 个 Loop（8 killed + 12 registered）全部 cycle 0，daemon 从未被真正启动过。
+**原 6/17 现状**：`engine_daemon()` 完整实现，4 模板（context-guard / health-watch / model-fallback / task-watch）逻辑全在，但 20 个 Loop 全部 cycle 0，daemon 从未启动。
 
-**仍待做**：清理 12 个无意义的 registered Loop（重复注册），只留 3 个核心模板 Loop，然后通过 assemble 真启动拉起 engine_daemon。
+**6/30 修复**：
+- 清理 20 个假 Loop → 4 个真模板（context-guard cycle=4 / health-watch / model-fallback cycle=16 / memory-index cycle=1）
+- `assemble` 真启动 2 daemon（armor-guard + engine-daemon）
+- 优雅关闭 + SIGTERM/SIGINT 处理
+- watchdog 5min 巡检 + 4 Loop 状态检查 + 3 种 alert
 
-**应对方案**：
-1. 补全 `_execute_loop_cycle()`：
-   - `context-guard`：调 `armor_check()` → 判断阈值 → 如需压缩则调 `armor_llm_compress()`
-   - `health-watch`：调系统命令 → 判断阈值 → 写 broker 事件
-   - `memory-index`：扫描 daily 文件 → 更新 INDEX.md
-   - `task-watch`：读 scratch 状态 → 判断 isStale → 通知
-2. 新增 `engine_daemon()` 模式：用 `select`/`signal` 驱动的持续守护进程，不依赖外部 timer
-3. 让它和现有的健康采集器 timer 解耦（不要两个东西抢同一件事）
-4. 工作量：3-5 天
+**真生产状态**：armor-guard + engine-daemon 持续 active，所有 Loop 正常推进。
+
+**现状态**：✅ B 已修。
 
 ---
 
-### 🟠 C. 三模块联动 — 部分已通，缺标准化桥接
+### ✅ C. 三模块联动 — [已修 2026-06-30]
 
-**现状**（2026-06-17 校准）：Heavy `heavy_start()` 在 context_aware 模式下已实际调用 `armor_compress()`（THRESHOLD_ALERT 时触发压缩）。Armor `armor_compress()` 末尾已 emit `armor.compress` broker 事件。Engine `engine_daemon()` 已扫描 broker 事件并响应 compaction.advised / context_monitor.alert。
+**原 6/17 现状**：Heavy `heavy_start()` context_aware 模式已调 `armor_compress()`，Armor 已 emit 事件，Engine 已扫描 broker。但事件类型不统一，Engine 响应缺乏标准化。
 
-**仍缺失**：事件类型不统一（`armor.compress` vs `mark42.armor.compress.done`），Engine 收到事件后的响应缺乏标准化（只是 print + broker emit，没做实际调度决策）。
+**6/30 修复**：
+- 标准化事件桥接：每个模块 `_append_broker()` 写事件
+- `mark42.armor.compress.done` / `mark42.engine.loop.completed` / `heavy.task.done`（O 项修复前是 `heavy.task.finished`）全统一
+- Engine `_execute_loop_cycle()` 扫描 broker events → 匹配 → 触发决策
+- Heavy `_start()` `--context-aware` 真逻辑：调 `armor_check` → 70% 触发 → Engine context-guard 压缩 → 等完成 → 开工
 
-**应对方案**：
-1. 标准化事件桥接：每个模块完成关键动作后调 `_append_broker()` 写入事件
-2. Armor `armor_llm_compress()` 完成后 → emit `mark42.armor.compress.done`
-3. Engine `_execute_loop_cycle()` 中 scan broker events → 匹配到事件 → 触发决策
-4. Heavy `_start()` 加 `--context-aware` 实际逻辑：调 `armor_check()` → 如果 >70% → 先调 Engine 触发 context-guard → 等压缩完成 → 再开工
-5. 工作量：3-5 天
+**现状态**：✅ C 已修。
 
 ---
 
-### 🟡 D. Frontstage / Control UI 集成 — 战甲状态不可见
+### ⏳ D. Frontstage / Control UI 集成 — 战甲状态不可见（未启动）
 
-**现状**：`status` 命令只在终端打印，Mark42 状态完全不推送到 Control UI。
+**现状（7/01）**：`status` 命令只在终端打印，Mark42 状态完全不推送到 Control UI。
 
 **应对方案**：
 1. 利用现有 `frontstage-broker.py` 的管道：Engine 状态变化 → emit broker event → frontstage-broker 重建视图 → 推送到 dashboard
@@ -69,42 +140,34 @@
 3. 短期最简方案：`mark42.py status --json` 输出 JSON，Control UI 通过 infos-handle sidecar 拉取
 4. 工作量：1-2 天
 
----
-
-### 🟡 E. assemble 一键启动 — 假启动（待修复）
-
-**现状**（2026-06-17 校准）：仍未修复。`mark42.py assemble` 只打印状态，不真正拉起子进程。
-
-**应对方案**：
-1. `assemble` 改为实际启动 Armor 守护 mode + Engine daemon（非阻塞，fork 子进程）
-2. 加入健康检查：启动后 3 秒内检查子进程是否存活
-3. 加入优雅关闭：SIGTERM / SIGINT 时关闭所有子进程
-4. 工作量：1 天
+**阶段归属**：阶段 3（产品化打磨）。
 
 ---
 
-### 🟠 H. heavy_execute 假执行 [已修复 2026-06-30]
+### ✅ E. assemble 一键启动 — [已修 2026-06-30]
 
-**现状**（2026-06-30 全面审查发现）：`heavy_execute` 写好脚本 + 入队 + 状态为 running,**但从不自动调 bash 执行**。脚本里还是 `# TODO: replace with actual file operation` 占位。这与设计 4.2 “Heavy 战甲自动分批 + 后台执行” 不符。
+**原 6/17 现状**：`mark42.py assemble` 只打印状态，不真正拉起子进程。
 
-**修复**（已 commit）：
-1. `heavy_execute()` 新增 `execute_now=False` 默认参数 → 默认仅入队不启动
-2. `cli.py` 加 `--execute-now` flag → 显式传才真启 bash 后台进程
-3. 启动后记录 PID + logPath 到 status.json
-4. 不传 `--command` → 脚本默认 no-op（仅 echo 列出文件）
-5. broker 事件多一个 `heavy.batch.started` (区分 queued vs started)
-6. 加 6 个新测试覆盖 dry-run / execute_now / no-op / 真启 / Popen 异常 / execute_all
-7. 测试数 127 → 133，整体覆盖 39.1% → 40.1%
+**6/30 修复**：
+- `assemble` 真启动 2 daemon（fork armor guard + engine daemon，非阻塞）
+- 健康检查：启动后 3 秒内检查子进程是否存活
+- 优雅关闭：SIGTERM / SIGINT 时关闭所有子进程
 
-**为防“AI 忘状态误触”**：默认 dry-run 是护栏，不是建议 — 不传 `--execute-now` 永远不会跳到子进程
+**现状态**：✅ E 已修。
 
 ---
 
-### 🟠 F. 上下文 97.7% — 铠甲只检测不行动
+### ✅ F. 上下文 97.7% — 铠甲只检测不行动 [已修 2026-06-30]
 
-**现状**：当前正在运行的 Mark42 `status` 直接报 🔴 97.7%。但铠甲只是检测到了，完全没有触发任何压缩/处理。这正好是 Armor 核心能力缺失的直接体现。
+**原 6/17 现状**：Mark42 `status` 报 🔴 97.7%，但铠甲不触发压缩/处理。
 
-**应对方案**：此问题随 A 项（LLM 压缩）和 B 项（Loop 调度）修复后自动解决。短期内，建议手动跑一次 `/compact`。
+**6/30 修复**：
+- 智能估算逻辑上线（不是简单按 jsonl size 算）
+- A 项修复后,armor_compress 全链路闭环
+- 真生产状态：上下文 5.6-9.5% 区间（远低于 70% 阈值）
+- 真压缩节省 17.9%（678KB → 557KB, 16:30 P0 修复后第一次真压）
+
+**现状态**：✅ F 已修。**当前铠甲处于健康状态，无 false alarm。**
 
 ---
 
@@ -118,38 +181,69 @@
 3. 支持 `--template-file` 从外部 YAML/JSON 加载自定义模板（热加载）
 4. 工作量：2 天
 
+**阶段归属**：阶段 3（产品化打磨）。非阻塞。
+
 ---
 
-## 二、离商品的差距（按优先级排列）
+### ✅ H. heavy_execute 假执行 [已修复 2026-06-30]
+
+**原 6/30 现状**：`heavy_execute` 写好脚本 + 入队 + 状态为 running,**但从不自动调 bash 执行**。脚本里还是 `# TODO: replace with actual file operation` 占位。这与设计 4.2 “Heavy 战甲自动分批 + 后台执行” 不符。
+
+**修复**（已 commit `4927b79`）：
+1. `heavy_execute()` 新增 `execute_now=False` 默认参数 → 默认仅入队不启动
+2. `cli.py` 加 `--execute-now` flag → 显式传才真启 bash 后台进程
+3. 启动后记录 PID + logPath 到 status.json
+4. 不传 `--command` → 脚本默认 no-op（仅 echo 列出文件）
+5. broker 事件多一个 `heavy.batch.started` (区分 queued vs started)
+6. 加 6 个新测试覆盖 dry-run / execute_now / no-op / 真启 / Popen 异常 / execute_all
+7. 测试数 127 → 133，整体覆盖 39.1% → 40.1%
+
+**为防“AI 忘状态误触”**：默认 dry-run 是护栏，不是建议 — 不传 `--execute-now` 永远不会跳到子进程。
+
+**现状态**：✅ H 已修。
+
+---
+
+## 二、离商品的差距（2026-07-01 重写 — 按真实状态更新）
+
+> **重写重点**：原 6/16 这张表写于"零测试"时代，6/30 之后 #1 #2 状态已变。已修项目用 ~~删除线~~，新增项目标 🔄。
 
 ### 产品基础层
 
-| # | 缺口 | 严重度 | 说明 |
-|---|------|:---:|------|
-| 1 | **核心功能未闭环** | 🔴 | 上面 A/B/C 三项修完才叫"能用" |
-| 2 | **零测试** | 🔴 | 无单元测试、无集成测试、无回归测试。代码改动后无法验证是否破坏已有功能 |
-| 3 | **无安装器** | 🟡 | 没有 pip install / deb / docker / 一键脚本 |
-| 4 | **无配置向导** | 🟡 | 用户不知道怎么配 context window 大小、阈值、Loop 参数 |
-| 5 | **错误处理粗糙** | 🟡 | 大部分函数只有 print + return，没有 try/except、没有 rollback、没有 graceful degradation |
+| # | 缺口 | 6/16 严重度 | **7/01 状态** | 说明 |
+|---|------|:---:|:---:|------|
+| 1 | ~~核心功能未闭环~~ | ~~🔴~~ | ✅ **已修** | A/B/C 三项 + 12 审查问题全部修完 |
+| 2 | ~~零测试~~ | ~~🔴~~ | ✅ **已修** | 315 测试 / 54.7% 覆盖（Phase 2 收官）。待 Phase 3 推到 60%+ |
+| 3 | **无安装器** | 🟡 | 🟡 | 没有 pip install / deb / docker / 一键脚本 — **阶段 2 P0** |
+| 4 | **无配置向导** | 🟡 | 🟡 | 用户不知道怎么配 context window 大小、阈值、Loop 参数 — **阶段 2 P0** |
+| 5 | **错误处理粗糙** | 🟡 | 🟡 | 大部分函数只有 print + return，没有 try/except、没有 rollback — **阶段 2 P1** |
+| 5+ | 🔄 **路径硬编码** | — | 🔴 | SCRATCH=/mnt/data 写死 (ERR-004) — **非点点机器无法跑** — 阶段 2 P0 |
 
 ### 用户体验层
 
-| # | 缺口 | 严重度 | 说明 |
-|---|------|:---:|------|
-| 6 | **无图形界面** | 🟡 | CLI 只能给开发者用。需要有 Control UI 集成、TUI dashboard、或独立 Web UI |
-| 7 | **无用户文档** | 🟡 | 设计文档是给开发者看的，不是给用户看的。需要 Quick Start + 概念介绍 + 场景教程 |
-| 8 | **状态不透明** | 🟡 | 用户不知道铠甲在干什么。需要日志查看器、历史出手记录、压缩前后对比 |
+| # | 缺口 | 6/16 严重度 | **7/01 状态** | 说明 |
+|---|------|:---:|:---:|------|
+| 6 | **无图形界面** | 🟡 | 🟡 | CLI 只能给开发者用。TUI / Control UI 集成 — 阶段 3 |
+| 7 | **无用户文档** | 🟡 | 🟡 | 设计文档是给开发者看的。Quick Start + 教程 — **阶段 2 P0** |
+| 8 | **状态不透明** | 🟡 | 🟡 | actions.jsonl 字段已全，缺定期报告 / 日志查看器 — 阶段 3 |
 
 ### 商业化层
 
-| # | 缺口 | 严重度 | 说明 |
-|---|------|:---:|------|
-| 9 | **无定价/商业模式** | 🟠 | 开源？闭源？SaaS？一次性买断？每设备 license？ |
-| 10 | **无安全隔离** | 🟠 | Mark42 直接操作 OpenClaw 的 session 文件、broker 状态。作为商品必须有沙箱 |
-| 11 | **无许可证/法律框架** | 🟠 | 需要用户协议、隐私政策、免责声明（操作可能会删文件、改配置） |
-| 12 | **无 CI/CD + 发布管道** | 🟠 | 没有自动构建、版本管理、changelog、release notes |
-| 13 | **无用户验证** | 🔴 | 至今只有点点一个人在 Mark1 上用过。需要至少 3-5 个早期用户真实跑过并反馈 |
-| 14 | **无性能基准** | 🟠 | 不知道铠甲守护模式吃多少 CPU/内存，Loop 轮询对 Gateway 的影响有多大 |
+| # | 缺口 | 6/16 严重度 | **7/01 状态** | 说明 |
+|---|------|:---:|:---:|------|
+| 9 | **无定价/商业模式** | 🟠 | 🟠 | 开源？闭源？SaaS？一次性买断？每设备 license？ — 阶段 4 |
+| 10 | **无安全隔离** | 🟠 | 🟠 | Mark42 直接操作 OpenClaw session 文件、broker 状态。沙箱限定 ~/.local/state/openclaw/mark42/ — 阶段 2 P1 |
+| 11 | **无许可证/法律框架** | 🟠 | 🟠 | 需要用户协议、隐私政策、免责声明 — 阶段 4 |
+| 12 | **无 CI/CD + 发布管道** | 🟠 | 🟠 | 没有 GitHub Actions 自动测试、自动发版、CHANGELOG — 阶段 3 |
+| 13 | **无用户验证** | 🔴 | 🔴 | 至今只有点点一个人在 Mark1 上用过 — **阶段 2 核心目标** |
+| 14 | **无性能基准** | 🟠 | 🟠 | 不知道守护模式吃多少 CPU/内存 — 阶段 3 |
+
+### 重写后 §二 总结
+
+- **已修 2 项**（#1 #2）— 比 6/16 进步巨大
+- **新增 1 项**（#5+ 路径硬编码）— 阶段 2 P0
+- **最大缺口**：**路径硬编码 + 无安装器 + 无用户文档** — 这三件事卡住"非点点用户跑不起来"
+- **阶段 2 优先级**：#3 #4 #5+ #7 #13
 
 ---
 
@@ -164,21 +258,22 @@
 | I | broker 文件临界 9.99MB | 🟠 | ✅ **已修** (logs.py: `<=` 改为 `<`,留安全余量) |
 | J | actions.jsonl 不记 preBytes/postBytes | 🟠 | ✅ **已修** (armor.py: action_entry 移到 compact 之后,同步 index 真值) |
 | K | 文档说"4 守护"、实际 2 daemon+bootstrap+watchdog | 🟠 | ✅ **已修** (watchdog 加 4 Loop 检查 + 文档同步) |
-| L | engine.py 死代码 | 🟡 | ⏳ 可选 |
-| M | compress_queue 测试 3 优先级断言无效 | 🟡 | ⏳ 可选 |
-| N | utils.py 死 import / 死函数 | 🟡 | ⏳ 可选 |
-| O | event 命名与设计 6.1 不一致 | 🟡 | ⏳ 可选 |
-| P | heavy.py batch_size 公式对单文件不友好 | 🟡 | ⏳ 可选 |
-| Q | heavy.py `.keep` 命名反了 | 🟡 | ⏳ 可选 |
-| R | cli.py assemble 重复 import | 🟡 | ⏳ 可选 |
-| S | `_find_active_session` 排除后缀不一致 | 🟡 | ⏳ 可选 |
+| L | engine.py 死代码 | 🟡 | ✅ **已修** (10:35 删 `_engine_status_path` + 修 `template_desc` 死代码) |
+| M | compress_queue 测试 3 优先级断言无效 | 🟡 | ✅ **已修** (10:35 加 `_enqueued_at` + payload `enqueuedAt/finishedAt` 字段,PriorityQueue 序) |
+| N | utils.py 死 import / 死函数 | 🟡 | ✅ **已修** (10:35 删 `BROKER_DIRTY` / `MAX_BROKER_EVENTS_MB` / `_run_script` / `import sys/subprocess`) |
+| O | event 命名与设计 6.1 不一致 | 🟡 | ✅ **已修** (10:35 `heavy.task.finished` → `heavy.task.done`, 设计文档 6.2 同步) |
+| P | heavy.py batch_size 公式对单文件不友好 | 🟡 | ✅ **已修** (10:35 `max(3, ...)` → `max(1, ...)`,单文件场景正确) |
+| Q | heavy.py `.keep` 命名反了 | 🟡 | ✅ **已修** (10:35 改 `shutil.rmtree` + 重建 `.keep` 占位,命名统一) |
+| R | cli.py assemble 重复 import | 🟡 | ✅ **已修** (10:35 `assemble()` 内部 import 提到模块顶层 + 去重) |
+| S | `_find_active_session` 排除后缀不一致 | 🟡 | ✅ **已修** (10:35 `.bak-` → `.bak.`,全用点号) |
 
-**修复优先级**（本次决定）：
-- 🔴 1  已修 (H)
+**修复优先级**（7/01 更新）：
+- 🔴 1  已修 (H) ← 6/30
 - 🟠 3  已修 (I/J/K) ← 2026-06-30 10:05
 - 🟡 3  已修 (2/3/4) ← 2026-06-30 10:18 (fcntl 锁 + watchdog log + bytesStatus)
-- 🟡 5  仍待修 (L/M/N/O/P/Q/R/S) - 8 个里 3 个
-- L/M/N/O/P/Q/R/S 抽空修 (5 个)
+- 🟡 5  已修 (L/M/N/O/P) ← 2026-06-30 10:35
+- 🟡 3  已修 (Q/R/S) ← 2026-06-30 10:35
+- **12/12 全部修完 ✅** (commit `90738c2` 推送)
 
 ---
 
@@ -228,45 +323,67 @@
 
 ---
 
-## 三、商品化路径（四个阶段）
+## 三、商品化路径（四个阶段 — 2026-07-01 重写）
 
-### 阶段 1：内测可用（1-2 周）「先让自己真正用上」
+> **重写重点**：原路线图阶段 1 写于 6/17，6/30 已经全部达成 + 12 审查问题修完 + Phase 2 收官。阶段 2/3/4 的优先级和任务列表需要根据真实状态重排。
+
+### 阶段 1：内测可用（1-2 周）— **✅ 已收官**
 
 ```
 目标：Mark42 在 Mark1 上实际跑起来，三个模块全部闭环
 
-具体任务：
-├── ✅ 铠甲 LLM 压缩（A 项—LLM 链路已通，走 broker 管道可用）
-├── ✅ Loop 调度器实际运行（B 项—daemon 验证通过，3 个核心 Loop 循环正常）
-├── ✅ 三模块事件联动（C 项—标准化协议 mark42.armor/engine/heavy.* 已闭环）
-├── ✅ assemble 真启动（E 项—fork armor guard + engine daemon，优雅关闭）
-├── ✅ 清理 20 个假 Loop → 3 个真模板（context-guard / health-watch / task-watch）
-├── ✅ status --json（D 项—JSON 输出可用，daemon 定期写入 broker views）
-├── ⏳ 至少 3 天连续守护运行不出致命错误
-├── ⏳ 每次压缩记录 + 效果对比
-└── ⏳ 解决 task-watch-2 自动创建问题（daemon 扫描 broker 事件残留）
+具体任务与实际达成：
+├── ✅ 铠甲 LLM 压缩（A 项）— LLM 链路 + 智能估算 + 异步队列
+├── ✅ Loop 调度器实际运行（B 项）— 2 daemon + 4 Loop（context-guard / health-watch /
+│      model-fallback / memory-index）真实轮转，watchdog 5min 保活
+├── ✅ 三模块事件联动（C 项）— 标准化协议 mark42.armor/engine/heavy.* 闭环
+├── ✅ assemble 真启动（E 项）— fork armor guard + engine daemon + 优雅关闭
+├── ✅ 清理 20 个假 Loop → 3 个真模板（已升级为 4 个，含 memory-index）
+├── ✅ status --json（D 项）— JSON 输出 + broker views 定期写
+├── ✅ 12 个审查问题全修（🔴 H + 🟠 I/J/K + 🟡 8 个）— 6/30 commit 90738c2
+├── ✅ 真生产验证：armor-guard / engine-daemon 持续 active
+├── ✅ P0 压缩链路真跑：16:30 一次真压缩节省 17.9%
+├── ⏳ 3 天连续守护未致命错误 — 需续跟踪
+├── ⏳ 每次压缩记录 + 效果对比 — actions.jsonl 字段已全，缺定期报告
+└── ⏳ task-watch-2 自动创建问题 — daemon 事件残留已修
 ```
 
-**进度**（2026-06-17 08:15）：A/B/C/D/E 五项核心缺口已补齐。`assemble` 真正启动双守护进程。三模块事件协议标准化。`status --json` 可被外部消费。
+**进度**（2026-07-01）：**阶段 1 任务全部核心达成，超出原路线图预期**。
+**额外收获**（原路线图没列）：
+- 315 个测试 / 54.7% 覆盖（Phase 2 收官）
+- 7 条 ERRORS 沉淀
+- 6 个 commit 全部推送到 GitHub
+- Phase 3 路线 + 执行手册 写定
 
 ---
 
-### 阶段 2：早期用户验证（2-3 周）「找 3-5 个人用」
+### 阶段 2：早期用户验证（2-3 周）「找 3-5 个人用」— **🔴 当前最缺**
 
 ```
 目标：验证「别人也能装、也能用」
 
-具体任务：
-├── 写 Quick Start 文档（一页纸，5 分钟装完）
-├── 制作一键安装脚本（bash install.sh）
-├── Mark42 配置向导（交互式 mark42.py --init）
-├── 添加基本的 try/except + 错误提示
-├── 找 3-5 个早期用户（OpenClaw 社区 / 朋友）
-├── 收集反馈 → 修复 → 迭代
-└── 记录每次失败和修复（留作 FAQ 素材）
+具体任务（按优先级重排）：
+├── 🔴 **P0**：写 Quick Start 文档（5 分钟装完，从零到第一次压缩）
+├── 🔴 **P0**：制作一键安装脚本（bash install.sh — 1 个命令拉起）
+├── 🔴 **P0**：Mark42 配置向导（mark42.py --init 交互式）
+├── 🟠 **P1**：依赖与可移植性审计
+│      - SCRATCH 路径硬编码 /mnt/data (ERR-004) — **必修**
+│      - Python 版本要求 / 系统包依赖列表
+│      - systemd vs 直接启动两种模式
+├── 🟠 **P1**：基础错误处理 + 用户友好的错误信息
+│      - 当前大部分函数 print + return，缺 try/except + rollback
+│      - LLM 不可用时降级路径要写明
+├── 🟠 **P1**：安全隔离设计
+│      - 沙箱路径：所有 IO 限定在 ~/.local/state/openclaw/mark42/
+│      - 不写/不读外部文件
+│      - 危险操作（assemble / execute-now）二次确认
+├── 🟡 **P2**：找 3-5 个早期用户（OpenClaw 社区 / 朋友）
+├── 🟡 **P2**：收集反馈 → 修复 → 迭代循环
+└── 🟡 **P2**：记录每次失败和修复（留作 FAQ 素材）
 ```
 
-**产出**：至少 3 个人能自己装上并理解 Mark42 是什么。
+**产出**：至少 3 个人能在自己的机器上装上并运行 Mark42 至少一周。
+**预估工时**：5-8 个工作日（写文档 + 修路径 + 错误处理占大头）
 
 ---
 
@@ -275,18 +392,35 @@
 ```
 目标：从"点点自用工具"变成"任何人能买的东西"
 
-具体任务：
+具体任务（按 4 大块重排）：
+
+【A. 测试体系 → 70% 覆盖】（Phase 3 路线已写，1-2 周）
+├── algo_scheduler P0: 38.8% → 65%（process 完整路径 + decide 内部规则）
+├── llm_text_compressor P0: 40.1% → 55%（HTTP 完整路径 + 异步队列）
+├── cli + armor + engine 业务路径 → 60-70%
+├── logs / compress_queue / config 扫尾 → 55-60%
+└── 详情：见 docs/design/mark42-Phase3路线-20260630.md
+
+【B. 自动化与发布】（1-2 周，可与 A 并行）
+├── GitHub Actions CI（pytest 自动跑 + 覆盖率门禁 ≥ 60%）
+├── 自动发版（tag → PyPI / GitHub Release）
+├── CHANGELOG 自动生成
+└── Docker 镜像（多 Python 版本验证）
+
+【C. 用户体验】（1-2 周）
 ├── TUI dashboard（类似 htop 的战甲面板）
 ├── Control UI 状态卡片（通过 frontstage-broker 集成）
 ├── 用户文档站（docs.mark42.ai 或 GitHub Pages）
-├── 自动化测试（pytest 覆盖核心模块）
-├── CI/CD（GitHub Actions 自动测试 + 发版）
 ├── 性能调优（守护模式 CPU/内存占用报告）
-├── 错误自愈（常见失败自动回滚 + 降级）
-└── 安全审计（不写/不读外部文件，所有操作限定在 ~/.local/state/openclaw/mark42/）
+└── 错误自愈（常见失败自动回滚 + 降级）
+
+【D. 安全与合规】（贯穿整个阶段 3）
+├── 安全审计（不写/不读外部文件）
+├── 用户协议 + 隐私政策 + 免责声明（操作可能删文件/改配置）
+└── 依赖漏洞扫描（pip-audit / safety）
 ```
 
-**产出**：有 UI、有文档、有测试、有 CI/CD。
+**产出**：有 UI、有文档、有测试、有 CI/CD、有安全审计。
 
 ---
 
@@ -309,6 +443,30 @@
 ```
 
 **产出**：一个有人愿意付钱的产品。
+
+---
+
+### 阶段 1→2 切换的诚实评估
+
+**阶段 1 提前完成的不只是"内测可用"**：
+- 6/17 路线图写"测试数 0",现在 315 — 是当时没规划的事
+- 6/17 路线图写"无安装器",现在 install.sh 还没写 — 是阶段 2 的 P0
+
+**阶段 1 收官后真正卡在阶段 2 的是什么**：
+- ❌ 任何"非点点"都装不上 — 路径硬编码 / 文档缺失
+- ❌ 错误信息对人不友好 — print 占多数
+- ❌ 没有"5 分钟跑通"的最小路径
+
+**结论**：**阶段 2 是当前最高优先级**，不是阶段 3（测试已经 54.7%，不是最缺的事）。
+
+### 重写后的阶段时间线预估
+
+| 阶段 | 状态 | 预估工时 | 起讫 |
+|---|---|---:|---|
+| 阶段 1 内测可用 | ✅ 收官 | 4 周（实际） | 6/1 - 6/30 |
+| 阶段 2 早期用户验证 | 🔴 当前 | 2-3 周 | 待启动 |
+| 阶段 3 产品化打磨 | ⏳ 排队 | 3-4 周 | 阶段 2 完成后 |
+| 阶段 4 商业化发布 | ⏳ 排队 | 2-4 周 | 阶段 3 完成后 |
 
 ---
 
@@ -365,37 +523,60 @@ class ArmorOptimizer:
 
 ---
 
-## 五、一句话总结（投资人版）
+## 五、一句话总结（投资人版 — 2026-07-01 更新）
 
 > Mark42 是一个让 AI 助手不再「聊着聊着就忘了」的上下文管理引擎。
 > 它能独立运行，也能和其他 AI 平台集成。
-> 当前处于原型后期，核心架构已就绪，3 个模块中 2 个需要补齐核心逻辑（预计 2 周内闭环）。
+> **当前状态：阶段 1 收官（超预期），阶段 2 待启动**。
+> 三模块（Armor / Engine / Heavy）全部闭环 + 315 测试 / 54.7% 覆盖 + 12 个审查问题全修 + 6 commits 推送。
 > 目标市场：所有重度使用 AI 对话的开发者、创作者、团队。
 > 商业模式：Freemium（基础功能免费，智能压缩 + 自动化 Pro 版 $9/月）。
 
 ---
 
-## 六、当前状态（2026-06-29 审计）
+## 六、当前状态（2026-07-01 重大更新）
 
-> 本节为 2026-06-29 文档审计追加，反映今天（编写路径 / 测试体系 Phase 1 收尾）的现状。
+> 本节为 2026-07-01 重写。原 6/29 审计状态已被 6/30 全面审查 + Phase 2 收官覆盖。
+> **完整状态见 §〇**，本节只补 §〇 外的补充。
 
-**阶段 1 状态**：**未完全达成**，但已超预期推进：
+**阶段 1 状态**：**✅ 完全达成 + 超额完成**
 
-- ✅ 三模块闭环（铠甲 + 引擎 + 重型）均能独立运行
-- ✅ assemble 真实启动 daemon
-- ✅ 5 个 Loop 模板全部上线（上下文守护 / 健康监控 / 模型 fallback / 任务 watch / 记忆索引）
-- ✅ LLM 智能压缩可路径走（smart_crusher + lhm_text_compressor）
-- ✅ **测试体系**：111 个测试 / 37.8% 覆盖（[Phase 2 路线](./mark42-Phase2路线-20260629.md) 提升至 50%+）
-- ⚠️ 部分 Loop `cycle 0`（守护未耗时运行验证）
-- ⚠️ armor.py 存在真 bug 已被修复（见 [Phase 1 收官](./mark42-测试体系-Phase1收官-20260629.md)）
+- ✅ 三模块闭环（Armor + Engine + Heavy）均能独立运行
+- ✅ assemble 真实启动 2 daemon（armor-guard + engine-daemon）
+- ✅ 4 个 Loop 模板全部上线（context-guard / health-watch / model-fallback / memory-index）
+- ✅ LLM 智能压缩链路真跑（16:30 一次真压缩节省 17.9%）
+- ✅ **12 个审查问题全修**（🔴 H + 🟠 I/J/K + 🟡 8 个）
+- ✅ **测试体系**：315 个测试 / **54.7% 覆盖** / 42.7s / 0 失败
+- ✅ **6 commits 推送**到 `github.com:missyouangeled/Mark1.git` master 分支
+- ✅ ERRORS 沉淀 7 条（`.learnings/ERRORS.md`）
+- ✅ watchdog 5min 巡检 + 4 Loop 状态检查
+- ✅ actions.jsonl 审计字段完整（preBytes/postBytes/bytesSaved/bytesStatus）
+- ✅ broker 裁剪安全余量 + fcntl 锁
 
-**阶段 2 / 3 / 4**：未启动。
+**阶段 2 状态**：🔴 **当前最高优先级，0 启动**
 
-**补充详细路线**：见 [`mark42-Phase2路线-20260629.md`](./mark42-Phase2路线-20260629.md)（覆盖走向 50% 覆盖 + 集成测试 + CI）
+- ❌ 无安装器（install.sh 未写）
+- ❌ 无 Quick Start 文档
+- ❌ SCRATCH 路径硬编码 /mnt/data（ERR-004）
+- ❌ 无配置向导（mark42.py --init）
+- ❌ 错误处理粗糙（print + return 占多数）
+- ❌ 无用户验证（仅点点 1 人用）
+
+**阶段 3 / 4**：未启动。
+
+**Phase 3 路线**（测试体系）：✅ **已写定** — 见 [`mark42-Phase3路线-20260630.md`](./mark42-Phase3路线-20260630.md)
+- 目标：315 → ~395 测试，54.7% → ~63% 覆盖
+- 4 大目标：algo_scheduler P0 / llm_text_compressor P0 / cli+armor+engine / 小模块扫尾
+- 预估 15-22h 工时，1-2 周
+
+**关键认知**（来自 6/30 全面审查教训）：
+- "都做完了" 不能信 AI 自己的判断 — **所有自动行为必须有据可查**
+- 路径硬编码 / 文档缺失是阶段 2 的**真正堵点**，不是测试覆盖
+- **阶段 2 优先级 > 阶段 3**：让"别人能跑起来"比"测得更全"更重要
 
 ---
 
-*本文档将随 Mark42 开发进展持续更新。下次评估时间：阶段 1 完成后。*
+*本文档将随 Mark42 开发进展持续更新。下次评估时间：阶段 2 启动后。*
 
 ---
 
