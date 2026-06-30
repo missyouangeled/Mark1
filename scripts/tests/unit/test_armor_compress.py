@@ -372,6 +372,68 @@ class TestArmorCompress:
         # preBytes 记了, postBytes=None 或同 preBytes
         assert entry["preBytes"] == initial_size
 
+    # ── 2026-06-30 10:13 🟡4 修复: bytesStatus 语义标记 ──
+
+    def test_bytes_status_captured_on_successful_compact(self, mocker, armor_state):
+        """【🟡4】真 compact 成功,bytesStatus='captured'。"""
+        mocker.patch.object(
+            armor, "armor_check",
+            return_value={"usagePercent": 80.0, "severity": "warn", "summary": "x"},
+        )
+        session_mock, initial_bytes, compact_bytes = _high_usage_session_with_compactable(
+            target_pct=80.0, compact_to_pct=30.0,
+        )
+        mocker.patch.object(armor, "_find_active_session", return_value=session_mock)
+        msgs = [{"role": "user", "content": "x"}]
+        mocker.patch.object(armor, "_read_session_tail", return_value=msgs)
+        mocker.patch.object(
+            armor, "_llm_analyze",
+            return_value={"preserved": {}, "discarded": {}, "degradationDetected": None},
+        )
+        from unittest.mock import MagicMock as _MM
+        initial_size = session_mock.stat.return_value.st_size
+        compact_size = int(initial_size * 0.5)
+        def run_side(args, **kwargs):
+            if isinstance(args, (list, tuple)) and args[0] == "du":
+                fake = _MM(); fake.stdout = f"{int(initial_size/1024)}\t/sessions"; return fake
+            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+                session_mock.set_size(compact_size)
+                fake = _MM(); fake.returncode = 0; fake.stdout = '{"ok":true}'; fake.stderr = ""
+                return fake
+            fake = _MM(); fake.returncode = 0; fake.stdout = ""; fake.stderr = ""; return fake
+        mocker.patch("subprocess.run", side_effect=run_side)
+
+        armor.armor_compress()
+        entry = json.loads((armor_state / "actions.jsonl").read_text().strip().split("\n")[-1])
+        # 🟡4 验证: 压缩成功时 bytesStatus='captured'
+        assert entry.get("bytesStatus") == "captured", (
+            f"🟡4 修复: 压缩成功应记 bytesStatus='captured', 实际 {entry.get('bytesStatus')}"
+        )
+
+    def test_bytes_status_skipped_dry_run(self, mocker, armor_state):
+        """【🟡4】dry_run 模式,bytesStatus='skipped-dry-run',reader 明确不是 bug。"""
+        mocker.patch.object(
+            armor, "armor_check",
+            return_value={"usagePercent": 80.0, "severity": "warn", "summary": "x"},
+        )
+        mocker.patch.object(armor, "_find_active_session", return_value=None)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[])
+        mocker.patch.object(
+            armor, "_llm_analyze",
+            return_value={"preserved": {}, "discarded": {}, "degradationDetected": None},
+        )
+
+        armor.armor_compress(dry_run=True)
+        entry = json.loads((armor_state / "actions.jsonl").read_text().strip().split("\n")[-1])
+        # 🟡4 验证: dry_run 时 bytesStatus 明确标记,preBytes=null 是预期
+        assert entry.get("bytesStatus") == "skipped-dry-run", (
+            f"🟡4 修复: dry_run 应记 'skipped-dry-run', 实际 {entry.get('bytesStatus')}"
+        )
+        # preBytes 是 null 是预期, 不报错
+        assert entry.get("preBytes") is None
+        assert entry.get("action") == "compress-dryrun"
+
+
     def test_falls_back_to_heuristic_when_llm_unavailable(self, mocker, armor_state):
         """LLM 不可用时应回退到启发式分类。"""
         mocker.patch.object(

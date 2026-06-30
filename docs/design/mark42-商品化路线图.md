@@ -175,8 +175,10 @@
 
 **修复优先级**（本次决定）：
 - 🔴 1  已修 (H)
-- 🟠 3  下次会话 / Phase 2 一起修 (I/J/K)
-- 🟡 8  抽空修 (L~S)
+- 🟠 3  已修 (I/J/K) ← 2026-06-30 10:05
+- 🟡 3  已修 (2/3/4) ← 2026-06-30 10:18 (fcntl 锁 + watchdog log + bytesStatus)
+- 🟡 5  仍待修 (L/M/N/O/P/Q/R/S) - 8 个里 3 个
+- L/M/N/O/P/Q/R/S 抽空修 (5 个)
 
 ---
 
@@ -394,3 +396,62 @@ class ArmorOptimizer:
 ---
 
 *本文档将随 Mark42 开发进展持续更新。下次评估时间：阶段 1 完成后。*
+
+---
+
+## 1.7、2026-06-30 10:18 修 3 个 🟡 详情
+
+### 🟡2 修复: I 修复原子性 + fcntl 锁
+
+**问题**：`rotate_broker_events` 读 + 写 不是原子操作, armor-guard / engine-daemon 多个进程并发 append broker, 裁的瞬间可能丢中间事件。
+
+**修夏**（`scripts/mark42_modules/logs.py`）：
+- 加 `import fcntl`
+- 用独立 `.lock` 文件, 避免锁住业务读路径
+- `LOCK_EX | LOCK_NB`: 独占 + 非阻塞 (另一进程占锁就返 "跳过", 不死等)
+- 锁范围覆盖: 读 size + 读 lines + 写 kept
+- 3 个新测试: concurrent lock skip / lock released / lock path 是 .lock 后缀
+
+### 🟡3 修复: K 修复 4 Loop 异常 watchdog.log 留痕
+
+**问题**：4 Loop 挂掉时 `notify_alert` 推 dashboard, 但 watchdog.log 不记录 → 本地 audit gap。
+
+**修夏**（`tools/mark42-watchdog/mark42-watchdog.sh`）：
+- 4 处 `notify_alert` 前都加 `log()`:
+  - `loops-check-error` → log "⚠️ 4 Loop 检查出错: $loops_check"
+  - `loops-missing` → log "⚠️ 4 Loop 状态: $active/$total (expected: $total)"
+  - `loops-degraded` → log "⚠️ Loop 状态不为 registered: $bad_loops"
+  - 无输出 → log "⚠️ 4 Loop 检查无输出"
+
+### 🟡4 修复: J dry_run 模式 preBytes=null 加语义标记
+
+**问题**：dry_run 写 actions.jsonl 时 preBytes=null, reader 困惑 "是没统计?还是 dry_run 不写?"
+
+**修夏**（`scripts/mark42_modules/armor.py`）：
+- 加 `bytesStatus` 字段, 4 个值:
+  - `captured`: 压缩完成, 字段有真值
+  - `skipped-dry-run`: dry_run 模式, 没真压缩, 字段为 null 是预期
+  - `not-attempted`: 上下文 < THRESHOLD_WARN, 未尝试 compact
+  - `error`: compact 报错 (没产生 postBytes)
+- 2 个新测试: bytesStatus='captured' on success / bytesStatus='skipped-dry-run' on dry_run
+
+### 真生产端到端验证
+
+| 修 | 验证 |
+|---|---|
+| 🟡2 | rotate_broker_events 正常 (9MB 不裁), 锁机制 in 测试 |
+| 🟡3 | watchdog.log 新增 `⚠️ 4 Loop 状态: 3/4 (expected: 4)` |
+| 🟡4 | dry_run 写 actions.jsonl 含 `bytesStatus=skipped-dry-run` |
+
+### 累计指标
+
+| 项 | 修 🔴 后 | 修 1.6 后 | 修 3 🟡 后 |
+|---|---|---|---|
+| 测试数 | 133 | 141 | **146** |
+| 整体覆盖 | 40.1% | 40.8% | **41.5%** |
+| 时间 | 38.5s | 39.75s | 38.7s |
+
+### 未做 (留 Phase 2)
+
+- 🟡 L/M/N/O/P/Q/R/S (8 个里 5 个)
+- 阶段 2 推进 (压缩子模块+logs 单测,目标 50% 覆盖)

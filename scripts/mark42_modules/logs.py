@@ -1,5 +1,6 @@
 """Mark42 日志轮替模块：自动清理旧日志、broker 事件、历史索引。"""
 
+import fcntl
 import json
 import os
 import time
@@ -86,29 +87,46 @@ def rotate_broker_events() -> dict:
     【2026-06-30 10:11 优化】keep_count 乘 0.9 SAFETY_FACTOR, 裁完 < 9MB。
     原逻辑: size_mb=10, MAX/size=1.0, keep_count=100% 行, 裁完仍 10MB。
     改后: keep_count=90% 行, 裁后 ~9MB, 留 10% 余量 (1MB) 足够兼容即将产生的新事件。
+    
+    【2026-06-30 10:13 🟡2 修复】加 fcntl.flock 独占锁保证裁剪原子性。
+    原问题: armor-guard / engine-daemon 多个进程并发 append broker, 裁的瞬间可能丢中间事件。
+    修后: 读+写 全程占独占锁, 阻止其他进程同时改 broker 事件。
     """
     SAFETY_FACTOR = 0.9
     if not MARK42_BROKER_EVENTS.exists():
         return {"trimmed": 0, "note": "无 broker 事件"}
+    # 【🟡2】加 fcntl.flock 独占锁, 防止裁剪中其他进程 append
+    # 用 lock 文件而不是直接锁 broker events.jsonl, 避免锁住业务读路径
+    lock_path = MARK42_BROKER_EVENTS.with_suffix(MARK42_BROKER_EVENTS.suffix + ".lock")
     try:
-        size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
-        if size_mb < MAX_BROKER_EVENTS_MB:
-            return {"sizeMB": round(size_mb, 2), "trimmed": 0}
-        # 保留尾部的量 = 总行数 * (SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb)
-        # SAFETY_FACTOR=0.9 是保证裁后 < 9MB (留 1MB 余量) 而不是 10MB 临界
-        with open(MARK42_BROKER_EVENTS, "r") as f:
-            lines = f.readlines()
-        keep_count = max(100, int(len(lines) * SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb))
-        kept = lines[-keep_count:]
-        with open(MARK42_BROKER_EVENTS, "w") as f:
-            f.writelines(kept)
-        # 实际裁后大小 (读回再算)
-        post_size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
-        return {"sizeMB": round(size_mb, 2), "postSizeMB": round(post_size_mb, 2),
-                "trimmed": len(lines) - len(kept), "kept": len(kept),
-                "safetyFactor": SAFETY_FACTOR}
-    except OSError:
-        return {"trimmed": 0, "error": "IO 错误"}
+        lock_fh = open(lock_path, "w")
+        try:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock_fh.close()
+            return {"trimmed": 0, "note": "另一进程正在裁, 跳过"}
+        try:
+            size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
+            if size_mb < MAX_BROKER_EVENTS_MB:
+                return {"sizeMB": round(size_mb, 2), "trimmed": 0}
+            # 保留尾部的量 = 总行数 * (SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb)
+            # SAFETY_FACTOR=0.9 是保证裁后 < 9MB (留 1MB 余量) 而不是 10MB 临界
+            with open(MARK42_BROKER_EVENTS, "r") as f:
+                lines = f.readlines()
+            keep_count = max(100, int(len(lines) * SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb))
+            kept = lines[-keep_count:]
+            with open(MARK42_BROKER_EVENTS, "w") as f:
+                f.writelines(kept)
+            # 实际裁后大小 (读回再算)
+            post_size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
+            return {"sizeMB": round(size_mb, 2), "postSizeMB": round(post_size_mb, 2),
+                    "trimmed": len(lines) - len(kept), "kept": len(kept),
+                    "safetyFactor": SAFETY_FACTOR}
+        finally:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            lock_fh.close()
+    except OSError as e:
+        return {"trimmed": 0, "error": f"IO 错误: {e}"}
 
 
 def rotate_daemon_logs() -> dict:

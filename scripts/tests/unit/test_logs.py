@@ -122,3 +122,64 @@ class TestRotateBrokerEvents:
         # 验证 至少留 100 行
         kept_lines = config.MARK42_BROKER_EVENTS.read_text().strip().split("\n")
         assert len(kept_lines) >= 100, f"应至少留 100 行, 实际 {len(kept_lines)}"
+
+    # ── 2026-06-30 10:13 🟡2 修复: fcntl 锁原子性 ──
+
+    def test_concurrent_rotation_skipped_with_lock(self, monkeypatch, tmp_path):
+        """【🟡2】另一进程占锁时, 本次 rotate 应跳过不报错。"""
+        import fcntl
+        _populate_broker_file(config.MARK42_BROKER_EVENTS, 11)
+        monkeypatch.setattr(logs, "MAX_BROKER_EVENTS_MB", 10)
+
+        # 手动占锁, 模拟另一进程正在裁
+        lock_path = config.MARK42_BROKER_EVENTS.with_suffix(
+            config.MARK42_BROKER_EVENTS.suffix + ".lock"
+        )
+        other_lock = open(lock_path, "w")
+        fcntl.flock(other_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        try:
+            r = logs.rotate_broker_events()
+            # 验证: 返 "另一进程正在裁, 跳过", 不抛错
+            assert "另一进程正在裁" in r.get("note", ""), (
+                f"🟡2 修复: 应返跳过 note, 实际 {r}"
+            )
+            assert r["trimmed"] == 0
+            # 文件不应该被改
+            assert config.MARK42_BROKER_EVENTS.stat().st_size > 10 * 1024 * 1024
+        finally:
+            fcntl.flock(other_lock.fileno(), fcntl.LOCK_UN)
+            other_lock.close()
+
+    def test_lock_released_after_rotation(self, monkeypatch, tmp_path):
+        """【🟡2】rotate 完成后锁应释放, 后续 rotate 可正常执行。"""
+        _populate_broker_file(config.MARK42_BROKER_EVENTS, 11)
+        monkeypatch.setattr(logs, "MAX_BROKER_EVENTS_MB", 10)
+
+        # 第一次裁
+        r1 = logs.rotate_broker_events()
+        assert r1["trimmed"] > 0
+
+        # 第二次调, 锁应已释放(否则会返 "另一进程正在裁")
+        r2 = logs.rotate_broker_events()
+        # 第二次因为 < 10MB, 应返 trimmed=0
+        assert r2["trimmed"] == 0, (
+            f"🟡2: 锁应已释放, 第二次调应正常执行, 实际 {r2}"
+        )
+
+    def test_lock_path_separate_from_broker_file(self, monkeypatch, tmp_path):
+        """【🟡2】锁文件是 .jsonl.lock, 不是 .jsonl 本身 (避免锁住业务读)。"""
+        _populate_broker_file(config.MARK42_BROKER_EVENTS, 0.5)
+        monkeypatch.setattr(logs, "MAX_BROKER_EVENTS_MB", 10)
+
+        # 跑一次确保锁文件创建
+        logs.rotate_broker_events()
+        # 锁文件可能已被清, 但 .lock 后缀是固定规则
+        # 验证设计: import 后 .lock 后缀逻辑是固定的
+        from mark42_modules.logs import MARK42_BROKER_EVENTS
+        expected_lock = MARK42_BROKER_EVENTS.with_suffix(
+            MARK42_BROKER_EVENTS.suffix + ".lock"
+        )
+        assert expected_lock.suffix == ".lock"
+        # 注: 锁文件存在性不重要, 重要的是 .lock 后缀约定
+

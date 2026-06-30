@@ -657,6 +657,20 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 【2026-06-30 全面审查 J 修复】action_entry 写于 compact 后,同步 index 里的真值
     # 原动作写于函数入口,那时 preCompactBytes/postCompactBytes 还没填
     # 这样 actions.jsonl 能审计"压缩真截短了吗"(一键看透)
+    #
+    # 【2026-06-30 10:13 🟡4 修复】加 bytesStatus 语义标记,避免 reader 困惑 preBytes=null
+    # - "captured": 压缩完成, 字段有真值
+    # - "skipped-dry-run": dry_run 模式, 没真压缩, 字段为 null 是预期
+    # - "not-attempted": 上下文 < THRESHOLD_WARN, 未尝试 compact
+    # - "error": compact 报错 (没产生 postBytes)
+    if dry_run:
+        bytes_status = "skipped-dry-run"
+    elif index.get("preCompactBytes") is not None and index.get("postCompactBytes") is not None:
+        bytes_status = "captured"
+    elif index.get("compactError"):
+        bytes_status = "error"
+    else:
+        bytes_status = "not-attempted"
     action_entry = {
         "ts": _now_iso(),
         "action": "compress" if not dry_run else "compress-dryrun",
@@ -664,6 +678,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         "preBytes": index.get("preCompactBytes"),
         "postBytes": index.get("postCompactBytes"),
         "bytesSaved": index.get("bytesSaved"),
+        "bytesStatus": bytes_status,  # 🟡4 语义标记
         "compressionEffective": index.get("compressionEffective"),
         "compactTriggered": index.get("compactTriggered"),
         "compactMethod": index.get("compactMethod"),

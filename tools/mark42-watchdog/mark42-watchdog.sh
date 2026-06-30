@@ -141,6 +141,8 @@ except Exception as e:
 if [ -n "$loops_check" ]; then
     if [[ "$loops_check" == ERR* ]]; then
         reason="${reason:+$reason; }loops 检查出错 ($loops_check)"
+        # 【🟡3】本地 log 留痕
+        log "⚠️ 4 Loop 检查出错: $loops_check"
         notify_alert "loops-check-error" "🚨 mark42 watchdog 检查 4 Loop 时出错: $loops_check"
     else
         active_total=$(echo "$loops_check" | awk '{print $2}')
@@ -149,14 +151,20 @@ if [ -n "$loops_check" ]; then
         expected_total=$(echo "$active_total" | cut -d/ -f2)
         if [ "$expected_active" != "$expected_total" ]; then
             reason="${reason:+$reason; }4 Loop 有挂 (active=$expected_active/$expected_total)"
+            # 【🟡3】本地 log 留痕
+            log "⚠️ 4 Loop 状态: $expected_active/$expected_total (expected: $expected_total)"
             notify_alert "loops-missing" "🚨 mark42 4 Loop 状态: $expected_active/$expected_total。可能是 engine_daemon 出问题,需查 \`mark42.py status\`"
         elif [ -n "$bad_loops" ]; then
             reason="${reason:+$reason; }Loop 状态不为 registered: $bad_loops"
+            # 【🟡3】本地 log 留痕
+            log "⚠️ Loop 状态不为 registered: $bad_loops"
             notify_alert "loops-degraded" "🚨 mark42 Loop 状态异常: $bad_loops。看 \`mark42.py status --json\` 查细节"
         fi
     fi
 else
     reason="${reason:+$reason; }loops 检查无输出"
+    # 【🟡3】本地 log 留痕
+    log "⚠️ 4 Loop 检查无输出"
 fi
 
 # ── 3. 处置 ──
