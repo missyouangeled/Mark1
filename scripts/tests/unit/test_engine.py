@@ -87,6 +87,25 @@ class TestEngineStart:
         saved = mock_save.call_args[0][0]
         assert saved["context-guard"]["task"] == "new task"
 
+    # ── 2026-06-30 L 修复: template_desc / _engine_status_path 死代码清理 ──
+
+    def test_engine_status_path_removed(self):
+        """【L】_engine_status_path 死函数应被删 (不再存在于模块)。"""
+        assert not hasattr(engine, "_engine_status_path"), (
+            "L 修复: _engine_status_path 死函数应被删, 但还存在"
+        )
+
+    def test_template_help_uses_docstring_first_line(self, mocker, capsys, engine_state):
+        """【L】template 帮助文本用 engine_templates.__doc__ 第一行 (不再死代码)。"""
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mocker.patch.object(engine, "_save_loops")
+        engine.engine_start(task="test", template="context-guard")
+        out = capsys.readouterr().out
+        # 不应报 NameError 或 AttributeError
+        assert "模板: context-guard" in out
+        # template_help 变量应存在 (不报错)
+        # 原 template_desc = f"..." if template else "" 在新代码里改成模板 docstring 第一行
+
 
 class TestEngineKill:
     """engine_kill() 测试群。"""

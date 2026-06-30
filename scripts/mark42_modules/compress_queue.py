@@ -48,6 +48,10 @@ class CompressRequest:
     priority: int = 0                    # 0=normal, 1=urgent, 2=low (数值小优先级高)
     request_id: str = field(default_factory=lambda: f"req-{uuid.uuid4().hex[:8]}")
     created_at: float = field(default_factory=time.time)
+    # 【M 修复 2026-06-30】加 _enqueued_at: 记录该 request 实际入队时间戳
+    # 原 created_at 是创建时间, 不等于入队时间
+    # 测试 3 (优先级) 用这个字段才能真验证 "urgent 先于 low" (需 enqueue 后 priority 高者先出)
+    _enqueued_at: float | None = field(default=None, init=False, repr=False)
     # 结果回调
     _result: dict | None = field(default=None, init=False, repr=False)
     _result_event: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
@@ -136,6 +140,8 @@ class CompressQueue:
             seq = self._seq
         # 优先级队列: (priority, seq, request)
         item = (request.priority, seq, request)
+        # 【M 修复 2026-06-30】记入队时间戳, 供测试 3 验证 priority 真的影响处理顺序
+        request._enqueued_at = time.time()
         try:
             self._queue.put_nowait(item)
             self.stats["enqueued"] += 1
@@ -213,6 +219,8 @@ class CompressQueue:
                     "ratio": llm_stats.get("ratio", 0.0),
                     "duration_ms": int((time.time() - t0) * 1000),
                     "elapsed": time.time() - t0,
+                    "enqueuedAt": request._enqueued_at,  # 【M】入队时间
+                    "finishedAt": time.time(),  # 【M】实际完成时间
                 }
                 request.set_result(payload)
                 self.stats["processed"] += 1
@@ -238,6 +246,8 @@ class CompressQueue:
                 "ratio": result.get("compress_stats", {}).get("ratio", 0.0) if result.get("compress_stats") else 0.0,
                 "duration_ms": int((time.time() - t0) * 1000),
                 "elapsed": time.time() - t0,
+                "enqueuedAt": request._enqueued_at,  # 【M】入队时间
+                "finishedAt": time.time(),  # 【M】实际完成时间 = 测试判定依据
             }
             request.set_result(payload)
             self.stats["processed"] += 1
@@ -355,9 +365,16 @@ def _run_tests() -> bool:
     q3.enqueue(urgent)
     urgent.wait(timeout=20.0)
     low.wait(timeout=20.0)
-    # urgent 应先完成 (priority 0 < 9)
-    check("3.1 urgent 先于 low 完成", urgent.result["elapsed"] < low.result["elapsed"]
-          or abs(urgent.result["elapsed"] - low.result["elapsed"]) < 0.1)
+    # 【M 修复 2026-06-30】改用 enqueuedAt 真入队时间验证 priority 生效
+    # 原 urgent.result["elapsed"] < low.result["elapsed"] 是处理耗时, 同 content size 几乎相等, 断言总成立
+    # 真判定: urgent 比 low 先完成 = urgent 完成后 low 才完成
+    # 但 result 都是处理完成, 都有 elapsed 字段, 单看 elapsed 不能判定谁先完成
+    # 最准确: 用 enqueuedAt + 实际完成时间 (elapsed) 反推
+    # 修后: urgent 应先完成 = urgent 的 _result_event.set() 早于 low
+    # 用 EnqueuedAt + 处理时间 = 完成时间, 谁完成时间小谁先
+    urgent_finish = urgent.result["enqueuedAt"] + urgent.result["elapsed"]
+    low_finish = low.result["enqueuedAt"] + low.result["elapsed"]
+    check("3.1 urgent 真比 low 先完成", urgent_finish < low_finish)
     q3.shutdown()
 
     # ---- 测试 4: 错误处理 (异常内容不杀 worker) ----

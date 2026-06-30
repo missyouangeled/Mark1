@@ -222,9 +222,12 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     total_size = sum(f.stat().st_size for f in files)
     total_size_mb = total_size / (1024 * 1024)
     remaining_pct = 100 - usage
-    # batch_size 公式：文件越多/上下文越紧 → 每批越小（上限 30，下限 3）
+    # batch_size 公式：文件越多/上下文越紧 → 每批越小（上限 30，下限 1）
+    # 【P 修复 2026-06-30】下限从 3 改为 1：1 个文件的任务也合理 (例如检测到的 .py 单文件)
+    # 原 max(3, ...) 遇到 1 文件 + 100% 余量 = 0, max(3,0)=3, 实际只 1 文件被切成 1 批
+    # 改后 max(1, ...)=1, 1 文件/1 批 更准确表达
     # 分母 200 是经验校准值：100 个文件、20% 余量 → 10 文件/批
-    batch_size = max(3, min(30, int(total_files * remaining_pct / 200)))
+    batch_size = max(1, min(30, int(total_files * remaining_pct / 200)))
     num_batches = max(1, (total_files + batch_size - 1) // batch_size)
     print(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
     print(f"   📦 批次: {num_batches} 批 (每批 ≤{batch_size} 个文件)")
@@ -307,7 +310,7 @@ def heavy_finish(task_name: str) -> None:
     st["progress"] = "finished"
     st["lastUpdate"] = _now_iso()
     _save_json(status_file, st)
-    _append_broker("tasks", "heavy.task.finished", f"大工程收工: {task_name}", "ok",
+    _append_broker("tasks", "heavy.task.done", f"大工程收工: {task_name}", "ok",
                    f"全部 {total} 子任务完成",
                    {"taskName": task_name, "total": total})
     print(f"✅ 任务 '{task_name}' 已归档")

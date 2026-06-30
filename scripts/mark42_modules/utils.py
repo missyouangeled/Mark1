@@ -2,8 +2,6 @@
 
 import json
 import os
-import subprocess
-import sys
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -13,10 +11,13 @@ from typing import Any
 LOCK_MAX_AGE = 120
 
 # 从 config 导入常量
+# 【N 修复 2026-06-30】删死 import: BROKER_DIRTY, MAX_BROKER_EVENTS_MB
+# - BROKER_DIRTY: 仅 config.py 定义, utils import 后无人调 (所有 broker 事件都走 BROKER_DIR/events.jsonl)
+# - MAX_BROKER_EVENTS_MB: 仅 logs.py 调, utils import 后无人调
 from .config import (
-    ARMOR_STATE, BROKER_DIR, BROKER_DIRTY, BROKER_SOURCE, BYTES_PER_KTOKEN,
+    ARMOR_STATE, BROKER_DIR, BROKER_SOURCE, BYTES_PER_KTOKEN,
     CONFIG_PATH, DEFAULT_CONTEXT_WINDOW, HEAVY_STATE, MARK42_STATE,
-    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_HISTORY_FILES,
+    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_HISTORY_FILES,
     MAX_LOG_AGE_DAYS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE,
 )
@@ -57,11 +58,6 @@ def _append_broker(source_view: str, event_type: str, label: str, level: str,
     }
     with open(str(MARK42_BROKER_EVENTS), "a") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
-
-def _run_script(name: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    cmd = [sys.executable, str(WORKSPACE / "scripts" / name), *args]
-    return subprocess.run(cmd, capture_output=True, text=True, check=check)
-
 
 def _safe_mtime(path: Path) -> float:
     try:

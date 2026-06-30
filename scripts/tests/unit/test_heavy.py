@@ -252,6 +252,62 @@ class TestHeavyStart:
 
 # ─────────────────────── heavy_finish ───────────────────────
 
+class TestHeavyBatchSize:
+    """P 修复: batch_size 下限 3 改 1 (单文件友好)。"""
+
+    def test_single_file_yields_single_batch(self, tmp_path, scratch_dir, mocker):
+        """【P】1 个文件 + 100% 余量 → batch_size=1, num_batches=1 (原 3, 1 切 1 批但 batch_size 3 不准确)。"""
+        # 1 个文件
+        for i in range(1):
+            (tmp_path / f"f{i}.txt").write_text("x")
+        # mock armor_check 返 0% 使用率 (剩 100% 余量)
+        mocker.patch.object(heavy, "armor_check",
+                          return_value={"usagePercent": 0.0})
+        class FakeFile:
+            def read(self):
+                return "10G"
+        mocker.patch("os.popen", return_value=FakeFile())
+
+        # 调 heavy_start, 不传 task_name 但 mock
+        task_name = "p-single-file"
+        heavy.heavy_start(str(tmp_path), task_name=task_name, context_aware=True)
+
+        # 读 status.json, 验 num_batches
+        status = json.loads((scratch_dir / task_name / "status.json").read_text())
+        # num_batches 应 = 1 (单文件)
+        assert status["totalBatches"] == 1, (
+            f"P 修复: 1 文件应=1 批, 实际 {status['totalBatches']} 批"
+        )
+        # batch_size 应 = 1 (下限改了)
+        assert status["batchSize"] == 1, (
+            f"P 修复: 1 文件 batch_size 应=1 (下限改了), 实际 {status['batchSize']}"
+        )
+
+    def test_batch_size_lower_bound_is_one(self, tmp_path, scratch_dir, mocker):
+        """【P】batch_size 公式计算 < 1 时, 应保 1 不保 3。"""
+        # 0 个文件是边界, 制造 1 个测试
+        for i in range(1):
+            (tmp_path / f"f{i}.txt").write_text("x")
+        mocker.patch.object(heavy, "armor_check",
+                          return_value={"usagePercent": 99.0})  # 几乎 0% 余量
+        class FakeFile:
+            def read(self):
+                return "1G"
+        mocker.patch("os.popen", return_value=FakeFile())
+
+        task_name = "p-low-remaining"
+        heavy.heavy_start(str(tmp_path), task_name=task_name, context_aware=True)
+
+        status = json.loads((scratch_dir / task_name / "status.json").read_text())
+        # 原 max(3, ...) 至少 3, 改后 max(1, ...) 至少 1
+        assert status["batchSize"] >= 1
+        # 严重上下文紧时 (1%) 1 文件 → batch_size 应=1 (而不是 3)
+        # 1 * 0.01 / 200 = 0, max(1, 0) = 1
+        assert status["batchSize"] == 1, (
+            f"P 修复: 紧上下文 1 文件应 batch_size=1, 实际 {status['batchSize']}"
+        )
+
+
 class TestHeavyFinish:
     """heavy_finish() 测试群。"""
 
@@ -683,3 +739,36 @@ class TestHeavyPreflight:
         out = capsys.readouterr().out
         assert "⚠️" in out
         assert "不足" in out or "强烈建议" in out
+
+    # ── 2026-06-30 O 修复: event 命名 'heavy.task.finished' → 'heavy.task.done' ──
+
+    def test_heavy_finish_emits_done_event(self, tmp_path, scratch_dir, mocker):
+        """【O 修】heavy_finish 应发 'heavy.task.done' (对齐设计 6.2,不是 'finished')。"""
+        task_name = "o-test-done"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        # 全部 done
+        status = {
+            "taskName": task_name,
+            "targetPath": str(tmp_path / "project"),
+            "subtasks": {
+                "batch-001": {"status": "done"},
+            },
+        }
+        (task_scratch / "status.json").write_text(json.dumps(status))
+        (tmp_path / "project").mkdir()
+        # mock _append_broker 捕事件
+        captured_events = []
+        def mock_broker(view, event_type, *args, **kwargs):
+            captured_events.append((view, event_type))
+        mocker.patch.object(heavy, "_append_broker", side_effect=mock_broker)
+
+        heavy.heavy_finish(task_name)
+        # 验证事件: 用 'heavy.task.done' 不是 'heavy.task.finished'
+        events = [e[1] for e in captured_events]
+        assert "heavy.task.done" in events, (
+            f"O 修复: 应收 'heavy.task.done', 实际 {events}"
+        )
+        assert "heavy.task.finished" not in events, (
+            f"O 修复: 不应再发 'heavy.task.finished', 实际 {events}"
+        )

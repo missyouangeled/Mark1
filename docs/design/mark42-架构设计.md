@@ -507,6 +507,12 @@ python3 scripts/mark42.py assemble
 
 ### 6.2 事件类型表
 
+> 【2026-06-30 O 修】event 命名空间两种风格都接受:
+> - **内部事件**：`{view}.{module}.{action}` 简洁形式 (例: `armor.compress`、`engine.health.warn`、`heavy.task.done`)
+> - **跨模块桥接事件**：`mark42.{module}.{action}.{detail}` 加前缀 (例: `mark42.engine.bridge.heavy_started` 表明是 engine 主动桥接 heavy 事件)
+> 这样设计: 内部调试只看本地, 跨模块提醒看带 mark42. 前缀
+> 本表以内部事件为准 (例: `heavy.task.done` 不是 `heavy.task.finished`)
+
 | source | event | 含义 | 谁响应 |
 |--------|-------|------|--------|
 | `armor` | `context.ok` | 上下文正常 | — |
@@ -671,5 +677,5 @@ Armor 准备压缩前：
 
 - 改动 `armor.py` / `engine.py` / `cli.py` → 必须同步更新 `商品化路线图.md` 诊断标记
 - 改动 `loops.json` 结构 → 必须确保 `engine.py` 中 `_load_loops()` 兼容新旧格式
-- 新增事件类型 → 遵循命名空间 `mark42.{module}.{action}.{detail}`
+- 新增事件类型 → 遵循命名空间（见 6.2）
 - 任何涉及 API key / 外部请求的改动 → 必须有 try/except 静默失败回退

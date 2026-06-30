@@ -24,10 +24,6 @@ from .logs import log_rotate
 ENGINE_LOOPS = ENGINE_STATE / "loops.json"
 
 
-def _engine_status_path() -> Path:
-    return ENGINE_STATE
-
-
 def _load_loops() -> dict[str, Any]:
     return _load_json(ENGINE_LOOPS)
 
@@ -127,13 +123,16 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
         "createdAt": _now_iso(),
     }
     _save_loops(loops)
-    template_desc = f" — {engine_templates.__doc__}" if template else ""
     print(f"🔄 Loop '{name}' 已注册")
     print(f"   任务: {task}")
     print(f"   周期: {interval_s}s  |  最大循环: {max_cycles or '无限'}")
     if template:
-        print(f"   模板: {template}{template_desc}" if False else f"   模板: {template}")
-    if template:
+        # 【L 修复 2026-06-30】只查模板的 docstring, 不用 f-string 空拼接
+        # 原 template_desc = f" — {engine_templates.__doc__}" 是死代码, if False 进一步取消显示
+        template_help = ""
+        if engine_templates.__doc__:
+            template_help = f" — {engine_templates.__doc__.split(chr(10))[0].strip()}"
+        print(f"   模板: {template}{template_help}")
         print(f"   执行: python3 scripts/mark42.py engine --run {name}")
         print(f"   监控: python3 scripts/mark42.py engine --watch-task {name}")
 
