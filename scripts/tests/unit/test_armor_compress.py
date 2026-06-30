@@ -272,6 +272,106 @@ class TestArmorCompress:
         snapshots = list(history_dir.glob("memory-index-*.json"))
         assert len(snapshots) >= 1
 
+    # ── 2026-06-30 J 修复: actions.jsonl 加 preBytes/postBytes/bytesSaved/effective ──
+
+    def test_actions_log_includes_bytes_fields_when_compact_succeeds(self, mocker, armor_state):
+        """【J 修复】sessions.compact 成功后,actions.jsonl 应含 preBytes/postBytes/bytesSaved/compressionEffective。"""
+        # 设高使用率
+        mocker.patch.object(
+            armor, "armor_check",
+            return_value={"usagePercent": 80.0, "severity": "warn", "summary": "x"},
+        )
+        # 模拟会话: compact 前 X 字节, compact 后 Y 字节 (Y < X)
+        session_mock, initial_bytes, compact_bytes = _high_usage_session_with_compactable(
+            target_pct=80.0, compact_to_pct=30.0,
+        )
+        mocker.patch.object(armor, "_find_active_session", return_value=session_mock)
+        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(10)]
+        mocker.patch.object(armor, "_read_session_tail", return_value=msgs)
+        mocker.patch.object(
+            armor, "_llm_analyze",
+            return_value={"preserved": {}, "discarded": {}, "degradationDetected": None},
+        )
+        # 模拟 sessions.compact 成功且 session 变小
+        initial_size = session_mock.stat.return_value.st_size
+        compact_size = int(initial_size * 0.5)  # 压缩到一半
+        def shrink_session():
+            session_mock.set_size(compact_size)
+        # 用 mock run + side_effect 实现
+        from unittest.mock import MagicMock as _MM
+        def run_side(args, **kwargs):
+            if isinstance(args, (list, tuple)) and args and args[0] == "du":
+                fake = _MM()
+                fake.stdout = f"{int(initial_size/1024)}\t/sessions"
+                return fake
+            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+                # 模拟压缩后变小
+                session_mock.set_size(compact_size)
+                fake = _MM()
+                fake.returncode = 0
+                fake.stdout = '{"ok":true}'
+                fake.stderr = ""
+                return fake
+            fake = _MM()
+            fake.returncode = 0
+            fake.stdout = ""
+            fake.stderr = ""
+            return fake
+        mocker.patch("subprocess.run", side_effect=run_side)
+
+        armor.armor_compress()
+
+        actions_log = armor_state / "actions.jsonl"
+        assert actions_log.exists()
+        entry = json.loads(actions_log.read_text().strip().split("\n")[-1])
+        # J 修复后以下字段都应存在
+        assert "preBytes" in entry, "J 修复: actions.jsonl 应含 preBytes 字段"
+        assert "postBytes" in entry, "J 修复: actions.jsonl 应含 postBytes 字段"
+        assert "bytesSaved" in entry, "J 修复: actions.jsonl 应含 bytesSaved 字段"
+        assert "compressionEffective" in entry, "J 修复: actions.jsonl 应含 compressionEffective 字段"
+        # 真值: preBytes > postBytes, effective=True
+        assert entry["preBytes"] == initial_size
+        assert entry["postBytes"] == compact_size
+        assert entry["bytesSaved"] == initial_size - compact_size
+        assert entry["compressionEffective"] is True
+
+    def test_actions_log_marks_effective_false_when_no_bytes_saved(self, mocker, armor_state):
+        """【J 修复】sessions.compact 返回成功但 session 未变小时,actions.jsonl 应记 effective=False。"""
+        mocker.patch.object(
+            armor, "armor_check",
+            return_value={"usagePercent": 80.0, "severity": "warn", "summary": "x"},
+        )
+        session_mock = MagicMock()
+        session_mock.name = "agent.jsonl"
+        initial_size = 1024 * 1024  # 1MB, 不变
+        session_mock.stat.return_value.st_size = initial_size
+        mocker.patch.object(armor, "_find_active_session", return_value=session_mock)
+        msgs = [{"role": "user", "content": "x"}]
+        mocker.patch.object(armor, "_read_session_tail", return_value=msgs)
+        mocker.patch.object(
+            armor, "_llm_analyze",
+            return_value={"preserved": {}, "discarded": {}, "degradationDetected": None},
+        )
+        from unittest.mock import MagicMock as _MM
+        def run_side(args, **kwargs):
+            if isinstance(args, (list, tuple)) and args[0] == "du":
+                fake = _MM(); fake.stdout = f"{int(initial_size/1024)}\t/sessions"; return fake
+            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+                fake = _MM(); fake.returncode = 0; fake.stdout = '{"ok":true}'; fake.stderr = ""
+                return fake
+            fake = _MM(); fake.returncode = 0; fake.stdout = ""; fake.stderr = ""; return fake
+        mocker.patch("subprocess.run", side_effect=run_side)
+
+        armor.armor_compress()
+
+        actions_log = armor_state / "actions.jsonl"
+        entry = json.loads(actions_log.read_text().strip().split("\n")[-1])
+        # J 修复: effective 字段仍然要写,值为 False
+        assert "compressionEffective" in entry
+        assert entry["compressionEffective"] is False
+        # preBytes 记了, postBytes=None 或同 preBytes
+        assert entry["preBytes"] == initial_size
+
     def test_falls_back_to_heuristic_when_llm_unavailable(self, mocker, armor_state):
         """LLM 不可用时应回退到启发式分类。"""
         mocker.patch.object(

@@ -523,14 +523,6 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     actions_log = ARMOR_STATE / "actions.jsonl"
     history_dir = ARMOR_STATE / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
-    action_entry = {
-        "ts": _now_iso(),
-        "action": "compress" if not dry_run else "compress-dryrun",
-        "preCompressUsage": usage,
-        "indexPath": str(index_path),
-    }
-    with open(actions_log, "a") as f:
-        f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
     _append_broker("health", "armor.compress",
                    f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
                    "warn" if usage >= THRESHOLD_WARN else "ok",
@@ -619,12 +611,16 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         index["compactMethod"] = "openclaw-sessions-compact"
                         index["compressionEffective"] = False
                         index["compactError"] = "no-bytes-saved"
+                        index["preCompactBytes"] = pre_bytes  # J 修复: 也记
+                        index["postCompactBytes"] = post_bytes
+                        index["bytesSaved"] = bytes_saved
                         print(f"⚠️ sessions.compact 返回成功但 session 未变小")
                 else:
                     err = (compact_proc.stderr or compact_proc.stdout)[:300]
                     index["compactTriggered"] = False
                     index["compactError"] = err
                     index["compressionEffective"] = False
+                    index["preCompactBytes"] = pre_bytes  # J 修复: 也记
                     print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
                     _append_broker(
                         "armor", "mark42.armor.compact.failed",
@@ -637,6 +633,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 print("⚠️ 未找到活跃会话，跳过 compact")
                 index["compactTriggered"] = False
                 index["compressionEffective"] = False
+                index["preCompactBytes"] = pre_bytes  # J 修复: 也记
         except subprocess.TimeoutExpired:
             print("⚠️ sessions.compact 调用超时（200s）")
             index["compactTriggered"] = False
@@ -656,6 +653,25 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     _save_json(index_path, index)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     _save_json(history_dir / f"memory-index-{ts}.json", index)
+
+    # 【2026-06-30 全面审查 J 修复】action_entry 写于 compact 后,同步 index 里的真值
+    # 原动作写于函数入口,那时 preCompactBytes/postCompactBytes 还没填
+    # 这样 actions.jsonl 能审计"压缩真截短了吗"(一键看透)
+    action_entry = {
+        "ts": _now_iso(),
+        "action": "compress" if not dry_run else "compress-dryrun",
+        "preCompressUsage": usage,
+        "preBytes": index.get("preCompactBytes"),
+        "postBytes": index.get("postCompactBytes"),
+        "bytesSaved": index.get("bytesSaved"),
+        "compressionEffective": index.get("compressionEffective"),
+        "compactTriggered": index.get("compactTriggered"),
+        "compactMethod": index.get("compactMethod"),
+        "compactError": index.get("compactError"),
+        "indexPath": str(index_path),
+    }
+    with open(actions_log, "a") as f:
+        f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
 
     # ── P0 补充: 连续压缩无效升级报 ──
     # 读 actions.jsonl 最近 5 条, 如果全部 compressionEffective=False 且本次也是 False,

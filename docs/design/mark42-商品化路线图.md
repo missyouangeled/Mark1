@@ -161,9 +161,9 @@
 | # | 问题 | 严重度 | 状态 |
 |---|------|:---:|:---:|
 | H | heavy_execute 假执行 | 🔴 | ✅ **已修复** (上面 H 项) |
-| I | broker 文件临界 9.99MB | 🟠 | ⏳ 待修(`<=` 改成 `<`) |
-| J | actions.jsonl 不记 preBytes/postBytes | 🟠 | ⏳ 待修(添加字段) |
-| K | 文档说"4 守护"、实际 2 daemon+bootstrap+watchdog | 🟠 | ⏳ 待修(文档/服务不齐) |
+| I | broker 文件临界 9.99MB | 🟠 | ✅ **已修** (logs.py: `<=` 改为 `<`,留安全余量) |
+| J | actions.jsonl 不记 preBytes/postBytes | 🟠 | ✅ **已修** (armor.py: action_entry 移到 compact 之后,同步 index 真值) |
+| K | 文档说"4 守护"、实际 2 daemon+bootstrap+watchdog | 🟠 | ✅ **已修** (watchdog 加 4 Loop 检查 + 文档同步) |
 | L | engine.py 死代码 | 🟡 | ⏳ 可选 |
 | M | compress_queue 测试 3 优先级断言无效 | 🟡 | ⏳ 可选 |
 | N | utils.py 死 import / 死函数 | 🟡 | ⏳ 可选 |
@@ -177,6 +177,52 @@
 - 🔴 1  已修 (H)
 - 🟠 3  下次会话 / Phase 2 一起修 (I/J/K)
 - 🟡 8  抽空修 (L~S)
+
+---
+
+## 1.6、2026-06-30 I/J/K 修复详情
+
+### 🟠 I 修复: broker 阈值 `<=` 改 `<`
+
+**问题**：`rotate_broker_events` 条件是 `if size_mb <= MAX_BROKER_EVENTS_MB: return ...`,**10MB 临界不裁**。
+
+**修复**（`scripts/mark42_modules/logs.py`）：
+- `size_mb <= MAX_BROKER_EVENTS_MB` → `size_mb < MAX_BROKER_EVENTS_MB`
+- 10MB 临界状态会立即触发裁剪,留安全余量
+
+### 🟠 J 修复: actions.jsonl 加 preBytes/postBytes/bytesSaved/effective 字段
+
+**问题**：P0 修复把 `preCompactBytes/postCompactBytes/bytesSaved/compressionEffective` 写在 `memory-index.json` 里,**actions.jsonl 仍然只有 `preCompressUsage`**,无法审计“压缩是不是真截短了”。
+
+**修复**（`scripts/mark42_modules/armor.py`）：
+1. `action_entry` 写**移到 compact 之后** (原 写于函数入口,那时 preCompactBytes 还没填 = 一直 None)
+2. 同步从 `index` 拿 `preCompactBytes/postCompactBytes/bytesSaved/compressionEffective/compactTriggered/compactMethod/compactError`
+3. **顺手修 P0 隐藏 bug**:`preCompactBytes` 在 4 个分支(成功/未变小/失败/无 active session)全都补上,避免有效位不完整
+4. 加 2 个新测试:`test_actions_log_includes_bytes_fields_when_compact_succeeds` + `test_actions_log_marks_effective_false_when_no_bytes_saved`
+
+### 🟠 K 修复: 文档与实际不一致 + watchdog 加 4 Loop 检查
+
+**问题**：文档说"4 守护服务",实际是 2 daemon (armor-guard + engine-daemon) + 1 bootstrap (oneshot) + 1 watchdog (oneshot+timer),**没有独立 memory-index / task-watch service**。
+
+**修夏**（`tools/mark42-watchdog/mark42-watchdog.sh`）：
+1. watchdog 第 2 步加 4 Loop 状态检查,调 `mark42.py status --json` 读 `engine.activeLoops/totalLoops/loops[*].status`
+2. 不一致时 `notify_alert` 推 dashboard (1 小时去重)
+3. 也调 alert 补 `loops-check-error` / `loops-missing` / `loops-degraded` 三种
+4. 文档同步：上面 K 行的状态由"⏳ 待修"改为"✅ **已修**"
+5. 加服务门槛：`mark42-watchdog` 由 2 daemon 检查升为 2 daemon + 4 Loop 检查,覆盖面更准
+
+### 测试增量
+
+| 阶段 | 测试数 |
+|---|---|
+| 修 I/J/K 前 | 133 |
+| 修后 | **135** (+2 J 修复) |
+| 覆盖 | 40.1% → 40.4% (估) |
+
+### 未做(下次会话)
+
+- 🟡 L~S (8 个小问题)
+- Phase 2 推进 (压缩子模块+logs 单测,目标 50% 覆盖)
 
 ---
 

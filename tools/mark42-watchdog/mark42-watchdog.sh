@@ -120,6 +120,45 @@ if [ -z "$armor_pid" ]; then
     need_restart=1
 fi
 
+# 【2026-06-30 全面审查 K 修复】检查 4 个守护 Loop 状态
+# 文档说 4 守护服务,实际 2 daemon + bootstrap + watchdog (4 个 Loop 由 engine_daemon 动态跑)
+# watchdog 额外检查 4 Loop activeLoops=4、每个 loop 状态='registered',挂了就报
+loops_check=$(python3 -c "
+import json, subprocess
+try:
+    r = subprocess.run(['python3', '$WORKSPACE/scripts/mark42.py', 'status', '--json'],
+                      capture_output=True, text=True, timeout=10)
+    d = json.loads(r.stdout)
+    eng = d.get('engine', {})
+    active = eng.get('activeLoops', 0)
+    total = eng.get('totalLoops', 0)
+    loops = eng.get('loops', {})
+    bad = [k for k, v in loops.items() if v.get('status') != 'registered']
+    print(f'OK {active}/{total} {\",\".join(bad) if bad else \"\"}')
+except Exception as e:
+    print(f'ERR {e}')
+" 2>/dev/null)
+if [ -n "$loops_check" ]; then
+    if [[ "$loops_check" == ERR* ]]; then
+        reason="${reason:+$reason; }loops 检查出错 ($loops_check)"
+        notify_alert "loops-check-error" "🚨 mark42 watchdog 检查 4 Loop 时出错: $loops_check"
+    else
+        active_total=$(echo "$loops_check" | awk '{print $2}')
+        bad_loops=$(echo "$loops_check" | awk '{print $3}')
+        expected_active=$(echo "$active_total" | cut -d/ -f1)
+        expected_total=$(echo "$active_total" | cut -d/ -f2)
+        if [ "$expected_active" != "$expected_total" ]; then
+            reason="${reason:+$reason; }4 Loop 有挂 (active=$expected_active/$expected_total)"
+            notify_alert "loops-missing" "🚨 mark42 4 Loop 状态: $expected_active/$expected_total。可能是 engine_daemon 出问题,需查 \`mark42.py status\`"
+        elif [ -n "$bad_loops" ]; then
+            reason="${reason:+$reason; }Loop 状态不为 registered: $bad_loops"
+            notify_alert "loops-degraded" "🚨 mark42 Loop 状态异常: $bad_loops。看 \`mark42.py status --json\` 查细节"
+        fi
+    fi
+else
+    reason="${reason:+$reason; }loops 检查无输出"
+fi
+
 # ── 3. 处置 ──
 if [ -n "$need_restart" ]; then
     log "⚠️ 检测到异常: $reason → 重启 service"

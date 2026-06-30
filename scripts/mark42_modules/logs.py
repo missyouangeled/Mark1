@@ -78,12 +78,16 @@ def rotate_actions_log() -> dict:
 
 
 def rotate_broker_events() -> dict:
-    """若 broker events.jsonl 超过 MAX_BROKER_EVENTS_MB 则裁剪尾部。"""
+    """若 broker events.jsonl >= MAX_BROKER_EVENTS_MB 则裁剪尾部。
+    
+    【2026-06-30 全面审查 I 修复】原本是 size_mb <= MAX_BROKER_EVENTS_MB 才裁，
+    改为 <,留安全余量（10MB 临界不裁的问题）
+    """
     if not MARK42_BROKER_EVENTS.exists():
         return {"trimmed": 0, "note": "无 broker 事件"}
     try:
         size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
-        if size_mb <= MAX_BROKER_EVENTS_MB:
+        if size_mb < MAX_BROKER_EVENTS_MB:
             return {"sizeMB": round(size_mb, 2), "trimmed": 0}
         # 保留尾部的量 = 总行数 * (MAX_BROKER_EVENTS_MB / size_mb)
         with open(MARK42_BROKER_EVENTS, "r") as f:
