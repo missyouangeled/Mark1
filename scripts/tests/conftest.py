@@ -170,6 +170,68 @@ def broker_dir(state_dir):
     return config.BROKER_DIR
 
 
+# ── Phase 2 新增: 压缩子模块 + LLM mock 标准数据 ──
+
+@pytest.fixture
+def sample_long_text():
+    """5KB 中文长文本，用于压缩测试。"""
+    return "测试内容 " * 600
+
+
+@pytest.fixture
+def sample_repetitive_text():
+    """含重复段落的文本。"""
+    para = "第一段内容。\n"
+    return (para * 5) + "中间段。\n" + (para * 5)
+
+
+@pytest.fixture
+def sample_code_python():
+    """Python 代码样本。"""
+    return '''
+def hello(name: str) -> str:
+    """打招呼。"""
+    return f"Hello, {name}"
+
+# 这是注释
+class Foo:
+    def bar(self):
+        return 42
+'''
+
+
+@pytest.fixture
+def sample_diff():
+    """git diff 样本。"""
+    return '''
+diff --git a/foo.py b/foo.py
+index 1234567..89abcdef 100644
+--- a/foo.py
++++ b/foo.py
+@@ -1,3 +1,4 @@
+ def hello():
++    """Docstring."""
+     return 1
+'''
+
+
+@pytest.fixture
+def mock_llm_response():
+    """mock LLM API 响应的工厂。"""
+    from unittest.mock import MagicMock
+
+    def _make(summary="压缩后的摘要", prompt_tokens=100, completion_tokens=50):
+        resp = MagicMock()
+        resp.choices = [MagicMock()]
+        resp.choices[0].message.content = summary
+        resp.usage = MagicMock(
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        )
+        return resp
+
+    return _make
+
+
 @pytest.fixture
 def session_messages():
     """为 armor_compress 提供标准的 10 条 session 消息。

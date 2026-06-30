@@ -25549,3 +25549,51 @@ mocker.patch.object(armor, "armor_check", return_value={
 - 每一步都要问"这步是干啥的?有谁在调?"
 - 如果任何一步是 `# TODO` / `pass` / silent noop → 整条链路都是死的
 - 写一个 **e2e 集成测试**,真跑真后台真状态更新,跑通了再 commit
+
+## [ERR-20260630-006] Phase 2 手册 vs 实际实现差异（5 处）
+
+**Logged**: 2026-06-30T11:30:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs-vs-impl / mark42-testing
+
+### Summary
+Phase 2 路线 / 执行手册是 2026-06-29 写的，到 6/30 开干时手册和实现已经有 5 处不一致，需逐个校准。
+
+### 5 处差异
+
+1. **algo_scheduler `_should_use_llm` 决策依据** —
+   手册说"长内容 + 含 '复杂/算法/分析' 关键词 → True"，
+   实际: 完全由 env var 决定 (`MARK42_TEXT_USE_LLM` true/auto/false)。
+   修正: 测试改 monkeypatch + importlib.reload。
+
+2. **algo_scheduler `decide()` small bucket 默认 action** —
+   手册说 `action='compress'`, `route_algo='smartcrush'`,
+   实际: small bucket 默认 `action='skip'`, `should_compress=False`
+   (因为 `pii_enabled_small=False`)。
+   修正: 接受 skip 行为, 注释写明 P2 手册未提到的反直觉默认值。
+
+3. **algo_scheduler env var 名字** —
+   手册用 `_TEXT_USE_LLM` (下划线开头),
+   实际: `MARK42_TEXT_USE_LLM` (无下划线)。
+   修正: 测试改用真实 env var 名。
+
+4. **compress_queue 单例语义** —
+   手册说"不同 max_workers → 不同对象",
+   实际: 全局 _instance 单例, max_workers 仅首次生效, 之后直接返回。
+   修正: 测试 `assert q1 is q2`, 注释解释真实契约。
+
+5. **llm_text_compressor mode 字段 vs status 字段** —
+   手册说短文本 mode 字段是 "passthrough_small",
+   实际: mode 字段是模式名 ("summarize"), status 字段才是 "passthrough_small"。
+   修正: 测试用 `meta.get("status")` 判断。
+
+### 教训
+- **手册写得早 + 实际写得晚**，中差是常态。开干前不读 30KB 手册是偷懒。
+- **测试要按"实际行为"写**，发现不符先确认是 bug 还是设计变更, 别盲目按手册改实现。
+- 后续更新: 手册下个版本加 "实测 vs 文档" 章节, 把这些差异固化进文档。
+
+### 相关
+- Phase 2 路线: docs/design/mark42-Phase2路线-20260629.md
+- 执行手册: docs/design/mark42-Phase2执行手册-20260629.md
+- 阶段小结: memory/daily/2026-06-30.md (后续补)

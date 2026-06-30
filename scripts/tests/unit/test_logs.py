@@ -183,3 +183,91 @@ class TestRotateBrokerEvents:
         assert expected_lock.suffix == ".lock"
         # 注: 锁文件存在性不重要, 重要的是 .lock 后缀约定
 
+
+class TestRotateHistoryFiles:
+    """rotate_history_files() 历史文件裁剪测试群 (Phase 2 补充)。"""
+
+    def test_no_history_dir_returns_note(self, monkeypatch, tmp_path):
+        """无 history 目录 -> 返 note, 不崩。"""
+        from mark42_modules.config import ARMOR_STATE
+        history_dir = ARMOR_STATE / "history"
+        if history_dir.exists():
+            # conftest 隔离 tmp_path, 理论上不存在
+            for f in history_dir.iterdir():
+                f.unlink()
+            history_dir.rmdir()
+        r = logs.rotate_history_files()
+        assert r["note"] == "无历史目录"
+        assert r["cleaned"] == 0
+
+    def test_keeps_recent_files(self, monkeypatch, tmp_path):
+        """< MAX_HISTORY_FILES 个文件 -> 不裁。"""
+        from mark42_modules.config import ARMOR_STATE
+        history_dir = ARMOR_STATE / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        # 创建 3 个 history 文件
+        for i in range(3):
+            (history_dir / f"memory-index-2026-06-30-{i:02d}.json").write_text("{}")
+        r = logs.rotate_history_files()
+        # 不裁或裁 0
+        assert r["cleaned"] == 0
+
+
+class TestRotateActionsLog:
+    """rotate_actions_log() actions.jsonl 裁剪测试群 (Phase 2 补充)。"""
+
+    def test_no_actions_file_returns_note(self, monkeypatch, tmp_path):
+        """无 actions.jsonl -> 返 note, 不崩。"""
+        from mark42_modules.config import ARMOR_STATE
+        actions = ARMOR_STATE / "actions.jsonl"
+        if actions.exists():
+            actions.unlink()
+        r = logs.rotate_actions_log()
+        assert r["note"] == "无 actions 日志"
+        assert r["trimmed"] == 0
+
+    def test_short_actions_log_unchanged(self, monkeypatch, tmp_path):
+        """< MAX_ACTIONS_LINES 行 -> 不裁。"""
+        from mark42_modules.config import ARMOR_STATE
+        actions = ARMOR_STATE / "actions.jsonl"
+        actions.parent.mkdir(parents=True, exist_ok=True)
+        # 写 5 行
+        actions.write_text("\n".join([f'{{"i":{i}}}' for i in range(5)]) + "\n")
+        r = logs.rotate_actions_log()
+        assert r["trimmed"] == 0
+        assert r["lines"] == 5
+
+
+class TestLoadSaveState:
+    """_load_state / _save_state 状态持久化测试群 (Phase 2 补充)。"""
+
+    def test_load_state_empty_when_no_file(self, monkeypatch, tmp_path):
+        """无 state 文件 -> 返默认 dict。"""
+        from mark42_modules.config import ARMOR_STATE
+        state_file = ARMOR_STATE.parent / "log-rotation.json"
+        if state_file.exists():
+            state_file.unlink()
+        state = logs._load_state()
+        assert isinstance(state, dict)
+        assert "rotationCount" in state
+        assert state["rotationCount"] == 0
+
+    def test_save_and_load_state_roundtrip(self, monkeypatch, tmp_path):
+        """save 后 load 应拿到同样数据。"""
+        from mark42_modules.config import ARMOR_STATE
+        ARMOR_STATE.mkdir(parents=True, exist_ok=True)
+        original = {"lastRotation": "2026-06-30T10:00:00", "rotationCount": 5}
+        logs._save_state(original)
+        loaded = logs._load_state()
+        assert loaded == original
+
+    def test_load_state_handles_corrupt_json(self, monkeypatch, tmp_path):
+        """state 文件是损坏 JSON -> 返默认 dict, 不崩。"""
+        from mark42_modules.config import ARMOR_STATE
+        ARMOR_STATE.mkdir(parents=True, exist_ok=True)
+        state_file = ARMOR_STATE.parent / "log-rotation.json"
+        state_file.write_text("not valid json {{{")
+        state = logs._load_state()
+        assert isinstance(state, dict)
+        assert state["rotationCount"] == 0
+

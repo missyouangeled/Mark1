@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-06-30 #3 — Phase 2 单测全面开干：8 个压缩子模块 + 日志
+
+**背景**：按 `mark42-Phase2路线-20260629.md` 和 `mark42-Phase2执行手册-20260629.md` 开干。已写好的手册是 6/29 完成的，本次仅补测试不重写文档。
+
+**目标达成度**：
+- 测试数: 159 → **274** (+115)
+- 整体覆盖: 43.7% → **45.8%** (+2.1pp)
+- 耗时: 40.6s
+
+**模块覆盖变化**（从 0% 起点的 8 个模块）：
+
+| 模块 | 起点 | 现在 | 增量 |
+|---|---:|---:|---:|
+| text_compressor | 0% | **43.0%** | +43pp |
+| code_compressor | 0% | **26.0%** | +26pp |
+| diff_compressor | 0% | **53.7%** | +54pp |
+| compression_algorithms | 0% | **55.4%** | +55pp |
+| compress_queue | 36.7% | 38.1% | +1.4pp |
+| algo_scheduler | 20.5% | **38.8%** | +18pp |
+| smart_crusher | 10.5% | **57.3%** | +47pp |
+| llm_text_compressor | 0% | 20.9% | +21pp |
+| logs | 24.2% | **41.0%** | +17pp |
+| compaction_diag | 8.1% | 13.3% | +5pp |
+
+**未达 50% 目标的关键模块**（拖后腿，Phase 3 重点）：
+- `compaction_diag.py` (480 行, 13.3%) - IO 重，需要 mock 整个 session jsonl
+- `llm_text_compressor.py` (344 行, 20.9%) - LLM 真调路径未触发
+- `cli.py` (407 行, 46.9%) - subprocess 重，集成测试覆盖
+- `armor.py` (419 行, 50.8%) - 已接近目标
+
+**变更清单**：
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | feat | 新建 8 个测试文件: test_text_compressor / code_compressor / diff_compressor / compression_algorithms / algo_scheduler / smart_crusher / llm_text_compressor / compaction_diag |
+| A | feat | `conftest.py` 增 5 个 Phase 2 fixture: `sample_long_text` / `sample_repetitive_text` / `sample_code_python` / `sample_diff` / `mock_llm_response` |
+| A | feat | `test_compress_queue.py` 充 5 测试: TestCompressQueueSingleton + TestCompressQueueStats |
+| A | feat | `test_logs.py` 充 7 测试: TestRotateHistoryFiles + TestRotateActionsLog + TestLoadSaveState |
+| A | fix | `test_compaction_diag.py` 加 `@pytest.mark.slow` 保护 `compaction_apply` (真改 openclaw.json) |
+| B | docs | `.learnings/ERRORS.md` 追 ERR-20260630-006 (手册 vs 实现 5 处差异) |
+
+**遇到的关键问题**（详见 ERR-20260630-006）：
+1. algo_scheduler `_should_use_llm` 由 env var 决定, 改 env 需 reload module
+2. `MARK42_TEXT_USE_LLM` 而非 `_TEXT_USE_LLM` (手册 env var 名字错)
+3. small bucket 默认 action='skip' (手册说 'compress', 错了)
+4. compress_queue 全局单例, max_workers 仅首次生效
+5. llm_text_compressor 短文本 passthrough 看 status 字段, 不是 mode
+
+**Phase 3 候选 (50% → 60% 路径)**：
+- [ ] compaction_diag 13.3% → 50%: 需 mock session jsonl, 写 15-20 测试
+- [ ] llm_text_compressor 20.9% → 50%: 需 mock LLM client, 写 10-15 测试
+- [ ] cli 46.9% → 60%: 集成测试
+- [ ] armor 50.8% → 70%: 路径覆盖
+
+---
+
 ## 2026-06-26 #2 — v2.3.3 Phase 2 收口：P2-5 词典扩展 + P2-6 性能基准 + 运行时竞态修复
 
 **背景**：继续推进 Phase 2 时，先完成 `text_compressor` 词典扩展与性能基准脚本，再对已完成部分做严格复审。复审中实际发现了 3 类问题：过激词典替换误伤语义、性能基准口径/方法不严谨、Mark42 session 发现逻辑存在文件锁竞态。以上均已修正并重新烟测。

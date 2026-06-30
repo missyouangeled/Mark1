@@ -68,3 +68,61 @@ class TestCompressQueuePriority:
             assert r2._enqueued_at - r1._enqueued_at >= 0.001
         finally:
             q.shutdown()
+
+
+class TestCompressQueueSingleton:
+    """get_compress_queue() 工厂测试群 (Phase 2 补充)。"""
+
+    def test_get_singleton_default(self):
+        from mark42_modules import compress_queue
+        q1 = compress_queue.get_compress_queue()
+        q2 = compress_queue.get_compress_queue()
+        # 默认 max_workers=2 应该是同对象
+        assert q1 is q2
+        compress_queue.shutdown_compress_queue()
+
+    def test_get_different_workers_keeps_singleton(self):
+        """get_compress_queue 是单例, max_workers 仅首次生效。
+
+        实际实现: 全局 _instance, 已存在时直接返回, 不重建。
+        手册原话"不同 workers = 不同对象" 与实际不符, 按实际契约测。
+        """
+        from mark42_modules import compress_queue
+        q1 = compress_queue.get_compress_queue(max_workers=1)
+        q2 = compress_queue.get_compress_queue(max_workers=4)
+        # 单例: 同对象
+        assert q1 is q2
+        # 首次参数生效
+        assert q1.max_workers == 1
+        compress_queue.shutdown_compress_queue()
+
+    def test_get_starts_queue_lazily(self):
+        """get_compress_queue() 应自动 start() 队列。"""
+        from mark42_modules import compress_queue
+        q = compress_queue.get_compress_queue()
+        try:
+            # 入队不应报 "queue not started"
+            req = CompressRequest(content="x" * 200, session_id="lazy", priority=5)
+            assert q.enqueue(req) is True
+        finally:
+            compress_queue.shutdown_compress_queue()
+
+
+class TestCompressQueueStats:
+    """stats 字段测试群。"""
+
+    def test_stats_initial_zero(self):
+        q = CompressQueue(max_workers=1)
+        for k in ["enqueued", "processed", "failed", "dropped_queue_full"]:
+            assert q.stats[k] == 0
+
+    def test_enqueue_increments_counter(self):
+        q = CompressQueue(max_workers=1)
+        q.start()
+        try:
+            before = q.stats["enqueued"]
+            req = CompressRequest(content="x" * 200, session_id="s", priority=5)
+            q.enqueue(req)
+            assert q.stats["enqueued"] == before + 1
+        finally:
+            q.shutdown()
