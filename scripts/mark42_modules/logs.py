@@ -80,24 +80,33 @@ def rotate_actions_log() -> dict:
 def rotate_broker_events() -> dict:
     """若 broker events.jsonl >= MAX_BROKER_EVENTS_MB 则裁剪尾部。
     
-    【2026-06-30 全面审查 I 修复】原本是 size_mb <= MAX_BROKER_EVENTS_MB 才裁，
-    改为 <,留安全余量（10MB 临界不裁的问题）
+    【2026-06-30 全面审查 I 修复 v2】原本是 size_mb <= MAX_BROKER_EVENTS_MB 才裁，
+    改为 <,留安全余量（10MB 临界不裁的问题）。
+    
+    【2026-06-30 10:11 优化】keep_count 乘 0.9 SAFETY_FACTOR, 裁完 < 9MB。
+    原逻辑: size_mb=10, MAX/size=1.0, keep_count=100% 行, 裁完仍 10MB。
+    改后: keep_count=90% 行, 裁后 ~9MB, 留 10% 余量 (1MB) 足够兼容即将产生的新事件。
     """
+    SAFETY_FACTOR = 0.9
     if not MARK42_BROKER_EVENTS.exists():
         return {"trimmed": 0, "note": "无 broker 事件"}
     try:
         size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
         if size_mb < MAX_BROKER_EVENTS_MB:
             return {"sizeMB": round(size_mb, 2), "trimmed": 0}
-        # 保留尾部的量 = 总行数 * (MAX_BROKER_EVENTS_MB / size_mb)
+        # 保留尾部的量 = 总行数 * (SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb)
+        # SAFETY_FACTOR=0.9 是保证裁后 < 9MB (留 1MB 余量) 而不是 10MB 临界
         with open(MARK42_BROKER_EVENTS, "r") as f:
             lines = f.readlines()
-        keep_count = max(100, int(len(lines) * MAX_BROKER_EVENTS_MB / size_mb))
+        keep_count = max(100, int(len(lines) * SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb))
         kept = lines[-keep_count:]
         with open(MARK42_BROKER_EVENTS, "w") as f:
             f.writelines(kept)
-        return {"sizeMB": round(size_mb, 2), "trimmed": len(lines) - len(kept),
-                "kept": len(kept)}
+        # 实际裁后大小 (读回再算)
+        post_size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
+        return {"sizeMB": round(size_mb, 2), "postSizeMB": round(post_size_mb, 2),
+                "trimmed": len(lines) - len(kept), "kept": len(kept),
+                "safetyFactor": SAFETY_FACTOR}
     except OSError:
         return {"trimmed": 0, "error": "IO 错误"}
 
