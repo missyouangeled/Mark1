@@ -13,16 +13,18 @@
 
 ---
 
-## 〇、当前真实状态（2026-07-01 重写版）
+## 〇、当前真实状态（2026-07-01 重写版，07:50 二次修正）
 
 > **本节是重写重点**。原 §〇 数字停在 6/17（55% 完成度、20 个假 Loop），与 6/30 实际收官严重脱节。
-> 以下数字均来自 6/30 真生产审计 + Phase 2 收官 + 6 commits 推送。
+> 以下数字均来自 6/30 真生产审计 + Phase 2 收官 + 6 commits 推送 + **7/01 07:42 严格实测验证**。
+>
+> **7/01 07:42 二次修正**：点点 07:23 指出"55% 是错觉 + LLM 集成隐患"，AI 严格检查后**主动修正 9 处错误数字**（3 处表、3 处 ERR-004 笔误、2 处覆盖、1 处 model 名）— 详见 [§〇·7 错误纠正记录](#零·7-错误纠正记录-7月01-07-50)。
 
 ### 〇·1 三模块闭环
 
 | 模块 | 6/17 状态 | **6/30 实际** |
 |---|---|---|
-| Armor 铠甲 | LLM 链路通、未自动注入 | ✅ LLM 压缩 + 智能估算 + 异步队列闭环，**preBytes/postBytes/bytesSaved 全审计** |
+| Armor 铠甲 | LLM 链路通、未自动注入 | ✅ LLM 压缩 + 智能估算 + 异步队列闭环，**preBytes/postBytes/bytesSaved 全审计**。7/01 07:43 实测：LLM `MiniMax-M3` 真调通（327 次真生产成功 / 102 次 heuristic fallback，LLM 成功率 76%） |
 | Engine 引擎 | daemon 未启动、20 个假 Loop | ✅ 2 daemon 真跑，4 Loop 全部 registered（context-guard cycle=4 / health-watch / model-fallback / memory-index），watchdog 保活 |
 | Heavy 重型 | 设计有、自动执行空 | ✅ **heavy_execute 真启 Popen 进程**（dry-run 护栏，--execute-now 才真跑） |
 
@@ -37,7 +39,7 @@
 | 指标 | 6/17 | **6/30 Phase 2 收官** |
 |---|---:|---:|
 | 测试数 | 0 | **315** |
-| 整体覆盖 | 0% | **54.7%** |
+| 整体覆盖 | 0% | **53.0%** |
 | 串行耗时 | — | 42.7s |
 | 失败 | — | 0 |
 | ERRORS 累计 | 0 | 7 条（已沉淀到 .learnings/ERRORS.md） |
@@ -90,6 +92,36 @@
 
 ---
 
+### 〇·7 错误纠正记录（7/01 07:50）
+
+> **7/01 07:42 点点指令**："不许瞎编瞎猜。严格检查每项功能。给整体结论。"
+> AI 严格检查后发现**9 处错误数字/引用**（以下全部 7/01 07:50 修正）：
+
+| 错处 | 原文 | 修正后 | 验证 |
+|---|---|---|---|
+| E1 | 54.7% 覆盖 (7 处重复) | **53.0%** | pytest 实测 7/01 07:42 |
+| E2 | 上下文 5.6-9.5% | **5.8%** | armor_check() 7/01 07:43 |
+| E3 | armor 23.5M 内存 | **armor 12.7M / engine 23.9M** | systemctl 实测 |
+| E4 | DeepSeek API | **MiniMax-M3 via litellm/Agnes** | _llm_meta 实读 7/01 07:43 |
+| E5 | ERR-004 路径硬编码 (3 处) | **删 ERR-004**（该 ERR 不存在）/ 路径已修 | 7/01 改 SCRATCH + test_config.py |
+| E6 | "上下文 7-9%" 历史记忆 | **5.8% (7/01 07:43)** | armor_check() 实测 |
+| E7 | "LLM 路径未在生产验证" | **LLM 76% 成功率 / 327 次真跑** | broker metadata 实统计 |
+| E8 | armor 23.5M / engine 12.5M 错置 | 同 E3 | 同 E3 |
+| E9 | "session_fence 腐烂" | **设计断裂**（fence 从未接 armor，0 引用） | grep 实查 |
+
+**最关键发现**：
+- **"ERR-004" 根本不存在** — 5 个文档都引用错的 ERR 编号，是笔误传染
+- **LLM 集成不是"待验证"，是主路径**（76% 走 LLM 成功）
+- **"完成度 35% 错觉"** 是基于错误记忆估算，实际**加权完成度 42%**
+
+**避免再犯**：
+- 任何"完成度"数字必须基于实测，不基于历史/记忆
+- 任何"ERR-XXX"引用必须先 `grep .learnings/ERRORS.md` 验证
+- 任何"上下文 X%"必须用 `armor_check()` 实调，不写历史值
+- 任何"model Y"必须查 `_llm_meta` 或 openclaw.json，不写历史默认值
+
+---
+
 ## 一、逐项诊断 & 应对方案
 
 > **7/01 更新**：A/B/C/D/E/F 项 6/30 之前都已修完。当前未完成项只剩 G（Loop 模板热加载，低优先级）。H 项已修。
@@ -97,7 +129,7 @@
 
 ### ✅ A. 铠甲智能压缩（Armor smart-compress）— [已修 2026-06-30]
 
-**原 6/17 现状**：`_llm_analyze()` 已实现 DeepSeek API 调用，`armor_compress()` 已走 LLM→启发式回退链路。**唯一缺口：压缩后未自动注入 memory-index 到系统提示词**。
+**原 6/17 现状**：`_llm_analyze()` 已实现 LLM API 调用（7/01 实测为 `MiniMax-M3` via litellm/Agnes,非 DeepSeek），`armor_compress()` 已走 LLM→启发式回退链路。**唯一缺口：压缩后未自动注入 memory-index 到系统提示词**。
 
 **6/30 修复**：LLM 链路 + 智能估算 + 异步队列全闭环，**preBytes/postBytes/bytesSaved 全审计**。J 项修复把 action_entry 移到 compact 之后，同步真值。压缩主流程：`armor_check → armor_compress → mark42.armor.compress.done broker 事件 → engine context-guard 收到 → audit`。
 
@@ -169,7 +201,7 @@
 **6/30 修复**：
 - 智能估算逻辑上线（不是简单按 jsonl size 算）
 - A 项修复后,armor_compress 全链路闭环
-- 真生产状态：上下文 5.6-9.5% 区间（远低于 70% 阈值）
+- 真生产状态：上下文 5.8%（7/01 07:43 实测，远低于 70% 阈值）
 - 真压缩节省 17.9%（678KB → 557KB, 16:30 P0 修复后第一次真压）
 
 **现状态**：✅ F 已修。**当前铠甲处于健康状态，无 false alarm。**
@@ -218,11 +250,11 @@
 | # | 缺口 | 6/16 严重度 | **7/01 状态** | 说明 |
 |---|------|:---:|:---:|------|
 | 1 | ~~核心功能未闭环~~ | ~~🔴~~ | ✅ **已修** | A/B/C 三项 + 12 审查问题全部修完 |
-| 2 | ~~零测试~~ | ~~🔴~~ | ✅ **已修** | 315 测试 / 54.7% 覆盖（Phase 2 收官）。待 Phase 3 推到 60%+ |
+| 2 | ~~零测试~~ | ~~🔴~~ | ✅ **已修** | 315 测试 / 53.0% 覆盖（Phase 2 收官）。待 Phase 3 推到 60%+ |
 | 3 | **无安装器** | 🟡 | 🟡 | 没有 pip install / deb / docker / 一键脚本 — **阶段 2 P0** |
 | 4 | **无配置向导** | 🟡 | 🟡 | 用户不知道怎么配 context window 大小、阈值、Loop 参数 — **阶段 2 P0** |
 | 5 | **错误处理粗糙** | 🟡 | 🟡 | 大部分函数只有 print + return，没有 try/except、没有 rollback — **阶段 2 P1** |
-| 5+ | 🔄 **路径硬编码** | — | 🔴 | SCRATCH=/mnt/data 写死 (ERR-004) — **非点点机器无法跑** — 阶段 2 P0 |
+| 5+ | 🔄 **路径硬编码** | — | ✅ **7/01 已修** | SCRATCH 加 `MARK42_SCRATCH` env 路由 + 不存在时回退 `~/.local/state/openclaw/scratch`，+9 单测 (test_config.py) |
 
 ### 用户体验层
 
@@ -355,7 +387,7 @@
 
 **进度**（2026-07-01）：**阶段 1 任务全部核心达成，超出原路线图预期**。
 **额外收获**（原路线图没列）：
-- 315 个测试 / 54.7% 覆盖（Phase 2 收官）
+- 315 个测试 / 53.0% 覆盖（Phase 2 收官）
 - 7 条 ERRORS 沉淀
 - 6 个 commit 全部推送到 GitHub
 - Phase 3 路线 + 执行手册 写定
@@ -372,7 +404,7 @@
 ├── 🔴 **P0**：制作一键安装脚本（bash install.sh — 1 个命令拉起）
 ├── 🔴 **P0**：Mark42 配置向导（mark42.py --init 交互式）
 ├── 🟠 **P1**：依赖与可移植性审计
-│      - SCRATCH 路径硬编码 /mnt/data (ERR-004) — **必修**
+│      - ~~SCRATCH 路径硬编码 /mnt/data~~ — **7/01 已修**（加 `MARK42_SCRATCH` env 路由 + XDG_STATE fallback）
 │      - Python 版本要求 / 系统包依赖列表
 │      - systemd vs 直接启动两种模式
 ├── 🟠 **P1**：基础错误处理 + 用户友好的错误信息
@@ -462,7 +494,7 @@
 - ❌ 错误信息对人不友好 — print 占多数
 - ❌ 没有"5 分钟跑通"的最小路径
 
-**结论**：**阶段 2 是当前最高优先级**，不是阶段 3（测试已经 54.7%，不是最缺的事）。
+**结论**：**阶段 2 是当前最高优先级**，不是阶段 3（测试已经 53.0%，不是最缺的事）。
 
 ### 重写后的阶段时间线预估
 
@@ -533,7 +565,7 @@ class ArmorOptimizer:
 > Mark42 是一个让 AI 助手不再「聊着聊着就忘了」的上下文管理引擎。
 > 它能独立运行，也能和其他 AI 平台集成。
 > **当前状态：阶段 1 收官（超预期），阶段 2 待启动**。
-> 三模块（Armor / Engine / Heavy）全部闭环 + 315 测试 / 54.7% 覆盖 + 12 个审查问题全修 + 6 commits 推送。
+> 三模块（Armor / Engine / Heavy）全部闭环 + 315 测试 / 53.0% 覆盖 + 12 个审查问题全修 + 6 commits 推送。
 > 目标市场：所有重度使用 AI 对话的开发者、创作者、团队。
 > 商业模式：Freemium（基础功能免费，智能压缩 + 自动化 Pro 版 $9/月）。
 
@@ -551,7 +583,7 @@ class ArmorOptimizer:
 - ✅ 4 个 Loop 模板全部上线（context-guard / health-watch / model-fallback / memory-index）
 - ✅ LLM 智能压缩链路真跑（16:30 一次真压缩节省 17.9%）
 - ✅ **12 个审查问题全修**（🔴 H + 🟠 I/J/K + 🟡 8 个）
-- ✅ **测试体系**：315 个测试 / **54.7% 覆盖** / 42.7s / 0 失败
+- ✅ **测试体系**：315 个测试 / **53.0% 覆盖** / 42.7s / 0 失败
 - ✅ **6 commits 推送**到 `github.com:missyouangeled/Mark1.git` master 分支
 - ✅ ERRORS 沉淀 7 条（`.learnings/ERRORS.md`）
 - ✅ watchdog 5min 巡检 + 4 Loop 状态检查
@@ -562,7 +594,7 @@ class ArmorOptimizer:
 
 - ❌ 无安装器（install.sh 未写）
 - ❌ 无 Quick Start 文档
-- ❌ SCRATCH 路径硬编码 /mnt/data（ERR-004）
+- ✅ ~~SCRATCH 路径硬编码 /mnt/data~~（7/01 已修，+ `MARK42_SCRATCH` env 路由）
 - ❌ 无配置向导（mark42.py --init）
 - ❌ 错误处理粗糙（print + return 占多数）
 - ❌ 无用户验证（仅点点 1 人用）
@@ -570,7 +602,7 @@ class ArmorOptimizer:
 **阶段 3 / 4**：未启动。
 
 **Phase 3 路线**（测试体系）：✅ **已写定** — 见 [`mark42-Phase3路线-20260630.md`](./mark42-Phase3路线-20260630.md)
-- 目标：315 → ~395 测试，54.7% → ~63% 覆盖
+- 目标：315 → ~395 测试，53.0% → ~63% 覆盖
 - 4 大目标：algo_scheduler P0 / llm_text_compressor P0 / cli+armor+engine / 小模块扫尾
 - 预估 15-22h 工时，1-2 周
 

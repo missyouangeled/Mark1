@@ -29,10 +29,16 @@ def _conf_save_json(path: Path, data: dict) -> None:
 
 WORKSPACE = Path(__file__).resolve().parent.parent.parent
 SCRIPTS = WORKSPACE / "scripts"
-SCRATCH = Path("/mnt/data/openclaw/scratch")
 
 XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
+
+# SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
+# 优先级：MARK42_SCRATCH env > /mnt/data/openclaw/scratch > XDG_STATE fallback
+# 避免非点点机器 /mnt/data 不存在时 hard-fail
+SCRATCH = Path(os.environ.get("MARK42_SCRATCH", "/mnt/data/openclaw/scratch"))
+if not SCRATCH.parent.parent.exists():
+    SCRATCH = XDG_STATE / "openclaw" / "scratch"
 
 # 数据盘路径（优先 /mnt/data，回退 ~/.local/state）
 DATA_ROOT = Path("/mnt/data/openclaw/mark42")
