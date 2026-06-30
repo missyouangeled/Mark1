@@ -25550,11 +25550,11 @@ mocker.patch.object(armor, "armor_check", return_value={
 - 如果任何一步是 `# TODO` / `pass` / silent noop → 整条链路都是死的
 - 写一个 **e2e 集成测试**,真跑真后台真状态更新,跑通了再 commit
 
-## [ERR-20260630-006] Phase 2 手册 vs 实际实现差异（5 处）
+## [ERR-20260630-007] Phase 2 手册 vs 实际实现差异（5 处）
 
 **Logged**: 2026-06-30T11:30:00+08:00
 **Priority**: low
-**Status**: resolved
+**Status**: resolved (2026-06-30 15:40)
 **Area**: docs-vs-impl / mark42-testing
 
 ### Summary
@@ -25597,3 +25597,14 @@ Phase 2 路线 / 执行手册是 2026-06-29 写的，到 6/30 开干时手册和
 - Phase 2 路线: docs/design/mark42-Phase2路线-20260629.md
 - 执行手册: docs/design/mark42-Phase2执行手册-20260629.md
 - 阶段小结: memory/daily/2026-06-30.md (后续补)
+
+### 修复 (2026-06-30 15:40)
+5 处不符已在以下位置详述 + 修正:
+- 执行手册: `docs/design/mark42-Phase2执行手册-20260629.md` 附录 16 (1194 行)
+  - 差异 #1: _should_use_llm 决策依据 (env var 不是关键词)
+  - 差异 #2: decide() small bucket 默认 action='skip'
+  - 差异 #3: env var 名 MARK42_TEXT_USE_LLM 不是 _TEXT_USE_LLM
+  - 差异 #4: compress_queue 全局单例, max_workers 仅首次生效
+  - 差异 #5: llm_text_compressor mode 字段 vs status 字段
+- 路线: `docs/design/mark42-Phase2路线-20260629.md` 附录 A (6/30 收成 + Phase 3 候选)
+- 错误日志: 本文件 ERR-20260630-007 (重号修正: 原本误用 006, 已改 007)

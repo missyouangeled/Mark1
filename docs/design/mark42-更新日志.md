@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-06-30 #4 — Phase 2 拖后腿模块补完 + 手册修正
+
+**背景**：上条 (#3) 留下 compaction_diag 13.3% + llm_text_compressor 20.9% 两个拖后腿, 本次补到目标。同期修手册 5 处 vs 实现不符。
+
+**目标达成度**：
+- 测试数: 274 → **315** (+41)
+- 整体覆盖: 45.8% → **54.7%** (+8.9pp, **超 50% 目标 +4.7pp**)
+- 耗时: 44.0s
+
+**重点模块变化**：
+
+| 模块 | 起点 | 现在 | 增量 |
+|---|---:|---:|---:|
+| compaction_diag | 13.3% | **54.6%** | **+41.3pp** ✅ |
+| llm_text_compressor | 22.7% | **40.1%** | +17.4pp |
+| compress_queue | 38.1% | 42.2% | +4.1pp |
+| cli | 46.9% | 46.9% | 0 |
+| armor | 50.8% | 50.8% | 0 |
+
+**变更清单**：
+
+| # | 类型 | 内容 |
+|:---|:---:|------|
+| A | feat | `test_compaction_diag.py` 增 27 测试 (45 -> 72): TestDualThresholdCheck / TestIsolationCheck / TestTokenAwareCheck / TestProbeQualityCheck / TestDriftCheck / TestCompactionApply (P0 slow) / TestGetContextWindow / TestGetCompactionConfig。新增 `_fake_sessions_dir` fixture 填充假 session jsonl |
+| A | feat | `test_llm_text_compressor.py` 增 14 测试 (13 -> 27): TestCompressWithMockedLLM (7) / TestCallLLM (4) / TestFallback (1) / TestLLMTextCompressAsyncFull (2)。覆盖 LLM 成功/失败/超时/空返/低压缩率/超压缩/截断 7 条路径 |
+| A | fix | `_check_value` 测试加 too_low 路径 |
+| A | fix | `llm_text_compressor.llm_text_compress` 测试对 over-compressed 边界调整 (压缩率 5%-98% 区间) |
+| B | docs | `mark42-Phase2执行手册-20260629.md` 附录 16 详述 5 处手册 vs 实际不符 (#1-#5) |
+| B | docs | `mark42-Phase2路线-20260629.md` 附录 A 记录 6/30 实际收成 + Phase 3 候选 |
+| B | docs | `.learnings/ERRORS.md` ERR-20260630-007 加修复说明 (重号修正: 原本 006, 改 007) + 手册附录链接 |
+
+**关键决策**：
+- 手册主章节 (1-15) **不动**, 只在附录 16 加差异说明 — 保持"复制粘贴可用"特性
+- llm_text_compressor 40.1% 留 10pp 缺口: 接入 urllib 详情无业务价值, 不补
+- compaction_apply 测试加 `@pytest.mark.slow` (P0 安全: 真改 openclaw.json)
+
+**Phase 3 候选 (50% → 60% 路径)**：
+- [ ] llm_text_compressor 40% → 50% (mock LLM client 完整路径)
+- [ ] cli 47% → 60% (集成测试)
+- [ ] armor 51% → 70% (路径覆盖)
+- [ ] algo_scheduler 39% → 60% (process 完整路径)
+
+---
+
 ## 2026-06-30 #3 — Phase 2 单测全面开干：8 个压缩子模块 + 日志
 
 **背景**：按 `mark42-Phase2路线-20260629.md` 和 `mark42-Phase2执行手册-20260629.md` 开干。已写好的手册是 6/29 完成的，本次仅补测试不重写文档。

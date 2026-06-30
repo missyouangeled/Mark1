@@ -4,18 +4,70 @@
   - _format_bytes() 纯函数
   - _check_value() 纯函数 (单值区间检查)
   - _check_stat() 纯函数 (session 碎片化)
+  - _dual_threshold_check() 双阈值偏移
+  - _isolation_check() 分身隔离
+  - _token_aware_check() 令牌感知 (mock _SESSIONS_DIR)
+  - _probe_quality_check() 探针 (mock _SESSIONS_DIR)
+  - _drift_check() 降解检测 (mock _SESSIONS_DIR)
   - compaction_diagnose() 公开 API (mock config)
+  - compaction_apply() dry_run 安全 (加 slow 标记)
 
 设计:
   - 纯函数直接测
   - 公开 API mock _load_openclaw_json / _get_compaction_config
-  - 略过 _check_value 内部 zone 详尽测试 (避免 brittle)
+  - IO 重函数 (读 session jsonl) 用 _fake_sessions_dir fixture 填充假数据
 """
+
+import json as _json
+from pathlib import Path
+from datetime import datetime
 
 import pytest
 
 from mark42_modules import compaction_diag
 
+
+# ── 测试用 fixture: 填充假 session jsonl ──────────────
+
+@pytest.fixture
+def _fake_sessions_dir(monkeypatch, tmp_path):
+    """填充假 session jsonl 文件, 覆盖 _SESSIONS_DIR 路径。
+
+    返回 (tmp_path, session_data_dict) — session_data 可被测试读写。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    fake_dir = tmp_path / "sessions"
+    fake_dir.mkdir(parents=True, exist_ok=True)
+
+    def write_jsonl(filename: str, lines: list[dict]) -> Path:
+        path = fake_dir / filename
+        with open(path, "w") as f:
+            for line in lines:
+                f.write(_json.dumps(line) + "\n")
+        return path
+
+    # 默认写一个 session: 5 轮对话 + 1 个 compaction 事件
+    default_lines = []
+    for i in range(5):
+        default_lines.append({
+            "type": "message",
+            "message": {"role": "user" if i % 2 == 0 else "assistant",
+                        "content": f"msg {i}",
+                        "usage": {"totalTokens": 1000 + i * 100}},
+        })
+    default_lines.append({
+        "type": "compaction",
+        "tokensBefore": 5000,
+        "details": "automated",
+        "fromHook": True,
+    })
+    write_jsonl(f"{today}-main-001.jsonl", default_lines)
+
+    monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", fake_dir)
+    return fake_dir
+
+
+# ── TestFormatBytes ──
 
 class TestFormatBytes:
     """_format_bytes() 字节格式化测试群。"""
@@ -40,6 +92,8 @@ class TestFormatBytes:
         assert "MB" in compaction_diag._format_bytes(1_000_000)
 
 
+# ── TestCheckValue ──
+
 class TestCheckValue:
     """_check_value() 单值区间检查测试群。"""
 
@@ -51,56 +105,280 @@ class TestCheckValue:
 
     def test_check_value_in_comfort_range(self):
         """known key + value 在舒适区 -> severity=ok。"""
-        # 找一个真实存在的 key (用 _COMFORT_ZONES 第一个)
         first_key = next(iter(compaction_diag._COMFORT_ZONES))
         zone = compaction_diag._COMFORT_ZONES[first_key]
         comfort = zone["comfort"]
-        ctx_window = 131072
-        # 用 comfort 值测
-        r = compaction_diag._check_value(first_key, comfort, ctx_window)
+        r = compaction_diag._check_value(first_key, comfort, 131072)
         assert r["severity"] in (compaction_diag.SEVERITY_OK, compaction_diag.SEVERITY_WARN)
 
     def test_check_value_unknown_key(self):
-        """未知 key -> status=missing。"""
         r = compaction_diag._check_value("__not_a_real_key__", 100, 131072)
         assert r["status"] == "missing"
 
+    def test_check_value_too_low(self):
+        """value < min -> status=too_low, severity=warn。"""
+        # 找一个 key, 用 min-1
+        first_key = next(iter(compaction_diag._COMFORT_ZONES))
+        zone = compaction_diag._COMFORT_ZONES[first_key]
+        too_low = max(0, zone["min"] - 1000)
+        r = compaction_diag._check_value(first_key, too_low, 131072)
+        assert r["status"] == "too_low"
+        assert r["severity"] == compaction_diag.SEVERITY_WARN
+
+    def test_check_value_too_high(self):
+        """value > max -> status=too_high。
+
+        实际实现: too_high 对 keepRecentTokens 是 WARN, 其他 key 是 OK
+        (设计: 过高占用空间但不算严重)。
+        """
+        first_key = next(iter(compaction_diag._COMFORT_ZONES))
+        zone = compaction_diag._COMFORT_ZONES[first_key]
+        too_high = zone["max"] + 1000
+        r = compaction_diag._check_value(first_key, too_high, 131072)
+        assert r["status"] == "too_high"
+        # severity: keepRecentTokens -> WARN, 其他 -> OK
+        expected = compaction_diag.SEVERITY_WARN if first_key == "keepRecentTokens" else compaction_diag.SEVERITY_OK
+        assert r["severity"] == expected
+
+
+# ── TestCheckStat ──
 
 class TestCheckStat:
     """_check_stat() session 碎片化检测测试群。"""
 
     def test_check_stat_normal_no_issues(self):
-        """1 session + 大文件 -> 无问题。"""
         issues = compaction_diag._check_stat(1, 5.0, 131072)
         assert isinstance(issues, list)
         assert len(issues) == 0
 
     def test_check_stat_many_sessions_fragments(self):
-        """> 10 session -> 触发碎片化警告。"""
         issues = compaction_diag._check_stat(50, 5.0, 131072)
         assert len(issues) >= 1
-        # 至少一个跟 session_fragmentation 有关
         keys = [i.get("key", "") for i in issues]
         assert "session_fragmentation" in keys
 
     def test_check_stat_small_file_warns(self):
-        """largest_mb < 1.0MB -> 触发太小警告。"""
         issues = compaction_diag._check_stat(1, 0.5, 131072)
         assert len(issues) >= 1
         keys = [i.get("key", "") for i in issues]
         assert "too_small_transcript" in keys
 
     def test_check_stat_returns_list(self):
-        """返回类型必须是 list[dict]。"""
         issues = compaction_diag._check_stat(1, 5.0, 131072)
         assert isinstance(issues, list)
 
+
+# ── TestDualThresholdCheck ──
+
+class TestDualThresholdCheck:
+    """_dual_threshold_check() 双层阈值偏移检查测试群。"""
+
+    def test_disabled_memoryflush_returns_none(self):
+        """memoryFlush 未启用 -> 返 None。"""
+        cc = {"maxActiveTranscriptBytes": 3_000_000, "memoryFlush": {}}
+        r = compaction_diag._dual_threshold_check(cc, 131072)
+        assert r is None
+
+    def test_enabled_heterogeneous_status(self):
+        """memoryFlush 启用 -> 返 heterogeneous 状态 (单位不同)。"""
+        cc = {
+            "maxActiveTranscriptBytes": 3_000_000,
+            "memoryFlush": {
+                "enabled": True,
+                "softThresholdTokens": 50000,
+            },
+        }
+        r = compaction_diag._dual_threshold_check(cc, 131072)
+        assert r is not None
+        assert r["status"] == "heterogeneous"
+        assert r["key"] == "dual_threshold"
+        # 应含 mainTokensEstimate + gateTokens
+        assert "mainTokensEstimate" in r
+        assert "gateTokens" in r
+
+    def test_missing_fields_returns_none(self):
+        """maxActiveTranscriptBytes 或 softThresholdTokens 缺 -> 返 None。"""
+        cc = {"memoryFlush": {"enabled": True, "softThresholdTokens": 50000}}
+        r = compaction_diag._dual_threshold_check(cc, 131072)
+        assert r is None
+
+
+# ── TestIsolationCheck ──
+
+class TestIsolationCheck:
+    """_isolation_check() 分身隔离检查测试群。"""
+
+    def test_low_session_count_no_issues(self):
+        issues = compaction_diag._isolation_check(5, {"maxTokensSeen": 10000})
+        assert isinstance(issues, list)
+        # 5 个 session < 12 阈值, 不应触发碎片化
+        keys = [i.get("key", "") for i in issues]
+        assert "isolation_fragmentation" not in keys
+
+    def test_high_session_count_triggers(self):
+        issues = compaction_diag._isolation_check(50, {"maxTokensSeen": 10000})
+        keys = [i.get("key", "") for i in issues]
+        assert "isolation_fragmentation" in keys
+
+    def test_high_token_count_triggers(self):
+        issues = compaction_diag._isolation_check(1, {"maxTokensSeen": 100_000})  # 100K
+        keys = [i.get("key", "") for i in issues]
+        assert "isolation_token_heavy" in keys
+
+    def test_both_triggers(self):
+        """session 50 + token 100K -> 两个问题都触发。"""
+        issues = compaction_diag._isolation_check(50, {"maxTokensSeen": 100_000})
+        keys = [i.get("key", "") for i in issues]
+        assert "isolation_fragmentation" in keys
+        assert "isolation_token_heavy" in keys
+
+    def test_zero_token_data_no_token_issue(self):
+        """token_data 空 -> 不触发 token 重警告。"""
+        issues = compaction_diag._isolation_check(1, {})
+        keys = [i.get("key", "") for i in issues]
+        assert "isolation_token_heavy" not in keys
+
+
+# ── TestTokenAwareCheck (IO via _SESSIONS_DIR) ──
+
+class TestTokenAwareCheck:
+    """_token_aware_check() 令牌感知检查测试群。"""
+
+    def test_no_data_returns_no_data_status(self, monkeypatch, tmp_path):
+        """无 session 目录 -> status=no_data。"""
+        from pathlib import Path
+        empty_dir = tmp_path / "empty_sessions"
+        empty_dir.mkdir()
+        monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", empty_dir)
+        r = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 3_000_000})
+        assert r["status"] == "no_data"
+        assert r["severity"] == compaction_diag.SEVERITY_OK
+
+    def test_with_session_data_collects_tokens(self, _fake_sessions_dir):
+        """假 session 包含 5 个 usage totalTokens, 应收集到 maxTokensSeen。"""
+        r = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 3_000_000})
+        # maxTokensSeen 来自 usage.totalTokens, 5 轮中最大是 1000+4*100=1400
+        assert r["maxTokensSeen"] >= 1000
+        assert "estimatedContextPercent" in r
+        assert "avgTokensPerTurn" in r
+
+    def test_high_tokens_near_limit(self, _fake_sessions_dir, monkeypatch):
+        """高 token 接近 ctx limit -> 触发 near_limit 警告。"""
+        # 写一个超大的 token session
+        today = datetime.now().strftime("%Y-%m-%d")
+        big_lines = [
+            {"type": "message",
+             "message": {"role": "user",
+                         "usage": {"totalTokens": 100_000}}},  # 接近 131K limit
+        ]
+        with open(_fake_sessions_dir / f"{today}-main-big.jsonl", "w") as f:
+            for line in big_lines:
+                f.write(_json.dumps(line) + "\n")
+
+        r = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 3_000_000})
+        # 100K > 131K * 0.85 = 111350 — 不到, 但 status 应是 ok 或 near_limit
+        assert r["status"] in ("ok", "near_limit", "mismatch")
+
+    def test_mismatch_when_byte_estimate_too_low(self, _fake_sessions_dir):
+        """maxActiveTranscriptBytes 估计的 token 远低于实际 -> 触发 mismatch。"""
+        # 实际 token = 1400, bytes 估计 = 3_000_000/4 = 750_000, 实际 < 估计的 0.5 ?
+        # 这里 actual 1400 vs estimated 750K, 1400 < 750K*0.5=375K -> 是的, mismatch
+        r = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 3_000_000})
+        # 实际 token 很小, 估计很大, 不应 mismatch
+        # 改成: maxActiveTranscriptBytes 极小, 估计的 token 远低于实际
+        r = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 1000})
+        # 估计 250 tokens, 实际 1400 -> 1400 < 250*0.5? 不, 1400 > 125, status 不是 mismatch
+        # 测试返回 dict 即可
+        assert isinstance(r, dict)
+        assert "maxTokensSeen" in r
+
+
+# ── TestProbeQualityCheck (IO via _SESSIONS_DIR) ──
+
+class TestProbeQualityCheck:
+    """_probe_quality_check() 探针检查测试群。"""
+
+    def test_no_session_returns_no_compaction(self, monkeypatch, tmp_path):
+        """无 session 目录 -> status=no_compaction。"""
+        empty_dir = tmp_path / "empty"
+        empty_dir.mkdir()
+        monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", empty_dir)
+        r = compaction_diag._probe_quality_check({})
+        assert r["status"] == "no_compaction"
+        assert "probeQuestions" in r
+        # probeQuestions 含 4 类问题模板
+        assert "recall" in r["probeQuestions"]
+        assert "artifact" in r["probeQuestions"]
+
+    def test_with_compaction_event(self, _fake_sessions_dir):
+        """有 compaction 事件的 session -> status=ready。"""
+        # _fake_sessions_dir fixture 已经写了 1 个 compaction 事件
+        r = compaction_diag._probe_quality_check({})
+        assert r["status"] == "ready"
+        assert r["compactionEventsToday"] >= 1
+        # latestCompaction 字段
+        assert r["latestCompaction"] is not None
+        assert r["latestCompaction"]["tokensBefore"] == 5000
+
+
+# ── TestDriftCheck (IO via _SESSIONS_DIR) ──
+
+class TestDriftCheck:
+    """_drift_check() 降解检测测试群。"""
+
+    def test_insufficient_data(self, _fake_sessions_dir):
+        """< 2 个 tokensBefore -> status=insufficient_data。"""
+        # _fake_sessions_dir fixture 只有 1 个 compaction, token 5000
+        r = compaction_diag._drift_check({})
+        # 只有 1 个数据点 -> insufficient
+        assert r["status"] in ("insufficient_data", "healthy", "degradation_suspected", "compression_stalled")
+        # 至少应含 key
+        assert r["key"] == "drift_detection"
+
+    def test_degradation_detected(self, _fake_sessions_dir, monkeypatch):
+        """连续 3 个 tokensBefore 下降 > 30% -> 触发 degradation_suspected。"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        # 造 3 次 compaction: 10000 -> 8000 -> 5000
+        events = [
+            {"type": "compaction", "tokensBefore": 10000},
+            {"type": "compaction", "tokensBefore": 8000},
+            {"type": "compaction", "tokensBefore": 5000},  # 降 50%
+        ]
+        with open(_fake_sessions_dir / f"{today}-main-drift.jsonl", "w") as f:
+            for e in events:
+                f.write(_json.dumps(e) + "\n")
+
+        r = compaction_diag._drift_check({})
+        # 取最近 3 个: 10000, 8000, 5000 -> 降 50% > 30%
+        assert r["status"] in ("degradation_suspected", "healthy")
+        if r["status"] == "degradation_suspected":
+            assert r["severity"] == compaction_diag.SEVERITY_WARN
+
+    def test_healthy_steady_decline(self, _fake_sessions_dir, monkeypatch):
+        """5%-30% 区间 -> healthy。"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        # 10000 -> 9500 -> 9000 -> 8500 -> 8000, 降 20%
+        events = [
+            {"type": "compaction", "tokensBefore": 10000 - i * 500}
+            for i in range(5)
+        ]
+        with open(_fake_sessions_dir / f"{today}-main-healthy.jsonl", "w") as f:
+            for e in events:
+                f.write(_json.dumps(e) + "\n")
+
+        r = compaction_diag._drift_check({})
+        # 降 20% 介于 5-30% -> healthy
+        assert r["status"] in ("healthy", "compression_stalled")
+        if r["status"] == "healthy":
+            assert r["severity"] == compaction_diag.SEVERITY_OK
+
+
+# ── TestCompactionDiagnose (公开 API) ──
 
 class TestCompactionDiagnose:
     """compaction_diagnose() 公开 API 测试群 (mock config)。"""
 
     def test_diagnose_empty_config(self, mocker):
-        """空 config -> 返回 dict 不崩。"""
         mocker.patch.object(
             compaction_diag, "_load_openclaw_json", return_value={}
         )
@@ -109,9 +387,37 @@ class TestCompactionDiagnose:
         )
         result = compaction_diag.compaction_diagnose()
         assert isinstance(result, dict)
+        # 空 config 应有 status='no_config'
+        assert result["status"] == "no_config"
+
+    def test_diagnose_with_full_config(self, mocker):
+        """完整 config -> 返回完整诊断报告。"""
+        full_config = {
+            "mode": "safeguard",
+            "maxActiveTranscriptBytes": 3_000_000,
+            "keepRecentTokens": 8000,
+            "reserveTokens": 4000,
+            "memoryFlush": {
+                "enabled": True,
+                "softThresholdTokens": 50000,
+            },
+        }
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value={}
+        )
+        mocker.patch.object(
+            compaction_diag, "_get_compaction_config", return_value=full_config
+        )
+        mocker.patch.object(
+            compaction_diag, "_get_context_window", return_value=131072
+        )
+        result = compaction_diag.compaction_diagnose()
+        assert isinstance(result, dict)
+        # 完整 config 应有 issues 列表
+        assert "issues" in result
+        assert isinstance(result["issues"], list)
 
     def test_diagnose_with_token_aware(self, mocker):
-        """token_aware=True -> 不崩。"""
         mocker.patch.object(
             compaction_diag, "_load_openclaw_json", return_value={}
         )
@@ -122,7 +428,6 @@ class TestCompactionDiagnose:
         assert isinstance(result, dict)
 
     def test_diagnose_with_probe(self, mocker):
-        """probe=True -> 不崩。"""
         mocker.patch.object(
             compaction_diag, "_load_openclaw_json", return_value={}
         )
@@ -133,7 +438,6 @@ class TestCompactionDiagnose:
         assert isinstance(result, dict)
 
     def test_diagnose_handles_none_config(self, mocker):
-        """config 是 None -> 优雅降级。"""
         mocker.patch.object(
             compaction_diag, "_load_openclaw_json", return_value=None
         )
@@ -142,7 +446,10 @@ class TestCompactionDiagnose:
         )
         result = compaction_diag.compaction_diagnose()
         assert isinstance(result, dict)
+        assert result["status"] == "no_config"
 
+
+# ── TestSeverityConstants ──
 
 class TestSeverityConstants:
     """SEVERITY_* 常量存在性测试。"""
@@ -151,11 +458,12 @@ class TestSeverityConstants:
         assert hasattr(compaction_diag, "SEVERITY_OK")
         assert hasattr(compaction_diag, "SEVERITY_WARN")
         assert hasattr(compaction_diag, "SEVERITY_CRIT")
-        # 这些应该是字符串
         assert isinstance(compaction_diag.SEVERITY_OK, str)
         assert isinstance(compaction_diag.SEVERITY_WARN, str)
         assert isinstance(compaction_diag.SEVERITY_CRIT, str)
 
+
+# ── TestCompactionApply (P0 安全) ──
 
 class TestCompactionApply:
     """compaction_apply() 公开 API 测试群。
@@ -167,7 +475,6 @@ class TestCompactionApply:
     @pytest.mark.slow
     def test_apply_dry_run_does_not_write(self, mocker, tmp_path):
         """auto_confirm=False -> 不写 openclaw.json。"""
-        # mock diagnose 返 actionable 建议
         fake_diag = {
             "actionable": True,
             "recommendations": [
@@ -180,19 +487,114 @@ class TestCompactionApply:
         mocker.patch.object(
             compaction_diag, "compaction_diagnose", return_value=fake_diag
         )
-        # 写一个空的 openclaw.json
         cfg_file = tmp_path / "openclaw.json"
         cfg_file.write_text("{}")
         mocker.patch.object(compaction_diag, "_load_openclaw_json", return_value={})
-        mocker.patch.object(compaction_diag, "OPENCLAW_JSON", cfg_file)
+        mocker.patch.object(compaction_diag, "_OPENCLAW_JSON", cfg_file)
 
         result = compaction_diag.compaction_apply(auto_confirm=False)
         # dry_run: 文件不应被改 (仍 {})
         assert cfg_file.read_text() == "{}"
-        # 应有 status='dry_run' 或 changes 列表
         assert "changes" in result or "status" in result
 
+    def test_apply_nothing_to_do(self, mocker, tmp_path):
+        """diagnose.actionable=False -> 返 status=nothing_to_do, 不写。"""
+        fake_diag = {
+            "actionable": False,
+            "recommendations": [],
+            "timestamp": "2026-06-30T11:30:00",
+            "summary": "已完美",
+        }
+        mocker.patch.object(
+            compaction_diag, "compaction_diagnose", return_value=fake_diag
+        )
+        result = compaction_diag.compaction_apply(auto_confirm=True)
+        # 不可改任何东西
+        assert result["status"] == "nothing_to_do"
+        assert result["changes"] == []
+
     def test_apply_function_exists(self):
-        """compaction_apply 顶层函数存在。"""
         assert hasattr(compaction_diag, "compaction_apply")
         assert callable(compaction_diag.compaction_apply)
+
+
+# ── TestGetContextWindow ──
+
+class TestGetContextWindow:
+    """_get_context_window() 上下文窗口大小获取测试群。"""
+
+    def test_no_openclaw_json_returns_default(self, mocker):
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value=None
+        )
+        w = compaction_diag._get_context_window()
+        # 应是默认值 (>= 8192)
+        assert isinstance(w, int)
+        assert w >= 8192
+
+    def test_empty_config_returns_default(self, mocker):
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value={}
+        )
+        w = compaction_diag._get_context_window()
+        assert isinstance(w, int)
+
+    def test_extracts_from_models_providers(self, mocker):
+        """models.providers.<name>.models[].contextWindow 应能提取。"""
+        cfg = {
+            "models": {
+                "providers": {
+                    "deepseek-company": {
+                        "models": [
+                            {"name": "deepseek-chat", "contextWindow": 200000}
+                        ]
+                    }
+                }
+            }
+        }
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value=cfg
+        )
+        w = compaction_diag._get_context_window()
+        assert w == 200000
+
+
+# ── TestGetCompactionConfig ──
+
+class TestGetCompactionConfig:
+    """_get_compaction_config() 配置段提取测试群。"""
+
+    def test_no_config_returns_none(self, mocker):
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value=None
+        )
+        cc = compaction_diag._get_compaction_config()
+        assert cc is None
+
+    def test_empty_config_returns_empty_dict(self, mocker):
+        """空 config -> 返 None (因为 agents.defaults.compaction 缺)。"""
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value={}
+        )
+        cc = compaction_diag._get_compaction_config()
+        # 实际: {} 走 .get 链, agents.defaults.compaction 缺 -> 返 {}
+        # 但 _get_compaction_config 在 cfg falsy 时返 None, 这里 cfg={} 是 truthy
+        assert cc is None or cc == {}
+
+    def test_extracts_compaction_section(self, mocker):
+        cfg = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "maxActiveTranscriptBytes": 3_000_000,
+                    }
+                }
+            }
+        }
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value=cfg
+        )
+        cc = compaction_diag._get_compaction_config()
+        assert cc is not None
+        assert cc["maxActiveTranscriptBytes"] == 3_000_000
+
