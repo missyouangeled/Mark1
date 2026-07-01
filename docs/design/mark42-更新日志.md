@@ -116,7 +116,12 @@
   - `python3 -m pytest scripts/tests/unit/test_utils.py --cov=mark42_modules.utils --cov-report=term-missing -q`
   - **27 passed**
   - `utils.py`: **100.0%**
-- 因此没有对 `utils.py` 做重复提交，只把它作为“已确认收口”的现状写入接力文档。
+- 之后复核工作树时发现：`scripts/tests/unit/test_utils.py` 其实仍是未跟踪文件，意味着前述 100% 结果虽然真实，但远端尚未入库，直接引用会导致“本地通过、远端缺文件”的复现偏差。
+- 已立即补验：
+  - `python3 -m pytest scripts/tests/unit/test_utils.py scripts/tests/unit/test_utils_cleanup.py --cov=mark42_modules.utils --cov-report=term-missing -q`
+  - **32 passed**
+  - `utils.py`: **100.0%**
+- 因此本轮收尾会把 `test_utils.py` 一并补提交，确保远端与全量基线一致。
 
 **当前意义**：
 - `armor.py` 从“明显黑洞模块”进入高覆盖区
