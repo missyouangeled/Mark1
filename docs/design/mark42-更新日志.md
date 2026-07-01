@@ -73,6 +73,53 @@
 
 ---
 
+## 2026-07-01 #26 — 继续测试接力：`perf_bench.py` 单文件打到 100%，整体覆盖升到 89.7%
+
+**背景**：
+`cli.py` 收口后，下一刀自然切到 `scripts/mark42_modules/perf_bench.py`。但这次没有去碰真实 benchmark 主流程，也没有跑 `bench_*` / `main()` 的重路径，而是严格遵守边界，只补 pure-helper / smoke / 异常容错支路。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_perf_bench.py`
+2. 新增覆盖重点：
+   - `_safe_quantile()`
+     - `statistics.quantiles(...)` 抛异常时回退到 `max(values)`
+   - `bench_async_queue()`
+     - warmup enqueue 失败 → `RuntimeError("queue warmup enqueue failed")`
+     - warmup wait timeout → `TimeoutError("queue warmup timed out")`
+     - 正式 benchmark enqueue 失败 → `RuntimeError("queue enqueue failed during benchmark")`
+     - req.error 分支 → 透传 `RuntimeError(req.error)`
+     - req.result 缺失 → `RuntimeError("queue result missing")`
+   - 所有异常路径都同时验证：
+     - `q.shutdown(timeout=15.0)` 仍会执行
+3. 单文件 coverage 继续使用模块口径：
+   - `--cov=mark42_modules.perf_bench`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_perf_bench.py --cov=mark42_modules.perf_bench --cov-report=term-missing -q` ✅
+  - **73 passed, 1 skipped**
+  - `perf_bench.py`: 单文件口径 **100.0%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **621 passed, 2 skipped**
+  - `perf_bench.py`: 全量口径 **99.7%**（仅余 1 行导入层残差）
+  - overall: **86.1% → 89.7%**
+
+**边界仍然保持住了**：
+- 没跑真实 `bench_*`
+- 没跑 `main()` 真写盘链路
+- 没碰真实 LLM
+- 没碰真实大样本重负载
+
+**当前意义**：
+- `perf_bench.py` 已基本收满
+- overall 一口气推到 **89.7%**
+- 下一刀已经不再是“明显黑洞模块”，而是开始进入第二梯队：
+  - `smart_crusher.py`
+  - `armor.py`
+  - `utils.py`
+  - `pii_redactor.py`
+
+---
+
 ## 2026-07-01 #25 — 继续测试接力：`cli.py` 从 61.9% 拉到 98.0%，整体覆盖升到 86.1%
 
 **背景**：

@@ -169,6 +169,14 @@ class TestSafeQuantile:
         with pytest.raises(ValueError):
             pb._safe_quantile([1.0, 2.0], 90)
 
+    def test_quantiles_failure_falls_back_to_max(self, mocker):
+        """statistics.quantiles 异常时应回退到 max(values)."""
+        mocker.patch.object(pb, "quantiles", side_effect=RuntimeError("boom"))
+
+        out = pb._safe_quantile([1.0, 7.0, 3.0], 95)
+
+        assert out == pytest.approx(7.0)
+
 
 # ──────────────── _estimate_ratio ────────────────
 
@@ -667,6 +675,121 @@ class TestBenchSmoke:
         mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
 
         with pytest.raises(TimeoutError, match="queue wait timed out"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+    def test_bench_async_queue_warmup_enqueue_failure(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {}
+
+            def wait(self, timeout: float):
+                return True
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.side_effect = [False]
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+
+        with pytest.raises(RuntimeError, match="queue warmup enqueue failed"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+    def test_bench_async_queue_warmup_timeout(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {}
+
+            def wait(self, timeout: float):
+                return False
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+
+        with pytest.raises(TimeoutError, match="queue warmup timed out"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+    def test_bench_async_queue_enqueue_failure_during_benchmark(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {"ratio": 0.5, "changed": True}
+
+            def wait(self, timeout: float):
+                return True
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.side_effect = [True, False]
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+        perf = iter([1.0])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+
+        with pytest.raises(RuntimeError, match="queue enqueue failed during benchmark"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+    def test_bench_async_queue_raises_request_error(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None if session_id.endswith("warmup") else "boom"
+                self.result = {} if session_id.endswith("warmup") else {"ratio": 0.5, "changed": True}
+
+            def wait(self, timeout: float):
+                return True
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+        mocker.patch.object(pb, "_measure_peak_kb", return_value=1.0)
+        mocker.patch.object(pb, "_queue_roundtrip", return_value={"ratio": 0.5, "changed": True})
+        perf = iter([1.0, 1.05])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+
+        with pytest.raises(RuntimeError, match="boom"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+    def test_bench_async_queue_raises_when_result_missing(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {} if session_id.endswith("warmup") else None
+
+            def wait(self, timeout: float):
+                return True
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+        mocker.patch.object(pb, "_measure_peak_kb", return_value=1.0)
+        mocker.patch.object(pb, "_queue_roundtrip", return_value={"ratio": 0.5, "changed": True})
+        perf = iter([1.0, 1.05])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+
+        with pytest.raises(RuntimeError, match="queue result missing"):
             pb.bench_async_queue(["a"])
 
         fake_queue.shutdown.assert_called_once_with(timeout=15.0)
