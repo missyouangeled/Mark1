@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-07-01 #23 — 继续测试接力：`log_deduplicator.py` 从 54.5% 拉到 98.3%，整体覆盖升到 81.0%
+
+**背景**：
+`diff_compressor.py` 收口后，接力文档的首要候选切到 `log_deduplicator.py`。实跑看下来，它和前两刀很像：主体逻辑已有一些基础覆盖，但模块底部 `_run_tests()` 几乎整段未收编，导致整体覆盖停在 `54.5%`。这类模块很适合继续按“把作者自检脚本收进正式 pytest”的策略推进。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_log_deduplicator.py`
+2. 新增覆盖重点：
+   - `repeated_lines_total` 统计值
+   - 所有内容都落入 tail 时，不出现 head 段
+   - 模块底部 `_run_tests()` 成功路径
+   - `__main__` 退出码 `0 / 1`
+3. 延续前几刀策略：
+   - 不改实现
+   - 不追低价值碎洞
+   - 直接把内置 smoke / self-check 契约收编进 pytest
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_log_deduplicator.py --cov=scripts/mark42_modules/log_deduplicator.py --cov-report=term-missing -q` ✅
+  - **18 passed**
+  - `log_deduplicator.py`: **54.5% → 98.3%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **566 passed, 2 skipped**
+  - overall: **79.4% → 81.0%**
+
+**剩余少量未覆盖行**：
+- `70`
+  - `__init__` 参数行（覆盖报告映射到定义处，不影响实质）
+- `251-252`
+  - `_run_tests()` 内 `check()` 的失败打印支路
+  - 需要故意构造失败态才会命中，本轮不追
+
+**当前意义**：
+- `log_deduplicator.py` 已基本完成收口
+- overall 已正式跨到 **81.0%**
+- 后续最有价值的主线已经更清晰：
+  - `engine.py`
+  - `cli.py`
+  - 或继续按策略守住 `perf_bench.py` 只补 helper
+
+---
+
 ## 2026-07-01 #22 — 继续测试接力：`diff_compressor.py` 从 53.7% 拉到 98.9%，整体覆盖升到 79.4%
 
 **背景**：

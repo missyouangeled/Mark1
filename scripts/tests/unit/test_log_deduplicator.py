@@ -12,6 +12,8 @@
   - 断言字段名按 log_deduplicator.py 当前实现
 """
 
+import pytest
+
 from mark42_modules import log_deduplicator
 
 
@@ -201,3 +203,56 @@ class TestLogDedup:
             "mode",
         ]:
             assert key in meta
+
+    def test_repeated_lines_total_counts_all_repeated_occurrences(self):
+        dedup = log_deduplicator.LogDeduplicator(keep_tail_lines=2, dedup_min_repeat=2)
+        text = "\n".join([
+            "2026-07-01 10:00:00 INFO: alpha",
+            "2026-07-01 10:00:00 INFO: alpha",
+            "2026-07-01 10:00:00 INFO: alpha",
+            "2026-07-01 10:00:01 INFO: beta",
+            "2026-07-01 10:00:01 INFO: beta",
+            "2026-07-01 10:00:02 INFO: tail a",
+            "2026-07-01 10:00:03 INFO: tail b",
+        ])
+        result, meta = dedup.dedup(text)
+        assert meta["repeated_lines_total"] == 5
+        assert meta["merged_groups"] == 2
+        assert "[×3] 2026-07-01 10:00:00 INFO: alpha" in result
+        assert "[×2] 2026-07-01 10:00:01 INFO: beta" in result
+
+    def test_no_head_section_when_all_lines_are_tail(self):
+        dedup = log_deduplicator.LogDeduplicator(keep_tail_lines=50)
+        text = "\n".join([f"2026-07-01 10:00:{i:02d} INFO: tail only {i}" for i in range(10)])
+        result, meta = dedup.dedup(text)
+        assert meta["kept_tail_lines"] == 10
+        assert meta["unique_lines"] == 0
+        assert "--- 去重后的日志 (head) ---" not in result
+        assert "--- 最后 10 行原文 (debug 用) ---" in result
+
+
+class TestRunTests:
+    def test_run_tests_success(self, capsys):
+        assert log_deduplicator._run_tests() is True
+        out = capsys.readouterr().out
+        assert "LogDeduplicator 单元测试" in out
+        assert "结果:" in out
+        assert "失败" in out
+
+    def test_main_branch_exit_zero(self, monkeypatch):
+        monkeypatch.setattr(log_deduplicator, "_run_tests", lambda: True)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": log_deduplicator._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 0
+
+    def test_main_branch_exit_one(self, monkeypatch):
+        monkeypatch.setattr(log_deduplicator, "_run_tests", lambda: False)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": log_deduplicator._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 1
