@@ -15,6 +15,7 @@
 import json
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -392,3 +393,280 @@ class TestEngineDaemon:
         # 所以 cursor 文件应存在
         assert cursor.exists() or not (engine_state / "daemon-heartbeat.json").exists()
         # 至少心跳存在证明 daemon 跑过
+
+
+class TestEngineWatchTask:
+    def test_missing_status_file_prints_error(self, capsys, scratch_dir, mocker):
+        mocker.patch.object(engine, "SCRATCH", scratch_dir)
+        engine.engine_watch_task("no-such-task", interval_s=0)
+        out = capsys.readouterr().out
+        assert "任务状态文件不存在" in out
+
+    def test_empty_status_then_keyboard_interrupt_exits_cleanly(self, capsys, scratch_dir, mocker):
+        task_dir = scratch_dir / "demo"
+        task_dir.mkdir(parents=True)
+        (task_dir / "status.json").write_text("{}")
+        mocker.patch.object(engine, "SCRATCH", scratch_dir)
+        mocker.patch.object(engine, "_load_json", return_value={})
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_watch_task("demo", interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "状态文件为空" in out
+        assert "监控已退出" in out
+
+    def test_completed_success_task_emits_completion_event(self, capsys, scratch_dir, mocker):
+        task_dir = scratch_dir / "demo"
+        task_dir.mkdir(parents=True)
+        (task_dir / "status.json").write_text("{}")
+        mocker.patch.object(engine, "SCRATCH", scratch_dir)
+        mocker.patch.object(
+            engine,
+            "_load_json",
+            return_value={
+                "subtasks": {
+                    "a": {"status": "done"},
+                    "b": {"status": "completed"},
+                }
+            },
+        )
+        mock_append = mocker.patch.object(engine, "_append_broker")
+
+        engine.engine_watch_task("demo", interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "全部成功 (2/2)" in out
+        mock_append.assert_called_once()
+        assert mock_append.call_args[0][1] == "heavy.task.completed"
+
+    def test_failed_task_emits_failed_and_completion_events(self, capsys, scratch_dir, mocker):
+        task_dir = scratch_dir / "demo"
+        task_dir.mkdir(parents=True)
+        (task_dir / "status.json").write_text("{}")
+        mocker.patch.object(engine, "SCRATCH", scratch_dir)
+        mocker.patch.object(
+            engine,
+            "_load_json",
+            return_value={
+                "subtasks": {
+                    "a": {"status": "failed"},
+                    "b": {"status": "error"},
+                }
+            },
+        )
+        mock_append = mocker.patch.object(engine, "_append_broker")
+
+        engine.engine_watch_task("demo", interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "失败，需人工检查" in out
+        event_types = [call.args[1] for call in mock_append.call_args_list]
+        assert "heavy.subtask.failed" in event_types
+        assert "heavy.task.completed" in event_types
+
+
+class TestEngineDaemonEvents:
+    def test_daemon_bridges_broker_events(self, mocker, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text(
+            "".join([
+                json.dumps({
+                    "sourceEventType": "mark42.armor.compress.done",
+                    "metadata": {"usagePercent": 48, "strategy": "semantic"},
+                }) + "\n",
+                json.dumps({
+                    "sourceEventType": "mark42.compaction.advised",
+                    "metadata": {"usagePercent": 91},
+                }) + "\n",
+                json.dumps({
+                    "sourceEventType": "model.fallback.detected",
+                    "summary": "primary timeout",
+                    "metadata": {},
+                }) + "\n",
+            ]),
+            encoding="utf-8",
+        )
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_append = mocker.patch.object(engine, "_append_broker")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        event_types = [call.args[1] for call in mock_append.call_args_list]
+        assert "mark42.engine.bridge.armor_compress_seen" in event_types
+        assert "engine.compaction.alerted" in event_types
+        assert "engine.model.fallback.detected" in event_types
+
+    def test_daemon_context_alert_spawns_compress_subprocess(self, mocker, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text(
+            json.dumps({
+                "sourceEventType": "context_monitor.alert",
+                "metadata": {"usagePercent": engine.THRESHOLD_ALERT + 1},
+            }) + "\n",
+            encoding="utf-8",
+        )
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_popen = mocker.patch.object(engine.subprocess, "Popen")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        assert args[-2:] == ["armor", "--compress"]
+
+    def test_daemon_context_alert_subprocess_error_is_printed(self, mocker, capsys, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text(
+            json.dumps({
+                "sourceEventType": "context_monitor.critical",
+                "metadata": {"usagePercent": engine.THRESHOLD_ALERT + 5},
+            }) + "\n",
+            encoding="utf-8",
+        )
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mocker.patch.object(engine.subprocess, "Popen", side_effect=engine.subprocess.SubprocessError("boom"))
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "启动压缩子进程失败" in out
+
+    def test_daemon_heavy_task_started_valid_creates_watch_loop(self, mocker, engine_state, broker_dir, heavy_state):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text(
+            json.dumps({
+                "sourceEventType": "heavy.task.started",
+                "metadata": {"taskName": "alpha"},
+            }) + "\n",
+            encoding="utf-8",
+        )
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+        (heavy_state / "alpha.json").write_text(
+            json.dumps({"taskName": "alpha", "startedAt": datetime.now(timezone.utc).isoformat()}),
+            encoding="utf-8",
+        )
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_start = mocker.patch.object(engine, "engine_start")
+        mock_append = mocker.patch.object(engine, "_append_broker")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        mock_start.assert_called_once_with(task="监控大工程: alpha", interval_s=30, template="task-watch")
+        assert any(call.args[1] == "mark42.engine.bridge.heavy_started" for call in mock_append.call_args_list)
+
+    def test_daemon_heavy_task_started_invalid_skips_watch_creation(self, mocker, capsys, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text(
+            json.dumps({
+                "sourceEventType": "heavy.task.started",
+                "metadata": {"taskName": "stale"},
+            }) + "\n",
+            encoding="utf-8",
+        )
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_start = mocker.patch.object(engine, "engine_start")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "跳过创建 watch" in out
+        mock_start.assert_not_called()
+
+    def test_daemon_executes_due_registered_loop_and_persists(self, mocker, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text("", encoding="utf-8")
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+        loops = _make_loop(name="due", template="", task="something")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value=loops)
+        mock_run = mocker.patch.object(engine, "engine_run_loop")
+        mock_save = mocker.patch.object(engine, "_save_loops")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == "due"
+        mock_save.assert_called_once_with(loops)
+
+    def test_daemon_rotation_tick_writes_status_snapshot(self, mocker, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text("", encoding="utf-8")
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_rotate = mocker.patch.object(engine, "log_rotate")
+
+        from mark42_modules import cli
+        mocker.patch.object(
+            cli,
+            "status_dashboard",
+            return_value={
+                "checkedAt": "2026-07-01T14:20:00+08:00",
+                "armor": {"status": "ok"},
+                "engine": {"activeLoops": 1},
+                "heavy": {"activeTasks": 0},
+                "actions": {"last": "noop"},
+            },
+        )
+
+        counter = {"n": 0}
+
+        def fake_sleep(_):
+            counter["n"] += 1
+            if counter["n"] >= 10:
+                raise KeyboardInterrupt
+
+        mocker.patch.object(engine.time, "sleep", side_effect=fake_sleep)
+
+        engine.engine_daemon(interval_s=0)
+
+        mock_rotate.assert_called_once_with("all")
+        snapshot = broker_dir / "views" / "mark42-status.json"
+        assert snapshot.exists()
+        saved = json.loads(snapshot.read_text())
+        assert saved["engine"]["activeLoops"] == 1
+        assert saved["heavy"]["activeTasks"] == 0

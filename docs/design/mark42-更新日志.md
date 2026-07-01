@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-07-01 #24 — 继续测试接力：`engine.py` 从 62.0% 拉到 90.7%，整体覆盖升到 83.2%
+
+**背景**：
+`log_deduplicator.py` 收口后，测试接力主线正式切到运行主路径模块。`engine.py` 是这一轮最值钱的一刀：此前整体只有 `62.0%`，缺口主要集中在 `engine_watch_task()`、`engine_daemon()` 的 broker 事件桥接、到期 loop 执行，以及 daemon 第 10 tick 的状态快照分支。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_engine.py`
+2. 新增覆盖重点：
+   - `engine_watch_task()`
+     - 状态文件不存在
+     - 状态文件为空后被 `KeyboardInterrupt` 打断
+     - 全部成功完成路径
+     - 失败完成路径（同时发 `heavy.subtask.failed` 与 `heavy.task.completed`）
+   - `engine_daemon()`
+     - broker 事件桥接：
+       - `mark42.armor.compress.done`
+       - `mark42.compaction.advised`
+       - `model.fallback.detected`
+     - 上下文告警触发压缩子进程
+     - 压缩子进程启动失败打印
+     - `heavy.task.started` 有效任务 → 自动创建 `task-watch`
+     - `heavy.task.started` 无效/过期任务 → 跳过创建 watch
+     - 到期 `registered` loop 触发执行并统一持久化
+     - 第 10 tick 触发 `log_rotate("all")` + 写 `broker/views/mark42-status.json`
+3. 同时修正单文件覆盖命令口径：
+   - 从会误报 `module-not-imported` 的 file path `--cov=.../engine.py`
+   - 改为模块路径：`--cov=mark42_modules.engine`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_engine.py --cov=mark42_modules.engine --cov-report=term-missing -q` ✅
+  - **35 passed**
+  - `engine.py`: 单文件口径到 **87.4%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **577 passed, 2 skipped**
+  - `engine.py`: **62.0% → 90.7%**
+  - overall: **81.0% → 83.2%**
+
+**剩余未覆盖主要是低价值/硬环境分支**：
+- `47-79`：`engine_templates()` 的纯打印模板块
+- `168` / `195`：`engine_watch_task()` 的长轮询继续睡眠支路
+- `262-264`：`health-watch` 异常 fallback
+- `378-379`：读取 broker 文件 `OSError`
+- `442-443`：Heavy 时间戳解析失败吞错
+- `467-472`：`lastRun` 解析异常 / interval 未到的 continue 分支
+- `503-504`：`status_dashboard` 失败静默吞错
+- `512`：20 tick 的空 pass 分支
+
+这些都不再是当下最值钱的洞。
+
+**当前意义**：
+- `engine.py` 已从“运行主路径缺口大户”变成“高覆盖核心模块”
+- overall 已推进到 **83.2%**
+- 下一刀的最佳候选自然切到：
+  - `cli.py`
+  - `perf_bench.py`（继续只补 helper）
+
+---
+
 ## 2026-07-01 #23 — 继续测试接力：`log_deduplicator.py` 从 54.5% 拉到 98.3%，整体覆盖升到 81.0%
 
 **背景**：
