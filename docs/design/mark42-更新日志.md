@@ -73,6 +73,50 @@
 
 ---
 
+## 2026-07-01 #27 — 继续测试接力：`smart_crusher.py` 单文件打到 100%，整体覆盖升到 90.7%
+
+**背景**：
+`perf_bench.py` 收口后，下一刀切到 `smart_crusher.py`。这个模块体量不大，但之前有一整段 `_run_tests()` 自检逻辑完全没进正式 pytest，外加一个序列化失败容错分支和空数值数组分支，属于很典型的“少量测试换整段覆盖”的高性价比模块。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_smart_crusher.py`
+2. 新增覆盖重点：
+   - `SmartCrusher.crush()`
+     - `json.dumps(...)` 失败时：
+       - 返回原始 content
+       - `ratio = 0.0`
+       - `error = "serialization failed: ..."`
+   - `SmartCrusher._compress_numeric_array([])`
+     - 空数值数组返回 `"[]"`
+   - `_run_tests()`
+     - 直接 smoke 执行整段自检链路
+     - 验证关键输出与 `所有测试通过 ✓`
+   - `if __name__ == "__main__"`
+     - 用 `runpy.run_module(..., run_name="__main__")` 覆盖模块直跑入口
+     - 同时压掉已知 `RuntimeWarning`，避免污染回归输出
+3. 单文件 coverage：
+   - `python3 -m pytest scripts/tests/unit/test_smart_crusher.py --cov=mark42_modules.smart_crusher --cov-report=term-missing -q`
+
+**验证结果**：
+- 单文件 ✅
+  - **16 passed**
+  - `smart_crusher.py`: **100.0%**
+- 全量 ✅
+  - `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q`
+  - **625 passed, 2 skipped**
+  - `smart_crusher.py`: **57.3% → 100.0%**
+  - overall: **89.7% → 90.7%**
+
+**当前意义**：
+- `smart_crusher.py` 已正式收口
+- Mark42 全量 coverage 首次稳定越过 **90%**
+- 接下来可以把主线切向第二梯队：
+  - `pii_redactor.py`
+  - `utils.py`
+  - `armor.py`
+
+---
+
 ## 2026-07-01 #26 — 继续测试接力：`perf_bench.py` 单文件打到 100%，整体覆盖升到 89.7%
 
 **背景**：

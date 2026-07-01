@@ -14,6 +14,8 @@
 """
 
 import json as _json
+import runpy
+import warnings
 
 import pytest
 
@@ -147,3 +149,44 @@ class TestSmartcrushMetadata:
         assert len(result) == 2
         assert isinstance(result[0], str)
         assert isinstance(result[1], dict)
+
+    def test_serialization_failure_returns_original_and_error(self, mocker):
+        """json.dumps 失败时应返回原文并写入 error 字段。"""
+        crusher = smart_crusher.SmartCrusher()
+        mocker.patch.object(smart_crusher.json, "loads", return_value={"ok": True})
+        mocker.patch.object(smart_crusher.json, "dumps", side_effect=TypeError("bad dump"))
+
+        out, meta = crusher.crush('{"ok": true}')
+
+        assert out == '{"ok": true}'
+        assert meta["ratio"] == 0.0
+        assert meta["error"] == "serialization failed: bad dump"
+
+
+class TestSmartCrusherHelpers:
+    """补空数值数组与 _run_tests() 自检链路。"""
+
+    def test_compress_numeric_array_empty_returns_brackets(self):
+        crusher = smart_crusher.SmartCrusher()
+
+        out = crusher._compress_numeric_array([])
+
+        assert out == "[]"
+
+    def test_run_tests_smoke(self, capsys):
+        smart_crusher._run_tests()
+
+        out = capsys.readouterr().out
+        assert "SmartCrusher 单元测试" in out
+        assert "[测试 1]" in out
+        assert "[测试 6]" in out
+        assert "所有测试通过 ✓" in out
+
+    def test_module_main_runs_run_tests(self, capsys):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            runpy.run_module("mark42_modules.smart_crusher", run_name="__main__")
+
+        out = capsys.readouterr().out
+        assert "SmartCrusher 单元测试" in out
+        assert "所有测试通过 ✓" in out
