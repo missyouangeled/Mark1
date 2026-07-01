@@ -73,6 +73,48 @@
 
 ---
 
+## 2026-07-01 #28 — 继续测试接力：`pii_redactor.py` 单文件打到 100%，整体覆盖升到 91.4%
+
+**背景**：
+`smart_crusher.py` 收口后，下一刀切到 `pii_redactor.py`。这个模块的缺口非常集中，几乎整段都落在底部 `_run_tests()` 和 `__main__` 入口，属于最适合继续用“把作者自检链路收编进 pytest”的类型。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_pii_redactor.py`
+2. 新增覆盖重点：
+   - `_run_tests()` 成功路径
+     - 断言返回 `True`
+     - 断言输出 `PIIRedactor 单元测试`
+     - 断言 `结果: 13 通过 / 0 失败 / 共 13 个`
+   - `_run_tests()` 失败/异常路径
+     - mock `PIIRedactor`，同时打到：
+       - `缺少` / `泄漏` 分支
+       - `异常: boom` 分支
+     - 断言返回 `False`
+   - `if __name__ == "__main__"`
+     - 用 `runpy.run_module(..., run_name="__main__")`
+     - 断言 `SystemExit.code == 0`
+     - 继续压掉已知 `RuntimeWarning`
+3. 单文件 coverage：
+   - `python3 -m pytest scripts/tests/unit/test_pii_redactor.py --cov=mark42_modules.pii_redactor --cov-report=term-missing -q`
+
+**验证结果**：
+- 单文件 ✅
+  - **21 passed**
+  - `pii_redactor.py`: **100.0%**
+- 全量 ✅
+  - `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q`
+  - **628 passed, 2 skipped**
+  - `pii_redactor.py`: **68.3% → 100.0%**
+  - overall: **90.7% → 91.4%**
+
+**当前意义**：
+- `pii_redactor.py` 已正式收口
+- 当前第二梯队里，最自然的下一刀已经切到：
+  - `utils.py`
+  - 然后再评估 `armor.py`
+
+---
+
 ## 2026-07-01 #27 — 继续测试接力：`smart_crusher.py` 单文件打到 100%，整体覆盖升到 90.7%
 
 **背景**：

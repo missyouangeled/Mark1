@@ -13,6 +13,11 @@
   - 断言字段名按 pii_redactor.py 当前实现
 """
 
+import runpy
+import warnings
+
+import pytest
+
 from mark42_modules import pii_redactor
 
 
@@ -193,3 +198,54 @@ class TestRedactDictValues:
         assert meta["total_redactions"] == 0
         assert meta["original_bytes"] == 0
         assert meta["redacted_bytes"] == 0
+
+
+class TestRunTestsHarness:
+    """补 _run_tests() 与 __main__ 入口。"""
+
+    def test_run_tests_success(self, capsys):
+        ok = pii_redactor._run_tests()
+
+        out = capsys.readouterr().out
+        assert ok is True
+        assert "PIIRedactor 单元测试" in out
+        assert "结果: 13 通过 / 0 失败 / 共 13 个" in out
+
+    def test_run_tests_failure_and_exception_paths(self, mocker, capsys):
+        class FakeRedactor:
+            def redact(self, content: str):
+                if "Random:" in content:
+                    raise RuntimeError("boom")
+                return content, {
+                    "original_bytes": len(content.encode("utf-8")),
+                    "redacted_bytes": len(content.encode("utf-8")),
+                    "total_redactions": 0,
+                    "redactions_by_type": {},
+                }
+
+            def redact_dict_values(self, obj):
+                return obj, {
+                    "original_bytes": 0,
+                    "redacted_bytes": 0,
+                    "total_redactions": 0,
+                    "redactions_by_type": {},
+                }
+
+        mocker.patch.object(pii_redactor, "PIIRedactor", return_value=FakeRedactor())
+
+        ok = pii_redactor._run_tests()
+
+        out = capsys.readouterr().out
+        assert ok is False
+        assert "缺少" in out or "泄漏" in out
+        assert "异常: boom" in out
+
+    def test_module_main_exits_zero_when_run_tests_pass(self, capsys):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            with pytest.raises(SystemExit) as exc:
+                runpy.run_module("mark42_modules.pii_redactor", run_name="__main__")
+
+        out = capsys.readouterr().out
+        assert exc.value.code == 0
+        assert "PIIRedactor 单元测试" in out
