@@ -15,7 +15,7 @@
   - conftest autouse 已经把 mark42_modules.* reload 一遍, perf_bench 是顶层可执行
     脚本, 不依赖 mark42 状态路径, 所以无需额外 fixture.
   - 直接 import perf_bench 后取属性(下划线函数也不屏蔽).
-  - 不调用 bench_* / main() (避免 tracemalloc + 真压缩 + 真队列往返带来耗时与产物污染).
+  - 默认不跑真实 bench_* / main()；若需要覆盖，只做全 mock smoke，避免 tracemalloc + 真压缩 + 真队列往返 + 真写盘污染.
   - 生成时间字段在 format_report 里会被写成 datetime.now(), 报告测试只断结构字段不锁时间字符串.
 """
 
@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import math
 import re
+import io
 import sys
 import types
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -437,3 +439,264 @@ class TestFormatReportStructure:
         cwd_after = set(os.listdir(tmp_path))
         assert cwd_before == cwd_after
         assert isinstance(out, str)
+
+
+# ──────────────── runtime / smoke helpers ────────────────
+
+class TestRuntimeHelpers:
+    """轻量运行时 helper：不跑真实压缩，只测控制流 contract。"""
+
+    def test_flush_calls_stdout_flush(self, mocker):
+        fake_stdout = MagicMock()
+        mocker.patch.object(pb.sys, "stdout", fake_stdout)
+
+        pb._flush()
+
+        fake_stdout.flush.assert_called_once_with()
+
+    def test_measure_peak_kb_uses_tracemalloc(self, mocker):
+        calls: list[str] = []
+        mocker.patch.object(pb.tracemalloc, "start", side_effect=lambda: calls.append("start"))
+        mocker.patch.object(pb.tracemalloc, "get_traced_memory", return_value=(128, 4096))
+        mocker.patch.object(pb.tracemalloc, "stop", side_effect=lambda: calls.append("stop"))
+
+        ran = {"ok": False}
+
+        def run_once():
+            ran["ok"] = True
+
+        out = pb._measure_peak_kb(run_once)
+
+        assert ran["ok"] is True
+        assert out == pytest.approx(4.0)
+        assert calls == ["start", "stop"]
+
+    def test_warmup_repeats_given_times(self):
+        seen: list[str] = []
+
+        def run_once(sample: str):
+            seen.append(sample)
+
+        pb._warmup(run_once, "abc", warmup_runs=3)
+
+        assert seen == ["abc", "abc", "abc"]
+
+    def test_progress_prints_to_stderr_and_flushes(self, mocker, capsys):
+        mock_flush = mocker.patch.object(pb, "_flush")
+
+        pb._progress("sync", 2, 5)
+
+        err = capsys.readouterr().err
+        assert "[sync] 2/5" in err
+        mock_flush.assert_called_once_with()
+
+
+class TestQueueRoundtrip:
+    """_queue_roundtrip: 队列 contract 的最小 smoke。"""
+
+    def test_returns_result_when_queue_completes(self, mocker):
+        req = MagicMock()
+        req.wait.return_value = True
+        req.error = None
+        req.result = {"ok": True}
+
+        captured = {}
+
+        def fake_request(*, content, session_id):
+            captured["content"] = content
+            captured["session_id"] = session_id
+            return req
+
+        queue = MagicMock()
+        queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressRequest", side_effect=fake_request)
+
+        out = pb._queue_roundtrip(queue, "hello", "sid-1")
+
+        assert out == {"ok": True}
+        assert captured == {"content": "hello", "session_id": "sid-1"}
+        queue.enqueue.assert_called_once_with(req)
+        req.wait.assert_called_once_with(timeout=30.0)
+
+    def test_raises_when_enqueue_fails(self, mocker):
+        req = MagicMock()
+        queue = MagicMock()
+        queue.enqueue.return_value = False
+        mocker.patch.object(pb, "CompressRequest", return_value=req)
+
+        with pytest.raises(RuntimeError, match="queue enqueue failed during memory probe"):
+            pb._queue_roundtrip(queue, "hello", "sid-2")
+
+    def test_raises_when_wait_times_out(self, mocker):
+        req = MagicMock()
+        req.wait.return_value = False
+        queue = MagicMock()
+        queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressRequest", return_value=req)
+
+        with pytest.raises(TimeoutError, match="queue wait timed out during memory probe"):
+            pb._queue_roundtrip(queue, "hello", "sid-3")
+
+    def test_raises_when_request_has_error(self, mocker):
+        req = MagicMock()
+        req.wait.return_value = True
+        req.error = "boom"
+        req.result = None
+        queue = MagicMock()
+        queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressRequest", return_value=req)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            pb._queue_roundtrip(queue, "hello", "sid-4")
+
+
+class TestBenchSmoke:
+    """bench_* 全 mock smoke：验证统计聚合与错误分支，不跑真实基准。"""
+
+    def test_bench_sync_algo_aggregates_ratio_and_changed(self, mocker):
+        mocker.patch.object(pb, "_warmup")
+        mocker.patch.object(pb, "_measure_peak_kb", side_effect=[10.0, 20.0])
+        perf = iter([10.0, 10.01, 20.0, 20.03])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+        mocker.patch.object(pb, "_safe_quantile", side_effect=lambda values, percentile: 99.0 if percentile == 99 else 95.0)
+
+        def algo_fn(sample: str):
+            if sample == "a":
+                return "A", {"ratio": 0.5, "changed": True}
+            return sample, {"ratio": 0.25, "changed": False}
+
+        result = pb.bench_sync_algo(algo_fn, ["a", "b"])
+
+        assert result.runs == 2
+        assert result.p50_ms == pytest.approx(20.0)
+        assert result.p95_ms == pytest.approx(95.0)
+        assert result.p99_ms == pytest.approx(99.0)
+        assert result.peak_mem_kb_p50 == pytest.approx(15.0)
+        assert result.ratio_p50 == pytest.approx(0.375)
+        assert result.ratio_p95 == pytest.approx(95.0)
+        assert result.changed_rate == pytest.approx(0.5)
+
+    def test_bench_scheduler_sets_notes_and_changed_rate(self, mocker):
+        mocker.patch.object(pb, "_warmup")
+        mocker.patch.object(pb, "_measure_peak_kb", side_effect=[11.0, 13.0])
+        perf = iter([30.0, 30.02, 40.0, 40.06])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+        mocker.patch.object(pb, "_safe_quantile", side_effect=lambda values, percentile: 9.9 if percentile == 99 else 9.5)
+
+        def fake_scheduler(sample: str):
+            return {"ratio": 0.4 if sample == "x" else None, "changed": sample == "x"}
+
+        mocker.patch.object(pb, "scheduler_process", side_effect=fake_scheduler)
+
+        result = pb.bench_scheduler(["x", "y"])
+
+        assert result.runs == 2
+        assert result.notes == "algo_scheduler.process end-to-end"
+        assert result.changed_rate == pytest.approx(0.5)
+        assert result.ratio_p50 == pytest.approx(0.4)
+        assert result.ratio_p95 == pytest.approx(0.4)
+
+    def test_bench_async_entry_handles_non_dict_result(self, mocker, capsys):
+        mocker.patch.object(pb, "_warmup")
+        mocker.patch.object(pb, "_measure_peak_kb", side_effect=[7.0, 9.0])
+        perf = iter([50.0, 50.05, 70.0, 70.09])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+        mocker.patch.object(pb, "_safe_quantile", side_effect=lambda values, percentile: 19.9 if percentile == 99 else 19.5)
+        mocker.patch.object(pb, "llm_text_compress_async", side_effect=[
+            "bad",
+            {"stats": {"ratio": 0.6, "changed": True}, "result": "NEW"},
+        ])
+
+        result = pb.bench_async_entry(["s1", "s2"])
+
+        assert result.runs == 2
+        assert result.changed_rate == pytest.approx(0.5)
+        assert result.ratio_p50 == pytest.approx(0.6)
+        assert "async_entry done" in capsys.readouterr().err
+
+    def test_bench_async_queue_happy_path_and_shutdown(self, mocker, capsys):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {"ratio": 0.5, "changed": True} if not session_id.endswith("warmup") else {"ratio": 0.2, "changed": False}
+
+            def wait(self, timeout: float):
+                return True
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.return_value = True
+        fake_queue.shutdown.return_value = None
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+        mocker.patch.object(pb, "_measure_peak_kb", side_effect=[5.0, 7.0])
+        mocker.patch.object(pb, "_queue_roundtrip", return_value={"ratio": 0.5, "changed": True})
+        mocker.patch.object(pb, "_safe_quantile", side_effect=lambda values, percentile: 29.9 if percentile == 99 else 29.5)
+        perf = iter([1.0, 1.02, 2.0, 2.05])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+
+        result = pb.bench_async_queue(["a", "b"])
+
+        assert result.runs == 2
+        assert result.changed_rate == pytest.approx(1.0)
+        assert result.ratio_p50 == pytest.approx(0.5)
+        fake_queue.start.assert_called_once_with()
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+        err = capsys.readouterr().err
+        assert "queued" in err
+        assert "done" in err
+
+    def test_bench_async_queue_timeout_still_shutdowns(self, mocker):
+        class FakeReq:
+            def __init__(self, content: str, session_id: str):
+                self.content = content
+                self.session_id = session_id
+                self.error = None
+                self.result = {}
+
+            def wait(self, timeout: float):
+                return not self.session_id.endswith("-0")
+
+        fake_queue = MagicMock()
+        fake_queue.enqueue.return_value = True
+        mocker.patch.object(pb, "CompressQueue", return_value=fake_queue)
+        mocker.patch.object(pb, "CompressRequest", side_effect=lambda *, content, session_id: FakeReq(content, session_id))
+        mocker.patch.object(pb, "_measure_peak_kb", return_value=1.0)
+        perf = iter([1.0, 1.02])
+        mocker.patch.object(pb.time, "perf_counter", side_effect=lambda: next(perf))
+
+        with pytest.raises(TimeoutError, match="queue wait timed out"):
+            pb.bench_async_queue(["a"])
+
+        fake_queue.shutdown.assert_called_once_with(timeout=15.0)
+
+
+class TestMainSmoke:
+    """main() 只做全 mock 烟测，不跑真实算法、不写真实报告。"""
+
+    def test_main_runs_full_flow_and_writes_report(self, mocker, capsys):
+        mocker.patch.object(pb, "make_samples", side_effect=lambda kind, size_kb, n: [f"{kind}-{size_kb}"] * n)
+        mocker.patch.object(pb, "bench_sync_algo", side_effect=lambda fn, samples: _make_benchresult(runs=len(samples), p50_ms=1.0, p95_ms=2.0, p99_ms=3.0, peak_mem_kb_p50=4.0))
+        mocker.patch.object(pb, "bench_scheduler", side_effect=lambda samples: _make_benchresult(runs=len(samples), p50_ms=5.0, p95_ms=6.0, p99_ms=7.0, peak_mem_kb_p50=8.0))
+        mocker.patch.object(pb, "bench_async_queue", side_effect=lambda samples: _make_benchresult(runs=len(samples), p50_ms=9.0, p95_ms=10.0, p99_ms=11.0, peak_mem_kb_p50=12.0))
+        mocker.patch.object(pb, "bench_async_entry", side_effect=lambda samples: _make_benchresult(runs=len(samples), p50_ms=13.0, p95_ms=14.0, p99_ms=15.0, peak_mem_kb_p50=16.0))
+        mocker.patch.object(pb, "format_report", return_value="# report")
+        mock_flush = mocker.patch.object(pb, "_flush")
+
+        written = {}
+
+        def fake_write_text(self, content: str):
+            written["content"] = content
+
+        mocker.patch.object(pb.Path, "write_text", fake_write_text, create=True)
+
+        pb.main()
+
+        out = capsys.readouterr().out
+        assert "=== 本地算法层基准 ===" in out
+        assert "=== 调度层基准 ===" in out
+        assert "=== 异步层基准 ===" in out
+        assert "报告已写入:" in out
+        assert written["content"] == "# report"
+        assert mock_flush.call_count >= 4

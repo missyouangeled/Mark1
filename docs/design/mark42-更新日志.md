@@ -5,6 +5,74 @@
 
 ---
 
+## 2026-07-01 #26 — 继续测试接力：`perf_bench.py` 从 44.9% 拉到 97.4%，整体覆盖升到 89.6%
+
+**背景**：
+`cli.py` 收口后，主线自然切到 `scripts/mark42_modules/perf_bench.py`。这一刀依然遵守边界：**只补 helper / smoke，不跑 `bench_*` 的真实耗时路径，不跑真实 `main()` 产物流程，不碰真实 LLM / 真实写盘**。目标是给性能基准脚本内部 contract 加回归保护，而不是把性能测试本身塞进日常套件。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_perf_bench.py`
+2. 注释同步更新：把测试设计说明从“完全不调用 bench_* / main()”修正为“默认不跑真实 bench_* / main()；如需覆盖，只做全 mock smoke”。
+3. 新增覆盖重点：
+   - runtime helper：
+     - `_flush()`
+     - `_measure_peak_kb()`
+     - `_warmup()`
+     - `_progress()`
+   - `_queue_roundtrip()`：
+     - 成功返回 result
+     - enqueue 失败
+     - wait timeout
+     - req.error 冒泡
+   - `bench_sync_algo()`：
+     - ratio / changed 聚合
+     - P50 / P95 / P99 / median 内存聚合
+   - `bench_scheduler()`：
+     - scheduler 结果聚合
+     - `notes="algo_scheduler.process end-to-end"`
+   - `bench_async_entry()`：
+     - 非 dict 结果容错
+     - dict stats 聚合
+     - stderr 进度输出
+   - `bench_async_queue()`：
+     - happy path
+     - timeout 异常
+     - `finally` 中始终 `shutdown(timeout=15.0)`
+   - `main()`：
+     - 全 mock 烟测
+     - 三层 benchmark 输出
+     - `format_report()` 调用
+     - 报告写入路径流程
+4. 单文件 coverage 继续使用模块口径：
+   - `--cov=mark42_modules.perf_bench`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_perf_bench.py --cov=mark42_modules.perf_bench --cov-report=term-missing -q` ✅
+  - **67 passed, 1 skipped**
+  - `perf_bench.py`: 单文件口径 **97.7%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **615 passed, 2 skipped**
+  - `perf_bench.py`: 全量口径 **44.9% → 97.4%**
+  - overall: **86.1% → 89.6%**
+
+**剩余未覆盖的 perf_bench.py 分支仍然符合“故意不碰”的边界**：
+- `33`：`sys.path.insert` 的保护分支（依赖导入现场）
+- `89-90`：`_safe_quantile()` 的异常 fallback
+- `197 / 199 / 205 / 220 / 222`：`bench_async_queue()` 中 queue warmup/benchmark/result 缺失等异常分支
+
+这些都已经进入“低收益碎支路”，不值得为了抬几个点把真实行为 mock 得过分扭曲。
+
+**当前意义**：
+- `perf_bench.py` 不再是低覆盖黑洞
+- overall 已推进到 **89.6%**
+- 接下来如果继续冲覆盖，最自然的候选会转向：
+  - `armor.py`
+  - `smart_crusher.py`
+  - `utils.py`
+  - 或继续清 `engine.py` / `compaction_diag.py` 的碎支路
+
+---
+
 ## 2026-07-01 #25 — 继续测试接力：`cli.py` 从 61.9% 拉到 98.0%，整体覆盖升到 86.1%
 
 **背景**：
