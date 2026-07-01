@@ -280,390 +280,57 @@ coverage: 74.7%
 
 ---
 
-## 8. 目录与状态文件
-
-### 代码入口
-
-- CLI 入口：`scripts/mark42.py`
-- 实际主逻辑：`scripts/mark42_modules/cli.py`
-
-### 运行时状态
-
-默认状态目录：
-
-- `~/.local/state/openclaw/mark42/`
-
-其中：
-
-- `armor/`：压缩、memory-index、actions
-- `engine/`：loops、daemon-heartbeat
-- `heavy/`：大工程任务状态
-
-### 数据盘/回退路径
-
-- `SCRATCH`：优先 `MARK42_SCRATCH`，否则 `/mnt/data/openclaw/scratch`，不存在时回退 `~/.local/state/openclaw/scratch`
-- `LOG_DIR`：优先 `/mnt/data/openclaw/mark42/logs`，不存在时回退 `~/.local/state/openclaw/mark42/logs`
-
----
-
-## 9. `install.sh` 现在到了哪一步
-
-**它已经存在，但目前更适合“维护者手动验收后再 apply”，还不适合宣称“一键安装完成”。**
-
-现在已经完成：
-
-- ✅ 4 个 service 文件改成 **模板占位符**（`__MARK42_*`）
-- ✅ `bootstrap.sh` / `watchdog.sh` 改成 **环境变量驱动**
-- ✅ `tools/mark42-systemd/install.sh` 已补上
-  - 默认 **dry-run**
-  - 传 `--apply` 才真正写入 `~/.config/systemd/user/`
-  - 会渲染 4 个 service 模板，并复制 `mark42-watchdog.timer`
-  - 会做基础检测：`python/systemctl/sed/install`、`mark42.py`、模板文件是否存在
-  - 会提示 `openclaw` 命令和 `openclaw-gateway.service` 当前是否可用
-
-### 陌生机器安装前置条件清单
-
-在陌生机器上，**不要一上来就 `--apply`**。先对这张清单：
-
-#### 必须有
-
-1. **Linux + user systemd 可用**
-   - 至少要能执行：
-   ```bash
-   systemctl --user status
-   ```
-2. **Python 3.10+ 可用**
-   - 至少要能执行：
-   ```bash
-   python3 --version
-   ```
-3. **当前仓库就在目标 workspace 里**
-   - 并且 `scripts/mark42.py` 存在
-4. **基础命令存在**
-   - `systemctl`
-   - `sed`
-   - `install`
-5. **目标用户对自己的 `~/.config/systemd/user/` 有写权限**
-6. **OpenClaw Gateway 已装好，且 `openclaw-gateway.service` 已装好并建议先确认其正常**
-   - 因为 bootstrap / engine 的长期行为默认建立在 Gateway 可用之上
-
-#### 最好先确认
-
-1. **`openclaw` 命令可用**
-2. **`~/.openclaw/openclaw.json` 已有可工作的 provider / API key**
-3. **状态目录与数据盘路径策略明确**
-   - 默认 state：`~/.local/state/openclaw/mark42`
-   - 默认 scratch：`/mnt/data/openclaw/scratch`
-4. **知道这台机器要走哪种模式**
-   - 临时调试 → `python3 scripts/mark42.py assemble`
-   - 长期托管 → `tools/mark42-systemd/install.sh --apply`
-
-#### 没确认前先别装
-
-如果下面这些还不明确，建议先停在 dry-run：
-
-- `openclaw-gateway.service` 是否真的能稳定运行
-- 这台机器有没有 user systemd 会话环境
-- `/mnt/data/openclaw/scratch` 不存在时，是否接受默认 scratch 策略
-- 这台机器是临时开发机，还是要长期保活的生产托管机
-- 出问题后是否有回退办法（至少要先备份旧 unit）
-
-### 推荐先这样用
-
-先看 dry-run：
-
-```bash
-tools/mark42-systemd/preflight.sh
-tools/mark42-systemd/install.sh
-```
-
-需要真正写入时再执行：
-
-```bash
-tools/mark42-systemd/install.sh --apply
-```
-
-可选参数：
-
-- `--workspace PATH`
-- `--python PATH`
-- `--state-dir PATH`
-- `--scratch PATH`
-- `--user-unit-dir PATH`
-
-### systemd 工具链标准流程（推荐按顺序）
-
-#### 1）首装流程
-
-```bash
-tools/mark42-systemd/preflight.sh
-tools/mark42-systemd/install.sh
-tools/mark42-systemd/install.sh --apply
-systemctl --user start mark42-bootstrap.service
-systemctl --user start mark42-engine-daemon.service
-systemctl --user start mark42-armor-guard.service
-systemctl --user enable --now mark42-watchdog.timer
-tools/mark42-systemd/verify.sh
-```
-
-适用：
-- 第一次把 Mark42 挂到这台机器的 user systemd
-- 准备把这台机器切到长期托管模式
-
-#### 2）回退流程
-
-```bash
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS --apply
-tools/mark42-systemd/verify.sh
-```
-
-适用：
-- `install.sh --apply` 后想恢复旧 unit
-- 需要退回到已知稳定版本的 user systemd 配置
-
-#### 3）最低验收流程
-
-```bash
-tools/mark42-systemd/verify.sh
-```
-
-用途：
-- 安装后验收
-- 恢复后验收
-- 日后怀疑 user systemd 托管状态跑偏时，先做一次标准检查
-
-#### 4）卸载流程
-
-```bash
-tools/mark42-systemd/uninstall.sh
-tools/mark42-systemd/uninstall.sh --apply
-```
-
-用途：
-- 只卸载 Mark42 的 user systemd unit
-- 不删除工作区代码 / state / scratch 数据
-
-### 现在已经补出的辅助脚本
-
-#### `tools/mark42-systemd/preflight.sh`
-
-用途：
-- 把“陌生机器安装前置条件清单”脚本化
-- 在真正 `--apply` 前先跑一次机器体检
-- 额外补了 Gateway / provider 健康探测
-
-建议先跑：
-
-```bash
-tools/mark42-systemd/preflight.sh
-```
-
-通过标准：
-- `FAIL=0` 才建议进入 `install.sh --apply`
-- 有 `WARN` 时不一定阻塞，但要人工确认
-
-当前已覆盖的健康检查：
-- `openclaw status`
-- `openclaw health --json`（要求健康快照 `ok=true`）
-- `openclaw models status --json`（确认 provider/auth 状态面可读，并输出保守摘要）
-
-当前 provider 摘要会保守给出：
-- `providers=<n>`
-- `providersWithOAuth=<n>`
-- `oauthProfiles=<n>`
-- `unusableProfiles=<n>`
-- `missingProvidersInUse=<n>`
-
-#### `tools/mark42-systemd/uninstall.sh`
-
-用途：
-- 把 user systemd 卸载步骤脚本化
-
-先看 dry-run：
-
-```bash
-tools/mark42-systemd/uninstall.sh
-```
-
-真正卸载：
-
-```bash
-tools/mark42-systemd/uninstall.sh --apply
-```
-
-它默认只移除 user systemd unit，**不会删除**：
-- 工作区代码
-- `~/.local/state/openclaw/mark42/`
-- `/mnt/data/openclaw/scratch`
-
-#### `tools/mark42-systemd/restore.sh`
-
-用途：
-- 恢复 `install.sh --apply` 之前自动备份的旧 Mark42 unit
-- 默认 dry-run，只预览恢复动作
-
-示例：
-
-```bash
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS --apply
-```
-
-恢复行为：
-- stop 当前 Mark42 service（容错）
-- disable 当前 `mark42-watchdog.timer`（容错）
-- 把备份目录中的 `mark42-*.service` / `mark42-watchdog.timer` 覆盖回 user unit 目录
-- `systemctl --user daemon-reload`
-- `systemctl --user reset-failed`
-
-#### `tools/mark42-systemd/verify.sh`
-
-用途：
-- 统一安装后 / 恢复后的最小验收入口
-- 默认只读，不修改 systemd
-- 输出 `PASS/WARN/FAIL`，区分“没启动”和“真故障”
-
-示例：
-
-```bash
-tools/mark42-systemd/verify.sh
-```
-
-当前会检查：
-- user systemd 会话是否可访问
-- Mark42 unit 文件是否存在
-- `openclaw-gateway.service` 是否已安装且 active
-- `mark42-bootstrap.service` / `mark42-engine-daemon.service` / `mark42-armor-guard.service` / `mark42-watchdog.timer` 的加载与运行态
-- `openclaw status` 是否可读
-- `python3 scripts/mark42.py status --json` 是否可读
-- `activeLoops` 与 `armor.status` 是否达到最低预期
-
-### 当前还没到“完全交付”的原因
-
-1. **本机已经真实 `--apply` 并跑通最小验收，但仍未覆盖“陌生机器”场景**
-2. **开发模式 vs 生产守护模式的文档还在收尾**
-3. **安装器目前只负责“渲染 + 写入 + daemon-reload + enable watchdog timer”**
-   - 它不会替你自动启动全部 daemon
-   - 启动顺序和最终验收仍建议人工确认
-4. **`openclaw-gateway.service` 依赖仍然是前提**
-   - 这不是 bug，但意味着宿主环境检查必须明确
-5. **失败回退 / 卸载说明虽已脚本化基础版本，但陌生机器细节仍需继续收尾**
-6. **preflight 已具备基础 Gateway/provider 健康探测，但还不是完整生产级深探测**
-7. **现在已补“安装前自动备份 + 显式 restore 入口”，但仍不等于全自动无损回滚**
-8. **现在已补统一 `verify.sh` 验收入口，但它仍是“最低验收”，不是完整生产巡检**
-
-### 回退 / 卸载 / 故障恢复
-
-#### 1）快速回退到本机旧 unit
-
-如果这台机器上已经像今天这样先做过备份，可以直接退回：
-
-```bash
-backup_dir="$HOME/.config/systemd/user/mark42-backup-20260701-0849"
-systemctl --user stop mark42-watchdog.timer mark42-engine-daemon.service mark42-armor-guard.service mark42-bootstrap.service
-cp -f "$backup_dir"/mark42-*.service "$HOME/.config/systemd/user/"
-cp -f "$backup_dir"/mark42-watchdog.timer "$HOME/.config/systemd/user/"
-systemctl --user daemon-reload
-systemctl --user restart mark42-bootstrap.service
-systemctl --user restart mark42-engine-daemon.service
-systemctl --user restart mark42-armor-guard.service
-systemctl --user enable --now mark42-watchdog.timer
-```
-
-如果没有备份目录，就不要假装“可秒回退”，而是应先保留当前现场，再按 git 历史或已知稳定版本重新渲染安装。
-
-现在也可以优先用脚本化入口：
-
-```bash
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS
-tools/mark42-systemd/restore.sh --backup-dir ~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS --apply
-```
-
-另外，`tools/mark42-systemd/install.sh --apply` 现在会在覆盖已有 Mark42 unit 前，自动把旧 unit 备份到：
-
-```bash
-~/.config/systemd/user/mark42-backup-YYYYmmdd-HHMMSS/
-```
-
-至少先把“回退材料”保留下来。
-
-#### 2）卸载 user systemd 安装
-
-```bash
-systemctl --user disable --now mark42-watchdog.timer
-systemctl --user stop mark42-engine-daemon.service mark42-armor-guard.service mark42-bootstrap.service || true
-rm -f ~/.config/systemd/user/mark42-bootstrap.service \
-      ~/.config/systemd/user/mark42-engine-daemon.service \
-      ~/.config/systemd/user/mark42-armor-guard.service \
-      ~/.config/systemd/user/mark42-watchdog.service \
-      ~/.config/systemd/user/mark42-watchdog.timer
-systemctl --user daemon-reload
-systemctl --user reset-failed
-```
-
-这只会卸载 user systemd 单元，**不会删除**：
-
-- 工作区代码
-- `~/.local/state/openclaw/mark42/` 状态数据
-- `/mnt/data/openclaw/scratch` scratch 数据
-
-如果要清状态目录，建议先备份再删，不要把卸载和清数据混成一步。
-
-#### 3）故障恢复顺序
-
-如果 `--apply` 后服务起不来，按这个顺序查：
-
-1. 看 unit 状态
-```bash
-systemctl --user status mark42-bootstrap.service mark42-engine-daemon.service mark42-armor-guard.service mark42-watchdog.timer
-```
-2. 看最近日志
-```bash
-journalctl --user -u mark42-bootstrap.service -u mark42-engine-daemon.service -u mark42-armor-guard.service -u mark42-watchdog.service -n 80 --no-pager
-```
-3. 看 Mark42 总状态
-```bash
-python3 scripts/mark42.py status --json
-```
-4. 看 Gateway 依赖是否活着
-```bash
-systemctl --user status openclaw-gateway.service --no-pager
-```
-5. 看目录是否真的存在
-```bash
-ls -ld ~/.local/state/openclaw/mark42 ~/.local/state/openclaw/mark42/logs ~/.local/state/openclaw/mark42/engine /mnt/data/openclaw/scratch
-```
-
-本机这次真实 apply 踩到过的已知故障就是：
-- `mark42-armor-guard.service`
-- `status=209/STDOUT`
-- 根因是 `MARK42_LOG_DIR` 不存在
-
-所以以后如果再看到 `Failed to set up standard output`，优先先查日志目录，而不是先怀疑 Python 逻辑。
-
-### 最小验收流程
-
-执行 `--apply` 后，至少再验这一组：
-
-```bash
-tools/mark42-systemd/preflight.sh
-systemctl --user start mark42-bootstrap.service
-systemctl --user start mark42-engine-daemon.service
-systemctl --user start mark42-armor-guard.service
-systemctl --user enable --now mark42-watchdog.timer
-systemctl --user status mark42-bootstrap.service mark42-engine-daemon.service mark42-armor-guard.service mark42-watchdog.timer
-python3 scripts/mark42.py status --json
-```
-
-### 这意味着什么
-
-当前更诚实的状态是：
-
-- ✅ **Quick Start 已可用**：能让新接手的人先跑通、先验活
-- ✅ **模板化 + 安装脚本已落地**
-- ✅ **本机真实 apply 已验过**：bootstrap / engine / armor / watchdog timer 全部通过最小验收
-- 🟡 **但仍未达到“陌生机器一键装好”**：因为跨机器前置条件、回退说明、模式分流还没完全写完
+## 8. 快速导航：目录 / 文档 / 测试 / systemd
+
+### 代码与测试入口
+
+| 目标 | 路径 / 命令 |
+|---|---|
+| CLI 入口 | `scripts/mark42.py` |
+| 主逻辑 | `scripts/mark42_modules/cli.py` |
+| 单元/集成测试 | `scripts/tests/` |
+| 全量回归 | `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` |
+| 当前测试接力说明 | `docs/design/mark42-测试覆盖接力开发方向-20260701.md` |
+
+### 文档入口
+
+| 想看什么 | 入口 |
+|---|---|
+| 当前阶段裁定 | `docs/design/mark42-最终审查报告-20260701.md` |
+| 当前运行态 | `docs/design/mark42-当前总体状态报告-20260701.md` |
+| 对外可读摘要 | `docs/design/mark42-发布摘要-20260701.md` |
+| 完整文档地图 | `docs/design/mark42-文档目录.md` |
+| 详细变更留痕 | `docs/design/mark42-更新日志.md` |
+
+### 运行时目录
+
+| 目标 | 路径 |
+|---|---|
+| 主状态目录 | `~/.local/state/openclaw/mark42/` |
+| armor 状态 | `~/.local/state/openclaw/mark42/armor/` |
+| engine 状态 | `~/.local/state/openclaw/mark42/engine/` |
+| heavy 状态 | `~/.local/state/openclaw/mark42/heavy/` |
+| scratch（默认优先） | `/mnt/data/openclaw/scratch` |
+| 日志目录（默认优先） | `/mnt/data/openclaw/mark42/logs` |
+
+### systemd 工具链入口
+
+| 场景 | 命令 |
+|---|---|
+| 安装前体检 | `tools/mark42-systemd/preflight.sh` |
+| 安装预览（dry-run） | `tools/mark42-systemd/install.sh` |
+| 真正写入 user systemd | `tools/mark42-systemd/install.sh --apply` |
+| 最低验收 | `tools/mark42-systemd/verify.sh` |
+| 回退旧 unit | `tools/mark42-systemd/restore.sh --backup-dir <dir> --apply` |
+| 卸载 unit | `tools/mark42-systemd/uninstall.sh --apply` |
+
+### 一句话边界
+
+- **README 负责快速导航，不展开所有运维细节。**
+- 更细的背景、风险、裁定口径，优先看：
+  - `docs/design/mark42-当前总体状态报告-20260701.md`
+  - `docs/design/mark42-最终审查报告-20260701.md`
+  - `docs/design/mark42-更新日志.md`
 
 ---
 
