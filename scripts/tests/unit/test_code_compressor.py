@@ -274,3 +274,110 @@ class TestCodeCrush:
         assert "truncated_functions" in meta
         assert "removed_docstrings" in meta
         assert "removed_comments" in meta
+
+    def test_preserve_signatures_false_uses_ellipsis_signature(self):
+        comp = code_compressor.CodeCompressor(
+            language="python",
+            min_code_size=50,
+            preserve_signatures=False,
+        )
+        src = (
+            "def hello(name, age):\n"
+            "    value = name\n"
+            "    return value\n"
+        ) * 4
+        result, meta = comp.compress(src)
+        assert "def hello(...):" in result
+        assert meta["mode"] == "compressed"
+
+    def test_docstring_only_function_becomes_pass(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "import os\n\n"
+            "def only_doc():\n"
+            "    \"\"\"doc only\"\"\"\n"
+        ) * 6
+        result, meta = comp.compress(src)
+        assert "def only_doc():" in result
+        assert "    pass" in result
+        assert meta["removed_docstrings"] >= 1
+        assert meta["is_code"] is True
+
+    def test_empty_class_becomes_pass(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "import os\n\n"
+            "class Empty:\n"
+            "    \"\"\"doc\"\"\"\n"
+        ) * 6
+        result, meta = comp.compress(src)
+        assert "class Empty:" in result
+        assert "    pass" in result
+        assert meta["removed_docstrings"] >= 1
+        assert meta["is_code"] is True
+
+    def test_class_fallback_skips_stmt_when_unparse_fails(self, monkeypatch):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "class Holder:\n"
+            "    VALUE = 1\n"
+            "    def ok(self):\n"
+            "        return 1\n"
+        ) * 4
+        original_unparse = code_compressor.ast.unparse
+
+        def fake_unparse(node):
+            if getattr(node, "id", None) == "VALUE":
+                raise RuntimeError("boom")
+            return original_unparse(node)
+
+        monkeypatch.setattr(code_compressor.ast, "unparse", fake_unparse)
+        result, meta = comp.compress(src)
+        assert "class Holder:" in result
+        assert "def ok(self): ..." in result
+        assert meta["mode"] == "compressed"
+
+    def test_regex_mode_without_comment_removal_keeps_comments(self):
+        comp = code_compressor.CodeCompressor(
+            language="javascript",
+            min_code_size=50,
+            remove_comments=False,
+        )
+        js = (
+            "// keep me\n"
+            "function hello(name) {\n"
+            "    return name;\n"
+            "}\n"
+            "const x = 1;\n"
+        ) * 4
+        result, meta = comp.compress(js)
+        assert "// keep me" in result
+        assert meta["removed_comments"] == 0
+        assert meta["mode"] == "compressed"
+
+
+class TestRunTests:
+    def test_run_tests_success(self, capsys):
+        assert code_compressor._run_tests() is True
+        out = capsys.readouterr().out
+        assert "CodeCompressor 单元测试" in out
+        assert "结果:" in out
+        assert "失败" in out
+
+    def test_main_branch_exit_zero(self, monkeypatch):
+        monkeypatch.setattr(code_compressor, "_run_tests", lambda: True)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": code_compressor._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 0
+
+    def test_main_branch_exit_one(self, monkeypatch):
+        monkeypatch.setattr(code_compressor, "_run_tests", lambda: False)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": code_compressor._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 1

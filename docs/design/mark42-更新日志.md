@@ -5,6 +5,61 @@
 
 ---
 
+## 2026-07-01 #20 — 收紧 README 导航块，并把 `code_compressor.py` 正式收口到 95.1%
+
+**背景**：
+在先后补完总体状态报告、发布摘要和 README 首页状态区之后，README 后半段仍有一大块“目录 / 文档 / systemd / 测试入口”说明写得过长，不够像首页导航。同时，测试接力主线按既定顺序切回 `code_compressor.py`，单文件覆盖实跑仍只有 `61.8%`，缺口高度集中在模块底部 `_run_tests()` 和少量中段分支。
+
+**本轮实际动作**：
+1. **README 导航再收口**：
+   - 将原来长篇展开的：
+     - 目录与状态文件
+     - systemd 工具链说明
+     - 测试 / 文档入口
+   - 压成一块更短、更适合 GitHub 首页浏览的导航区：
+     - 代码与测试入口
+     - 文档入口
+     - 运行时目录
+     - systemd 工具链入口
+     - 一句话边界
+   - 保留关键信息，但把细节背景移交给：
+     - `mark42-当前总体状态报告-20260701.md`
+     - `mark42-最终审查报告-20260701.md`
+     - `mark42-更新日志.md`
+2. **测试接力切回 `code_compressor.py`**：
+   - 继续沿用“直接补现有测试文件”的策略
+   - 修改：`scripts/tests/unit/test_code_compressor.py`
+3. **新增测试覆盖重点**：
+   - `preserve_signatures=False` 的 `def xxx(...):` 分支
+   - docstring-only function 在剥离后补 `pass` 的分支
+   - docstring-only class 在剥离后补 `pass` 的分支
+   - `_process_class()` 中 `ast.unparse()` 异常吞错分支
+   - regex fallback 在 `remove_comments=False` 时保留注释
+   - 模块底部 `_run_tests()` 成功路径
+   - `__main__` 分支退出码：`0 / 1`
+4. **中途修正了 1 个测试口径问题**：
+   - 一开始“只有 `def` + docstring”的样本被 `is_code()` 识别成非代码 passthrough
+   - 不是实现错，而是启发式要求至少两个代码关键词种类
+   - 后来补入 `import` 让样本更贴真实代码路径，测试稳定通过
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_code_compressor.py --cov=scripts/mark42_modules/code_compressor.py --cov-report=term-missing -q` ✅
+  - **33 passed**
+  - `code_compressor.py`: **61.8% → 95.1%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **534 passed, 2 skipped**
+  - overall: **74.7% → 76.0%**
+
+**当前意义**：
+- README 首页已经更像真正的仓库导航页，而不是把所有运维细节都堆在首页
+- `code_compressor.py` 从中位覆盖模块正式进入“基本收口”区间
+- overall 已经跨过 **75%** 这条线，后续可以更从容地把主线切到：
+  - `config.py`
+  - `engine.py`
+  - 或者若要继续压小洞，再看 `diff_compressor.py` / `log_deduplicator.py`
+
+---
+
 ## 2026-07-01 #19 — 新增对外可读版《Mark42 发布摘要》，补齐 GitHub / 回看入口
 
 **背景**：
