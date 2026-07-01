@@ -920,3 +920,228 @@ class TestArmorPreCompactHook:
         big = [{"role": "user", "content": f"msg {i}"} for i in range(1000)]
         result = armor.armor_pre_compact_hook(big, dry_run=False)
         assert isinstance(result, dict)
+
+    def test_scheduler_disabled_falls_back_to_direct_path(self, mocker, monkeypatch):
+        """调度器不可用时走 direct 路径。"""
+        # 启用所有门
+        monkeypatch.setattr(armor, "ALGO_SMARTCRUSH_ENABLED", True)
+        monkeypatch.setattr(armor, "ALGO_EXPERIMENT_MODE", True)
+        monkeypatch.setattr(armor, "ALGO_USE_SCHEDULER", False)
+        # fake smartcrush
+        fake_result = {"crushed_bytes": 50, "original_bytes": 200}
+        mocker.patch.object(armor, "smartcrush", return_value=("", fake_result))
+
+        msgs = [
+            {"type": "message", "message": {"content": "a" * 5000}},
+            {"type": "message", "message": {"content": "b" * 5000}},
+        ]
+        result = armor.armor_pre_compact_hook(msgs, dry_run=False)
+
+        assert result["enabled"] is True
+        assert result["mode"] == "direct"
+        assert result["algorithm"] == "smartcrush"
+        assert result["filesProcessed"] == 2
+        assert result["overallRatio"] > 0
+
+    def test_scheduler_path_records_buckets_pii_and_fallback(self, mocker, monkeypatch):
+        """调度器路径应记录桶分布、PII 脱敏数和回退。"""
+        monkeypatch.setattr(armor, "ALGO_SMARTCRUSH_ENABLED", True)
+        monkeypatch.setattr(armor, "ALGO_EXPERIMENT_MODE", True)
+        monkeypatch.setattr(armor, "ALGO_USE_SCHEDULER", True)
+        # fake algo_scheduler
+        mock_decide = MagicMock()
+        mock_decide.size_bucket = "small"
+        mocker.patch.object(armor, "algo_scheduler_decide", return_value=mock_decide)
+        mock_process = MagicMock(side_effect=[
+            {"result": "compressed", "pii_stats": {"total_redactions": 3}, "fallback_reason": None},
+            {"result": "compressed", "pii_stats": {"total_redactions": 0}, "fallback_reason": "too_small"},
+            {"result": "compressed", "pii_stats": None, "fallback_reason": None},
+        ])
+        mocker.patch.object(armor, "algo_scheduler_process", side_effect=mock_process)
+
+        msgs = [
+            {"type": "message", "message": {"content": "foo"}},
+            {"type": "message", "message": {"content": "bar"}},
+            {"type": "other", "content": "ignored"},
+            {"type": "message", "message": {"content": 12345}},
+        ]
+        result = armor.armor_pre_compact_hook(msgs, dry_run=False)
+
+        assert result["enabled"] is True
+        assert result["mode"] == "scheduler"
+        assert result["algorithm"] == "algo_scheduler"
+        assert result["filesProcessed"] == 2
+        assert result["piiRedactions"] == 3
+        assert result["fallbackCount"] == 1
+        assert result["decisionsByBucket"].get("small", 0) == 2
+
+    def test_scheduler_dry_run_skips_process_but_records_decisions(self, mocker, monkeypatch):
+        """dry_run=True 时只记录决策，不真的跑调度处理。"""
+        monkeypatch.setattr(armor, "ALGO_SMARTCRUSH_ENABLED", True)
+        monkeypatch.setattr(armor, "ALGO_EXPERIMENT_MODE", True)
+        monkeypatch.setattr(armor, "ALGO_USE_SCHEDULER", True)
+        mock_decide = MagicMock(size_bucket="tiny")
+        mocker.patch.object(armor, "algo_scheduler_decide", return_value=mock_decide)
+        mock_process = mocker.patch.object(armor, "algo_scheduler_process")
+
+        msgs = [{"type": "message", "message": {"content": "x"}}]
+        result = armor.armor_pre_compact_hook(msgs, dry_run=True)
+
+        assert result["decisionsByBucket"].get("tiny", 0) == 1
+        mock_process.assert_not_called()
+        assert result["filesProcessed"] == 0
+
+    def test_scheduler_failure_with_fail_safe_swallows(self, mocker, monkeypatch):
+        """调度器异常 + ALGO_FAIL_SAFE=True 时静默吞错。"""
+        monkeypatch.setattr(armor, "ALGO_SMARTCRUSH_ENABLED", True)
+        monkeypatch.setattr(armor, "ALGO_EXPERIMENT_MODE", True)
+        monkeypatch.setattr(armor, "ALGO_USE_SCHEDULER", True)
+        monkeypatch.setattr(armor, "ALGO_FAIL_SAFE", True)
+        mocker.patch.object(armor, "algo_scheduler_decide", side_effect=RuntimeError("boom"))
+
+        msgs = [{"type": "message", "message": {"content": "x"}}]
+        result = armor.armor_pre_compact_hook(msgs, dry_run=False)
+
+        assert result["ran"] is True
+        assert "boom" in (result["error"] or "")
+        assert result["filesProcessed"] == 0
+
+    def test_scheduler_path_no_compression_available(self, mocker, monkeypatch):
+        """算法不可用时应直接返回 disabled stats（不发燥）。"""
+        monkeypatch.setattr(armor, "_COMPRESSION_AVAILABLE", False)
+
+        result = armor.armor_pre_compact_hook([], dry_run=False)
+
+        assert result["enabled"] is False
+        assert result["ran"] is False
+        assert result["error"] is None
+
+
+class TestArmorCompressSkip:
+    """armor_compress() 低于阈值 / dry_run 分支。"""
+
+    def test_skip_below_warn_threshold(self, mocker):
+        """使用率 < WARN 且非 dry_run 时返回 skip。"""
+        fake_check = {"usagePercent": 30.0, "severity": "ok"}
+        mocker.patch.object(armor, "armor_check", return_value=fake_check)
+
+        result = armor.armor_compress()
+
+        assert result["action"] == "skip"
+        assert "30.0%" in result["reason"]
+
+
+class TestArmorGuard:
+    """armor_guard() 守护循环。"""
+
+    def test_guard_exits_on_keyboard_interrupt(self, mocker):
+        """守护循环应可被 KeyboardInterrupt 干净退出。"""
+        fake_check = {"usagePercent": 30.0, "severity": "ok", "summary": "ok"}
+        mocker.patch.object(armor, "armor_check", return_value=fake_check)
+        mocker.patch.object(armor.time, "sleep", side_effect=KeyboardInterrupt)
+
+        armor.armor_guard(interval_s=0)
+
+    def test_guard_triggers_compress_above_alert(self, mocker):
+        """使用率超 ALERT 时自动触发 compress。"""
+        fake_check = {"usagePercent": 85.0, "severity": "warn", "summary": "near"}
+        mocker.patch.object(armor, "armor_check", return_value=fake_check)
+        mocker.patch.object(armor, "armor_compress", return_value={"action": "compress"})
+        sleep_mock = mocker.patch.object(armor.time, "sleep", side_effect=KeyboardInterrupt)
+
+        armor.armor_guard(interval_s=0)
+
+        assert sleep_mock.called
+
+
+class TestArmorCompressAsyncExtra:
+    """armor_compress_async() 补充覆盖：queue dropped / timeout / failed。"""
+
+    def test_async_queue_full_returns_dropped(self, mocker):
+        """queue 已满时返回 dropped。"""
+        fake_active = MagicMock()
+        fake_active.name = "agent.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_active)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[{"role": "user"}])
+
+        fake_req = MagicMock()
+        mocker.patch("mark42_modules.compress_queue.CompressRequest", return_value=fake_req)
+        fake_queue = MagicMock(enqueue=MagicMock(return_value=False), qsize=MagicMock(return_value=42))
+        mocker.patch("mark42_modules.compress_queue.get_compress_queue", return_value=fake_queue)
+
+        result = armor.armor_compress_async()
+
+        assert result["status"] == "dropped"
+        assert result["reason"] == "queue_full"
+        assert result["queue_size"] == 42
+
+    def test_async_wait_timeout_returns_timeout(self, mocker):
+        """wait=True 但 req.wait 超时：返回 timeout。"""
+        fake_active = MagicMock()
+        fake_active.name = "agent.jsonl"
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_active)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[{"role": "user"}])
+
+        fake_req = MagicMock()
+        fake_req.wait.return_value = False
+        mocker.patch("mark42_modules.compress_queue.CompressRequest", return_value=fake_req)
+        fake_queue = MagicMock(enqueue=MagicMock(return_value=True), qsize=MagicMock(return_value=1))
+        mocker.patch("mark42_modules.compress_queue.get_compress_queue", return_value=fake_queue)
+
+        result = armor.armor_compress_async(wait=True)
+
+        assert result["status"] == "timeout"
+        assert result["request_id"] == fake_req.request_id
+
+    def test_async_wait_failed_returns_error(self, mocker):
+        """wait=True 且 req.error 不为空：返回 failed。"""
+        fake_active = MagicMock(name="agent.jsonl")
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_active)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[])
+
+        fake_req = MagicMock()
+        fake_req.wait.return_value = True
+        fake_req.error = "scheduler explode"
+        mocker.patch("mark42_modules.compress_queue.CompressRequest", return_value=fake_req)
+        fake_queue = MagicMock(enqueue=MagicMock(return_value=True), qsize=MagicMock(return_value=1))
+        mocker.patch("mark42_modules.compress_queue.get_compress_queue", return_value=fake_queue)
+
+        result = armor.armor_compress_async(wait=True)
+
+        assert result["status"] == "failed"
+        assert result["error"] == "scheduler explode"
+
+    def test_async_completed_returns_result(self, mocker):
+        """wait=True 且 req.error=None：返回 completed + result。"""
+        fake_active = MagicMock(name="agent.jsonl")
+        mocker.patch.object(armor, "_find_active_session", return_value=fake_active)
+        mocker.patch.object(armor, "_read_session_tail", return_value=[{"role": "user"}])
+
+        fake_req = MagicMock()
+        fake_req.wait.return_value = True
+        fake_req.error = None
+        fake_req.result = {"action": "compress"}
+        mocker.patch("mark42_modules.compress_queue.CompressRequest", return_value=fake_req)
+        fake_queue = MagicMock(enqueue=MagicMock(return_value=True), qsize=MagicMock(return_value=1))
+        mocker.patch("mark42_modules.compress_queue.get_compress_queue", return_value=fake_queue)
+
+        result = armor.armor_compress_async(wait=True)
+
+        assert result["status"] == "completed"
+        assert result["result"] == {"action": "compress"}
+
+
+class TestArmorCompressQueueStatsExtra:
+    """armor_compress_queue_stats() 错误路径。"""
+
+    def test_returns_error_when_module_unavailable(self, mocker):
+        """队列模块 import 失败时返回 error dict。"""
+        mocker.patch(
+            "mark42_modules.compress_queue.get_compress_queue",
+            side_effect=ImportError("queue broken"),
+        )
+
+        result = armor.armor_compress_queue_stats()
+
+        assert "error" in result
+        assert "queue broken" in result["error"]

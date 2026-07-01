@@ -570,6 +570,13 @@ class TestMainDispatchExtra:
         out = capsys.readouterr().out
         assert "--task-name 不能为空" in out
 
+    def test_heavy_without_any_action_prints_help(self, mocker, capsys):
+        """heavy 子命令不带任何 --start/--execute/... 时报错。"""
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy"])
+        cli.main()
+        out = capsys.readouterr().out
+        assert "请指定" in out or "--preflight" in out
+
     def test_status_json_prints_serialized_dashboard(self, mocker, capsys):
         mocker.patch.object(sys, "argv", ["mark42.py", "status", "--json"])
         mocker.patch.object(cli, "status_dashboard", return_value={"ok": True, "value": 1})

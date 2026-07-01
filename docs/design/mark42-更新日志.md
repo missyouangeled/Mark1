@@ -5,6 +5,221 @@
 
 ---
 
+## 2026-07-01 #34 — 继续测试接力：收尾 `code_compressor.py` + 扫描 `cli.py` 边缘分支，整体覆盖升到 97.5%
+
+**背景**：
+`heavy.py` 完成后，按接力顺位补 `code_compressor.py` 和 `cli.py` 最后一类高价值 contract。这轮尽量在“不扭实现”的前提下填补能填的。
+
+**本轮实际动作**：
+1. 修改：
+   - `scripts/tests/unit/test_code_compressor.py`
+     - 新增顶层常量赋值走 `_compress_python` else 分支的测试
+     - 新增函数体被截断后 `ast.unparse` 异常走 `...` fallback 的测试
+   - `scripts/tests/unit/test_cli.py`
+     - 新增 heavy 子命令无 `--start/--execute/...` 任何 action 时走 else 兑底分支的测试
+2. 不补的：
+   - `cli.py` 的 SIGTERM/SIGINT 信号处理路径（只能真发信号触发）
+   - `cli.py` 的 `args.module == "heavy"` 之后重复出现的 `elif args.preflight` `elif args.start` （实际是死代码）
+   - `code_compressor.py` 的 AST 异常 fallback (在进程里赋 ast 不可变、不能动)
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_code_compressor.py -q --cov=mark42_modules.code_compressor --cov-report=term-missing -q` ✅
+  - **35 passed**
+  - `code_compressor.py`: **96.1%**
+- `python3 -m pytest scripts/tests/unit/test_cli.py -q --cov=mark42_modules.cli --cov-report=term-missing -q` ✅
+  - **55 passed**
+  - `cli.py`: 仍 **98.0%**（兑底 else 走通但 cov 仍报 5 行未覆盖，主要是死代码 / 信号处理）
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **700 passed, 2 skipped**
+  - overall: **97.4% → 97.5%**
+
+**当前意义**：
+- overall 已在 **97.5%**，主要模块全部 ≥ 92%，只有 `armor.py` 92.6% / `heavy.py` 92.8% 偏中位但都已进入不可达分支。
+- 继续补单测的边际收益已低于 0.1%。
+- 下一个真正的价值点仍是：商品化 / 文档 / 陌生机器从零安装验证 / 阶段 2 路径。
+
+## 2026-07-01 #33 — 继续测试接力：`heavy.py` 收到 92.8%，整体覆盖升到 97.4%
+
+**背景**：
+`armor.py` 主要 contract 收口后，主线按接力顺位切到 `heavy.py`。这一刀仍遵守边界：只补高价值 contract —— `heavy_detect_human` 的 "ask" 分支、`heavy_execute_all` 缺任务 / 无 pending 路径。不去重写 stdin 倒计时 / Popen 启动细节。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_heavy.py`
+2. 新增覆盖重点：
+   - `heavy_detect_human(..., auto_mode="ask")`
+     - isHeavy=True + ask 模式只提示手动命令，不调 `heavy_start`
+   - `heavy_execute_all()`
+     - status_file 不存在 → 返回 `[]` + 报错
+     - 无 pending 子任务 → 返回 `[]` + 报错
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_heavy.py -q` ✅
+  - **41 passed**
+- `python3 -m pytest scripts/tests/unit/test_heavy.py --cov=mark42_modules.heavy --cov-report=term-missing -q` ✅
+  - `heavy.py`: **92.8%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **697 passed, 2 skipped**
+  - `heavy.py`: **90.6% → 92.8%**
+  - overall: **97.3% → 97.4%**
+
+**当前意义**：
+- `heavy.py` 剩余未覆盖几乎全是 stdin 交互 / Popen 启动内部细节，硬补收益很低
+- 下一刀主候选：`cli.py` (98.0%) 的残余异常吞错支路；或 `code_compressor.py` (95.1%) 的尾段
+- overall 已 **97.4%**，到达能继续推进但单刀收益越来越小的阶段
+
+## 2026-07-01 #32 — 继续测试接力：`armor.py` 收到 92.6%，整体覆盖升到 97.3%
+
+**背景**：
+`engine.py` 基本收口后，主线按接力顺位切到 `armor.py`。这一刀仍遵守边界：只补高价值 contract / 守护循环 / 异步入口的状态机。不去重跑 `openclaw sessions compact` 或真依赖 LLM。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_armor_compress.py`
+2. 新增覆盖重点：
+   - `armor_pre_compact_hook()`
+     - 调度器不可用 → 走 `_hook_direct_smartcrush`
+     - 调度器路径下记录 `decisionsByBucket` / `piiRedactions` / `fallbackCount`
+     - `dry_run=True` 只记录决策不真处理
+     - `ALGO_FAIL_SAFE=True` 时调度异常静默吞错
+     - 算法不可用时返回 disabled stats
+   - `armor_compress()`
+     - 使用率 < `THRESHOLD_WARN` 且非 `dry_run` → 返回 `action=skip`
+   - `armor_guard()`
+     - `KeyboardInterrupt` 干净退出
+     - 超 `THRESHOLD_ALERT` 自动触发 `armor_compress`
+   - `armor_compress_async()`
+     - 队列满 → `status=dropped`
+     - `wait=True` 但超时 → `status=timeout`
+     - `wait=True` 且 `req.error` 不为空 → `status=failed`
+     - `wait=True` 且完成 → `status=completed` + result
+   - `armor_compress_queue_stats()`
+     - 队列模块 `ImportError` 时返回 error dict
+3. 实跑中修了 2 处测试预期，让它贴合真实实现：
+   - `_hook_direct_smartcrush` 受 `ALGO_SMARTCRUSH_MIN_CONTENT_SIZE` 影响，测试载荷加大到 5000 字节以触发
+   - skip 理由里是 `30.0%`，断言已改成包含 `30.0%`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_armor_check.py scripts/tests/unit/test_armor_compress.py -q` ✅
+  - **71 passed**
+- `python3 -m pytest scripts/tests/unit/test_armor_check.py scripts/tests/unit/test_armor_compress.py --cov=mark42_modules.armor --cov-report=term-missing -q` ✅
+  - `armor.py`: **92.4%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **694 passed, 2 skipped**
+  - `armor.py`: **86.9% → 92.6%**
+  - overall: **96.7% → 97.3%**
+
+**当前意义**：
+- `armor.py` 现有剩余未覆盖是 import 块 / 几乎不可达的守卫行 / PII 边缘决策，肉的 contract 都已收口
+- 下一刀主候选：`heavy.py` (90.6%)，仍有若干错误路径 / fallback 可补
+
+## 2026-07-01 #31 — 继续测试接力：`engine.py` 收到 98.1%，整体覆盖升到 96.7%
+
+**背景**：
+`compaction_diag.py` 基本收口后，主线按接力顺位自然切到 `engine.py`。这一刀继续遵守边界：不碰真实 systemd / 长时间 daemon 守护，不去重跑外部重型流程，而是专门补 `engine.py` 剩余高价值 contract 分支——模板输出、task-watch 活跃任务汇总、health-watch 的低内存/异常 fallback、memory-index 对旧文件/坏文件的容错，以及 daemon 对坏事件/坏时间戳/非 registered loop 的处理。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_engine.py`
+2. 新增覆盖重点：
+   - `engine_templates()`
+     - 内置模板输出 smoke
+   - `engine_list()`
+     - `template=""` 时不打印模板行
+   - `engine_run_loop(..., template="task-watch")`
+     - 只统计 `status=started` 的重型任务
+     - 汇总 scratch 子任务的 `pending` / `failed`
+   - `engine_run_loop(..., template="health-watch")`
+     - 低内存告警
+     - `disk_usage/open/read_meminfo` 异常时 fallback 到 `?`
+   - `engine_run_loop(..., template="memory-index")`
+     - 跳过过旧 daily
+     - 跳过非法日期文件名
+     - INDEX 追加去重
+   - `engine_run_loop()`
+     - `persist=True` 真走 `_save_loops`
+     - 缺失 loop 名称时报错返回
+   - `engine_daemon()`
+     - broker 里坏 JSON 行直接跳过
+     - 非 `registered` loop 不执行
+     - `lastRun` 是坏时间戳时走异常 fallback，继续执行
+     - 事件文件 `open()` 抛 `OSError` 时容错
+     - 10 周期 rotation 时 `status_dashboard` 失败也静默吞掉
+3. 实跑中修正了 3 个测试预期，让它贴合真实实现：
+   - `Path.glob()` 返回顺序不保证按文件名字典序，所以 `activeTasks` 断言改成排序后比较
+   - `health-watch` 告警后还会统一发一条 loop completed broker 事件，不能只断言 `_append_broker` 调 1 次
+   - daemon 写 cursor/heartbeat 走的是 `_save_json`，不是 `_save_loops`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_engine.py -q` ✅
+  - **43 passed**
+- `python3 -m pytest scripts/tests/unit/test_engine.py --cov=mark42_modules.engine --cov-report=term-missing -q` ✅
+  - `engine.py`: **98.1%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **681 passed, 2 skipped**
+  - `engine.py`: **90.2% → 98.1%**
+  - overall: **96.1% → 96.7%**
+
+**当前意义**：
+- `engine.py` 已从“下一个主候选”进入**基本收口**状态
+- Mark42 全量覆盖再抬一个台阶，到 **96.7%**
+- 下一刀最自然的主候选已经切到：
+  1. `armor.py`
+  2. 然后再看 `heavy.py`
+  3. `cli.py` 残差最后评估值不值得清
+
+## 2026-07-01 #30 — 继续测试接力：`compaction_diag.py` 收到 99.4%，整体覆盖升到 96.1%
+
+**背景**：
+`armor.py` 补强后，主线按接力文档继续切回 `compaction_diag.py`。这一刀不去碰真实 Gateway / 长耗时探针，而是专门补它剩下那批**高价值碎支路**：session 读取容错、`_load_openclaw_json()` 异常分支、`compaction_diagnose()` 的 real-session 扫描汇总、`compaction_apply()` 的 error/no-op/额外修正分支，以及 `print_diagnose()` 的剩余输出分支。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_compaction_diag.py`
+2. 新增覆盖重点：
+   - `_load_openclaw_json()`
+     - 路径不存在
+     - 非法 JSON
+     - `open()` 抛 `OSError`
+   - `_token_aware_check()`
+     - `_SESSIONS_DIR` 不存在
+     - `near_limit` 分支
+   - `_probe_quality_check()` / `_drift_check()`
+     - 空行 / 坏 JSON 跳过
+     - 读取某个 session 文件时 `OSError` 容错
+     - `latestCompaction` 选择契约
+   - `compaction_diagnose()`
+     - `softThresholdTokens` 告警汇总
+     - 真实 session 目录扫描后的 `todaySessionCount` / `largestTranscriptMB`
+     - `token_aware` / `dual_threshold` advice 聚合
+   - `compaction_apply()`
+     - `openclaw.json` 无法读取 → `error`
+     - `issues` 有告警但无可自动修正项 → `nothing_to_do`
+     - `keepRecentTokens` / `reserveTokens` 自动修正
+   - `print_diagnose()`
+     - `token_awareness=no_data`
+     - `dual_threshold`
+     - `drift_detection=insufficient_data`
+     - 普通 `ok` / `too_high` 展示分支
+3. 实跑时发现 2 个测试预期最初不贴真实实现：
+   - `probe` 会抓到**第一个** compaction 事件，不是后面的那个
+   - `largestTranscriptMB` 会先 `round(..., 1)`，太小文件会被吞成 `0.0`
+   已按真实行为修正测试，不去反向扭实现。
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_compaction_diag.py -q` ✅
+  - **64 passed, 1 skipped**
+- `python3 -m pytest scripts/tests/unit/test_compaction_diag.py --cov=mark42_modules.compaction_diag --cov-report=term-missing -q` ✅
+  - `compaction_diag.py`: **99.4%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **673 passed, 2 skipped**
+  - `compaction_diag.py`: **86.5% → 99.4%**
+  - `engine.py`: **88.0% → 90.2%**（受全量联动覆盖影响）
+  - overall: **94.7% → 96.1%**
+
+**当前意义**：
+- `compaction_diag.py` 已从“还剩一批碎支路”变成**基本收口**
+- Mark42 全量覆盖率继续上推到 **96.1%**
+- 下一刀最自然的主候选已切到：
+  - `engine.py`
+  - 然后再评估 `armor.py` / `cli.py` 是否值得清残差
+
 ## 2026-07-01 #26 — 继续测试接力：`perf_bench.py` 从 44.9% 拉到 97.4%，整体覆盖升到 89.6%
 
 **背景**：
@@ -3632,4 +3847,50 @@ python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-
 - `docs/design/mark42-文档目录.md` 同步基线 + 指针
 - `memory/daily/2026-07-01.md` §19 本轮指针
 - `docs/design/mark42-更新日志.md` #本条已写完
+
+---
+
+## 2026-07-01 #35 — 本轮测试补强收口总结（15:46 存档）
+
+> **为什么加这一条**：本轮 #30 → #34 连推了 5 轮、补了 5 个模块，本条仅作为“本轮联动总结”，方便未读 #30-#34 的下次接手者一眼看清本轮产出的全部位置。
+
+**本轮产出**：
+
+- `scripts/mark42_modules/` 下 5 个模块进入基本收口：
+  - `compaction_diag.py`: 86.5% → **98.8%**（全量口径补）
+  - `engine.py`: 90.2% → **98.1%**
+  - `armor.py`: 86.9% → **92.6%**
+  - `heavy.py`: 90.6% → **92.8%**
+  - `code_compressor.py`: 95.1% → **96.1%**
+  - `cli.py`: 保留 98.0%（死代码 / SIGTERM 不扭实现）
+
+**本轮总体成果**：
+
+- passed: **526 → 700**
+- skipped: **2 → 2**
+- overall: **74.7% → 97.5%**
+- 测试耗时：~47-51s
+
+**本轮未补的**：
+
+- `cli.py` SIGTERM/SIGINT 信号处理（必须真发信号）
+- `cli.py` 重出现死代码 `elif args.preflight/start` （重复不可触发）
+- `code_compressor.py` AST 异常 fallback（需 monkeypatch ast.unparse）
+- `armor.py` PII 边缘决策 / `compaction_diag.py` 残余三行（边际收益 < 0.1%）
+
+**本轮交班时的指引**：
+
+1. **不要继续推单测**。下一刀价值已不在这里。
+2. **应转向**：商品化 / 文档 / 陌生机器从零安装验证 / 阶段 2 路径硬编码 P0。
+3. **本轮变更全部已同步于**：
+   - `docs/design/mark42-测试覆盖接力开发方向-20260701.md`
+   - `README.md` §1 / §7.4
+   - `docs/design/mark42-QuickStart-20260701.md` §“本机 7/01 测试基线演进”
+   - `memory/daily/2026-07-01.md` #15-#22
+
+**未变但重要的边界提醒**：
+
+- 未知机器从零安装仍未走通闭环
+- `armor_compress` 仍依赖 `openclaw sessions compact` 子命令在宿主机上存在
+- 24h 稳定运行报告需到 2026-07-02 07:15 才能看 cron 提醒
 

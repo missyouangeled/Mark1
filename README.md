@@ -16,15 +16,16 @@
 - **语义索引链路：已修复并恢复**
 - **当前最大边界：尚未完成“陌生机器从零开始”的真实全链路验收**
 
-### 最新基线（2026-07-01）
+### 最新基线（2026-07-01 15:46）
 
 - 生产模块：**18**
 - 死代码：**0**
-- 测试：**526 passed, 2 skipped**
-- 整体覆盖率：**74.7%**
+- 测试：**700 passed, 2 skipped**
+- 整体覆盖率：**97.5%**
 - 核心服务：`bootstrap / engine-daemon / armor-guard / watchdog.timer / embed-sidecar` **均 active**
 - 语义索引：**7206 segments / 384 dim**
 - Armor 真压缩链路：**已现场验收成功**（`openclaw-sessions-compact`，会话真实缩小）
+- 本轮测试补强覆盖：engine.py 98.1% / armor.py 92.6% / heavy.py 92.8% / code_compressor.py 96.1% / cli.py 98.0%
 
 ### 建议先读哪几份文档
 
@@ -269,14 +270,14 @@ python3 scripts/mark42.py status --json
 python3 -m pytest scripts/tests/ --no-cov -q
 ```
 
-当前推荐参考基线（2026-07-01 最新）：
+当前推荐参考基线（2026-07-01 15:46 最新）：
 
 ```text
-526 passed, 2 skipped
-coverage: 74.7%
+700 passed, 2 skipped
+coverage: 97.5%
 ```
 
-> 如果你在看更早文档里见到 `316 passed / 45.9%`，那是 7/01 上午较早阶段的审查基线，不是当前最新数字。
+> 如果你在看更早文档里见到 `316 passed / 45.9%` 或 `526 passed / 74.7%`，那是 7/01 上、下午较早阶段的审查基线，不是当前最新数字。
 
 ---
 

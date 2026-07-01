@@ -670,3 +670,208 @@ class TestEngineDaemonEvents:
         saved = json.loads(snapshot.read_text())
         assert saved["engine"]["activeLoops"] == 1
         assert saved["heavy"]["activeTasks"] == 0
+
+
+class TestEngineAdditionalBranches:
+    """继续补 engine.py 剩余高价值碎支路。"""
+
+    def test_templates_print_all_builtin_templates(self, capsys):
+        engine.engine_templates()
+        out = capsys.readouterr().out
+        assert "context-guard" in out
+        assert "health-watch" in out
+        assert "memory-index" in out
+
+    def test_list_hides_template_line_when_template_missing(self, mocker, capsys):
+        mocker.patch.object(
+            engine,
+            "_load_loops",
+            return_value={
+                "plain-loop": {
+                    "status": "registered",
+                    "interval": 42,
+                    "cycle": 1,
+                    "maxCycles": 0,
+                    "template": "",
+                    "task": "plain task",
+                }
+            },
+        )
+
+        engine.engine_list()
+        out = capsys.readouterr().out
+        assert "plain-loop" in out
+        assert "任务: plain task" in out
+        assert "模板:" not in out
+
+    def test_task_watch_collects_started_tasks_and_subtask_stats(self, mocker, heavy_state, scratch_dir):
+        loops = _make_loop(name="tw", template="task-watch")
+        (heavy_state / "a.json").write_text(json.dumps({"status": "started", "taskName": "a"}), encoding="utf-8")
+        (heavy_state / "b.json").write_text(json.dumps({"status": "done", "taskName": "b"}), encoding="utf-8")
+        (heavy_state / "c.json").write_text(json.dumps({"status": "started", "taskName": "c"}), encoding="utf-8")
+        (scratch_dir / "a").mkdir(parents=True)
+        (scratch_dir / "a" / "status.json").write_text(
+            json.dumps({"subtasks": {"x": {"status": "pending"}, "y": {"status": "failed"}}}),
+            encoding="utf-8",
+        )
+
+        mocker.patch.object(engine, "HEAVY_STATE", heavy_state)
+        mocker.patch.object(engine, "SCRATCH", scratch_dir)
+
+        engine.engine_run_loop("tw", persist=False, _loops=loops)
+
+        result = loops["tw"]["lastResult"]
+        assert sorted(result["activeTasks"]) == ["a", "c"]
+        assert result["pending"] == 1
+        assert result["failed"] == 1
+
+    def test_health_watch_low_memory_and_exception_fallback(self, mocker):
+        loops = _make_loop(name="hw", template="health-watch")
+        mocker.patch.object(engine, "_save_loops")
+        mock_du = MagicMock()
+        mock_du.free = 20 * 1024**3
+        mocker.patch("shutil.disk_usage", return_value=mock_du)
+        mocker.patch.object(Path, "exists", return_value=False)
+        meminfo = "MemAvailable:    256000 kB\n"
+        mock_append = mocker.patch.object(engine, "_append_broker")
+        mocker.patch("builtins.open", mock_open(read_data=meminfo))
+
+        engine.engine_run_loop("hw", persist=False, _loops=loops)
+
+        alerts = loops["hw"]["lastResult"]["alerts"]
+        assert any("内存紧张" in a for a in alerts)
+        event_types = [call.args[1] for call in mock_append.call_args_list]
+        assert "engine.health.warn" in event_types
+
+        loops2 = _make_loop(name="hw2", template="health-watch")
+        mocker.patch("shutil.disk_usage", side_effect=RuntimeError("boom"))
+        engine.engine_run_loop("hw2", persist=False, _loops=loops2)
+        assert loops2["hw2"]["lastResult"]["diskRoot"] == "?"
+        assert loops2["hw2"]["lastResult"]["memAvail"] == "?"
+
+    def test_memory_index_skips_old_and_invalid_files_without_duplicating(self, mocker, tmp_path):
+        memory_dir = tmp_path / "memory"
+        daily_dir = memory_dir / "daily"
+        daily_dir.mkdir(parents=True)
+        recent_name = datetime.now().strftime("%Y-%m-%d")
+        (daily_dir / f"{recent_name}.md").write_text("## Topic A\n## Topic A\n## Topic B\n", encoding="utf-8")
+        (daily_dir / "bad-name.md").write_text("## Broken\n", encoding="utf-8")
+        (daily_dir / "2020-01-01.md").write_text("## Too Old\n", encoding="utf-8")
+        (memory_dir / "INDEX.md").write_text(f"# 记忆索引\n- [{recent_name}] Topic A\n", encoding="utf-8")
+        loops = _make_loop(name="mi", template="memory-index")
+        mocker.patch.object(engine, "WORKSPACE", tmp_path)
+
+        engine.engine_run_loop("mi", persist=False, _loops=loops)
+
+        content = (memory_dir / "INDEX.md").read_text(encoding="utf-8")
+        assert content.count(f"- [{recent_name}] Topic A") == 1
+        assert f"- [{recent_name}] Topic B" in content
+        assert "Too Old" not in content
+        assert loops["mi"]["lastResult"]["scannedDays"] == 1
+
+    def test_run_loop_saves_when_persist_true_and_handles_missing_loop(self, mocker, capsys):
+        loops = _make_loop(name="persist-me", template="", task="plain task")
+        mock_save = mocker.patch.object(engine, "_save_loops")
+
+        engine.engine_run_loop("persist-me", persist=True, _loops=loops)
+        engine.engine_run_loop("missing", persist=True, _loops={})
+
+        out = capsys.readouterr().out
+        assert mock_save.called
+        assert "Loop 'missing' 不存在" in out
+
+    def test_daemon_skips_bad_event_lines_and_recent_or_nonregistered_loops(self, mocker, capsys, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text("{bad-json\n", encoding="utf-8")
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+        now_iso = datetime.now().isoformat()
+        loops = {
+            "done-loop": {
+                "task": "noop",
+                "interval": 300,
+                "maxCycles": None,
+                "template": "",
+                "status": "done",
+                "cycle": 0,
+                "lastRun": None,
+                "lastResult": None,
+                "createdAt": "2026-06-29T09:00:00",
+            },
+            "recent-loop": {
+                "task": "noop",
+                "interval": 300,
+                "maxCycles": None,
+                "template": "",
+                "status": "registered",
+                "cycle": 0,
+                "lastRun": now_iso,
+                "lastResult": None,
+                "createdAt": "2026-06-29T09:00:00",
+            },
+            "bad-time-loop": {
+                "task": "noop",
+                "interval": 300,
+                "maxCycles": None,
+                "template": "",
+                "status": "registered",
+                "cycle": 0,
+                "lastRun": "not-an-iso-time",
+                "lastResult": None,
+                "createdAt": "2026-06-29T09:00:00",
+            },
+        }
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch.object(engine, "_load_loops", side_effect=[loops, loops, loops])
+        mock_run = mocker.patch.object(engine, "engine_run_loop")
+        mock_save_loops = mocker.patch.object(engine, "_save_loops")
+        mock_save_json = mocker.patch.object(engine, "_save_json")
+        mocker.patch.object(engine.time, "sleep", side_effect=KeyboardInterrupt)
+
+        engine.engine_daemon(interval_s=0)
+
+        out = capsys.readouterr().out
+        assert "触发 Loop 'bad-time-loop'" in out
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == "bad-time-loop"
+        mock_save_loops.assert_called_once_with(loops)
+        assert any(call.args[0] == engine.ENGINE_STATE / "daemon-cursor.json" for call in mock_save_json.call_args_list)
+
+    def test_daemon_handles_event_file_oserror_and_status_snapshot_failure(self, mocker, engine_state, broker_dir):
+        broker_events = broker_dir / "events.jsonl"
+        broker_events.parent.mkdir(parents=True, exist_ok=True)
+        broker_events.write_text("", encoding="utf-8")
+        mark42_events = broker_dir / "mark42-events.jsonl"
+        mark42_events.write_text("", encoding="utf-8")
+
+        real_open = open
+
+        def fake_open(path, mode="r", *args, **kwargs):
+            if str(path).endswith("events.jsonl") and "r" in mode:
+                raise OSError("boom")
+            return real_open(path, mode, *args, **kwargs)
+
+        mocker.patch.object(engine, "BROKER_EVENTS", broker_events)
+        mocker.patch.object(engine, "MARK42_BROKER_EVENTS", mark42_events)
+        mocker.patch("builtins.open", side_effect=fake_open)
+        mocker.patch.object(engine, "_load_loops", return_value={})
+        mock_rotate = mocker.patch.object(engine, "log_rotate")
+
+        from mark42_modules import cli
+        mocker.patch.object(cli, "status_dashboard", side_effect=RuntimeError("snapshot failed"))
+
+        counter = {"n": 0}
+
+        def fake_sleep(_):
+            counter["n"] += 1
+            if counter["n"] >= 10:
+                raise KeyboardInterrupt
+
+        mocker.patch.object(engine.time, "sleep", side_effect=fake_sleep)
+
+        engine.engine_daemon(interval_s=0)
+
+        mock_rotate.assert_called_once_with("all")

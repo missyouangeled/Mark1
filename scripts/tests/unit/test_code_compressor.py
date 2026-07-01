@@ -355,6 +355,53 @@ class TestCodeCrush:
         assert meta["removed_comments"] == 0
         assert meta["mode"] == "compressed"
 
+    def test_python_module_level_constant_assignment_preserved(self):
+        """顶层常量赋值不是 import/函数/类，应走 unparse 汇汇保留。"""
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "MAX_VALUE = 100\n"
+            "def helper():\n"
+            "    return 1\n"
+        ) * 4
+        result, meta = comp.compress(src)
+        assert "MAX_VALUE" in result
+        assert meta["mode"] == "compressed"
+
+    def test_python_truncated_function_unparse_falls_back_to_ellipsis(self, monkeypatch):
+        """函数 body 被截断后 ast.unparse 异常时走 '...' fallback。"""
+        comp = code_compressor.CodeCompressor(
+            language="python",
+            min_code_size=50,
+            max_stmts_per_func=2,
+            preserve_signatures=False,
+        )
+        # 函数里超过 max_stmts_per_func 条语句才会进入截断分支
+        src = (
+            "def big():\n"
+            "    a = 1\n"
+            "    b = 2\n"
+            "    c = 3\n"
+            "    d = 4\n"
+            "    e = 5\n"
+            "    f = 6\n"
+            "    return a\n"
+        )
+        original_unparse = code_compressor.ast.unparse
+        call_count = {"n": 0}
+
+        def flaky_unparse(node):
+            call_count["n"] += 1
+            if call_count["n"] == 4:  # 在截断 body 中选一条静默爆
+                raise RuntimeError("boom")
+            return original_unparse(node)
+
+        monkeypatch.setattr(code_compressor.ast, "unparse", flaky_unparse)
+
+        result, meta = comp.compress(src)
+        assert "..." in result
+        assert meta["truncated_functions"] >= 1
+        assert meta["mode"] == "compressed"
+
 
 class TestRunTests:
     def test_run_tests_success(self, capsys):

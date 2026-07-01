@@ -154,6 +154,21 @@ class TestHeavyDetectHuman:
         # 倒计时结束后应自动调 heavy_start
         mock_start.assert_called_once()
 
+    def test_ask_mode_shows_manual_command(self, tmp_path, mocker, capsys):
+        """ask 模式：检测到大型项目时只提示手动命令，不开工。"""
+        for i in range(60):
+            (tmp_path / f"f{i}.txt").write_text("x")
+        mocker.patch.object(heavy, "armor_check",
+                          return_value={"usagePercent": 30.0})
+        mock_start = mocker.patch.object(heavy, "heavy_start")
+
+        heavy.heavy_detect_human(str(tmp_path), auto_mode="ask")
+
+        out = capsys.readouterr().out
+        assert "手动开工命令" in out
+        assert "--task-name" in out
+        mock_start.assert_not_called()
+
 
 # ─────────────────────── heavy_start ───────────────────────
 
@@ -644,6 +659,29 @@ class TestHeavyExecute:
         for r in results:
             assert r["dryRun"] is True
             assert r["action"] == "queued"
+
+    def test_execute_all_missing_status_returns_empty(self, scratch_dir, capsys):
+        """heavy_execute_all：任务未开工时返回空列表。"""
+        results = heavy.heavy_execute_all("never-started")
+        assert results == []
+        out = capsys.readouterr().out
+        assert "未开工" in out
+
+    def test_execute_all_no_pending_returns_empty(self, scratch_dir, capsys):
+        """heavy_execute_all：无 pending 时返回空列表并提示。"""
+        task_name = "all-done"
+        task_scratch = scratch_dir / task_name
+        task_scratch.mkdir(parents=True)
+        (task_scratch / "status.json").write_text(json.dumps({
+            "taskName": task_name,
+            "subtasks": {"batch-001": {"status": "done"}},
+        }))
+
+        results = heavy.heavy_execute_all(task_name)
+
+        assert results == []
+        out = capsys.readouterr().out
+        assert "无 pending" in out
 
 
 # ─────────────────────── heavy_cleanup ───────────────────────

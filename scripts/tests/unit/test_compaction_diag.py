@@ -988,3 +988,310 @@ class TestGetContextWindowDictModels:
 
         assert w == 262144
 
+
+class TestLoadOpenclawJsonMoreBranches:
+    """_load_openclaw_json() 的缺失/异常分支测试。"""
+
+    def test_returns_none_when_path_missing(self, mocker, tmp_path):
+        missing = tmp_path / "missing-openclaw.json"
+        mocker.patch.object(compaction_diag, "_OPENCLAW_JSON", missing)
+
+        assert compaction_diag._load_openclaw_json() is None
+
+    def test_returns_none_on_invalid_json(self, mocker, tmp_path):
+        bad = tmp_path / "openclaw.json"
+        bad.write_text("{not-valid-json", encoding="utf-8")
+        mocker.patch.object(compaction_diag, "_OPENCLAW_JSON", bad)
+
+        assert compaction_diag._load_openclaw_json() is None
+
+    def test_returns_none_on_oserror(self, mocker, tmp_path):
+        cfg_file = tmp_path / "openclaw.json"
+        cfg_file.write_text("{}", encoding="utf-8")
+        mocker.patch.object(compaction_diag, "_OPENCLAW_JSON", cfg_file)
+        mocker.patch("builtins.open", side_effect=OSError("boom"))
+
+        assert compaction_diag._load_openclaw_json() is None
+
+
+class TestSessionReadersMoreBranches:
+    """token/probe/drift 三类 session 读取器的容错分支测试。"""
+
+    def test_token_aware_handles_missing_dir_and_near_limit(self, monkeypatch, tmp_path):
+        missing_dir = tmp_path / "missing-sessions"
+        monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", missing_dir)
+        no_data = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 3_000_000})
+        assert no_data["status"] == "no_data"
+
+        real_dir = tmp_path / "sessions"
+        real_dir.mkdir()
+        today = datetime.now().strftime("%Y-%m-%d")
+        (real_dir / f"{today}-near-limit.jsonl").write_text(
+            _json.dumps(
+                {
+                    "type": "message",
+                    "message": {"role": "assistant", "usage": {"totalTokens": 120000}},
+                }
+            ) + "\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", real_dir)
+
+        result = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 1_000_000})
+        assert result["status"] == "near_limit"
+        assert result["severity"] == compaction_diag.SEVERITY_WARN
+
+    def test_token_probe_and_drift_skip_invalid_json_empty_lines_and_oserror(self, monkeypatch, tmp_path):
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+        today = datetime.now().strftime("%Y-%m-%d")
+        good = sessions_dir / f"{today}-good.jsonl"
+        broken = sessions_dir / f"{today}-broken.jsonl"
+        good.write_text(
+            "\n".join(
+                [
+                    "",
+                    "{bad-json",
+                    _json.dumps({
+                        "type": "message",
+                        "message": {"role": "assistant", "usage": {"totalTokens": 2000}},
+                    }),
+                    _json.dumps({"type": "compaction", "tokensBefore": 6000, "details": "ok", "fromHook": True}),
+                    _json.dumps({"type": "compaction", "tokensBefore": 0}),
+                    _json.dumps({"type": "compaction", "tokensBefore": 5900}),
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        broken.write_text(_json.dumps({"type": "compaction", "tokensBefore": 5800}), encoding="utf-8")
+        monkeypatch.setattr(compaction_diag, "_SESSIONS_DIR", sessions_dir)
+
+        import builtins
+        real_open = builtins.open
+
+        def fake_open(path, *args, **kwargs):
+            if str(path).endswith("broken.jsonl"):
+                raise OSError("simulated read failure")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", fake_open)
+
+        token_result = compaction_diag._token_aware_check({"maxActiveTranscriptBytes": 10_000})
+        probe_result = compaction_diag._probe_quality_check({})
+        drift_result = compaction_diag._drift_check({})
+
+        assert token_result["maxTokensSeen"] == 6000
+        assert probe_result["status"] == "ready"
+        assert probe_result["latestCompaction"]["tokensBefore"] == 6000
+        assert drift_result["status"] == "healthy"
+
+
+class TestCompactionDiagnoseAdditionalBranches:
+    """继续补 compaction_diagnose() 的剩余汇总分支。"""
+
+    def test_collects_soft_threshold_warn_and_scans_real_sessions_dir(self, mocker, tmp_path):
+        cfg = {
+            "mode": "safeguard",
+            "maxActiveTranscriptBytes": 3_000_000,
+            "keepRecentTokens": 15_000,
+            "reserveTokens": 16_000,
+            "memoryFlush": {
+                "enabled": True,
+                "softThresholdTokens": 1000,
+                "prompt": "p",
+            },
+        }
+        sessions_dir = tmp_path / ".openclaw" / "agents" / "main" / "sessions"
+        sessions_dir.mkdir(parents=True)
+        today = datetime.now().strftime("%Y-%m-%d")
+        payload = "x" * (200 * 1024)
+        (sessions_dir / f"{today}-scan.jsonl").write_text(payload, encoding="utf-8")
+
+        mocker.patch.object(compaction_diag, "_get_compaction_config", return_value=cfg)
+        mocker.patch.object(compaction_diag, "_get_context_window", return_value=131072)
+        mocker.patch.object(compaction_diag.Path, "home", return_value=tmp_path)
+        mocker.patch.object(compaction_diag, "_check_stat", return_value=[])
+        mocker.patch.object(
+            compaction_diag,
+            "_token_aware_check",
+            return_value={
+                "key": "token_awareness",
+                "severity": compaction_diag.SEVERITY_WARN,
+                "status": "near_limit",
+                "advice": "token 接近上限。",
+                "maxTokensSeen": 120000,
+                "avgTokensPerTurn": 6.0,
+            },
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_dual_threshold_check",
+            return_value={
+                "key": "dual_threshold",
+                "severity": compaction_diag.SEVERITY_WARN,
+                "status": "misaligned",
+                "advice": "双层阈值需要调整。",
+            },
+        )
+        mocker.patch.object(compaction_diag, "_isolation_check", return_value=[])
+        mocker.patch.object(
+            compaction_diag,
+            "_drift_check",
+            return_value={
+                "key": "drift_detection",
+                "severity": compaction_diag.SEVERITY_OK,
+                "status": "healthy",
+                "advice": "趋势健康。",
+                "compactionCount": 3,
+            },
+        )
+
+        result = compaction_diag.compaction_diagnose(token_aware=True)
+
+        assert result["status"] == "warn"
+        assert result["todaySessionCount"] == 1
+        assert result["largestTranscriptMB"] > 0
+        assert "token 接近上限。" in result["advice"]
+        assert "双层阈值需要调整。" in result["advice"]
+        issue_keys = [issue["key"] for issue in result["issues"]]
+        assert "softThresholdTokens" in issue_keys
+
+
+class TestCompactionApplyMoreBranches:
+    """继续补 compaction_apply() 的 error / no-change / 额外修正分支。"""
+
+    def test_apply_returns_error_when_config_cannot_be_loaded(self, mocker):
+        mocker.patch.object(
+            compaction_diag,
+            "compaction_diagnose",
+            return_value={"actionable": True, "issues": [], "summary": "需调优"},
+        )
+        mocker.patch.object(compaction_diag, "_load_openclaw_json", return_value=None)
+
+        result = compaction_diag.compaction_apply(auto_confirm=True)
+
+        assert result["status"] == "error"
+        assert result["summary"] == "无法读取 openclaw.json"
+
+    def test_apply_returns_nothing_to_do_when_no_supported_changes(self, mocker):
+        mocker.patch.object(
+            compaction_diag,
+            "compaction_diagnose",
+            return_value={
+                "actionable": True,
+                "issues": [{"key": "unknown", "status": "warn", "advice": "noop"}],
+                "summary": "有告警但无自动修正项",
+            },
+        )
+        mocker.patch.object(compaction_diag, "_load_openclaw_json", return_value={"agents": {"defaults": {"compaction": {}}}})
+
+        result = compaction_diag.compaction_apply(auto_confirm=False)
+
+        assert result["status"] == "nothing_to_do"
+        assert result["summary"] == "无需要修改的配置项"
+
+    def test_apply_adjusts_keep_recent_and_reserve_tokens(self, mocker):
+        cfg = {"agents": {"defaults": {"compaction": {}}}}
+        mocker.patch.object(
+            compaction_diag,
+            "compaction_diagnose",
+            return_value={
+                "actionable": True,
+                "issues": [
+                    {
+                        "key": "keepRecentTokens",
+                        "status": "too_high",
+                        "current": 99_999,
+                        "advice": "保留太多。",
+                    },
+                    {
+                        "key": "reserveTokens",
+                        "status": "too_low",
+                        "current": 1000,
+                        "advice": "预留太少。",
+                    },
+                ],
+                "summary": "发现 2 个优化点",
+            },
+        )
+        mocker.patch.object(compaction_diag, "_load_openclaw_json", return_value=cfg)
+
+        result = compaction_diag.compaction_apply(auto_confirm=False)
+
+        assert result["status"] == "dry_run"
+        assert [change["key"] for change in result["changes"]] == ["keepRecentTokens", "reserveTokens"]
+        compact = cfg["agents"]["defaults"]["compaction"]
+        assert compact["keepRecentTokens"] == 15_000
+        assert compact["reserveTokens"] == 16_000
+
+
+class TestPrintFunctionsAdditionalBranches:
+    """继续补 print_diagnose() 的其余输出分支。"""
+
+    def test_print_diagnose_renders_token_no_data_dual_threshold_and_general_ranges(self, capsys):
+        diag = {
+            "status": "warn",
+            "summary": "发现 4 个优化点",
+            "contextWindow": 131072,
+            "todaySessionCount": 1,
+            "largestTranscriptMB": 0.3,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "token_awareness",
+                    "label": "令牌感知诊断",
+                    "status": "no_data",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "advice": "暂无 token 数据。",
+                },
+                {
+                    "key": "dual_threshold",
+                    "label": "双层阈值偏移",
+                    "status": "heterogeneous",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "mainTokensEstimate": 750000,
+                    "gateTokens": 32000,
+                    "ratio": 0.04,
+                    "gapPercent": 96,
+                    "advice": "异构单位，设计合理。",
+                },
+                {
+                    "key": "drift_detection",
+                    "label": "上下文降解检测",
+                    "status": "insufficient_data",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "compactionCount": 1,
+                    "advice": "数据不足。",
+                },
+                {
+                    "key": "maxActiveTranscriptBytes",
+                    "label": "JSONL 压缩阈值",
+                    "status": "ok",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "current_human": "3.0MB",
+                    "range": "1.0MB ~ 10.0MB",
+                },
+                {
+                    "key": "keepRecentTokens",
+                    "label": "保留最近 Token 数",
+                    "status": "too_high",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "current_human": "50000",
+                    "comfort_human": "15000",
+                    "range": "8000 ~ 30000",
+                    "advice": "建议降到舒适值。",
+                },
+            ],
+            "advice": [],
+        }
+
+        compaction_diag.print_diagnose(diag)
+        out = capsys.readouterr().out
+
+        assert "状态: no_data" in out
+        assert "主阈值等效: ~750000 tokens" in out
+        assert "状态: 数据不足（仅 1 次压缩）" in out
+        assert "JSONL 压缩阈值 = 3.0MB (舒适范围 1.0MB ~ 10.0MB)" in out
+        assert "舒适值: 15000 (范围 8000 ~ 30000)" in out
+
