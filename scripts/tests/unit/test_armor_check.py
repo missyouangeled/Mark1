@@ -370,3 +370,153 @@ def test_severity_mapping_at_thresholds(mocker, target_pct, expected_severity, e
 
     assert result["severity"] == expected_severity
     assert result["status"] == expected_status
+
+
+def test_check_smart_mode_includes_estimate_detail(mocker):
+    """smart 模式应带回 estimateDetail 供 debug。"""
+    fake_session = MagicMock()
+    fake_session.name = "agent-smart.jsonl"
+    fake_session.stat.return_value.st_size = 4096
+    _patch_du(mocker, 4)
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "smart"})
+    mocker.patch.object(armor, "_estimate_tokens_smart", return_value={
+        "estimatedTokens": 12345,
+        "method": "smart",
+        "zhChars": 12,
+        "enChars": 34,
+        "otherChars": 56,
+        "scannedMessages": 7,
+    })
+
+    with patch.object(armor, "_find_active_session", return_value=fake_session):
+        result = armor.armor_check()
+
+    assert result["estimatedTokens"] == 12345
+    assert result["estimateDetail"] == {
+        "method": "smart",
+        "zhChars": 12,
+        "enChars": 34,
+        "otherChars": 56,
+        "scannedMessages": 7,
+    }
+
+
+def test_check_estimate_oserror_falls_back_to_zero(mocker):
+    """smart/simple 估算阶段抛 OSError 时应回退 estimatedTokens=0。"""
+    fake_session = MagicMock()
+    fake_session.name = "agent-oserror.jsonl"
+    fake_session.stat.return_value.st_size = 4096
+    _patch_du(mocker, 4)
+    mocker.patch.dict(os.environ, {"MARK42_TOKEN_ESTIMATE_MODE": "smart"})
+    mocker.patch.object(armor, "_estimate_tokens_smart", side_effect=OSError("boom"))
+
+    with patch.object(armor, "_find_active_session", return_value=fake_session):
+        result = armor.armor_check()
+
+    assert result["estimatedTokens"] == 0
+    assert result["usagePercent"] == 0
+
+
+class TestReadSessionTail:
+    def test_reads_tail_and_filters_invalid_lines(self, tmp_path):
+        session = tmp_path / "session.jsonl"
+        lines = [
+            b'not-json',
+            json.dumps([1, 2, 3], ensure_ascii=False).encode("utf-8"),
+            json.dumps({"message": "not-a-dict"}, ensure_ascii=False).encode("utf-8"),
+            json.dumps({"message": {"role": "user", "content": "nested ok"}}, ensure_ascii=False).encode("utf-8"),
+            json.dumps({"role": "assistant", "content": "plain ok"}, ensure_ascii=False).encode("utf-8"),
+            json.dumps({"message": {"content": "missing role"}}, ensure_ascii=False).encode("utf-8"),
+        ]
+        session.write_bytes(b"\n".join(lines) + b"\n")
+
+        result = armor._read_session_tail(session, lines=10)
+
+        assert result == [
+            {"role": "user", "content": "nested ok"},
+            {"role": "assistant", "content": "plain ok"},
+        ]
+
+    def test_returns_empty_on_oserror(self, tmp_path):
+        missing = tmp_path / "missing.jsonl"
+        assert armor._read_session_tail(missing) == []
+
+
+class TestClassifyMessages:
+    def test_classifies_preserve_discard_and_non_string_content(self):
+        messages = [
+            {"role": "user", "content": "这是重要规则，Mark42 方案不要忘"},
+            {"role": "assistant", "content": "好的"},
+            {"role": "user", "content": "x" * 220},
+            {"role": "assistant", "content": [{"text": "记住这个配置"}, {"text": "以及 API Key"}]},
+            {"role": "tool", "content": "tool output"},
+            {"role": "user", "content": 12345},
+            {"role": "user", "content": ""},
+        ]
+
+        result = armor._classify_messages(messages)
+
+        assert result["totalAnalyzed"] == len(messages)
+        assert len(result["preserved"]) == 3
+        assert len(result["discarded"]) == 3
+        assert any("Mark42" in item["preview"] for item in result["preserved"])
+        assert any(item["preview"] == "好的" for item in result["discarded"])
+        assert any(item["role"] == "tool" for item in result["discarded"])
+
+
+class TestLlmAnalyze:
+    def test_returns_none_when_model_unresolved(self, mocker):
+        mocker.patch.object(armor, "resolve_model", return_value=None)
+        assert armor._llm_analyze([{"role": "user", "content": "hi"}]) is None
+
+    def test_parses_think_and_json_codeblock(self, mocker):
+        mocker.patch.object(armor, "resolve_model", return_value={
+            "model": "demo-model",
+            "apiKey": "k",
+            "baseUrl": "https://example.com",
+            "endpoint": "/v1/chat/completions",
+            "timeout": 5,
+            "maxTokens": 999,
+            "temperature": 0,
+        })
+
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": "<think>internal</think>```json\n{\"preserved\": {\"preferences\": [\"a\"]}, \"discarded\": {\"summary\": \"x\", \"estimatedTokensSaved\": 1}, \"degradationDetected\": \"无\", \"suggestedAction\": \"monitor\"}\n```"
+                }
+            }],
+            "model": "demo-model",
+            "usage": {"total_tokens": 42},
+        }
+
+        fake_resp = MagicMock()
+        fake_resp.read.return_value = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        mocker.patch.object(armor.urllib.request, "urlopen", return_value=fake_resp)
+
+        result = armor._llm_analyze([
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": [{"text": "world"}]},
+        ])
+
+        assert result["preserved"]["preferences"] == ["a"]
+        assert result["discarded"]["estimatedTokensSaved"] == 1
+        assert result["_llm_meta"] == {
+            "model": "demo-model",
+            "tokens": {"total_tokens": 42},
+            "responseFormat": "json_object",
+        }
+
+    def test_returns_none_on_request_failure(self, mocker):
+        mocker.patch.object(armor, "resolve_model", return_value={
+            "model": "demo-model",
+            "apiKey": "k",
+            "baseUrl": "https://example.com",
+            "endpoint": "/v1/chat/completions",
+            "timeout": 5,
+            "maxTokens": 999,
+            "temperature": 0,
+        })
+        mocker.patch.object(armor.urllib.request, "urlopen", side_effect=RuntimeError("boom"))
+
+        assert armor._llm_analyze([{"role": "user", "content": "hello"}]) is None

@@ -73,6 +73,61 @@
 
 ---
 
+## 2026-07-01 #29 — 继续测试接力：`armor.py` 补 helper / classify / LLM 解析分支，整体覆盖升到 94.7%
+
+**背景**：
+上一刀本来计划切 `utils.py`，但实跑发现它已经被既有测试补到 **100.0%**，无需重复发力。所以本轮顺势切到 `armor.py`，专门挑一组不依赖真实 LLM、也不去硬怼重型压缩主流程的高价值 helper / contract 分支来补。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_armor_check.py`
+2. 新增覆盖重点：
+   - `armor_check()`
+     - smart 模式带回 `estimateDetail`
+     - `_estimate_tokens_smart()` 抛 `OSError` 时回退 `estimatedTokens=0`
+   - `_read_session_tail()`
+     - 过滤坏 JSON / 非 dict / 缺少 role 的行
+     - 兼容 nested `message` 格式与 plain dict 格式
+     - 文件不存在时返回空列表
+   - `_classify_messages()`
+     - `preserved` / `discarded` 分类契约
+     - content 为 list / 非字符串 / 空字符串时的处理
+   - `_llm_analyze()`
+     - `resolve_model()` 失败直接返回 `None`
+     - 解析 `<think>...</think>` + ```json code fence``` 包裹的返回
+     - 请求失败时返回 `None`
+3. 精确单文件回归：
+   - `python3 -m pytest scripts/tests/unit/test_armor_check.py -q`
+   - `python3 -m pytest scripts/tests/unit/test_armor_check.py scripts/tests/unit/test_armor_compress.py --cov=mark42_modules.armor --cov-report=term-missing -q`
+
+**验证结果**：
+- `armor_check` 组单测 ✅
+  - **25 passed**
+- `armor.py` 单文件组合口径 ✅
+  - **58 passed**
+  - `armor.py`: **72.3%**（这组 helper/contract 组合口径）
+- 全量 ✅
+  - `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q`
+  - **663 passed, 2 skipped**
+  - `armor.py`: **65.4% → 86.9%**
+  - overall: **91.4% → 94.7%**
+
+**补充说明**：
+- 本轮开头先精确确认了 `utils.py` 当前状态：
+  - `python3 -m pytest scripts/tests/unit/test_utils.py --cov=mark42_modules.utils --cov-report=term-missing -q`
+  - **27 passed**
+  - `utils.py`: **100.0%**
+- 因此没有对 `utils.py` 做重复提交，只把它作为“已确认收口”的现状写入接力文档。
+
+**当前意义**：
+- `armor.py` 从“明显黑洞模块”进入高覆盖区
+- `utils.py` / `smart_crusher.py` / `pii_redactor.py` 都已收口
+- Mark42 全量 coverage 再次大幅抬升到 **94.7%**
+- 下一刀可以更从容地在以下方向里二选一：
+  - `compaction_diag.py` 的剩余碎支路
+  - `engine.py` / `cli.py` 的少量残差收尾
+
+---
+
 ## 2026-07-01 #28 — 继续测试接力：`pii_redactor.py` 单文件打到 100%，整体覆盖升到 91.4%
 
 **背景**：
