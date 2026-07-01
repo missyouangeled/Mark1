@@ -5,6 +5,68 @@
 
 ---
 
+## 2026-07-01 #21 — 继续测试接力：`config.py` 从 45.2% 拉到 96.6%，整体覆盖升到 77.7%
+
+**背景**：
+在 `code_compressor.py` 收口后，整体覆盖已从 74.7% 提到 76.0%。按接力文档的新顺位，下一刀切到 `config.py`：这个模块虽然体量不大，但前半是配置/模型解析，后半是初始化与打印口径，真实调用很集中，且此前正式覆盖只有 `45.2%`，属于高收益缺口。
+
+**本轮实际动作**：
+1. 继续沿用“直接补现有测试文件”的策略：
+   - 修改：`scripts/tests/unit/test_config.py`
+2. 新增覆盖重点：
+   - `_conf_load_json()`
+     - 缺文件返回 `{}`
+     - 坏 JSON 返回 `{}`
+   - `_conf_save_json()`
+     - 自动建父目录并正确写回 JSON
+   - `get_model_config()`
+     - 默认回退 `MARK42_MODEL_TABLE`
+     - 运行时 `config.json` dict 覆盖
+     - 旧格式 string entry 兼容
+     - 坏 JSON 回退默认表
+   - `resolve_model()`
+     - unknown key 返回 `None`
+     - provider 无 `apiKey` 返回 `None`
+     - 从 `~/.openclaw/openclaw.json` 读取 `apiKey` / `baseUrl`
+     - provider 无 `baseUrl` 时回退 `baseUrlFallback`
+   - `_load_config()` / `_save_config()`
+   - `mark42_init()`
+     - 首次初始化真实写配置 + 建目录
+     - 已初始化时提示“使用 --config 修改”
+   - `mark42_config()`
+     - 未初始化提示
+     - 正常打印配置摘要
+     - 旧格式模型条目 `(...旧格式)` 输出
+3. 测试过程中保持了一个关键原则：
+   - 不去 reload 整个模块污染其他测试
+   - 需要环境隔离的继续走 subprocess
+   - 需要 home/config 路径切换的，用 `monkeypatch` 定点改 `CONFIG_PATH` / `Path.home`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_config.py --cov=scripts/mark42_modules/config.py --cov-report=term-missing -q` ✅
+  - **26 passed**
+  - `config.py`: **45.2% → 96.6%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **551 passed, 2 skipped**
+  - overall: **76.0% → 77.7%**
+
+**剩余少量未覆盖行**：
+- `41` / `46`：模块 import 时的 `/mnt/data` 存在性分支（真实机器环境分支）
+- `186-187`：读取 `openclaw.json` 时异常吞错分支
+- `206`：`_load_config()` 中 `CONFIG_PATH.exists()` 为真后走 `_conf_load_json()` 的一条轻分支（主价值已被 helper 覆盖）
+
+这些都已经不是当前最值钱的洞了。
+
+**当前意义**：
+- `config.py` 已从“路径/配置硬编码高风险区”进入“基本收口区”
+- overall 已进一步推到 **77.7%**
+- 下一刀可以更放心切到：
+  - `engine.py`
+  - `diff_compressor.py`
+  - `log_deduplicator.py`
+
+---
+
 ## 2026-07-01 #20 — 收紧 README 导航块，并把 `code_compressor.py` 正式收口到 95.1%
 
 **背景**：
