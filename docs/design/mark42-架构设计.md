@@ -39,11 +39,9 @@
 | **支撑模块** | `cli.py` | argparse + status dashboard |
 |  | `config.py` | XDG 路径 + 配置初始化 |
 |  | `utils.py` | JSON 加载、文件锁 |
-|  | `session_fence_safe.py` | 会话安全写入 |
 |  | `logs.py` | 日志轮转 |
 | **性能 / 调试** | `perf_bench.py` | 性能基准 |
 | **原型期脚本** | `test_day4_integration.py` | Day 4 集成脚本（保留供调试） |
-|  | `test_session_fence.py` | Day 2 会话栅栏测试 |
 
 > **怎么说**：Mark42 从 2026-06-15 原始设计到现在，**多了 16 个模块**。
 > 设计哲学（三层架构 / 独立可用 / 事件总线）未变。

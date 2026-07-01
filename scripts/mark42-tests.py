@@ -61,10 +61,8 @@ def test_imports():
         "engine",
         "heavy",
         "cli",
-        "compression_algorithms",
         "pii_redactor",
         "algo_scheduler",
-        "session_fence_safe",
     ]
     for m in modules:
         code, out, stderr = run(
@@ -102,19 +100,6 @@ def test_day6_algorithms():
                 ok(f"{name} 单元测试")
         else:
             err(f"{name} 单元测试", stderr.strip() or out.strip()[-300:])
-
-
-def test_compression_algorithms():
-    """阶段 1 Day 1: SmartCrusher 压缩算法专项测试"""
-    print("\n🧪 压缩算法专项 (Day 1)")
-    code, out, stderr = run(
-        [sys.executable, str(SCRIPTS / "mark42_modules" / "compression_algorithms.py")],
-        timeout=30,
-    )
-    if code == 0 and "通过" in out:
-        ok("SmartCrusher 单元测试")
-    else:
-        err("SmartCrusher 单元测试", stderr.strip() or out.strip()[-300:])
 
 
 def test_phase2_async_llm():
@@ -344,20 +329,6 @@ def test_algo_scheduler():
         ok("AlgorithmScheduler 单元测试")
     else:
         err("AlgorithmScheduler 单元测试", stderr.strip() or out.strip()[-300:])
-
-
-def test_session_fence():
-    """Session Fence 安全测试"""
-    print("\n🚧 Session Fence 安全测试")
-    # 7/01 迁移:从 scripts/mark42_modules/ 移到 scripts/tests/integration/
-    code, out, stderr = run(
-        [sys.executable, str(SCRIPTS / "tests" / "integration" / "test_session_fence.py")],
-        timeout=60,
-    )
-    if code == 0 and "通过" in out and "0 失败" in out:
-        ok("session_fence 测试")
-    else:
-        err("session_fence 测试", stderr.strip() or out.strip()[-300:])
 
 
 def test_day4_integration():
@@ -590,7 +561,6 @@ def main():
     test_log_paths()
 
     # 阶段 1 专项 (2026-06-24 Day 1-3)
-    test_compression_algorithms()
     test_pii_redactor()
     test_algo_scheduler()
     test_day6_algorithms()
@@ -598,7 +568,6 @@ def main():
     test_day8_llm_compress()
     test_phase2_async_llm()
     test_phase2_use_llm_env()
-    test_session_fence()
     # 阶段 1 Day 4 集成
     test_day4_integration()
 

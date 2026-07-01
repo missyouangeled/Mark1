@@ -122,6 +122,36 @@
 
 ---
 
+### 〇·8 死模块清理（7/01 08:00）
+
+> **点点 07:59 拍板**：session_fence_safe + compression_algorithms 两个 0 引用模块全部删。
+> **理由**：实测验证后判定 2 个模块不需接 armor, 保留是技术债。
+
+| 模块 | 行数 | 引用 | 实测结论 |
+|---|---:|:---:|---|
+| `session_fence_safe.py` | 185 | 0 | armor.py 6/29 已改用 `openclaw sessions compact` 调 CLI, 独立跑通, fence_safe 用的 `openclaw agent --message /compact` 是已废弃 API |
+| `compression_algorithms.py` (RAGRanker) | 133 | 0 | Phase 2 路线"如何接入"未实际执行, Phase 3 不需要 RAG 排序 (armor 走 LLM 路径) |
+
+**删后的状态**：
+- 18 个生产模块（不是 19 — 之前 21 个 减去删 2 减 1 备份文件）
+- 0 个死代码, 0 个 0 引用模块
+- 测试数 324 → 316 (去 8 个 RAGRanker 测试, 去 4 个 session_fence skip)
+- 整体覆盖 53.0% → 略升 (dead code 不再算分母)
+
+**保留** vs **删** 决策原则（避免后续类似问题）：
+- 有生产代码 import → 保留（即使是阉割版）
+- 仅文档字符串提到 → 保留（如 3 个 compressor 的 "接口风格对齐" 注释）
+- 真 0 引用 + 设计断裂 → 删（如 session_fence_safe）
+- 真 0 引用 + 未来价值低 → 删（如 RAGRanker）
+- 历史参考价值 → 保留为设计文档，但写明"7/01 删"避免传播
+
+**未动的 stale 引用**（9 个文档 + 3 个 _archive, 故意保留作历史）：
+- mark42-Phase2执行手册 / Phase2路线 / 更新日志 (创建历史)
+- mark42-压缩方案借鉴Headroom / 整体审查报告 / 测试体系-Phase1收官 / 测试体系设计方案 / 测试手册 (设计历史)
+- 详细说明见 `mark42-更新日志.md` 7/01 08:00 段
+
+---
+
 ## 一、逐项诊断 & 应对方案
 
 > **7/01 更新**：A/B/C/D/E/F 项 6/30 之前都已修完。当前未完成项只剩 G（Loop 模板热加载，低优先级）。H 项已修。

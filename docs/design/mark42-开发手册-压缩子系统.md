@@ -91,11 +91,8 @@
 │       ├── config.py                      # ★ 所有 ALGO_* 常量在这里
 │       ├── armor.py                       # ★ 上下文铠甲主逻辑（含 pre_compact_hook）
 │       ├── utils.py                       # 工具函数（_find_active_session 等）
-│       ├── compression_algorithms.py      # ★ Day 1: SmartCrusher（已实现）
 │       ├── algo_scheduler.py              # ★ Day 3: 算法调度器（已实现）
 │       ├── pii_redactor.py                # ★ Day 2: PII 脱敏（已实现）
-│       ├── session_fence_safe.py          # ★ Day 1: Session fence 安全工具
-│       ├── test_session_fence.py          #   fence 专项测试
 │       ├── test_day4_integration.py       #   Day 4 集成测试（7 个场景）
 │       ├── engine.py                      # 循环引擎（5 个 Loop 在跑）
 │       ├── heavy.py                       # 重型战甲

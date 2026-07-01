@@ -89,10 +89,8 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
     reload_order = [
         # 底层：只依赖 stdlib + config
         "mark42_modules.utils",
-        "mark42_modules.session_fence_safe",
         # 压缩子模块（依赖 utils）
         "mark42_modules.smart_crusher",
-        "mark42_modules.compression_algorithms",
         "mark42_modules.code_compressor",
         "mark42_modules.diff_compressor",
         "mark42_modules.text_compressor",
