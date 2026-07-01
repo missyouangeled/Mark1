@@ -598,3 +598,393 @@ class TestGetCompactionConfig:
         assert cc is not None
         assert cc["maxActiveTranscriptBytes"] == 3_000_000
 
+
+class TestCompactionDiagnoseWarnPaths:
+    """compaction_diagnose() 的告警/汇总分支测试。"""
+
+    def test_collects_warn_advice_from_token_probe_isolation_and_drift(self, mocker):
+        cfg = {
+            "mode": "safeguard",
+            "maxActiveTranscriptBytes": 1000,
+            "keepRecentTokens": 2000,
+            "reserveTokens": 4000,
+            "memoryFlush": {},
+        }
+        mocker.patch.object(
+            compaction_diag, "_get_compaction_config", return_value=cfg
+        )
+        mocker.patch.object(
+            compaction_diag, "_get_context_window", return_value=131072
+        )
+        mocker.patch.object(compaction_diag.Path, "home", return_value=Path("/tmp/fakehome"))
+        mocker.patch.object(
+            compaction_diag,
+            "_check_stat",
+            return_value=[
+                {
+                    "key": "session_fragmentation",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "status": "high",
+                    "advice": "会话碎片过多。",
+                }
+            ],
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_token_aware_check",
+            return_value={
+                "key": "token_awareness",
+                "severity": compaction_diag.SEVERITY_WARN,
+                "status": "near_limit",
+                "advice": "token 已接近上限。",
+                "maxTokensSeen": 120000,
+                "avgTokensPerTurn": 8.0,
+            },
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_dual_threshold_check",
+            return_value={
+                "key": "dual_threshold",
+                "severity": compaction_diag.SEVERITY_OK,
+                "status": "heterogeneous",
+                "advice": "双层阈值设计合理。",
+            },
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_probe_quality_check",
+            return_value={
+                "key": "probe_quality",
+                "severity": compaction_diag.SEVERITY_OK,
+                "status": "ready",
+                "advice": "可运行 probe。",
+                "compactionEventsToday": 1,
+                "probeQuestions": {"recall": "x"},
+            },
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_isolation_check",
+            return_value=[
+                {
+                    "key": "isolation_fragmentation",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "status": "high",
+                    "advice": "建议拆子 Agent。",
+                }
+            ],
+        )
+        mocker.patch.object(
+            compaction_diag,
+            "_drift_check",
+            return_value={
+                "key": "drift_detection",
+                "severity": compaction_diag.SEVERITY_WARN,
+                "status": "compression_stalled",
+                "advice": "压缩疑似停滞。",
+                "compactionCount": 3,
+            },
+        )
+
+        result = compaction_diag.compaction_diagnose(token_aware=True, probe=True)
+
+        assert result["status"] == "warn"
+        assert result["actionable"] is True
+        assert "token 已接近上限。" in result["advice"]
+        assert "可运行 probe。" in result["advice"]
+        assert "建议拆子 Agent。" in result["advice"]
+        assert "压缩疑似停滞。" in result["advice"]
+        assert result["summary"].startswith("发现 ")
+
+
+class TestPrintFunctionsMoreBranches:
+    """继续补 print_diagnose()/print_apply_result() 的剩余分支。"""
+
+    def test_print_diagnose_ok_short_circuit(self, capsys):
+        diag = {
+            "status": "ok",
+            "summary": "所有压缩配置在舒适范围内 ✅",
+            "contextWindow": 131072,
+            "todaySessionCount": 0,
+            "largestTranscriptMB": 0.0,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [],
+            "advice": [],
+        }
+
+        compaction_diag.print_diagnose(diag)
+        out = capsys.readouterr().out
+
+        assert "所有压缩配置在舒适范围内" in out
+
+    def test_print_diagnose_renders_general_missing_probe_and_isolation(self, capsys):
+        diag = {
+            "status": "warn",
+            "summary": "发现 3 个优化点",
+            "contextWindow": 131072,
+            "todaySessionCount": 9,
+            "largestTranscriptMB": 2.5,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "memoryFlush",
+                    "label": "Memory Flush（压缩前记忆写入）",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "status": "missing",
+                    "advice": "启用 memoryFlush。",
+                },
+                {
+                    "key": "probe_quality",
+                    "label": "摘要质量探针",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "status": "ready",
+                    "compactionEventsToday": 2,
+                    "latestCompaction": {
+                        "tokensBefore": 5000,
+                        "sessionFile": "2026-07-01-main.jsonl",
+                    },
+                    "probeQuestions": {
+                        "recall": "x",
+                        "artifact": "y",
+                    },
+                    "advice": "今日可运行 probe。",
+                },
+                {
+                    "key": "isolation_fragmentation",
+                    "label": "分身隔离建议（碎片化）",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "status": "high",
+                    "current": 15,
+                    "threshold": 12,
+                    "advice": "建议拆分子任务。",
+                },
+            ],
+            "advice": ["启用 memoryFlush。"],
+        }
+
+        compaction_diag.print_diagnose(diag)
+        out = capsys.readouterr().out
+
+        assert "状态: 未启用" in out
+        assert "今日压缩事件: 2 次" in out
+        assert "探针问题数: 2 类" in out
+        assert "阈值: 12" in out
+
+    def test_print_apply_result_applied_error_and_fallback(self, capsys):
+        compaction_diag.print_apply_result(
+            {
+                "status": "applied",
+                "changes": [{"key": "keepRecentTokens", "from": 8000, "to": 15000}],
+                "backupPath": "/tmp/openclaw.json.bak.20260701",
+            }
+        )
+        applied_out = capsys.readouterr().out
+        assert "已应用压缩配置优化" in applied_out
+        assert "备份: /tmp/openclaw.json.bak.20260701" in applied_out
+
+        compaction_diag.print_apply_result(
+            {
+                "status": "error",
+                "summary": "无法读取 openclaw.json",
+            }
+        )
+        error_out = capsys.readouterr().out
+        assert "错误: 无法读取 openclaw.json" in error_out
+
+        compaction_diag.print_apply_result(
+            {
+                "status": "custom",
+                "summary": "自定义状态摘要",
+            }
+        )
+        fallback_out = capsys.readouterr().out
+        assert "自定义状态摘要" in fallback_out
+
+
+class TestCompactionDiagnoseCurrentConfig:
+    """compaction_diagnose() 的 currentConfig 汇总与脱敏测试。"""
+
+    def test_truncates_memoryflush_prompt_and_keeps_soft_threshold(self, mocker):
+        long_prompt = "关键决策：" + ("A" * 120)
+        full_config = {
+            "mode": "safeguard",
+            "truncateAfterCompaction": True,
+            "notifyUser": True,
+            "maxActiveTranscriptBytes": 3_000_000,
+            "keepRecentTokens": 15_000,
+            "reserveTokens": 16_000,
+            "memoryFlush": {
+                "enabled": True,
+                "softThresholdTokens": 50_000,
+                "prompt": long_prompt,
+                "systemPrompt": "只保留长期有价值的信息。",
+            },
+        }
+        mocker.patch.object(
+            compaction_diag, "_get_compaction_config", return_value=full_config
+        )
+        mocker.patch.object(
+            compaction_diag, "_get_context_window", return_value=200_000
+        )
+        mocker.patch.object(compaction_diag, "_check_stat", return_value=[])
+        mocker.patch.object(
+            compaction_diag,
+            "_drift_check",
+            return_value={
+                "key": "drift_detection",
+                "label": "上下文降解检测",
+                "status": "healthy",
+                "severity": compaction_diag.SEVERITY_OK,
+                "compactionCount": 3,
+                "recentTokensBefore": [10000, 9000, 8000],
+                "dropRatio": 0.2,
+                "advice": "压缩趋势健康。",
+            },
+        )
+        mocker.patch.object(compaction_diag, "_isolation_check", return_value=[])
+
+        result = compaction_diag.compaction_diagnose()
+
+        assert result["status"] == "ok"
+        current = result["currentConfig"]
+        assert current["memoryFlush"]["softThresholdTokens"] == 50_000
+        assert current["memoryFlush"]["prompt"].endswith("…")
+        assert len(current["memoryFlush"]["prompt"]) == 81
+        keys = [issue["key"] for issue in result["issues"]]
+        assert "memoryFlush.softThresholdTokens" in keys
+
+
+class TestCompactionApplyAutoConfirm:
+    """compaction_apply(auto_confirm=True) 真写入路径测试。"""
+
+    def test_apply_auto_confirm_writes_backup_and_updates_config(self, mocker, tmp_path):
+        fake_diag = {
+            "actionable": True,
+            "issues": [
+                {
+                    "key": "maxActiveTranscriptBytes",
+                    "status": "too_low",
+                    "current": 1000,
+                    "advice": "阈值过低，建议提高。",
+                },
+                {
+                    "key": "memoryFlush",
+                    "status": "missing",
+                    "advice": "启用 memoryFlush。",
+                },
+            ],
+            "summary": "发现 2 个优化点",
+        }
+        cfg = {"agents": {"defaults": {"compaction": {}}}}
+        cfg_file = tmp_path / "openclaw.json"
+        cfg_file.write_text(_json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+
+        mocker.patch.object(
+            compaction_diag, "compaction_diagnose", return_value=fake_diag
+        )
+        mocker.patch.object(compaction_diag, "_load_openclaw_json", return_value=cfg)
+        mocker.patch.object(compaction_diag, "_OPENCLAW_JSON", cfg_file)
+
+        result = compaction_diag.compaction_apply(auto_confirm=True)
+
+        assert result["status"] == "applied"
+        assert len(result["changes"]) == 2
+        saved = _json.loads(cfg_file.read_text(encoding="utf-8"))
+        compaction_cfg = saved["agents"]["defaults"]["compaction"]
+        assert compaction_cfg["maxActiveTranscriptBytes"] == 3_000_000
+        assert compaction_cfg["memoryFlush"]["enabled"] is True
+        assert compaction_cfg["memoryFlush"]["softThresholdTokens"] == 32_000
+        backup_files = list(tmp_path.glob("openclaw.json.bak.*"))
+        assert len(backup_files) == 1
+        assert result["backupPath"] == str(backup_files[0])
+
+
+class TestPrintFunctions:
+    """print_diagnose() / print_apply_result() 输出测试。"""
+
+    def test_print_diagnose_renders_special_issue_sections(self, capsys):
+        diag = {
+            "status": "warn",
+            "summary": "发现 2 个优化点",
+            "contextWindow": 131072,
+            "todaySessionCount": 3,
+            "largestTranscriptMB": 1.2,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "token_awareness",
+                    "label": "令牌感知诊断",
+                    "status": "near_limit",
+                    "severity": compaction_diag.SEVERITY_WARN,
+                    "maxTokensSeen": 120000,
+                    "estimatedContextPercent": 91.5,
+                    "estimatedByteEquivalentTokens": 750000,
+                    "advice": "建议降低阈值。",
+                },
+                {
+                    "key": "drift_detection",
+                    "label": "上下文降解检测",
+                    "status": "healthy",
+                    "severity": compaction_diag.SEVERITY_OK,
+                    "compactionCount": 3,
+                    "recentTokensBefore": [10000, 9000, 8000],
+                    "dropRatio": 0.2,
+                    "advice": "压缩趋势健康。",
+                },
+            ],
+            "advice": ["建议降低阈值。"],
+        }
+
+        compaction_diag.print_diagnose(diag)
+        out = capsys.readouterr().out
+
+        assert "Mark42 压缩配置诊断 v2.0" in out
+        assert "实际最大 token: 120000" in out
+        assert "最近 trend: [10000, 9000, 8000]" in out
+        assert "优化建议汇总" in out
+
+    def test_print_apply_result_renders_dry_run_changes(self, capsys):
+        result = {
+            "status": "dry_run",
+            "changes": [
+                {
+                    "key": "maxActiveTranscriptBytes",
+                    "from": 1000,
+                    "to": 3_000_000,
+                    "reason": "阈值过低，建议提高。",
+                }
+            ],
+        }
+
+        compaction_diag.print_apply_result(result)
+        out = capsys.readouterr().out
+
+        assert "预览模式" in out
+        assert "maxActiveTranscriptBytes" in out
+        assert "执行 --apply 以应用更改" in out
+
+
+class TestGetContextWindowDictModels:
+    """_get_context_window() 的 dict 型 models 分支测试。"""
+
+    def test_extracts_from_models_dict_shape(self, mocker):
+        cfg = {
+            "models": {
+                "providers": {
+                    "deepseek": {
+                        "models": {
+                            "deepseek-chat": {"contextWindow": 262144}
+                        }
+                    }
+                }
+            }
+        }
+        mocker.patch.object(
+            compaction_diag, "_load_openclaw_json", return_value=cfg
+        )
+
+        w = compaction_diag._get_context_window()
+
+        assert w == 262144
+

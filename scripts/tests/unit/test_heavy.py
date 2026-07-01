@@ -696,9 +696,11 @@ class TestHeavyPreflight:
 
     def test_existing_path_with_mocked_popen(self, tmp_path, mocker, capsys):
         """存在路径 + mock os.popen，应输出文件数和上下文余量。"""
-        # 创建一些文件
+        # 用独立 project 子目录，避免 tmp_path 根目录混入 autouse fixture 生成的 state/data 文件
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
         for i in range(5):
-            (tmp_path / f"f{i}.txt").write_text("x" * 1000)
+            (project_dir / f"f{i}.txt").write_text("x" * 1000)
         mocker.patch.object(heavy, "armor_check",
                           return_value={"usagePercent": 40.0})
 
@@ -718,7 +720,7 @@ class TestHeavyPreflight:
 
         mocker.patch("os.popen", side_effect=popen_side_effect)
 
-        heavy.heavy_preflight(str(tmp_path))
+        heavy.heavy_preflight(str(project_dir))
         out = capsys.readouterr().out
         assert "⚙️ 重型战甲预检" in out
         assert "📂 文件数: 5" in out

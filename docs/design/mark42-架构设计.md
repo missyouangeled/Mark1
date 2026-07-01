@@ -6,17 +6,23 @@
 
 ---
 
-## 〇、当前实际资产（2026-06-29）
+## 〇、当前实际资产（2026-07-01 严格审查对齐）
 
 > 本文档为 2026-06-15 原始设计，架构哲学仍适用。
-> 代码状态以 `scripts/mark42_modules/` 为准。**设计 = 代码 +1**。
+> 代码状态以 `scripts/mark42_modules/` 与 2026-07-01 严格审查结果为准。
 
 ### 代码体量
 
-- **22 个模块** / **9526 行** Python
+- **18 个模块文件**（`scripts/mark42_modules/*.py`）
 - **1 个 CLI 入口** `scripts/mark42.py`
-- **111 个测试** / **37.8% 覆盖**（待 Phase 2 提升至 50%+）
-- 四个守护服务（armor-guard / engine-daemon / memory-index / task-watch）
+- **316 passed / 8 skipped / 45.9% 覆盖**（2026-07-01 上午早期实跑基线）
+- **后续测试推进已继续提升到 452 passed / 1 skipped / 63.2% 覆盖**；最新测试口径请看 `docs/design/mark42-测试覆盖接力开发方向-20260701.md`
+- 当前生产托管单元：
+  - `mark42-bootstrap.service`
+  - `mark42-engine-daemon.service`
+  - `mark42-armor-guard.service`
+  - `mark42-watchdog.service`
+  - `mark42-watchdog.timer`
 
 ### 模块清单（按职责分组）
 
@@ -31,7 +37,6 @@
 |  | `code_compressor.py` | 代码压缩（去注 + AST） |
 |  | `diff_compressor.py` | git diff 压缩 |
 |  | `llm_text_compressor.py` | LLM 语义压缩（同步 + 异步） |
-|  | `compression_algorithms.py` | RAGRanker |
 |  | `compress_queue.py` | 压缩线程队列 |
 |  | `compaction_diag.py` | 压缩诊断 + 修复 |
 |  | `pii_redactor.py` | PII 脱敏 |
@@ -43,8 +48,8 @@
 | **性能 / 调试** | `perf_bench.py` | 性能基准 |
 | **原型期脚本** | `test_day4_integration.py` | Day 4 集成脚本（保留供调试） |
 
-> **怎么说**：Mark42 从 2026-06-15 原始设计到现在，**多了 16 个模块**。
-> 设计哲学（三层架构 / 独立可用 / 事件总线）未变。
+> **怎么说**：Mark42 的核心设计哲学（三层架构 / 独立可用 / 事件总线）仍然成立，
+> 但资产统计、测试基线、守护部署形态已经发生演进；具体现况应以代码和 2026-07-01 严格审查报告为准。
 
 ---
 
@@ -146,7 +151,7 @@ Mark42 就是把这三块做成**可独立运行、可插拔组合**的标准化
 # 查看当前上下文健康度
 python3 scripts/mark42.py armor --check
 
-# 触发智能压缩（生成记忆索引 → 注入 → 触发 /compact）
+# 触发智能压缩（生成记忆索引 → 调用 openclaw sessions compact）
 python3 scripts/mark42.py armor --compress
 
 # 持续守护模式（每 5 分钟自检，超阈值自动出手）

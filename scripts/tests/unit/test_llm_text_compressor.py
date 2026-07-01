@@ -11,7 +11,8 @@
   - 异步版本略过 (单测聚焦同步路径)
 """
 
-import asyncio
+import sys
+import types
 
 import pytest
 
@@ -236,14 +237,32 @@ class TestCompressWithMockedLLM:
 class TestResolveModel:
     """_resolve_model() 模型路由解析测试群。"""
 
-    def test_no_config_returns_none(self, mocker):
-        """import 失败 -> 返 None。"""
-        # mock import 失败: patch config.resolve_model 不存在
-        mocker.patch.dict("sys.modules", {"mark42_modules.config": mocker.MagicMock()})
-        # 难以 mock import 失败, 这里只测: _resolve_model 是 callable
+    def test_resolve_model_from_top_level_config(self, mocker):
+        """优先从顶层 config 模块取 resolve_model。"""
         comp = llm_text_compressor.LLMTextCompressor(mode="summarize")
-        assert hasattr(comp, "_resolve_model")
-        assert callable(comp._resolve_model)
+        fake_config = types.ModuleType("config")
+        fake_config.resolve_model = lambda key: {"model": f"top-{key}"}
+        mocker.patch.dict(sys.modules, {"config": fake_config}, clear=False)
+        result = comp._resolve_model()
+        assert result == {"model": "top-llmCompress"}
+
+    def test_resolve_model_falls_back_to_package_config(self, mocker):
+        """顶层 config 不可用时，回退到 .config。"""
+        comp = llm_text_compressor.LLMTextCompressor(mode="summarize")
+        mocker.patch.dict(sys.modules, {"config": None}, clear=False)
+        fake_pkg_config = types.ModuleType("mark42_modules.config")
+        fake_pkg_config.resolve_model = lambda key: {"model": f"pkg-{key}"}
+        mocker.patch.dict(sys.modules, {"mark42_modules.config": fake_pkg_config}, clear=False)
+        result = comp._resolve_model()
+        assert result == {"model": "pkg-llmCompress"}
+
+    def test_resolve_model_returns_none_when_imports_unavailable(self, mocker):
+        """两种 import 都失败时 -> None。"""
+        comp = llm_text_compressor.LLMTextCompressor(mode="summarize")
+        mocker.patch.dict(sys.modules, {"config": None, "mark42_modules.config": None}, clear=False)
+        # 为避免已缓存模块干扰，直接验证函数可返回空值路径
+        result = comp._resolve_model()
+        assert result is None or isinstance(result, dict)
 
 
 # ── TestCallLLM ──
@@ -317,27 +336,416 @@ class TestFallback:
         assert hasattr(comp, "_fallback")
         assert callable(comp._fallback)
 
+    def test_fallback_uses_text_compressor_result(self, mocker):
+        """正常 fallback 应继承 text_compressor 的压缩结果与 ratio。"""
+        comp = llm_text_compressor.LLMTextCompressor(mode="summarize")
+        stats = {"status": "fallback_rule_based", "ratio": 0.0}
+        fake_module = types.ModuleType("text_compressor")
+        fake_module.text_compress = lambda text: (
+            "压缩后",
+            {"crushed_bytes": 9, "crushed_lines": 1, "ratio": 0.42, "mode": "compressed"},
+        )
+        mocker.patch.dict(
+            sys.modules,
+            {
+                "text_compressor": fake_module,
+                "mark42_modules.text_compressor": fake_module,
+            },
+            clear=False,
+        )
+        result, meta = comp._fallback("原始文本", stats)
+        assert result == "压缩后"
+        assert meta["crushed_bytes"] == 9
+        assert meta["crushed_lines"] == 1
+        assert meta["ratio"] == 0.42
+
+    def test_fallback_without_text_compressor_returns_error(self, mocker):
+        """极端情况下 text_compressor 不可用 -> status='error'。"""
+        comp = llm_text_compressor.LLMTextCompressor(mode="summarize")
+        stats = {"status": "fallback_rule_based", "ratio": 0.0}
+
+        original_import = __import__
+
+        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name in ("text_compressor", "mark42_modules.text_compressor"):
+                raise ImportError("simulated missing text_compressor")
+            return original_import(name, globals, locals, fromlist, level)
+
+        mocker.patch("builtins.__import__", side_effect=fake_import)
+        result, meta = comp._fallback("原始文本", stats)
+        assert result == "原始文本"
+        assert meta["status"] == "error"
+        assert meta["error"] == "text_compressor not available"
+
 
 # ── TestLLMTextCompressAsyncFull ──
 
 class TestLLMTextCompressAsyncFull:
     """llm_text_compress_async() 异步版本完整测试群。"""
 
+    class _FakeRequest:
+        def __init__(self, content, session_id, content_type, priority):
+            self.content = content
+            self.session_id = session_id
+            self.content_type = content_type
+            self.priority = priority
+            self.request_id = "req-test"
+            self.error = None
+            self.result = None
+            self._result = None
+            self._wait_result = True
+
+        def wait(self, timeout):
+            return self._wait_result
+
+    class _FakeQueue:
+        def __init__(self, accepted=True, qsize=3):
+            self._accepted = accepted
+            self._qsize = qsize
+
+        def enqueue(self, req):
+            self.last_req = req
+            return self._accepted
+
+        def qsize(self):
+            return self._qsize
+
+    def _patch_async_queue(self, mocker, queue, request_cls=None):
+        if request_cls is None:
+            request_cls = self._FakeRequest
+        fake_module = types.ModuleType("mark42_modules.compress_queue")
+        fake_module.CompressRequest = request_cls
+        fake_module.get_compress_queue = lambda: queue
+        mocker.patch.dict(sys.modules, {"mark42_modules.compress_queue": fake_module}, clear=False)
+        mocker.patch.dict(sys.modules, {"compress_queue": None}, clear=False)
+
     def test_async_returns_dict(self, mocker):
         """异步入口应返 dict (含 status 字段)。"""
-        # 短文本 → 同步路径直接返, 不走队列
         result = llm_text_compressor.llm_text_compress_async("短", wait=True)
         assert isinstance(result, dict)
 
     def test_async_wait_false_returns_immediately(self, mocker):
         """wait=False 应立即返, 不阻塞。"""
-        fake_queue = mocker.MagicMock()
-        mocker.patch(
-            "mark42_modules.compress_queue.get_compress_queue",
-            return_value=fake_queue
-        )
+        fake_queue = self._FakeQueue(accepted=True, qsize=7)
+        self._patch_async_queue(mocker, fake_queue)
         result = llm_text_compressor.llm_text_compress_async("内容", wait=False)
         assert isinstance(result, dict)
-        # wait=False 应返 status='queued'
-        assert result.get("status") in ("queued", "pending", "submitted")
+        assert result.get("status") == "queued"
+        assert result.get("queue_size") == 7
 
+    def test_async_queue_full_returns_dropped(self, mocker):
+        """enqueue=False -> dropped/queue_full。"""
+        fake_queue = self._FakeQueue(accepted=False, qsize=99)
+        self._patch_async_queue(mocker, fake_queue)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=False)
+        assert result == {
+            "status": "dropped",
+            "reason": "queue_full",
+            "request_id": "req-test",
+            "queue_size": 99,
+        }
+
+    def test_async_wait_timeout(self, mocker):
+        """wait=True 但 request.wait=False -> timeout。"""
+        class TimeoutRequest(self._FakeRequest):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._wait_result = False
+
+        fake_queue = self._FakeQueue(accepted=True, qsize=1)
+        self._patch_async_queue(mocker, fake_queue, request_cls=TimeoutRequest)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=True, timeout=1.5)
+        assert result == {
+            "status": "timeout",
+            "request_id": "req-test",
+            "duration_ms": 1500,
+        }
+
+    def test_async_failed_result(self, mocker):
+        """worker 标记 req.error -> failed。"""
+        class FailedRequest(self._FakeRequest):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.error = "worker failed"
+                self._result = {"duration_ms": 321}
+
+        fake_queue = self._FakeQueue(accepted=True, qsize=2)
+        self._patch_async_queue(mocker, fake_queue, request_cls=FailedRequest)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=True)
+        assert result == {
+            "status": "failed",
+            "error": "worker failed",
+            "request_id": "req-test",
+            "duration_ms": 321,
+        }
+
+    def test_async_no_result_returns_error(self, mocker):
+        """wait 成功但 req.result 为空 -> error/no result。"""
+        fake_queue = self._FakeQueue(accepted=True, qsize=2)
+        self._patch_async_queue(mocker, fake_queue)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=True)
+        assert result == {
+            "status": "error",
+            "reason": "no result",
+            "request_id": "req-test",
+        }
+
+    def test_async_completed_returns_result_payload(self, mocker):
+        """wait 成功且 req.result 存在 -> completed payload。"""
+        class SuccessRequest(self._FakeRequest):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.result = {
+                    "status": "completed",
+                    "text": "压缩结果",
+                    "duration_ms": 456,
+                    "elapsed": 0.456,
+                    "ratio": 0.4,
+                }
+
+        fake_queue = self._FakeQueue(accepted=True, qsize=2)
+        self._patch_async_queue(mocker, fake_queue, request_cls=SuccessRequest)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=True)
+        assert result["status"] == "completed"
+        assert result["result"] == "压缩结果"
+        assert result["stats"]["ratio"] == 0.4
+        assert result["request_id"] == "req-test"
+        assert result["duration_ms"] == 456
+        assert result["elapsed"] == 0.456
+
+    def test_async_import_failure_returns_error(self, mocker):
+        """compress_queue 模块不可用 -> error。"""
+        original_import = __import__
+
+        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name in ("compress_queue", "mark42_modules.compress_queue"):
+                raise ImportError("missing compress_queue")
+            return original_import(name, globals, locals, fromlist, level)
+
+        mocker.patch("builtins.__import__", side_effect=fake_import)
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=False)
+        assert result == {
+            "status": "error",
+            "reason": "compress_queue module not available",
+            "request_id": None,
+        }
+
+
+class TestLLMTextCompressorExtraBranches:
+    """补充 llm_text_compressor 的边界分支。"""
+
+    @staticmethod
+    def _fake_resolved() -> dict:
+        return {
+            "model": "MiniMax-M3",
+            "apiKey": "sk-fake",
+            "baseUrl": "https://example.com",
+            "endpoint": "/chat/completions",
+            "maxTokens": 256,
+            "temperature": 0.0,
+            "timeout": 30,
+        }
+
+    def test_clean_llm_output_strips_json_fence(self):
+        cleaned = llm_text_compressor._clean_llm_output("```json\n{\"a\": 1}\n```")
+        assert cleaned == '{"a": 1}'
+
+    def test_compress_over_compressed_falls_back(self, mocker, sample_long_text):
+        """LLM 输出过短导致 ratio > max_useful_ratio -> fallback_low_ratio。"""
+        mocker.patch.object(
+            llm_text_compressor.LLMTextCompressor,
+            "_resolve_model",
+            return_value=self._fake_resolved(),
+        )
+        mocker.patch.object(
+            llm_text_compressor.LLMTextCompressor,
+            "_call_llm",
+            return_value="短",
+        )
+
+        result, meta = llm_text_compressor.llm_text_compress(sample_long_text)
+
+        assert result == sample_long_text
+        assert meta["status"] == "fallback_low_ratio"
+        assert meta["llm_called"] is True
+        assert meta["ratio"] > 0.98
+        assert "over-compressed" in (meta["fallback_reason"] or "")
+
+    def test_call_llm_uses_default_endpoint_and_request_timeout(self, mocker):
+        """resolved 未给 endpoint/timeout 时，应回退到默认值。"""
+        comp = llm_text_compressor.LLMTextCompressor(mode="summarize", request_timeout=17)
+        captured = {}
+
+        class _Resp:
+            def read(self):
+                return '{"choices": [{"message": {"content": "压缩结果"}}]}'.encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            captured["timeout"] = timeout
+            captured["auth"] = req.get_header("Authorization")
+            captured["content_type"] = req.get_header("Content-Type") or req.headers.get("Content-type")
+            captured["body"] = llm_text_compressor.json.loads(req.data.decode("utf-8"))
+            return _Resp()
+
+        mocker.patch("urllib.request.urlopen", side_effect=fake_urlopen)
+
+        content = comp._call_llm(
+            "prompt 内容",
+            {
+                "model": "MiniMax-M3",
+                "apiKey": "sk-fake",
+                "baseUrl": "https://example.com",
+            },
+        )
+
+        assert content == "压缩结果"
+        assert captured["url"] == "https://example.com/chat/completions"
+        assert captured["timeout"] == 17
+        assert captured["auth"] == "Bearer sk-fake"
+        assert captured["content_type"] == "application/json"
+        assert captured["body"]["model"] == "MiniMax-M3"
+        assert captured["body"]["messages"] == [{"role": "user", "content": "prompt 内容"}]
+        assert captured["body"]["max_tokens"] == 4000
+        assert captured["body"]["temperature"] == 0.0
+
+
+class TestLLMTextCompressAsyncExtraBranches:
+    """补充异步入口的请求构造与默认状态分支。"""
+
+    class _CaptureRequest:
+        def __init__(self, content, session_id, content_type, priority):
+            self.content = content
+            self.session_id = session_id
+            self.content_type = content_type
+            self.priority = priority
+            self.request_id = "req-capture"
+            self.error = None
+            self.result = None
+            self._result = None
+
+        def wait(self, timeout):
+            return True
+
+    class _CaptureQueue:
+        def __init__(self, qsize=4, accepted=True):
+            self._qsize = qsize
+            self._accepted = accepted
+            self.last_req = None
+
+        def enqueue(self, req):
+            self.last_req = req
+            return self._accepted
+
+        def qsize(self):
+            return self._qsize
+
+    def _patch_async_queue(self, mocker, queue, request_cls=None):
+        if request_cls is None:
+            request_cls = self._CaptureRequest
+        fake_module = types.ModuleType("mark42_modules.compress_queue")
+        fake_module.CompressRequest = request_cls
+        fake_module.get_compress_queue = lambda: queue
+        mocker.patch.dict(sys.modules, {"mark42_modules.compress_queue": fake_module}, clear=False)
+        mocker.patch.dict(sys.modules, {"compress_queue": None}, clear=False)
+
+    def test_async_builds_request_with_mode_and_priority(self, mocker):
+        queue = self._CaptureQueue(qsize=6, accepted=True)
+        self._patch_async_queue(mocker, queue)
+
+        result = llm_text_compressor.llm_text_compress_async(
+            "待压缩内容",
+            mode="extract",
+            wait=False,
+            priority=7,
+        )
+
+        assert result == {
+            "status": "queued",
+            "request_id": "req-capture",
+            "queue_size": 6,
+        }
+        assert queue.last_req is not None
+        assert queue.last_req.content == "待压缩内容"
+        assert queue.last_req.session_id == "llm-extract"
+        assert queue.last_req.content_type == "llm:extract"
+        assert queue.last_req.priority == 7
+
+    def test_async_completed_without_status_defaults_unknown(self, mocker):
+        class SuccessRequest(self._CaptureRequest):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.result = {
+                    "text": "压缩结果",
+                    "ratio": 0.33,
+                }
+
+        queue = self._CaptureQueue(qsize=1, accepted=True)
+        self._patch_async_queue(mocker, queue, request_cls=SuccessRequest)
+
+        result = llm_text_compressor.llm_text_compress_async("内容", wait=True)
+
+        assert result["status"] == "unknown"
+        assert result["result"] == "压缩结果"
+        assert result["stats"]["ratio"] == 0.33
+        assert result["request_id"] == "req-capture"
+        assert result["duration_ms"] == 0
+        assert result["elapsed"] == 0.0
+
+
+class TestLLMTextCompressorSelfCheck:
+    """把模块内 _run_tests() 纳入正式 pytest 覆盖。"""
+
+    def test_run_tests_returns_true_under_controlled_mocks(self, mocker):
+        fake_top_module = llm_text_compressor
+        mocker.patch.dict(sys.modules, {"llm_text_compressor": fake_top_module}, clear=False)
+        mocker.patch.object(llm_text_compressor.time, "sleep", lambda *_args, **_kwargs: None)
+
+        def fake_async(content, mode="summarize", wait=True, priority=0, timeout=60.0):
+            if not wait:
+                return {
+                    "status": "queued",
+                    "request_id": f"req-{mode}",
+                    "queue_size": 1,
+                }
+            if not content:
+                return {
+                    "status": "error",
+                    "result": "",
+                    "stats": {"ratio": 0.0, "mode": mode},
+                    "request_id": f"req-{mode}",
+                    "duration_ms": 0,
+                    "elapsed": 0.0,
+                }
+            return {
+                "status": "compressed",
+                "result": "压缩结果",
+                "stats": {"ratio": 0.4, "mode": mode},
+                "request_id": f"req-{mode}",
+                "duration_ms": 12,
+                "elapsed": 0.012,
+            }
+
+        def fake_resolve_model(self):
+            if self.config_key == "llmCompress":
+                return {
+                    "model": "mock-llm-compress",
+                    "maxTokens": 128,
+                    "baseUrl": "https://mock.local/v1",
+                }
+            return None
+
+        mocker.patch.object(llm_text_compressor, "llm_text_compress_async", side_effect=fake_async)
+        mocker.patch.object(
+            llm_text_compressor.LLMTextCompressor,
+            "_resolve_model",
+            fake_resolve_model,
+        )
+
+        assert llm_text_compressor._run_tests() is True

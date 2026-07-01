@@ -10,13 +10,34 @@
 
 set -e
 
-WORKSPACE="/home/missyouangeled/.openclaw/workspace"
-HEARTBEAT="$HOME/.local/state/openclaw/mark42/engine/daemon-heartbeat.json"
-LOGFILE="/home/missyouangeled/.local/state/openclaw/mark42/watchdog.log"
+MARK42_WORKSPACE="${MARK42_WORKSPACE:-/home/missyouangeled/.openclaw/workspace}"
+MARK42_CLI="${MARK42_CLI:-$MARK42_WORKSPACE/scripts/mark42.py}"
+MARK42_PYTHON_BIN="${MARK42_PYTHON_BIN:-python3}"
+XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+MARK42_STATE_DIR="${MARK42_STATE_DIR:-$XDG_STATE_HOME/openclaw/mark42}"
+MARK42_LOG_DIR="${MARK42_LOG_DIR:-$MARK42_STATE_DIR/logs}"
+MARK42_SCRATCH="${MARK42_SCRATCH:-/mnt/data/openclaw/scratch}"
+WORKSPACE="$MARK42_WORKSPACE"
+HEARTBEAT="${HEARTBEAT:-$MARK42_STATE_DIR/engine/daemon-heartbeat.json}"
+LOGFILE="${LOGFILE:-$MARK42_STATE_DIR/watchdog.log}"
+PROACTIVE_INJECT="${PROACTIVE_INJECT:-$MARK42_WORKSPACE/scripts/openclaw-proactive-inject.py}"
 
 mkdir -p "$(dirname "$LOGFILE")"
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOGFILE"
+    local line="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+    if [ -t 1 ]; then
+        printf '%s\n' "$line" | tee -a "$LOGFILE"
+    else
+        printf '%s\n' "$line"
+    fi
+}
+
+run_and_log() {
+    if [ -t 1 ]; then
+        "$@" 2>&1 | tee -a "$LOGFILE"
+    else
+        "$@"
+    fi
 }
 
 WARN_THRESHOLD=300  # 5 分钟心跳超时视为异常
@@ -44,12 +65,12 @@ notify_alert() {
     echo "$now_epoch" > "$cooldown_file" 2>/dev/null || true
     # 推送到 dashboard (失败不影响主流程)
     echo -n "$msg" > "$ALERT_FILE" 2>/dev/null || true
-    python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-proactive-inject.py \
+    "$MARK42_PYTHON_BIN" "$PROACTIVE_INJECT" \
         --source "mark42-watchdog" --file "$ALERT_FILE" >/dev/null 2>&1 || true
 }
 
 # ── 0. L2.5 嵌入索引健康检查（只告警，不重启 service） ──
-EMBED_INDEX="/mnt/data/openclaw/scratch/memory-embed-index/embeddings.npy"
+EMBED_INDEX="${EMBED_INDEX:-$MARK42_SCRATCH/memory-embed-index/embeddings.npy}"
 EMBED_MIN_BYTES=100000  # 100 KB 以下视为异常（正常 ~10 MB）
 if [ ! -f "$EMBED_INDEX" ]; then
     log "🚨 L2.5 嵌入索引缺失: $EMBED_INDEX 不存在"
@@ -66,7 +87,7 @@ else
 fi
 
 # ── 0b. L1 MEMORY_INDEX 健康检查（只告警，不重启 service） ──
-MEMORY_INDEX="/mnt/data/openclaw/scratch/memory-index/MEMORY_INDEX.json"
+MEMORY_INDEX="${MEMORY_INDEX:-$MARK42_SCRATCH/memory-index/MEMORY_INDEX.json}"
 MEMORY_INDEX_MIN_BYTES=10000  # 10 KB 以下视为异常（正常 ~260 KB）
 if [ ! -f "$MEMORY_INDEX" ]; then
     log "🚨 L1 关键词索引缺失: $MEMORY_INDEX 不存在"
@@ -84,7 +105,7 @@ fi
 
 # ── 1. 心跳超时检查 ──
 if [ -f "$HEARTBEAT" ]; then
-    last_tick=$(python3 -c "
+    last_tick=$("$MARK42_PYTHON_BIN" -c "
 import json
 from datetime import datetime, timezone
 try:
@@ -126,7 +147,7 @@ fi
 loops_check=$(python3 -c "
 import json, subprocess
 try:
-    r = subprocess.run(['python3', '$WORKSPACE/scripts/mark42.py', 'status', '--json'],
+    r = subprocess.run(['$MARK42_PYTHON_BIN', '$MARK42_CLI', 'status', '--json'],
                       capture_output=True, text=True, timeout=10)
     d = json.loads(r.stdout)
     eng = d.get('engine', {})
@@ -170,8 +191,8 @@ fi
 # ── 3. 处置 ──
 if [ -n "$need_restart" ]; then
     log "⚠️ 检测到异常: $reason → 重启 service"
-    systemctl --user restart mark42-engine-daemon.service 2>&1 | tee -a "$LOGFILE" || log "   engine-daemon 重启失败"
-    systemctl --user restart mark42-armor-guard.service 2>&1 | tee -a "$LOGFILE" || log "   armor-guard 重启失败"
+    run_and_log systemctl --user restart mark42-engine-daemon.service || log "   engine-daemon 重启失败"
+    run_and_log systemctl --user restart mark42-armor-guard.service || log "   armor-guard 重启失败"
     sleep 5
     new_engine=$(pgrep -f "mark42.py engine --daemon" | head -1 || echo "")
     new_armor=$(pgrep -f "mark42.py armor --guard" | head -1 || echo "")

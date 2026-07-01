@@ -118,8 +118,14 @@ class LogDeduplicator:
         stats["is_log"] = True
 
         # 1. 分离 tail lines
-        tail = lines[-self.keep_tail_lines:] if len(lines) > self.keep_tail_lines else lines
-        head = lines[:-self.keep_tail_lines] if len(lines) > self.keep_tail_lines else []
+        # 注意: keep_tail_lines=0 时, lines[-0:] 会返回整份列表, 不是空列表。
+        # 这里显式处理 <=0, 避免“整份日志都被当成 tail”这种边界 bug。
+        if self.keep_tail_lines <= 0:
+            tail = []
+            head = lines
+        else:
+            tail = lines[-self.keep_tail_lines:] if len(lines) > self.keep_tail_lines else lines
+            head = lines[:-self.keep_tail_lines] if len(lines) > self.keep_tail_lines else []
         stats["kept_tail_lines"] = len(tail)
 
         # 2. 提取 critical events (从全量内容中)

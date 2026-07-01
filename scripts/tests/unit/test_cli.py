@@ -297,3 +297,192 @@ class TestAssemble:
 
         mock_init.assert_called_once()
         assert mock_popen.call_count >= 2
+
+
+class TestTrimDaemonLogs:
+    """_trim_daemon_logs() 日志截尾逻辑。"""
+
+    def test_trims_large_log_file(self, mocker, capsys):
+        fake_log = MagicMock()
+        fake_log.name = "engine-daemon.log"
+        fake_log.stat.return_value.st_size = 5 * 1024 * 1024
+
+        fake_dir = MagicMock()
+        fake_dir.glob.return_value = [fake_log]
+
+        mocker.patch("mark42_modules.config.MAX_DAEMON_LOG_MB", 1)
+        mocker.patch("mark42_modules.config.MAX_DAEMON_LOG_LINES", 10)
+        mocker.patch(
+            "builtins.open",
+            mock_open(read_data="".join(f"line{i}\n" for i in range(12))),
+        )
+
+        cli._trim_daemon_logs(fake_dir)
+
+        out = capsys.readouterr().out
+        assert "🧹 截尾 engine-daemon.log" in out
+        assert "5 行" in out
+
+    def test_skips_small_log_file(self, mocker):
+        fake_log = MagicMock()
+        fake_log.name = "small.log"
+        fake_log.stat.return_value.st_size = 100
+
+        fake_dir = MagicMock()
+        fake_dir.glob.return_value = [fake_log]
+
+        mocker.patch("mark42_modules.config.MAX_DAEMON_LOG_MB", 1)
+        mocker.patch("mark42_modules.config.MAX_DAEMON_LOG_LINES", 10)
+        open_mock = mocker.patch("builtins.open", mock_open(read_data="x\n"))
+
+        cli._trim_daemon_logs(fake_dir)
+
+        open_mock.assert_not_called()
+
+    def test_ignores_oserror(self, mocker):
+        fake_log = MagicMock()
+        fake_log.stat.side_effect = OSError("boom")
+
+        fake_dir = MagicMock()
+        fake_dir.glob.return_value = [fake_log]
+
+        cli._trim_daemon_logs(fake_dir)
+
+
+class TestMainDispatchExtra:
+    """补 main() 里现有未覆盖的高价值分发。"""
+
+    def test_logs_rotate_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "logs", "--rotate"])
+        mock_rotate = mocker.patch("mark42_modules.logs.log_rotate")
+        mock_status = mocker.patch("mark42_modules.logs.log_rotate_status")
+
+        cli.main()
+
+        mock_rotate.assert_called_once_with("all")
+        mock_status.assert_not_called()
+
+    def test_logs_status_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "logs", "--status"])
+        mock_rotate = mocker.patch("mark42_modules.logs.log_rotate")
+        mock_status = mocker.patch("mark42_modules.logs.log_rotate_status")
+
+        cli.main()
+
+        mock_rotate.assert_not_called()
+        mock_status.assert_called_once()
+
+    def test_engine_start_dispatches(self, mocker):
+        mocker.patch.object(
+            sys,
+            "argv",
+            [
+                "mark42.py", "engine", "--start",
+                "--task", "监控上下文",
+                "--interval", "60",
+                "--max-cycles", "3",
+                "--template", "context-guard",
+            ],
+        )
+        mock_start = mocker.patch("mark42_modules.engine.engine_start")
+
+        cli.main()
+
+        mock_start.assert_called_once_with(
+            task="监控上下文",
+            interval_s=60,
+            max_cycles=3,
+            template="context-guard",
+        )
+
+    def test_engine_daemon_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--daemon", "--interval", "45"])
+        mock_daemon = mocker.patch("mark42_modules.engine.engine_daemon")
+
+        cli.main()
+
+        mock_daemon.assert_called_once_with(45)
+
+    def test_engine_watch_task_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--watch-task", "big-proj", "--interval", "120"])
+        mock_watch = mocker.patch("mark42_modules.engine.engine_watch_task")
+
+        cli.main()
+
+        mock_watch.assert_called_once_with("big-proj", interval_s=120)
+
+    def test_heavy_start_dispatches_context_toggle(self, mocker):
+        mocker.patch.object(
+            sys,
+            "argv",
+            [
+                "mark42.py", "heavy", "--start", "/tmp/proj",
+                "--task-name", "big-task", "--no-context-aware",
+            ],
+        )
+        mock_start = mocker.patch("mark42_modules.heavy.heavy_start")
+
+        cli.main()
+
+        mock_start.assert_called_once_with("/tmp/proj", "big-task", context_aware=False)
+
+    def test_heavy_execute_dispatches(self, mocker):
+        mocker.patch.object(
+            sys,
+            "argv",
+            [
+                "mark42.py", "heavy", "--execute", "--task-name", "big-task",
+                "--batch", "b1", "--command", "python {f}", "--execute-now",
+            ],
+        )
+        mock_execute = mocker.patch("mark42_modules.heavy.heavy_execute")
+
+        cli.main()
+
+        mock_execute.assert_called_once_with(
+            "big-task", "b1", command="python {f}", execute_now=True
+        )
+
+    def test_heavy_execute_all_dispatches(self, mocker):
+        mocker.patch.object(
+            sys,
+            "argv",
+            [
+                "mark42.py", "heavy", "--execute-all", "--task-name", "big-task",
+                "--command", "python {f}", "--execute-now",
+            ],
+        )
+        mock_execute_all = mocker.patch("mark42_modules.heavy.heavy_execute_all")
+
+        cli.main()
+
+        mock_execute_all.assert_called_once_with(
+            "big-task", command="python {f}", execute_now=True
+        )
+
+    def test_heavy_missing_task_name_prints_error(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy", "--start", "/tmp/proj"])
+        mocker.patch("mark42_modules.heavy.heavy_start")
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "--task-name 不能为空" in out
+
+    def test_status_json_prints_serialized_dashboard(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "status", "--json"])
+        mocker.patch.object(cli, "status_dashboard", return_value={"ok": True, "value": 1})
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert '"ok": true' in out
+        assert '"value": 1' in out
+
+    def test_assemble_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "assemble"])
+        mock_assemble = mocker.patch.object(cli, "assemble")
+
+        cli.main()
+
+        mock_assemble.assert_called_once()

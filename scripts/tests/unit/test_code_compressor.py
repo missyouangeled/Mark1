@@ -56,6 +56,33 @@ class TestIsCode:
         assert comp.is_code("def foo(): pass") is False
 
 
+class TestDetectLanguage:
+    """_detect_language() 自动语言检测测试群。"""
+
+    def test_detect_python(self, sample_code_python):
+        comp = code_compressor.CodeCompressor(language="auto")
+        assert comp._detect_language(sample_code_python) == "python"
+
+    def test_detect_javascript(self):
+        comp = code_compressor.CodeCompressor(language="auto")
+        js = (
+            "function hello(name) {\n"
+            "  return name;\n"
+            "}\n"
+            "const x = 1;\n"
+        )
+        assert comp._detect_language(js) == "javascript"
+
+    def test_detect_shell(self):
+        comp = code_compressor.CodeCompressor(language="auto")
+        sh = "#!/bin/sh\necho hello\nexport NAME=world\n"
+        assert comp._detect_language(sh) == "shell"
+
+    def test_detect_generic(self):
+        comp = code_compressor.CodeCompressor(language="auto")
+        assert comp._detect_language("plain text without code keywords") == "generic"
+
+
 class TestCodeCrush:
     """codecrush() 包装函数测试群。"""
 
@@ -73,6 +100,45 @@ class TestCodeCrush:
             or meta["original_bytes"] >= meta["crushed_bytes"]
         )
 
+    def test_python_docstring_removed_and_signature_preserved(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "def hello(name: str) -> str:\n"
+            "    \"\"\"docstring\"\"\"\n"
+            "    value = name.strip()\n"
+            "    return value\n"
+        )
+        result, meta = comp.compress(src)
+        assert 'docstring' not in result
+        assert 'def hello(name: str) -> str:' in result
+        assert meta["removed_docstrings"] == 1
+        assert meta["mode"] == "compressed"
+
+    def test_python_big_function_is_truncated(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50, max_stmts_per_func=3)
+        body = "".join([f"    x_{i} = {i}\n" for i in range(8)])
+        src = "def big():\n" + body + "    return x_7\n"
+        result, meta = comp.compress(src)
+        assert meta["truncated_functions"] >= 1
+        assert "more statements" in result
+
+    def test_python_class_signature_and_method_skeleton_preserved(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "class Foo(Bar):\n"
+            "    \"\"\"class doc\"\"\"\n"
+            "    KIND = 'x'\n"
+            "\n"
+            "    def bar(self, x):\n"
+            "        return x\n"
+        )
+        result, meta = comp.compress(src)
+        assert "class Foo(Bar):" in result
+        assert "def bar(self, x): ..." in result
+        assert "class doc" not in result
+        assert meta["removed_docstrings"] == 1
+        assert meta["truncated_functions"] >= 1
+
     def test_codecrush_javascript(self):
         """JavaScript 代码 - is_code 应识别, 但 codecrush 可能 passthrough (仅支持 python)。"""
         js = (
@@ -89,11 +155,76 @@ class TestCodeCrush:
         # is_code 启发式应识别
         assert meta["is_code"] is True or meta["mode"] == "passthrough"
 
+    def test_javascript_regex_fallback_removes_comments(self):
+        comp = code_compressor.CodeCompressor(language="javascript", min_code_size=50)
+        js = (
+            "// top comment\n"
+            "function hello(name) {\n"
+            "    // inner comment\n"
+            "    const value = name;\n"
+            "    return value;\n"
+            "}\n"
+            "/* block comment */\n"
+            "const x = 1;\n"
+        ) * 3
+        result, meta = comp.compress(js)
+        assert "top comment" not in result
+        assert "inner comment" not in result
+        assert "block comment" not in result
+        assert "function hello" in result
+        assert meta["mode"] == "compressed"
+        assert meta["removed_comments"] > 0
+
     def test_codecrush_empty(self):
         """空字符串 -> 原文, mode='none'。"""
         result, meta = code_compressor.codecrush("")
         assert result == ""
         assert meta["mode"] == "none"
+
+    def test_small_code_passthrough_small(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=500)
+        src = (
+            "def hello(name):\n"
+            "    return name\n"
+            "\n"
+            "class Foo:\n"
+            "    def bar(self):\n"
+            "        return 42\n"
+        )
+        result, meta = comp.compress(src)
+        assert result == src
+        assert meta["is_code"] is True
+        assert meta["mode"] == "passthrough_small"
+
+    def test_syntax_error_fails_safe(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        bad = (
+            "def broken(:\n"
+            "    pass\n"
+            "\n"
+            "class Foo:\n"
+            "    def bar(self):\n"
+            "        return 1\n"
+        ) * 5
+        result, meta = comp.compress(bad)
+        assert result == bad
+        assert meta["is_code"] is True
+        assert meta["mode"] == "error"
+        assert "error" in meta
+
+    def test_auto_language_updates_meta(self):
+        comp = code_compressor.CodeCompressor(language="auto", min_code_size=50)
+        js = (
+            "function hello(name) {\n"
+            "  return name;\n"
+            "}\n"
+            "const x = 1;\n"
+            "let y = 2;\n"
+        ) * 4
+        result, meta = comp.compress(js)
+        assert meta["language"] == "javascript"
+        assert meta["is_code"] is True
+        assert meta["mode"] in ("compressed", "passthrough_small")
 
     def test_codecrush_natural_text_passthrough(self):
         """非代码内容应 passthrough, 不破坏。"""
@@ -131,3 +262,15 @@ class TestCodeCrush:
         assert len(result) == 2
         assert isinstance(result[0], str)
         assert isinstance(result[1], dict)
+
+    def test_metadata_contains_truncation_fields(self):
+        comp = code_compressor.CodeCompressor(language="python", min_code_size=50)
+        src = (
+            "def hello(name):\n"
+            "    \"\"\"doc\"\"\"\n"
+            "    return name\n"
+        )
+        _, meta = comp.compress(src)
+        assert "truncated_functions" in meta
+        assert "removed_docstrings" in meta
+        assert "removed_comments" in meta

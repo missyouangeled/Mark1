@@ -7,6 +7,8 @@
 """
 
 import json
+import os
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -271,3 +273,221 @@ class TestLoadSaveState:
         assert isinstance(state, dict)
         assert state["rotationCount"] == 0
 
+
+class TestAgeDays:
+    """_age_days() 基础分支。"""
+
+    def test_age_days_returns_999_on_oserror(self, mocker, tmp_path):
+        path = tmp_path / "ghost.txt"
+        mocker.patch.object(Path, "stat", side_effect=OSError("boom"))
+        assert logs._age_days(path) == 999
+
+
+class TestRotateHistoryFilesMore:
+    """rotate_history_files() 的数量/老化裁剪补测。"""
+
+    def test_trim_excess_history_files_by_count(self, monkeypatch, tmp_path):
+        history_dir = config.ARMOR_STATE / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(logs, "MAX_HISTORY_FILES", 3)
+        monkeypatch.setattr(logs, "MAX_LOG_AGE_DAYS", 999)
+
+        files = []
+        for i in range(5):
+            f = history_dir / f"memory-index-2026-07-01-{i:02d}.json"
+            f.write_text("{}")
+            ts = 1_700_000_000 + i
+            os.utime(f, (ts, ts))
+            files.append(f)
+
+        result = logs.rotate_history_files()
+        assert result["cleaned"] == 2
+        remaining = sorted(p.name for p in history_dir.glob("memory-index-*.json"))
+        assert len(remaining) == 3
+        assert remaining == [
+            "memory-index-2026-07-01-02.json",
+            "memory-index-2026-07-01-03.json",
+            "memory-index-2026-07-01-04.json",
+        ]
+
+    def test_trim_old_history_files_by_age(self, monkeypatch, tmp_path):
+        history_dir = config.ARMOR_STATE / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(logs, "MAX_HISTORY_FILES", 99)
+        monkeypatch.setattr(logs, "MAX_LOG_AGE_DAYS", 7)
+
+        old_file = history_dir / "memory-index-old.json"
+        recent_file = history_dir / "memory-index-recent.json"
+        old_file.write_text("{}")
+        recent_file.write_text("{}")
+
+        old_ts = time.time() - 10 * 86400
+        recent_ts = time.time() - 1 * 86400
+        os.utime(old_file, (old_ts, old_ts))
+        os.utime(recent_file, (recent_ts, recent_ts))
+
+        result = logs.rotate_history_files()
+        assert result["cleaned"] == 1
+        assert not old_file.exists()
+        assert recent_file.exists()
+
+
+class TestRotateActionsLogMore:
+    """rotate_actions_log() 的真实裁剪/异常补测。"""
+
+    def test_trim_long_actions_log_keeps_tail(self, monkeypatch, tmp_path):
+        actions = config.ARMOR_STATE / "actions.jsonl"
+        actions.parent.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(logs, "MAX_ACTIONS_LINES", 3)
+        actions.write_text("".join(f'{i}\n' for i in range(6)))
+
+        result = logs.rotate_actions_log()
+        assert result == {"trimmed": 3, "lines": 3}
+        assert actions.read_text().splitlines() == ["3", "4", "5"]
+
+    def test_actions_log_io_error_returns_error(self, mocker, tmp_path):
+        actions = config.ARMOR_STATE / "actions.jsonl"
+        actions.parent.mkdir(parents=True, exist_ok=True)
+        actions.write_text("x\n")
+        mocker.patch("builtins.open", side_effect=OSError("boom"))
+
+        result = logs.rotate_actions_log()
+        assert result == {"trimmed": 0, "error": "IO 错误"}
+
+
+class TestRotateDaemonLogs:
+    """rotate_daemon_logs() 补测。"""
+
+    def test_no_log_dir_returns_note(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(logs, "LOG_DIR", tmp_path / "missing-logs")
+        result = logs.rotate_daemon_logs()
+        assert result == {"trimmed": 0, "note": "无日志目录"}
+
+    def test_trim_large_daemon_log_keeps_tail_half_limit(self, monkeypatch, tmp_path):
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(logs, "LOG_DIR", log_dir)
+        monkeypatch.setattr(logs, "MAX_DAEMON_LOG_MB", 0.0001)
+        monkeypatch.setattr(logs, "MAX_DAEMON_LOG_LINES", 10)
+
+        big_log = log_dir / "daemon.log"
+        small_log = log_dir / "small.log"
+        big_log.write_text("".join(f"line-{i}-{'x' * 50}\n" for i in range(20)))
+        small_log.write_text("ok\n")
+
+        result = logs.rotate_daemon_logs()
+        assert result == {"trimmed_files": 1, "trimmed_lines": 15}
+        assert big_log.read_text().splitlines() == [f"line-{i}-{'x' * 50}" for i in range(15, 20)]
+        assert small_log.read_text() == "ok\n"
+
+
+class TestRotateScratchOld:
+    """rotate_scratch_old() 补测。"""
+
+    def test_no_scratch_dir_returns_note(self, monkeypatch, tmp_path):
+        scratch = tmp_path / "missing-scratch"
+        monkeypatch.setattr(config, "SCRATCH", scratch)
+        result = logs.rotate_scratch_old()
+        assert result == {"cleaned": 0, "note": "无 scratch 目录"}
+
+    def test_clean_only_old_unprotected_scratch_dirs(self, monkeypatch, tmp_path):
+        scratch = tmp_path / "scratch"
+        scratch.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config, "SCRATCH", scratch)
+        monkeypatch.setattr(logs, "MAX_LOG_AGE_DAYS", 7)
+
+        old_dir = scratch / "old-dir"
+        kept_dir = scratch / "kept-dir"
+        recent_dir = scratch / "recent-dir"
+        old_dir.mkdir()
+        kept_dir.mkdir()
+        recent_dir.mkdir()
+        (kept_dir / ".keep").write_text("")
+
+        monkeypatch.setattr(
+            logs,
+            "_age_days",
+            lambda path: 30 if path.name in {"old-dir", "kept-dir"} else 1,
+        )
+
+        result = logs.rotate_scratch_old()
+        assert result == {"cleaned": 1}
+        assert not old_dir.exists()
+        assert kept_dir.exists()
+        assert recent_dir.exists()
+
+
+class TestLogRotate:
+    """log_rotate() 汇总与状态保存补测。"""
+
+    def test_log_rotate_all_aggregates_results_and_updates_state(self, monkeypatch, capsys):
+        saved = {}
+        monkeypatch.setattr(logs, "rotate_daemon_logs", lambda: {"trimmed_files": 1, "trimmed_lines": 5})
+        monkeypatch.setattr(logs, "rotate_history_files", lambda: {"cleaned": 2})
+        monkeypatch.setattr(logs, "rotate_actions_log", lambda: {"trimmed": 3})
+        monkeypatch.setattr(logs, "rotate_broker_events", lambda: {"trimmed": 4})
+        monkeypatch.setattr(logs, "rotate_scratch_old", lambda: {"cleaned": 1})
+        monkeypatch.setattr(logs, "_load_state", lambda: {"lastRotation": None, "rotationCount": 7})
+        monkeypatch.setattr(logs, "_save_state", lambda state: saved.update(state))
+
+        result = logs.log_rotate("all")
+        output = capsys.readouterr().out
+
+        assert result["status"] == "ok"
+        assert result["totalItems"] == 16
+        assert saved["rotationCount"] == 8
+        assert saved["lastRotation"]
+        assert "日志轮替完成" in output
+        assert "history: 删除 2 个文件" in output
+        assert "actions: 裁剪 3 行" in output
+        assert "daemon: 截尾 1 个日志 (5 行)" in output
+
+    def test_log_rotate_single_target_only_runs_requested_branch(self, monkeypatch):
+        called = []
+        monkeypatch.setattr(logs, "rotate_daemon_logs", lambda: called.append("daemon") or {"trimmed_files": 0, "trimmed_lines": 0})
+        monkeypatch.setattr(logs, "rotate_history_files", lambda: called.append("history") or {"cleaned": 0})
+        monkeypatch.setattr(logs, "rotate_actions_log", lambda: called.append("actions") or {"trimmed": 0})
+        monkeypatch.setattr(logs, "rotate_broker_events", lambda: called.append("broker") or {"trimmed": 0})
+        monkeypatch.setattr(logs, "rotate_scratch_old", lambda: called.append("scratch") or {"cleaned": 0})
+        monkeypatch.setattr(logs, "_load_state", lambda: {"lastRotation": None, "rotationCount": 0})
+        monkeypatch.setattr(logs, "_save_state", lambda state: None)
+
+        result = logs.log_rotate("history")
+        assert result["results"] == {"history": {"cleaned": 0}}
+        assert called == ["history"]
+
+
+class TestLogRotateStatus:
+    """log_rotate_status() 输出补测。"""
+
+    def test_log_rotate_status_prints_current_snapshot(self, monkeypatch, tmp_path, capsys):
+        history_dir = config.ARMOR_STATE / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        (history_dir / "memory-index-a.json").write_text("{}")
+        (history_dir / "memory-index-b.json").write_text("{}")
+
+        actions = config.ARMOR_STATE / "actions.jsonl"
+        actions.parent.mkdir(parents=True, exist_ok=True)
+        actions.write_text('{"a":1}\n{"a":2}\n')
+
+        broker = config.MARK42_BROKER_EVENTS
+        broker.parent.mkdir(parents=True, exist_ok=True)
+        broker.write_text('{"e":1}\n{"e":2}\n')
+
+        scratch = tmp_path / "scratch-status"
+        scratch.mkdir(parents=True, exist_ok=True)
+        (scratch / "one").mkdir()
+        (scratch / "two").mkdir()
+        (scratch / "two" / ".keep").write_text("")
+        monkeypatch.setattr(config, "SCRATCH", scratch)
+
+        logs._save_state({"lastRotation": "2026-07-01 10:00:00", "rotationCount": 9})
+        logs.log_rotate_status()
+        output = capsys.readouterr().out
+
+        assert "上次轮替: 2026-07-01 10:00:00" in output
+        assert "累计次数: 9" in output
+        assert "历史索引: 2 个文件" in output
+        assert "actions.jsonl: 2 行" in output
+        assert "broker events:" in output
+        assert "scratch: 2 个目录 (1 受保护)" in output

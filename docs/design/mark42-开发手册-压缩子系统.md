@@ -226,7 +226,7 @@ ALGO_FAIL_SAFE     = os.environ.get("MARK42_ALGO_FAIL_SAFE", "true").lower() == 
 - 数值数组用 min/max/count 代替原始值
 - 混合内容（非纯 JSON）走正则 fallback
 
-### 4.3 算法 2：LogDeduplicator（待实现）
+### 4.3 算法 2：LogDeduplicator（2026-06-25 已实现，以下保留原始设计）
 
 **设计目标**：压缩 bash/docker/pytest 日志，预期 80-95% 压缩率。
 
@@ -334,7 +334,7 @@ assert out == inp  # 原文返回
 
 ---
 
-### 4.4 算法 3：CodeCompressor（待实现）
+### 4.4 算法 3：CodeCompressor（2026-06-25 已实现，以下保留原始设计）
 
 **设计目标**：对源代码做 AST 级 token 化压缩，预期 70-85%。
 
@@ -422,7 +422,7 @@ assert stats["statements_truncated"] > 0
 
 ---
 
-### 4.5 算法 4：DiffCompressor（待实现）
+### 4.5 算法 4：DiffCompressor（2026-06-25 已实现，以下保留原始设计）
 
 **设计目标**：对 git diff 做结构化压缩，保留 hunks + 行号，预期 90% 压缩率。
 
@@ -474,7 +474,7 @@ assert "@@" in out  # hunk headers 必须保留
 
 ---
 
-### 4.6 算法 5：TextCompressor（待实现）
+### 4.6 算法 5：TextCompressor（2026-06-25 已实现，以下保留原始设计）
 
 **设计目标**：通用文本语义压缩，预期 50-80%。
 

@@ -1,3 +1,4 @@
+# TEMPLATE FILE — 需先渲染 __MARK42_* 占位符，再安装到 ~/.config/systemd/user/
 [Unit]
 Description=Mark42 Bootstrap — 开机自动挂载四个守护 Loop
 After=openclaw-gateway.service
@@ -5,7 +6,14 @@ Wants=openclaw-gateway.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /home/missyouangeled/.openclaw/workspace/tools/mark42-bootstrap/mark42-bootstrap.sh
+Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
+Environment=MARK42_CLI=__MARK42_CLI__
+Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
+Environment=XDG_STATE_HOME=__XDG_STATE_HOME__
+Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
+Environment=MARK42_LOG_DIR=__MARK42_LOG_DIR__
+Environment=MARK42_SCRATCH=__MARK42_OPENCLAW_SCRATCH_ROOT__
+ExecStart=/bin/bash __MARK42_WORKSPACE__/tools/mark42-bootstrap/mark42-bootstrap.sh
 StandardOutput=journal
 StandardError=journal
 RemainAfterExit=yes

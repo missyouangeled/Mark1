@@ -15,11 +15,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:
+    np = None
 
 INDEX_DIR = Path(os.environ.get("MEMORY_INDEX_DIR", "/mnt/data/openclaw/scratch/memory-embed-index"))
 EMBEDDINGS_FILE = INDEX_DIR / "embeddings.npy"
@@ -46,6 +50,20 @@ def check_index() -> dict:
         "dim": manifest.get("dim", "?"),
         "last_built": manifest.get("last_built", "?"),
     }
+
+
+def _maybe_reexec_into_venv() -> None:
+    """当系统 python 缺少依赖时，自动切到 embed venv 重执行。"""
+    if np is not None:
+        return
+    current = os.path.abspath(sys.executable)
+    target = os.path.abspath(VENV_PYTHON)
+    if current == target:
+        raise ModuleNotFoundError("numpy 未安装在 embed venv 中")
+    if not os.path.exists(target):
+        raise ModuleNotFoundError(f"numpy 缺失，且 embed venv 不存在: {target}")
+    cmd = [target, os.path.abspath(__file__), *sys.argv[1:]]
+    raise SystemExit(subprocess.run(cmd).returncode)
 
 
 def load_model():
@@ -122,8 +140,10 @@ def search(query: str, top_k: int = 5) -> dict:
 
 
 def main():
+    _maybe_reexec_into_venv()
+
     parser = argparse.ArgumentParser(description="本地向量语义搜索")
-    parser.add_argument("query", nargs="+", help="搜索文本")
+    parser.add_argument("query", nargs="*", help="搜索文本")
     parser.add_argument("--top", type=int, default=5, help="返回 top-K 结果")
     parser.add_argument("--check", action="store_true", help="检查索引状态")
     parser.add_argument("--json", action="store_true", default=True)

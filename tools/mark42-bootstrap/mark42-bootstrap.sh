@@ -8,10 +8,19 @@
 
 set -e
 
-MARK42="/home/missyouangeled/.openclaw/workspace/scripts/mark42.py"
-LOGFILE="/home/missyouangeled/.local/state/openclaw/mark42/bootstrap.log"
+MARK42_WORKSPACE="${MARK42_WORKSPACE:-/home/missyouangeled/.openclaw/workspace}"
+MARK42_CLI="${MARK42_CLI:-$MARK42_WORKSPACE/scripts/mark42.py}"
+MARK42_PYTHON_BIN="${MARK42_PYTHON_BIN:-python3}"
+XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+MARK42_STATE_DIR="${MARK42_STATE_DIR:-$XDG_STATE_HOME/openclaw/mark42}"
+MARK42_LOG_DIR="${MARK42_LOG_DIR:-$MARK42_STATE_DIR/logs}"
+MARK42_SCRATCH="${MARK42_SCRATCH:-/mnt/data/openclaw/scratch}"
+LOGFILE="${LOGFILE:-$MARK42_STATE_DIR/bootstrap.log}"
+CONFIG_FILE="${CONFIG_FILE:-$MARK42_STATE_DIR/config.json}"
+LOOPS_FILE="${LOOPS_FILE:-$MARK42_STATE_DIR/engine/loops.json}"
+GATEWAY_HEALTH_URL="${GATEWAY_HEALTH_URL:-http://127.0.0.1:18789/healthz}"
 
-mkdir -p "$(dirname "$LOGFILE")"
+mkdir -p "$(dirname "$LOGFILE")" "$MARK42_STATE_DIR" "$MARK42_LOG_DIR" "$MARK42_SCRATCH" "$MARK42_STATE_DIR/engine"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOGFILE"
@@ -20,15 +29,15 @@ log() {
 log "=== Mark42 Bootstrap 启动 ==="
 
 # 等待 Mark42 初始化完成（首次可能需要 --init）
-if [ ! -f /home/missyouangeled/.local/state/openclaw/mark42/config.json ]; then
+if [ ! -f "$CONFIG_FILE" ]; then
     log "Mark42 未初始化，执行 --init"
-    python3 "$MARK42" --init >> "$LOGFILE" 2>&1
+    "$MARK42_PYTHON_BIN" "$MARK42_CLI" --init >> "$LOGFILE" 2>&1
 fi
 
 # 等待 Gateway 就绪（最多等 30 秒）
 log "等待 Gateway 就绪..."
 for i in $(seq 1 30); do
-    if curl -s http://127.0.0.1:18789/healthz > /dev/null 2>&1; then
+    if curl -s "$GATEWAY_HEALTH_URL" > /dev/null 2>&1; then
         log "✅ Gateway 就绪 (${i}s)"
         break
     fi
@@ -42,13 +51,15 @@ done
 # 先清理上轮遗留的 registered/running 状态的 Loop（防止连续开机多次重复注册）
 # 保留 status=killed/completed 的（历史记录）
 log "清理上轮残留 Loop (status=registered/running 且未在心跳周期内)..."
-python3 << 'PYEOF' >> "$LOGFILE" 2>&1 || true
+export LOOPS_FILE
+"$MARK42_PYTHON_BIN" << 'PYEOF' >> "$LOGFILE" 2>&1 || true
 import json
+import os
 from pathlib import Path
 import time
 from datetime import datetime, timezone, timedelta
 
-loops_file = Path("/home/missyouangeled/.local/state/openclaw/mark42/engine/loops.json")
+loops_file = Path(os.environ["LOOPS_FILE"])
 if loops_file.exists():
     try:
         loops = json.loads(loops_file.read_text())
@@ -83,7 +94,7 @@ register_loop() {
     local task="$2"
     local period="$3"
     log "注册 Loop: $template → $task ($period s)"
-    python3 "$MARK42" engine --start --task "$task" --template "$template" --interval "$period" >> "$LOGFILE" 2>&1 || {
+    "$MARK42_PYTHON_BIN" "$MARK42_CLI" engine --start --task "$task" --template "$template" --interval "$period" >> "$LOGFILE" 2>&1 || {
         log "   ⚠️ 注册失败（可能已存在，忽略）"
     }
 }

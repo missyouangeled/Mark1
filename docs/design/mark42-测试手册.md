@@ -1,8 +1,10 @@
 # Mark42 测试手册
 
 > 实战手册。读这个能上手写测试，不用先读完 14.7KB 的设计方案。
+> 最近一次大更新：**2026-07-01**。
 > 
-> 背景：2026-06-29 Phase 1 完成，111/111 测试通过，覆盖 37.8%。
+> 背景：本手册起源于 2026-06-29 Phase 1（当时 111/111 测试通过，覆盖 37.8%），后续已持续扩充。
+> **当前最新覆盖率与接力优先级，不看这里的历史背景段，改看** `docs/design/mark42-测试覆盖接力开发方向-20260701.md`。
 > 详细设计：`docs/design/mark42-测试体系设计方案-20260629.md`
 > 决策记录：`.learnings/ERRORS.md`（ERR-001 ~ ERR-007，**注意 7/01 发现"ERR-004"是笔误传染, 实际不存在该编号**）
 
@@ -356,6 +358,9 @@ pytest scripts/tests/ --cov=mark42_modules --cov-report=html
 
 ## 当前覆盖
 
+> ⚠️ 下面这张表是 **Phase 1/早期阶段的历史快照**，保留是为了说明本手册最初是在什么覆盖基础上长出来的。  
+> **当前最新覆盖率与优先级** 请始终以 `docs/design/mark42-测试覆盖接力开发方向-20260701.md` 为准。
+
 | 模块 | 覆盖 | 备注 |
 |---|---|---|
 | armor.py | 50%+ | armor_check 100% / armor_compress 主路径 |
@@ -363,7 +368,7 @@ pytest scripts/tests/ --cov=mark42_modules --cov-report=html
 | heavy.py | **85.9%** | detect + start/finish 全测 |
 | cli.py | 39.7% | status_dashboard + main 分发 |
 | utils.py | 51.2% | JSON helper |
-| 整体 | **37.8%** | 目标 ≥ 70%（Phase 3 末） |
+| 整体 | **37.8%** | 这是历史快照，不是当前最新口径 |
 
 ## 测试进度
 

@@ -1,3 +1,4 @@
+# TEMPLATE FILE — 需先渲染 __MARK42_* 占位符，再安装到 ~/.config/systemd/user/
 [Unit]
 Description=Mark42 Watchdog — 检查 daemon 存活并自动重启
 After=openclaw-gateway.service mark42-engine-daemon.service mark42-armor-guard.service
@@ -5,9 +6,16 @@ After=openclaw-gateway.service mark42-engine-daemon.service mark42-armor-guard.s
 [Service]
 Type=oneshot
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/bin/bash /home/missyouangeled/.openclaw/workspace/tools/mark42-watchdog/mark42-watchdog.sh
-StandardOutput=append:/home/missyouangeled/.local/state/openclaw/mark42/watchdog.log
-StandardError=append:/home/missyouangeled/.local/state/openclaw/mark42/watchdog.log
+Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
+Environment=MARK42_CLI=__MARK42_CLI__
+Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
+Environment=XDG_STATE_HOME=__XDG_STATE_HOME__
+Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
+Environment=MARK42_LOG_DIR=__MARK42_LOG_DIR__
+Environment=MARK42_SCRATCH=__MARK42_OPENCLAW_SCRATCH_ROOT__
+ExecStart=/bin/bash __MARK42_WORKSPACE__/tools/mark42-watchdog/mark42-watchdog.sh
+StandardOutput=append:__MARK42_STATE_DIR__/watchdog.log
+StandardError=append:__MARK42_STATE_DIR__/watchdog.log
 
 [Install]
 WantedBy=default.target
