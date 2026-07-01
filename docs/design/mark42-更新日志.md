@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-07-01 #25 — 继续测试接力：`cli.py` 从 61.9% 拉到 98.0%，整体覆盖升到 86.1%
+
+**背景**：
+`engine.py` 收口后，测试接力主线顺势切到 `cli.py`。这一刀非常值：`cli.py` 是用户入口模块，之前只有 `61.9%`，缺口主要集中在 `assemble()` 启动/监护路径、`status_dashboard()` 的人类可读输出细节，以及 `main()` 中一大串尚未命中的 argparse 分发支路。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_cli.py`
+2. 新增覆盖重点：
+   - `status_dashboard(json_mode=False)`
+     - 索引展示
+     - running / registered loop 图标与 cycle 输出
+     - heavy 任务展示
+     - 高 usage 时 `/compact` 提示
+   - `main()` 分发：
+     - `logs` 默认 status
+     - `armor --guard`
+     - `armor --queue-stats` 的 error / 正常输出
+     - `armor` 默认 check 输出
+     - `armor --smartcrush`
+     - `engine --templates / --kill / --run / --list / 默认 list`
+     - `heavy --detect / --preflight / --finish / --cleanup / 无动作报错`
+     - `--tune-compaction` 的 preview / apply / token-aware 路径
+     - `compaction --drift-check --probe`
+     - `status` 人类可读分支
+   - `assemble()`
+     - 子进程健康检查里 alive / dead 分支
+     - PID 文件校验成功 / 失败分支
+     - engine-daemon 死亡时读取心跳并打印 gap
+     - `KeyboardInterrupt` 触发优雅关闭、SIGTERM 广播、日志 fd close、PID 文件删除
+3. 单文件 coverage 继续使用模块口径：
+   - `--cov=mark42_modules.cli`
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_cli.py --cov=mark42_modules.cli --cov-report=term-missing -q` ✅
+  - **54 passed**
+  - `cli.py`: 单文件口径到 **98.0%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **601 passed, 2 skipped**
+  - `cli.py`: **61.9% → 98.0%**
+  - overall: **84.5% → 86.1%**
+
+**剩余未覆盖的 cli.py 分支已经很碎**：
+- `121-122`：`_shutdown()` 里 `os.kill(SIGTERM)` 失败分支
+- `126-127`：日志 fd close 异常吞错
+- `165-166`：心跳时间解析失败吞错
+- `468`：`--tune-compaction` token/probe 路径下 `apply=False` 的那一条 preview 分支
+- `598`：heavy 分支里重复的 `elif args.preflight` 死/冗余支路
+
+这些都不是当前最值钱的洞。
+
+**当前意义**：
+- `cli.py` 已经从“入口黑洞”变成高覆盖模块
+- overall 推进到 **86.1%**
+- 下一刀最自然切到：
+  - `perf_bench.py`（继续只补 helper / smoke）
+  - 或者回看 `engine.py` 的碎小剩余支路，但收益已明显不如 `perf_bench.py`
+
+---
+
 ## 2026-07-01 #24 — 继续测试接力：`engine.py` 从 62.0% 拉到 90.7%，整体覆盖升到 83.2%
 
 **背景**：

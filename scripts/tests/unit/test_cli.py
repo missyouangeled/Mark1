@@ -298,6 +298,107 @@ class TestAssemble:
         mock_init.assert_called_once()
         assert mock_popen.call_count >= 2
 
+    def test_assemble_reports_dead_engine_and_heartbeat_gap(self, mocker, capsys):
+        fake_armor_state = MagicMock()
+        fake_armor_state.exists.return_value = True
+        fake_armor_state.parent = MagicMock()
+        fake_engine_state = MagicMock()
+        heartbeat_file = MagicMock()
+        heartbeat_file.exists.return_value = True
+        fake_engine_state.__truediv__.return_value = heartbeat_file
+        fake_armor_state.parent.__truediv__.return_value = fake_engine_state
+
+        fake_log_dir = MagicMock()
+        fake_log_dir.mkdir.return_value = None
+        fake_pid_file = MagicMock()
+        fake_armor_state.__truediv__.return_value = fake_pid_file
+
+        mocker.patch("mark42_modules.config.ARMOR_STATE", fake_armor_state)
+        mocker.patch("mark42_modules.config.LOG_DIR", fake_log_dir)
+        mocker.patch("mark42_modules.config.mark42_init")
+        mocker.patch("mark42_modules.armor.armor_check", return_value={"usagePercent": 30.0, "summary": "ok"})
+        mocker.patch.object(cli, "_trim_daemon_logs")
+        mocker.patch("builtins.open", mock_open())
+
+        proc1 = MagicMock(pid=111)
+        proc2 = MagicMock(pid=222)
+        mocker.patch("subprocess.Popen", side_effect=[proc1, proc2])
+
+        def kill_side_effect(pid, sig=0):
+            if pid == 222 and sig == 0:
+                raise OSError("dead")
+            return 0
+
+        mocker.patch("os.kill", side_effect=kill_side_effect)
+        mocker.patch("signal.signal")
+        mocker.patch("time.sleep", return_value=None)
+        mocker.patch("mark42_modules.utils._now_iso", return_value="2026-07-01T14:37:00+00:00")
+        mocker.patch("mark42_modules.utils._save_json")
+        mocker.patch(
+            "mark42_modules.utils._load_json",
+            side_effect=[
+                {"children": [{"name": "armor-guard", "pid": 111}, {"name": "engine-daemon", "pid": 222}]},
+                {"lastTick": "2026-07-01T14:36:00+00:00"},
+            ],
+        )
+
+        cli.assemble()
+
+        out = capsys.readouterr().out
+        assert "✅ 存活: armor-guard" in out
+        assert "❌ 死亡: engine-daemon" in out
+        assert "📄 PID 文件:" in out
+        assert "最后一次心跳:" in out
+        assert "子进程异常退出，assemble 退出" in out
+
+    def test_assemble_warns_when_pid_file_verification_fails(self, mocker, capsys):
+        fake_armor_state = MagicMock()
+        fake_armor_state.exists.return_value = True
+        fake_armor_state.parent = MagicMock()
+        fake_engine_state = MagicMock()
+        heartbeat_file = MagicMock()
+        heartbeat_file.exists.return_value = False
+        fake_engine_state.__truediv__.return_value = heartbeat_file
+        fake_armor_state.parent.__truediv__.return_value = fake_engine_state
+
+        fake_log_dir = MagicMock()
+        fake_log_dir.mkdir.return_value = None
+        fake_pid_file = MagicMock()
+        fake_armor_state.__truediv__.return_value = fake_pid_file
+
+        mocker.patch("mark42_modules.config.ARMOR_STATE", fake_armor_state)
+        mocker.patch("mark42_modules.config.LOG_DIR", fake_log_dir)
+        mocker.patch("mark42_modules.config.mark42_init")
+        mocker.patch("mark42_modules.armor.armor_check", return_value={"usagePercent": 20.0, "summary": "ok"})
+        mocker.patch.object(cli, "_trim_daemon_logs")
+        mocker.patch("builtins.open", mock_open())
+        proc1 = MagicMock(pid=111)
+        proc2 = MagicMock(pid=222)
+        mocker.patch("subprocess.Popen", side_effect=[proc1, proc2])
+
+        sleep_count = {"n": 0}
+
+        def fake_sleep(_):
+            sleep_count["n"] += 1
+            if sleep_count["n"] >= 2:
+                raise KeyboardInterrupt
+
+        mocker.patch("time.sleep", side_effect=fake_sleep)
+        mocker.patch("os.kill", return_value=0)
+        mocker.patch("signal.signal")
+        mocker.patch("mark42_modules.utils._now_iso", return_value="2026-07-01T14:37:00+00:00")
+        mocker.patch("mark42_modules.utils._save_json")
+        mocker.patch("mark42_modules.utils._load_json", return_value={})
+
+        with pytest.raises(SystemExit):
+            cli.assemble()
+
+        out = capsys.readouterr().out
+        assert "PID 文件写入校验失败" in out
+        assert "收到信号，正在优雅关闭" in out
+        assert "已发送 SIGTERM → armor-guard" in out
+        assert "已发送 SIGTERM → engine-daemon" in out
+
 
 class TestTrimDaemonLogs:
     """_trim_daemon_logs() 日志截尾逻辑。"""
@@ -486,3 +587,272 @@ class TestMainDispatchExtra:
         cli.main()
 
         mock_assemble.assert_called_once()
+
+
+class TestStatusDashboardHumanExtra:
+    def test_prints_index_loops_heavy_and_compact_hint(self, mocker, capsys):
+        loops = {
+            "loop-a": {
+                "status": "running",
+                "template": "context-guard",
+                "cycle": 2,
+                "maxCycles": 5,
+                "task": "watch",
+                "lastRun": "2026-07-01T14:00:00",
+            },
+            "loop-b": {
+                "status": "registered",
+                "template": "",
+                "cycle": 0,
+                "maxCycles": None,
+                "task": "idle",
+                "lastRun": None,
+            },
+        }
+        heavy_tasks = [MagicMock(name="task-a.json")]
+        _mock_status_dashboard_deps(
+            mocker,
+            usage=88.0,
+            loops=loops,
+            heavy_tasks=heavy_tasks,
+            armor_index_data={
+                "strategyUsed": "semantic",
+                "generatedAt": "2026-07-01T14:20:00",
+                "modelGenerated": False,
+            },
+        )
+
+        cli.status_dashboard(json_mode=False)
+
+        out = capsys.readouterr().out
+        assert "🧠 索引: semantic" in out
+        assert "▶️ loop-a: running (cycle 2/5)" in out
+        assert "⏸️ loop-b: registered (cycle 0/∞)" in out
+        assert "🔄 t: started — x" in out
+        assert "⚠️ 上下文偏高 → 建议: /compact" in out
+
+
+class TestMainDispatchCoveragePush:
+    def test_logs_default_dispatches_status(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "logs"])
+        mock_rotate = mocker.patch("mark42_modules.logs.log_rotate")
+        mock_status = mocker.patch("mark42_modules.logs.log_rotate_status")
+
+        cli.main()
+
+        mock_rotate.assert_not_called()
+        mock_status.assert_called_once()
+
+    def test_armor_guard_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "armor", "--guard", "--interval", "45"])
+        mock_guard = mocker.patch("mark42_modules.armor.armor_guard")
+
+        cli.main()
+
+        mock_guard.assert_called_once_with(45)
+
+    def test_armor_queue_stats_prints_error(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "armor", "--queue-stats"])
+        mocker.patch("mark42_modules.armor.armor_compress_queue_stats", return_value={"error": "queue broken"})
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "📦 压缩队列统计" in out
+        assert "queue broken" in out
+
+    def test_armor_queue_stats_prints_values(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "armor", "--queue-stats"])
+        mocker.patch(
+            "mark42_modules.armor.armor_compress_queue_stats",
+            return_value={"pending": 2, "done": 5},
+        )
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "pending: 2" in out
+        assert "done: 5" in out
+
+    def test_armor_default_runs_check_and_prints_status(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "armor"])
+        mocker.patch(
+            "mark42_modules.armor.armor_check",
+            return_value={
+                "status": "ok",
+                "severity": "ok",
+                "usagePercent": 35.0,
+                "estimatedTokens": 46000,
+                "contextWindow": 131072,
+                "summary": "healthy",
+            },
+        )
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "状态: OK (ok)" in out
+        assert "healthy" in out
+
+    def test_armor_smartcrush_prints_stats(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "armor", "--smartcrush"])
+        mocker.patch(
+            "mark42_modules.smart_crusher.smartcrush",
+            return_value=("{}", {
+                "original_bytes": 1000,
+                "crushed_bytes": 400,
+                "ratio": 0.4,
+                "arrays_truncated": 2,
+                "strings_truncated": 3,
+                "depth_truncated": 1,
+            }),
+        )
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "🧪 smartcrush 演示" in out
+        assert "压缩率: 40.0%" in out
+
+    def test_engine_templates_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--templates"])
+        mock_templates = mocker.patch("mark42_modules.engine.engine_templates")
+
+        cli.main()
+
+        mock_templates.assert_called_once()
+
+    def test_engine_kill_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--kill", "loop-x"])
+        mock_kill = mocker.patch("mark42_modules.engine.engine_kill")
+
+        cli.main()
+
+        mock_kill.assert_called_once_with("loop-x")
+
+    def test_engine_run_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--run", "loop-y"])
+        mock_run = mocker.patch("mark42_modules.engine.engine_run_loop")
+
+        cli.main()
+
+        mock_run.assert_called_once_with("loop-y")
+
+    def test_engine_default_dispatches_list(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine"])
+        mock_list = mocker.patch("mark42_modules.engine.engine_list")
+
+        cli.main()
+
+        mock_list.assert_called_once()
+
+    def test_engine_list_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "engine", "--list"])
+        mock_list = mocker.patch("mark42_modules.engine.engine_list")
+
+        cli.main()
+
+        mock_list.assert_called_once()
+
+    def test_heavy_detect_dispatches_auto_mode(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy", "--detect", "/tmp/proj", "--auto", "semi"])
+        mock_detect = mocker.patch("mark42_modules.heavy.heavy_detect_human")
+
+        cli.main()
+
+        mock_detect.assert_called_once_with("/tmp/proj", auto_mode="semi")
+
+    def test_heavy_preflight_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy", "--preflight", "/tmp/proj"])
+        mock_preflight = mocker.patch("mark42_modules.heavy.heavy_preflight")
+
+        cli.main()
+
+        mock_preflight.assert_called_once_with("/tmp/proj")
+
+    def test_heavy_finish_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy", "--finish", "--task-name", "big-task"])
+        mock_finish = mocker.patch("mark42_modules.heavy.heavy_finish")
+
+        cli.main()
+
+        mock_finish.assert_called_once_with("big-task")
+
+    def test_heavy_cleanup_dispatches(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy", "--cleanup", "--task-name", "big-task"])
+        mock_cleanup = mocker.patch("mark42_modules.heavy.heavy_cleanup")
+
+        cli.main()
+
+        mock_cleanup.assert_called_once_with("big-task")
+
+    def test_heavy_without_action_prints_error(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "heavy"])
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup" in out
+
+    def test_tune_compaction_token_aware_with_apply_runs_diag_and_apply(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "--tune-compaction", "--token-aware", "--apply"])
+        mock_diag = mocker.patch("mark42_modules.compaction_diag.compaction_diagnose", return_value={"issues": [], "actionable": False})
+        mock_print_diag = mocker.patch("mark42_modules.compaction_diag.print_diagnose")
+        mock_apply = mocker.patch("mark42_modules.compaction_diag.compaction_apply", return_value={"ok": True})
+        mock_print_apply = mocker.patch("mark42_modules.compaction_diag.print_apply_result")
+
+        cli.main()
+
+        mock_diag.assert_called_once_with(token_aware=True, probe=False)
+        mock_print_diag.assert_called_once()
+        mock_apply.assert_called_once_with(auto_confirm=True)
+        mock_print_apply.assert_not_called()
+
+    def test_tune_compaction_preview_prints_apply_hint(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "--tune-compaction"])
+        mocker.patch("mark42_modules.compaction_diag.compaction_diagnose")
+        mocker.patch("mark42_modules.compaction_diag.compaction_apply", return_value={"ok": True})
+        mocker.patch("mark42_modules.compaction_diag.print_apply_result")
+
+        cli.main()
+
+        out = capsys.readouterr().out
+        assert "使用 --apply 实际应用更改" in out
+
+    def test_tune_compaction_apply_only_prints_apply_result(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "--tune-compaction", "--apply"])
+        mocker.patch("mark42_modules.compaction_diag.compaction_diagnose")
+        mock_apply = mocker.patch("mark42_modules.compaction_diag.compaction_apply", return_value={"ok": True})
+        mock_print_apply = mocker.patch("mark42_modules.compaction_diag.print_apply_result")
+
+        cli.main()
+
+        mock_apply.assert_called_once_with(auto_confirm=True)
+        mock_print_apply.assert_called_once()
+
+    def test_compaction_module_prints_drift_and_action_hints(self, mocker, capsys):
+        mocker.patch.object(sys, "argv", ["mark42.py", "compaction", "--drift-check", "--probe"])
+        diag = {
+            "issues": [
+                {"key": "drift_detection", "severity": "warn", "status": "drifting", "advice": "检查连续压缩质量"},
+            ],
+            "actionable": True,
+        }
+        mock_diag = mocker.patch("mark42_modules.compaction_diag.compaction_diagnose", return_value=diag)
+        mock_print_diag = mocker.patch("mark42_modules.compaction_diag.print_diagnose")
+
+        cli.main()
+
+        mock_diag.assert_called_once_with(token_aware=False, probe=True)
+        mock_print_diag.assert_called_once_with(diag)
+        out = capsys.readouterr().out
+        assert "降解检测: drifting" in out
+        assert "如需自动调优" in out
+
+    def test_status_human_dispatches_dashboard(self, mocker):
+        mocker.patch.object(sys, "argv", ["mark42.py", "status"])
+        mock_status = mocker.patch.object(cli, "status_dashboard")
+
+        cli.main()
+
+        mock_status.assert_called_once_with()
