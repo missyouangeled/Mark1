@@ -991,3 +991,111 @@ openclaw doctor:
 - **绝对不要瞎猜 doctor 报的是什么**：源码 30 行就能看明白 `hasUnresolvedAgentTurnShellToolPrompt` 的判断条件，不要凭"应该这样"行动。
 
 
+
+---
+
+## 升级 #5：2026.6.10 → 2026.6.11
+
+### 基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 升级日期 | 2026-07-01 |
+| 旧版本 | 2026.6.10 (aa69b12) |
+| 新版本 | 2026.6.11 (e085fa1) |
+| 触发方式 | 用户指令升级；先停 Mark42 / watcher，再 `npm update -g openclaw` |
+| 所在机器 | 公司（Linux）— `missyouangeled-VMware-Virtual-Platform` |
+
+### 升级前动作
+
+1. 先读：
+   - `docs/公司-Linux-OpenClaw-维护说明.md`
+   - `docs/对系统操作必须要参考的崩坏案例.md`
+   - `docs/通用-OpenClaw-升级后自检清单.md`
+   - `docs/通用-OpenClaw-补丁注册表.md`
+2. 备份：
+   - `~/.config/systemd/user/mark42-backup-20260701-161340/`（19 个相关 unit）
+   - `~/.openclaw/openclaw.json.bak.20260701-161340`
+3. 按用户要求先停服务再升级：
+   - 停 `mark42-bootstrap / engine-daemon / armor-guard / watchdog.timer`
+   - 停 `openclaw-frontstage-guardian.timer / health-collector.timer / task-scheduler.timer / lifecycle-maintainer.timer` 等 watcher
+
+### 升级过程
+
+```bash
+npm update -g openclaw
+```
+
+结果：
+- `OpenClaw 2026.6.10 (aa69b12)` → `OpenClaw 2026.6.11 (e085fa1)`
+- npm 输出：`changed 297 packages in 27s`
+
+随后重启 gateway。过程中发生过两次可预期扰动：
+1. 当前 agent turn 被 gateway restart 中断（系统自动恢复）
+2. 用户手动运行自检时 shell 落点漂到 `~/Desktop`，导致：
+   - `python3: can't open file '/home/missyouangeled/Desktop/scripts/openclaw-post-upgrade-self-check.py': [Errno 2] No such file or directory`
+
+### 升级后验证
+
+#### 1) Gateway / sidecar / proxy
+
+- `openclaw-gateway.service`：**active (running)**
+- `openclaw-embed-sidecar.service`：**active**
+- `openclaw-infos-handle-sidecar.service`：**active**
+- `openclaw-unified-proxy.service`：**active**
+
+关键日志：
+- `16:46:11 [gateway] ready`
+- `16:46:17 [main-session-restart-recovery] resumed interrupted main session: agent:main:main`
+- `16:46:00` 的 `ExecStartPre` 已自动重打 branding / infos-handle 相关前端补丁
+
+#### 2) 停掉的守护全部恢复
+
+以下 unit 已重新启动并确认 `active`：
+- `mark42-bootstrap.service`
+- `mark42-engine-daemon.service`
+- `mark42-armor-guard.service`
+- `mark42-watchdog.timer`
+- `openclaw-frontstage-guardian.timer`
+- `openclaw-health-collector.timer`
+- `openclaw-task-scheduler.timer`
+- `openclaw-lifecycle-maintainer.timer`
+
+#### 3) 升级后自检
+
+首次运行：
+```bash
+python3 /home/missyouangeled/.openclaw/workspace/scripts/openclaw-post-upgrade-self-check.py --strict --print-human
+```
+
+结果：
+- 绝大多数 PASS
+- 仅 2 个 FAIL：
+  - `broker_snapshot_dock_verify`
+  - `infos_handle_sidecar_live`
+- 两者错误一致：`urllib.error.URLError: <urlopen error [Errno 32] Broken pipe>`
+
+进一步单独重跑：
+```bash
+python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-snapshot-dock
+python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-infos-handle-sidecar
+```
+
+结果：**全部 PASS**。
+
+### 结论
+
+这次升级本身**成功**，没有留下持续性结构故障。
+
+首次自检里的两个 FAIL，属于 gateway / sidecar / unified proxy 刚恢复后的**瞬时 Broken pipe**，不是配置损坏、不是 reply pipeline 永久坏掉、不是补丁失效。
+
+### 经验教训
+
+1. **升级后自检必须用绝对路径**。
+   - 会话/网关恢复过程中，shell 落点可能漂移，不要假设当前目录仍在 workspace。
+2. **先停 Mark42 / watcher 再升级是对的**。
+   - 避免 engine / guardian / task-scheduler 在 gateway 重启窗口里制造噪声。
+3. **`Broken pipe` 不要第一时间判死刑**。
+   - 如果 service 状态 PASS、proxy verify PASS、4 个最小回归 PASS，则优先视作启动窗口瞬时抖动，单独重跑 verify 再定性。
+4. **reply pipeline 当时并未“永久损坏”**。
+   - 真正发生的是：gateway restart 中断当前 turn + 会话恢复期工具输出异常/漂移，后来日志已证明 gateway 正常 ready。
