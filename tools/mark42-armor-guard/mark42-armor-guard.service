@@ -16,7 +16,7 @@ Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
 Environment=MARK42_LOG_DIR=__MARK42_LOG_DIR__
 Environment=MARK42_SCRATCH=__MARK42_OPENCLAW_SCRATCH_ROOT__
 ExecStart=__MARK42_PYTHON__ -u __MARK42_CLI__ armor --guard --interval 300
-ExecStop=/bin/kill -TERM $MAINPID
+ExecStop=/bin/sh -c 'test -n "$MAINPID" && kill -TERM "$MAINPID" || true'
 Restart=always
 RestartSec=15
 StandardOutput=append:__MARK42_LOG_DIR__/armor-guard.log
