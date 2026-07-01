@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-07-01 #22 — 继续测试接力：`diff_compressor.py` 从 53.7% 拉到 98.9%，整体覆盖升到 79.4%
+
+**背景**：
+在 `code_compressor.py` 与 `config.py` 两轮收口后，接力文档里新的首要候选已切到 `diff_compressor.py`。实跑基线显示它虽然体量不大，但覆盖只有 `53.7%`，缺口几乎整块落在模块底部 `_run_tests()` 与少量包装/容错路径上，属于典型“好收编”的黑洞模块。
+
+**本轮实际动作**：
+1. 修改：`scripts/tests/unit/test_diff_compressor.py`
+2. 新增覆盖重点：
+   - context run 达到阈值时真实合并
+   - context run 低于阈值时保留原文
+   - 连续 insertions / deletions 长 run 合并
+   - `preserve_file_headers=False`
+   - `preserve_hunk_headers=False`
+   - `\ No newline at end of file` 标记保留
+   - multiple hunks 统计
+   - `compress()` 的 error fallback 分支
+   - 模块底部 `_run_tests()` 成功路径
+   - `__main__` 退出码 `0 / 1`
+3. 策略上仍然延续前两刀的做法：
+   - 不改实现
+   - 不追碎小洞
+   - 直接把模块内置的自检契约收编进正式 pytest
+
+**验证结果**：
+- `python3 -m pytest scripts/tests/unit/test_diff_compressor.py --cov=scripts/mark42_modules/diff_compressor.py --cov-report=term-missing -q` ✅
+  - **23 passed**
+  - `diff_compressor.py`: **53.7% → 98.9%**
+- `python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-missing -q` ✅
+  - **561 passed, 2 skipped**
+  - overall: **77.7% → 79.4%**
+
+**剩余两行未覆盖**：
+- `209-210`
+  - `_run_tests()` 里 `check()` 的失败打印支路
+  - 属于为了“故意制造失败”才会走的低价值分支，本轮不追
+
+**当前意义**：
+- `diff_compressor.py` 已基本完全收口
+- overall 已进一步推到 **79.4%**
+- 下一刀可以自然切到：
+  - `log_deduplicator.py`
+  - `engine.py`
+  - 再往后才是 `cli.py` / `perf_bench.py`
+
+---
+
 ## 2026-07-01 #21 — 继续测试接力：`config.py` 从 45.2% 拉到 96.6%，整体覆盖升到 77.7%
 
 **背景**：

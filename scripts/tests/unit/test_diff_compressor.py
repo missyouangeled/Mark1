@@ -114,7 +114,7 @@ class TestDiffCompress:
         assert isinstance(result[1], dict)
 
     def test_diff_with_context_lines_merged(self):
-        """含连续 5 行 context 的 diff, 应合并为 ' <5>L'。"""
+        """含连续 5 行 context 的 diff, 应合并。"""
         diff = (
             "diff --git a/foo.py b/foo.py\n"
             "--- a/foo.py\n"
@@ -130,6 +130,129 @@ class TestDiffCompress:
         )
         result, meta = diff_compressor.diff_compress(diff)
         assert meta["is_diff"] is True
-        # context 行合并数应 >= 1
-        # 实际行为: 看实现可能 0 也行 (threshold 2)
-        assert meta["context_lines_merged"] >= 0
+        assert "5 context" in result
+        assert meta["context_lines_merged"] == 5
+
+    def test_short_context_run_keeps_original_lines(self):
+        comp = diff_compressor.DiffCompressor(merge_context_threshold=3)
+        diff = (
+            "@@ -1,3 +1,3 @@\n"
+            " a\n"
+            " b\n"
+            "-old\n"
+            "+new\n"
+        )
+        result, meta = comp.compress(diff)
+        assert " a" in result
+        assert " b" in result
+        assert "context" not in result
+        assert meta["context_lines_merged"] == 2
+
+    def test_insertions_and_deletions_long_run_are_merged(self):
+        diff = (
+            "@@ -1,3 +1,8 @@\n"
+            " keep\n"
+            "+n1\n+n2\n+n3\n"
+            "-o1\n-o2\n-o3\n"
+        )
+        result, meta = diff_compressor.diff_compress(diff)
+        assert "3 insertions" in result
+        assert "3 deletions" in result
+        assert meta["insertions"] == 3
+        assert meta["deletions"] == 3
+
+    def test_preserve_file_headers_false_drops_file_headers(self):
+        comp = diff_compressor.DiffCompressor(preserve_file_headers=False)
+        diff = (
+            "diff --git a/foo.py b/foo.py\n"
+            "index 123..456 100644\n"
+            "--- a/foo.py\n"
+            "+++ b/foo.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        result, meta = comp.compress(diff)
+        assert "diff --git" not in result
+        assert "index 123..456 100644" not in result
+        assert "--- a/foo.py" not in result
+        assert "+++ b/foo.py" not in result
+        assert "@@ -1,2 +1,2 @@" in result
+        assert meta["hunks"] == 1
+
+    def test_preserve_hunk_headers_false_drops_hunk_header(self):
+        comp = diff_compressor.DiffCompressor(preserve_hunk_headers=False)
+        diff = (
+            "@@ -1,2 +1,2 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        result, meta = comp.compress(diff)
+        assert "@@ -1,2 +1,2 @@" not in result
+        assert "-old" in result
+        assert "+new" in result
+        assert meta["hunks"] == 1
+
+    def test_backslash_no_newline_marker_preserved(self):
+        diff = (
+            "@@ -1,2 +1,2 @@\n"
+            "-old\n"
+            "+new\n"
+            "\\ No newline at end of file\n"
+        )
+        result, meta = diff_compressor.diff_compress(diff)
+        assert "\\ No newline at end of file" in result
+        assert meta["mode"] == "compressed"
+
+    def test_multiple_hunks_counted(self):
+        diff = (
+            "@@ -1,2 +1,2 @@\n"
+            "-old1\n"
+            "+new1\n"
+            "@@ -10,2 +10,2 @@\n"
+            "-old2\n"
+            "+new2\n"
+        )
+        result, meta = diff_compressor.diff_compress(diff)
+        assert meta["hunks"] == 2
+        assert result.count("@@") == 4
+
+    def test_compress_error_returns_original_and_error_mode(self, monkeypatch):
+        comp = diff_compressor.DiffCompressor()
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("explode")
+
+        monkeypatch.setattr(comp, "_compress_diff", boom)
+        diff = "@@ -1,1 +1,1 @@\n-old\n+new\n"
+        result, meta = comp.compress(diff)
+        assert result == diff
+        assert meta["mode"] == "error"
+        assert meta["error"] == "explode"
+
+
+class TestRunTests:
+    def test_run_tests_success(self, capsys):
+        assert diff_compressor._run_tests() is True
+        out = capsys.readouterr().out
+        assert "结果:" in out
+        assert "通过" in out
+        assert "失败" in out
+
+    def test_main_branch_exit_zero(self, monkeypatch):
+        monkeypatch.setattr(diff_compressor, "_run_tests", lambda: True)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": diff_compressor._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 0
+
+    def test_main_branch_exit_one(self, monkeypatch):
+        monkeypatch.setattr(diff_compressor, "_run_tests", lambda: False)
+        with pytest.raises(SystemExit) as exc:
+            exec(
+                'import sys\nsys.exit(0 if _run_tests() else 1)',
+                {"_run_tests": diff_compressor._run_tests, "sys": __import__("sys")},
+            )
+        assert exc.value.code == 1
