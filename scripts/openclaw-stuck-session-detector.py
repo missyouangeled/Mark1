@@ -37,7 +37,7 @@ from typing import Any
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 SCRIPTS = WORKSPACE / "scripts"
-GATEWAY_LOG = Path("/tmp/openclaw/openclaw-2026-05-26.log")  # 当日日志
+GATEWAY_LOG_DIR = Path("/tmp/openclaw")
 STATE_DIR = Path(
     os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
 ) / "openclaw" / "stuck-session-detector"
@@ -91,6 +91,22 @@ def log_line(msg: str) -> None:
         f.write(line)
 
 
+def get_gateway_log_path() -> Path:
+    env_path = os.environ.get("OPENCLAW_GATEWAY_LOG_PATH")
+    if env_path:
+        return Path(env_path).expanduser()
+
+    today_name = f"openclaw-{datetime.now().date().isoformat()}.log"
+    today_path = GATEWAY_LOG_DIR / today_name
+    if today_path.exists():
+        return today_path
+
+    candidates = sorted(GATEWAY_LOG_DIR.glob("openclaw-*.log"), reverse=True)
+    if candidates:
+        return candidates[0]
+    return today_path
+
+
 def parse_long_running_entry(raw: str) -> dict | None:
     """解析 long-running session 日志条目"""
     # 格式: long-running session: sessionId=X sessionKey=Y state=processing age=Zs ...
@@ -121,7 +137,8 @@ def parse_long_running_entry(raw: str) -> dict | None:
 
 def get_recent_long_running_entries() -> list[dict]:
     """从网关日志获取最近的 long-running session 条目"""
-    if not GATEWAY_LOG.exists():
+    gateway_log = get_gateway_log_path()
+    if not gateway_log.exists():
         return []
 
     try:
@@ -129,7 +146,7 @@ def get_recent_long_running_entries() -> list[dict]:
         entries = []
         cutoff_time = time.time() - (LOOKBACK_MINUTES * 60)
         
-        with open(GATEWAY_LOG, "r", errors="replace") as f:
+        with open(gateway_log, "r", errors="replace") as f:
             # 从尾部读取（日志较大时高效）
             f.seek(0, 2)
             file_size = f.tell()
@@ -336,14 +353,15 @@ def is_main_session_actually_blocked(sessions: list[dict]) -> bool:
     检查近期是否有成功发送到前台的 chat.send（网关日志里的回执消息）。
     如果有，说明主会话仍在正常通信 → 卡住会话可能是后台系统 run，不阻塞用户。
     """
-    if not GATEWAY_LOG.exists():
+    gateway_log = get_gateway_log_path()
+    if not gateway_log.exists():
         return True  # 无法验证，保守认为阻塞
     
     cutoff = time.time() - 120  # 最近 2 分钟
     has_recent_chat = False
     
     try:
-        with open(GATEWAY_LOG, "r", errors="replace") as f:
+        with open(gateway_log, "r", errors="replace") as f:
             f.seek(0, 2)
             size = f.tell()
             start = max(0, size - 128 * 1024)
@@ -555,10 +573,13 @@ def main() -> None:
                         help="禁用自动恢复")
     parser.add_argument("--lookback-minutes", type=int, default=LOOKBACK_MINUTES)
     parser.add_argument("--stuck-threshold", type=int, default=STUCK_THRESHOLD_S)
+    parser.add_argument("--gateway-log-path", help="可选：显式指定网关日志文件路径")
     args = parser.parse_args()
 
     LOOKBACK_MINUTES = args.lookback_minutes
     STUCK_THRESHOLD_S = args.stuck_threshold
+    if args.gateway_log_path:
+        os.environ["OPENCLAW_GATEWAY_LOG_PATH"] = args.gateway_log_path
 
     entries = get_recent_long_running_entries()
     report = analyze_stuck_sessions(entries)

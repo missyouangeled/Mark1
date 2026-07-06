@@ -25656,3 +25656,93 @@ test_fail_safe_on_scheduler_error:
 - 清理触发: 点点 7/01 07:23 指出"55% 完成度是错觉, 实际 35%"
 - 移动: scripts/mark42_modules/test_*.py → scripts/tests/integration/
 - 父文档: docs/design/mark42-商品化路线图.md §〇(同步更新)
+
+## [ERR-20260702-001] user-reported-error
+
+**Logged**: 2026-07-02T00:55:33.735Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 这个错误报了好几次了。是不是有什么任务还没关闭。升级后体检全绿的任务已经完成了，如果没关闭的话，都关闭后清理掉。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260702-002] user-reported-error
+
+**Logged**: 2026-07-02T01:07:12.123Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+补 systemd user service 让 Mark42 跟 gateway 一样开机自启、崩了自动拉起
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260702-003] user-reported-error
+
+**Logged**: 2026-07-02T03:09:13.925Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+检查 OpenClaw 本身的运行状况 各个系统，功能都是否运行正常。有没有报错 警告。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

@@ -355,25 +355,26 @@ def _run_tests() -> bool:
     # ---- 测试 3: 优先级 (urgent 先处理) ----
     print("\n[测试 3] 优先级队列")
     q3 = CompressQueue(max_workers=1)  # 单 worker 强制串行
-    q3.start()
-    # 先入低优先级
+    # 【Bug fix 2026-07-02】关键: 先填队列再启 worker, 让 PriorityQueue 真有机会选 urgent
+    # 原版先 start() 再 enqueue(low), worker 立即抢走 low, urgent 后入队时 worker 已忙
+    # → urgent 等 low 跑完才能开始 → urgent_finish > low_finish → 3.1 必然失败
+    # 现与测试 5 同样手法, 直接 _queue.put_nowait, 两条都已就位再 start
     low = CompressRequest(content="def foo():\n    pass\n" * 100, session_id="low", priority=9)
-    # 再入紧急
     urgent = CompressRequest(content="def bar():\n    pass\n" * 100, session_id="urgent", priority=0)
-    q3.enqueue(low)
-    time.sleep(0.01)  # 确保 low 先入队
-    q3.enqueue(urgent)
+    # 两边同 timestamp 入队: PriorityQueue 只看 priority, 同 priority 才看 seq
+    # urgent (0) < low (9), worker 起来必先弹 urgent
+    t0 = time.time()
+    low._enqueued_at = t0
+    urgent._enqueued_at = t0
+    q3._queue.put_nowait((low.priority, 1, low))
+    q3._queue.put_nowait((urgent.priority, 2, urgent))
+    q3.stats["enqueued"] += 2
+    q3.start()  # worker 起来后两条都已入队, PriorityQueue 必先弹 urgent (priority=0)
     urgent.wait(timeout=20.0)
     low.wait(timeout=20.0)
-    # 【M 修复 2026-06-30】改用 enqueuedAt 真入队时间验证 priority 生效
-    # 原 urgent.result["elapsed"] < low.result["elapsed"] 是处理耗时, 同 content size 几乎相等, 断言总成立
-    # 真判定: urgent 比 low 先完成 = urgent 完成后 low 才完成
-    # 但 result 都是处理完成, 都有 elapsed 字段, 单看 elapsed 不能判定谁先完成
-    # 最准确: 用 enqueuedAt + 实际完成时间 (elapsed) 反推
-    # 修后: urgent 应先完成 = urgent 的 _result_event.set() 早于 low
-    # 用 EnqueuedAt + 处理时间 = 完成时间, 谁完成时间小谁先
-    urgent_finish = urgent.result["enqueuedAt"] + urgent.result["elapsed"]
-    low_finish = low.result["enqueuedAt"] + low.result["elapsed"]
+    # urgent 应先完成 = urgent 绝对完成时间 (enqueuedAt + elapsed) 早于 low
+    urgent_finish = urgent.result["finishedAt"]
+    low_finish = low.result["finishedAt"]
     check("3.1 urgent 真比 low 先完成", urgent_finish < low_finish)
     q3.shutdown()
 

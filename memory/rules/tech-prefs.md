@@ -39,6 +39,23 @@
 - NVIDIA Build 女性人像文生图 → 喜欢「自然直说式 prompt」而非模板化/结构化 prompt
 - 目标「真实、好看」的女性人像 → 优先沿 `FLUX.1-dev + 自然语言描述 + 少模板感` 线微调
 
+## 图像识别 / 看图能力（重要）
+
+- **Agnes-Image-2.0-Flash / 2.1-Flash 是生图模型，不是看图模型**
+  - 接口：`POST /v1/images/generations`
+  - 能力：文生图、图生图、多图合成、图像编辑、风格控制
+  - 不能力：图理解、图描述、Vision
+  - 适用范围：生成新图，不是读懂已有图
+- 当前 Agnes 体系下**没有看图模型**：
+  - `agnes-2.0-flash` 是文本对话（256K 上下文）
+  - `agnes-image-2.x-flash` 是生图
+  - `agnes-video-v2.0` 是生视频
+- 需要看图（Control UI 截图 / 图像理解）时：
+  - 默认走 OpenClaw image 工具，背后会选一个有视觉能力的模型
+  - 如果当前模型不支持 → 直接告诉用户，不猜
+  - 需要看图时优先考虑方案：本地 OCR / 搜前端源码 / 换有视觉能力的模型（gpt-4o / claude-sonnet / gemini-2.x）
+- 「看图」这件事曾被点点提议用 agnes-image 系列，但 agnes-image 不是看图模型，走不通——这个错误经验记下来，下次别重蹈
+
 ## Control UI 品牌
 
 - Control UI 页面里凡是能改的 `OpenClaw` 字样统一改成「贾维斯」品牌呈现

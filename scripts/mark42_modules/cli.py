@@ -24,6 +24,195 @@ def _trim_daemon_logs(log_dir):
             pass
 
 
+def _pid_alive(pid: int) -> bool:
+    """检查 PID 是否存活。"""
+    import os
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _find_mark42_processes() -> dict:
+    """兜底扫描 Mark42 守护相关进程。"""
+    import subprocess
+
+    result = {"parent": None, "children": []}
+    try:
+        out = subprocess.check_output(
+            "ps -eo pid=,ppid=,args= | grep -E 'mark42.py (assemble|armor --guard|engine --daemon)' | grep -v grep",
+            shell=True,
+            text=True,
+        )
+    except Exception:
+        return result
+
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid = int(parts[0])
+        ppid = int(parts[1])
+        args = parts[2]
+        if (
+            "mark42.py assemble" in args
+            and "assemble --stop" not in args
+            and "assemble --status" not in args
+            and "assemble --restart" not in args
+        ):
+            result["parent"] = {"name": "assemble", "pid": pid, "ppid": ppid, "alive": True}
+        elif "mark42.py armor --guard" in args:
+            result["children"].append({"name": "armor-guard", "pid": pid, "ppid": ppid, "alive": True})
+        elif "mark42.py engine --daemon" in args:
+            result["children"].append({"name": "engine-daemon", "pid": pid, "ppid": ppid, "alive": True})
+    return result
+
+
+def assemble_status() -> dict:
+    """查看 assemble / armor-guard / engine-daemon 当前状态。"""
+    import json
+    from .config import ARMOR_STATE
+    from .utils import _load_json
+
+    pid_file = ARMOR_STATE / "assemble.pids"
+    data = _load_json(pid_file) if pid_file.exists() else {}
+    parent = data.get("parent") or {}
+    children = data.get("children") or []
+
+    result = {
+        "pidFile": str(pid_file),
+        "pidFileExists": pid_file.exists(),
+        "parent": {
+            "name": parent.get("name", "assemble"),
+            "pid": parent.get("pid"),
+            "alive": _pid_alive(parent.get("pid")) if parent.get("pid") else False,
+        },
+        "children": [
+            {
+                "name": c.get("name"),
+                "pid": c.get("pid"),
+                "alive": _pid_alive(c.get("pid")) if c.get("pid") else False,
+            }
+            for c in children
+        ],
+    }
+
+    if (not result["parent"]["pid"] and not result["children"]) or (
+        not result["parent"]["alive"] and not any(c["alive"] for c in result["children"])
+    ):
+        scanned = _find_mark42_processes()
+        if scanned.get("parent"):
+            result["parent"] = scanned["parent"]
+        if scanned.get("children"):
+            result["children"] = scanned["children"]
+
+    print("🦾 Mark42 assemble 状态")
+    print(f"   PID 文件: {result['pidFile']} ({'存在' if result['pidFileExists'] else '不存在'})")
+    p = result["parent"]
+    print(f"   父进程: {p['name']} pid={p['pid']} alive={p['alive']}")
+    if result["children"]:
+        for c in result["children"]:
+            print(f"   子进程: {c['name']} pid={c['pid']} alive={c['alive']}")
+    else:
+        print("   子进程: 无记录")
+
+    return result
+
+
+def assemble_stop() -> dict:
+    """优雅停止 assemble；若父进程不存在，则兜底停止子进程。"""
+    import os
+    import signal
+    import time
+    from .config import ARMOR_STATE
+    from .utils import _load_json
+
+    pid_file = ARMOR_STATE / "assemble.pids"
+    data = _load_json(pid_file) if pid_file.exists() else {}
+    parent = data.get("parent") or {}
+    children = data.get("children") or []
+
+    stopped = []
+    missing = []
+
+    if not parent.get("pid") and not children:
+        scanned = _find_mark42_processes()
+        parent = scanned.get("parent") or {}
+        children = scanned.get("children") or []
+
+    parent_pid = parent.get("pid")
+    if parent_pid and _pid_alive(parent_pid):
+        os.kill(parent_pid, signal.SIGTERM)
+        deadline = time.time() + 8
+        while time.time() < deadline and _pid_alive(parent_pid):
+            time.sleep(0.2)
+        if _pid_alive(parent_pid):
+            os.kill(parent_pid, signal.SIGKILL)
+        stopped.append({"name": parent.get("name", "assemble"), "pid": parent_pid})
+    elif parent_pid:
+        missing.append({"name": parent.get("name", "assemble"), "pid": parent_pid})
+
+    for child in children:
+        pid = child.get("pid")
+        name = child.get("name", "child")
+        if not pid:
+            continue
+        if _pid_alive(pid):
+            try:
+                os.kill(pid, signal.SIGTERM)
+                time.sleep(0.2)
+                if _pid_alive(pid):
+                    os.kill(pid, signal.SIGKILL)
+                stopped.append({"name": name, "pid": pid})
+            except OSError:
+                missing.append({"name": name, "pid": pid})
+        else:
+            missing.append({"name": name, "pid": pid})
+
+    pid_file.unlink(missing_ok=True)
+    print("🛑 Mark42 assemble 已停止")
+    if stopped:
+        for item in stopped:
+            print(f"   已停止: {item['name']} (PID {item['pid']})")
+    if missing:
+        for item in missing:
+            print(f"   已不在运行: {item['name']} (PID {item['pid']})")
+
+    return {"stopped": stopped, "missing": missing}
+
+
+def assemble_restart() -> dict:
+    """重启 assemble：先停旧进程，再后台拉起新 assemble。"""
+    import os
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+    from .config import LOG_DIR
+
+    assemble_stop()
+    time.sleep(1.0)
+
+    script = str(Path(__file__).resolve().parent.parent / "mark42.py")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    restart_log = open(str(LOG_DIR / "assemble.log"), "a")
+    proc = subprocess.Popen(
+        [sys.executable, script, "assemble"],
+        stdout=restart_log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        cwd=str(Path(__file__).resolve().parent.parent.parent),
+    )
+    print(f"🔄 Mark42 assemble 已重启")
+    print(f"   新 PID: {proc.pid}")
+    print(f"   日志: {LOG_DIR / 'assemble.log'}")
+    return {"pid": proc.pid, "log": str(LOG_DIR / "assemble.log")}
+
+
 def assemble() -> None:
     """全甲启动入口 — fork 子进程拉起 armor guard + engine daemon。"""
     import subprocess, sys, time, signal, os
@@ -102,7 +291,11 @@ def assemble() -> None:
         print(f"❌ 死亡: {', '.join(dead)}")
 
     # 保存 PID 文件
-    pid_data = {"startedAt": _now_iso(), "children": [{"name": n, "pid": p} for n, p, _ in children]}
+    pid_data = {
+        "startedAt": _now_iso(),
+        "parent": {"name": "assemble", "pid": os.getpid()},
+        "children": [{"name": n, "pid": p} for n, p, _ in children],
+    }
     _save_json(pid_file, pid_data)
     # 校验写入
     verify_data = _load_json(pid_file)
@@ -438,7 +631,10 @@ def main() -> None:
                              help="启用摘要质量探针（检测压缩后关键信息留存率）")
     compaction_p.add_argument("--drift-check", action="store_true",
                              help="启用上下文降解检测（分析连续压缩趋势）")
-    sub.add_parser("assemble", help="一键启动完整战甲")
+    assemble_p = sub.add_parser("assemble", help="一键启动完整战甲")
+    assemble_p.add_argument("--status", action="store_true", help="查看 assemble/guard/daemon 状态")
+    assemble_p.add_argument("--stop", action="store_true", help="停止 assemble 及其子进程")
+    assemble_p.add_argument("--restart", action="store_true", help="重启 assemble 及其子进程")
     status_p = sub.add_parser("status", help="一屏聚合系统状态")
     status_p.add_argument("--json", action="store_true", help="输出 JSON 格式")
 
@@ -620,7 +816,14 @@ def main() -> None:
         return
 
     if args.module == "assemble":
-        assemble()
+        if args.status:
+            assemble_status()
+        elif args.stop:
+            assemble_stop()
+        elif args.restart:
+            assemble_restart()
+        else:
+            assemble()
         return
 
     if args.module == "status":

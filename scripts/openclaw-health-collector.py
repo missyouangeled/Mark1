@@ -89,14 +89,35 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, An
         degraded = result.returncode == 2  # exit 2 = warning/degraded, not a crash
         stdout = (result.stdout or "").strip()
         stderr = (result.stderr or "").strip()
-        first_line = stdout.split("\n")[0] if stdout else ""
+
+        summary = ""
+        if stdout:
+            first_line = stdout.split("\n")[0].strip()
+            summary = first_line[:200]
+            if first_line.startswith("{") or first_line.startswith("["):
+                try:
+                    parsed = json.loads(stdout)
+                except json.JSONDecodeError:
+                    pass
+                else:
+                    if isinstance(parsed, dict):
+                        parsed_summary = parsed.get("summary")
+                        if isinstance(parsed_summary, str) and parsed_summary.strip():
+                            summary = parsed_summary.strip()[:200]
+                        elif isinstance(parsed.get("action"), str) and parsed.get("action", "").strip():
+                            summary = str(parsed["action"]).strip()[:200]
+                            if parsed.get("ok") is True:
+                                summary = f"{summary}: ok"[:200]
+        if not summary:
+            summary = "degraded" if degraded else "error" if not ok else "ok"
+
         return {
             "label": label,
             "ok": ok,
             "degraded": degraded,
             "exitCode": result.returncode,
             "elapsedMs": int(elapsed * 1000),
-            "summary": first_line[:200] if first_line else ("degraded" if degraded else "error" if not ok else "ok"),
+            "summary": summary,
             "stderr": stderr[:300] if stderr else None,
             "stdoutRaw": stdout,
         }
@@ -140,15 +161,15 @@ def _read_supervisor_state() -> dict[str, Any]:
 
 
 def _count_active_tasks() -> int:
-    """扫描 runs.sqlite 统计活跃任务数。"""
-    runs_db = Path.home() / ".openclaw" / "tasks" / "runs.sqlite"
-    if not runs_db.exists():
+    """扫描共享状态库统计活跃任务数。"""
+    tasks_db = Path.home() / ".openclaw" / "state" / "openclaw.sqlite"
+    if not tasks_db.exists():
         return 0
     try:
-        conn = sqlite3.connect(str(runs_db))
+        conn = sqlite3.connect(str(tasks_db))
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT COUNT(*) as cnt FROM runs WHERE status IN ('running','pending')"
+            "SELECT COUNT(*) as cnt FROM task_runs WHERE status IN ('running','pending')"
         ).fetchall()
         conn.close()
         return rows[0]["cnt"] if rows else 0

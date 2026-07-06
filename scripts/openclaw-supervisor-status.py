@@ -14,7 +14,8 @@ from typing import Any
 
 from openclaw_infos_handle_contract import build_handle_request_payload, extract_frontstage_notify_payload, invoke_handle_request
 
-DEFAULT_TASKS_DB_PATH = Path.home() / ".openclaw" / "tasks" / "runs.sqlite"
+DEFAULT_TASKS_DB_PATH = Path.home() / ".openclaw" / "state" / "openclaw.sqlite"
+LEGACY_TASKS_DB_PATH = Path.home() / ".openclaw" / "tasks" / "runs.sqlite"
 DEFAULT_AGENTS_ROOT = Path.home() / ".openclaw" / "agents"
 DEFAULT_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "openclaw" / "supervisor"
 STATUS_PATH_NAME = "supervisor-status.json"
@@ -191,12 +192,45 @@ def save_service_control(
     return payload
 
 
-def open_db(tasks_db_path: Path) -> sqlite3.Connection | None:
-    if not tasks_db_path.exists():
+def _connect_db(path: Path) -> sqlite3.Connection | None:
+    if not path.exists():
         return None
-    conn = sqlite3.connect(tasks_db_path)
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _has_task_runs_table(conn: sqlite3.Connection | None) -> bool:
+    if conn is None:
+        return False
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='task_runs' LIMIT 1"
+        ).fetchone()
+    except sqlite3.Error:
+        return False
+    return row is not None
+
+
+def open_db(tasks_db_path: Path) -> tuple[sqlite3.Connection | None, Path | None]:
+    candidates: list[Path] = []
+    for candidate in (tasks_db_path, DEFAULT_TASKS_DB_PATH, LEGACY_TASKS_DB_PATH):
+        resolved = candidate.expanduser().resolve()
+        if resolved not in candidates:
+            candidates.append(resolved)
+
+    fallback: tuple[sqlite3.Connection | None, Path | None] = (None, None)
+    for candidate in candidates:
+        conn = _connect_db(candidate)
+        if conn is None:
+            continue
+        if _has_task_runs_table(conn):
+            return conn, candidate
+        if fallback[0] is None:
+            fallback = (conn, candidate)
+        else:
+            conn.close()
+    return fallback
 
 
 def parse_iso_ms(value: Any) -> int | None:
@@ -642,7 +676,7 @@ def build_report(tasks_db_path: Path, state_dir: Path, stalled_after_seconds: in
     status_path = state_dir / STATUS_PATH_NAME
     desired = load_service_control(control_path)
 
-    conn = open_db(tasks_db_path)
+    conn, resolved_tasks_db_path = open_db(tasks_db_path)
     status_errors: list[str] = []
     try:
         active_tasks, active_error = fetch_active_tasks(conn, now_ms, stalled_after_seconds)
@@ -688,7 +722,7 @@ def build_report(tasks_db_path: Path, state_dir: Path, stalled_after_seconds: in
         "recentTerminalTask": recent_terminal_task,
         "statusError": "; ".join(status_errors) if status_errors else None,
         "paths": {
-            "tasksDb": str(tasks_db_path),
+            "tasksDb": str(resolved_tasks_db_path or tasks_db_path),
             "stateDir": str(state_dir),
             "serviceControl": str(control_path),
             "statusFile": str(status_path),
@@ -806,7 +840,7 @@ def maybe_send_transition_notification(report: dict[str, Any], state_dir: Path, 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="OpenClaw supervisor status snapshot")
-    parser.add_argument("--tasks-db-path", default=str(DEFAULT_TASKS_DB_PATH), help="Path to ~/.openclaw/tasks/runs.sqlite")
+    parser.add_argument("--tasks-db-path", default=str(DEFAULT_TASKS_DB_PATH), help="Path to tasks database (默认 ~/.openclaw/state/openclaw.sqlite)")
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR), help="Directory for supervisor state files")
     parser.add_argument("--stalled-after-seconds", type=int, default=DEFAULT_STALLED_AFTER_SECONDS, help="Silent threshold for stalled tasks")
     parser.add_argument("--terminal-display-seconds", type=int, default=DEFAULT_TERMINAL_DISPLAY_SECONDS, help="Keep done/failed visible for this long")

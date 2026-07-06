@@ -29,6 +29,8 @@ def main() -> int:
 
         original_epoch_ms = mod.epoch_ms
         original_agents_root = mod.DEFAULT_AGENTS_ROOT
+        original_default_tasks_db_path = mod.DEFAULT_TASKS_DB_PATH
+        original_legacy_tasks_db_path = mod.LEGACY_TASKS_DB_PATH
         try:
             mod.epoch_ms = lambda: 1_000_000
             agents_root = tmp_path / "agents"
@@ -206,6 +208,31 @@ def main() -> int:
             else:
                 print("PASS fetch_active_tasks_prunes_orphaned_running_task")
 
+            conn, resolved_path = mod.open_db(tasks_db)
+            if conn is None or resolved_path != tasks_db.resolve():
+                failures.append(f"expected open_db to use explicit shared-schema db first, got conn={conn} path={resolved_path}")
+            else:
+                print("PASS open_db_prefers_explicit_task_runs_db")
+            if conn is not None:
+                conn.close()
+
+            legacy_db = tmp_path / "legacy-runs.sqlite"
+            legacy_conn = sqlite3.connect(legacy_db)
+            legacy_conn.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT)")
+            legacy_conn.commit()
+            legacy_conn.close()
+            mod.DEFAULT_TASKS_DB_PATH = tmp_path / "missing-default.sqlite"
+            mod.LEGACY_TASKS_DB_PATH = tmp_path / "missing-legacy.sqlite"
+            fallback_conn, fallback_path = mod.open_db(legacy_db)
+            if fallback_conn is None or fallback_path != legacy_db.resolve():
+                failures.append(f"expected open_db to return explicit fallback db when no candidate has task_runs, got conn={fallback_conn} path={fallback_path}")
+            else:
+                print("PASS open_db_falls_back_to_explicit_db_without_task_runs")
+            if fallback_conn is not None:
+                fallback_conn.close()
+            mod.DEFAULT_TASKS_DB_PATH = original_default_tasks_db_path
+            mod.LEGACY_TASKS_DB_PATH = original_legacy_tasks_db_path
+
             mod.save_service_control(
                 control_path,
                 policy_mode="force_on",
@@ -326,6 +353,8 @@ def main() -> int:
         finally:
             mod.epoch_ms = original_epoch_ms
             mod.DEFAULT_AGENTS_ROOT = original_agents_root
+            mod.DEFAULT_TASKS_DB_PATH = original_default_tasks_db_path
+            mod.LEGACY_TASKS_DB_PATH = original_legacy_tasks_db_path
 
     if failures:
         print("FAILURES:")

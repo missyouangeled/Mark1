@@ -6,7 +6,7 @@ Watcher 体系第 5 个成员：自动管理后台任务的生命周期。
 取代之前的"手动判断→手动开监工→手动关监工→手动清理"流程。
 
 每 60s 运行一次：
-  1. 扫描 runs.sqlite → 僵尸/静默/并发检测
+  1. 扫描共享状态库 task_runs → 僵尸/静默/并发检测
   2. 任务静默 > 3min → broker 回报前台
   3. 僵尸任务（无活动 > 30min）→ 自动 kill
   4. 终端任务过期 → 标记可清理
@@ -34,7 +34,7 @@ from typing import Any
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 SCRIPTS = WORKSPACE / "scripts"
-TASKS_DB = Path.home() / ".openclaw" / "tasks" / "runs.sqlite"
+TASKS_DB = Path.home() / ".openclaw" / "state" / "openclaw.sqlite"
 STATE_DIR = Path(
     os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
 ) / "openclaw" / "task-scheduler"
@@ -227,7 +227,7 @@ def _quick_count_tasks(conn: sqlite3.Connection | None) -> int:
         return 0
     try:
         rows = conn.execute(
-            "SELECT COUNT(*) as cnt FROM runs WHERE status IN ('running','pending')"
+            "SELECT COUNT(*) as cnt FROM task_runs WHERE status IN ('running','pending')"
         ).fetchall()
         return int(rows[0]["cnt"]) if rows else 0
     except (sqlite3.Error, KeyError, TypeError):
@@ -696,7 +696,7 @@ def main():
     # 5c. 旧会话清理
     actions.extend(maybe_cleanup_sessions(run_count, args.dry_run))
 
-    # 5d. 终端任务计数（从 runs.sqlite 视角）
+    # 5d. 终端任务计数（从共享任务库视角）
     if ready_cleanup_count > 0:
         actions.append(f"terminal-ready-cleanup:{ready_cleanup_count}")
 
