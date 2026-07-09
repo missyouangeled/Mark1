@@ -182,3 +182,77 @@
 - 后续大版本升级需再次核对函数名；查看 Console 中 sessions.patch 返回的 resolved.modelProvider
 - 相关文件：
 - `scripts/apply-openclaw-session-model-selector-fix.py`
+
+## 2026-07-07 12:51:00 CST (+08:00) — frontstage recovery 假 running 收口窗口补强
+
+- 类型：manual-fix
+- 适用范围：OpenClaw 主会话 frontstage recovery
+- 当前状态：已修复（待持续观察真实运行场景）
+- 未纳入正式补丁原因：
+- 仍属于针对当前 fake running / terminal gap 的保守热修，先放在脚本层验证“观察→宽限→超时收口”链路，不直接上更大 recovery 架构改造。
+- 后续排查 / 恢复提示：
+- `openclaw-frontstage-recovery-watch.py` 新增 running 空壳宽限窗口与超时强制收口能力；测试场景通过 `allow_force_fail=False` 避免历史样本误判。后续需继续观察真实主会话是否在超过宽限窗口后稳定转失败收口，以及 conflict 是否下降。
+- 相关文件：
+- `scripts/openclaw-frontstage-recovery-watch.py`
+- `scripts/test-frontstage-recovery-watch.py`
+
+## 2026-07-07 13:06:00 CST (+08:00) — reply 初始化 revision 保守收窄（排除 endedAt / abortedLastRun）
+
+- 类型：manual-fix
+- 适用范围：OpenClaw reply session initialization / main-session restart recovery 竞态
+- 当前状态：已修复（待观察 initialization conflict 是否下降）
+- 未纳入正式补丁原因：
+- 当前先在 dist 产物上做保守热修，仅从 `createReplySessionInitializationRevision(entry)` 中移除 `endedAt` / `abortedLastRun` 两个更像终态附属字段的 revision 因子，避免 recovery 合法落终态时把 reply 初始化误判为 stale-snapshot。
+- 后续排查 / 恢复提示：
+- 目标文件：`~/.npm-global/lib/node_modules/openclaw/dist/session-accessor-DvSc996e.js`
+- 当前仍保留 `status` / `startedAt` 等字段参与 revision；若 `reply session initialization conflicted` 仍高频出现，下一步继续评估 `status` 是否也应改为更窄语义或从 revision 中排除。
+- 已完成最小验证：`scripts/test-frontstage-recovery-watch.py` 全通过，说明前台 fake running 收口链未被该补丁破坏。
+- 相关文件：
+
+## 2026-07-07 13:11:00 CST (+08:00) — frontstage recovery 增加孤儿 restartRecoveryDelivery claim 兜底清理
+
+- 类型：manual-fix
+- 适用范围：OpenClaw 主会话 restart recovery delivery 残留
+- 当前状态：已修复（待真实窗口验证触发效果）
+- 未纳入正式补丁原因：
+- 当前先在 `openclaw-frontstage-recovery-watch.py` 增加最小风险兜底：当主会话 `status=running`、`hasActiveRun=false`、`endedAt=null`、`pendingFinalDelivery` 已清空、`runId/lifecycleGeneration` 为空、且最新 assistant turn 不是可见正常回复而是已超过 grace 窗口后，只清理 `restartRecoveryDeliveryContext` / `restartRecoveryDeliveryRunId`，不直接改更深 runtime。
+- 后续排查 / 恢复提示：
+- 若仍持续出现 `restartRecoveryDeliveryRunId` 残留，下一步应考虑在 `agent-command-Lx4tsfII.js` 的 cleanup 条件上做上游修复，而不是只靠 watcher 兜底。
+- 已完成最小验证：新增 `maybe_clear_orphan_restart_recovery_claim` 隔离测试并通过；现有 frontstage recovery 回归全通过。
+- 相关文件：
+- `scripts/openclaw-frontstage-recovery-watch.py`
+- `scripts/test-frontstage-recovery-watch.py`
+
+## 2026-07-07 13:29:00 CST (+08:00) — 主会话 restartRecoveryDelivery 残留完成收口
+
+- 类型：manual-fix
+- 适用范围：OpenClaw 主会话 fake running / restart recovery delivery 反复回写
+- 当前状态：已修复（现场复查通过）
+- 未纳入正式补丁原因：
+- 当前仍是 dist 产物上的保守热修，目标是先把“recovery claim 反复回写 + 主会话终态不收口”这轮实战问题压住，后续再决定是否整理成正式补丁脚本。
+- 本轮最终动作：
+- 在 `agent-runner.runtime-BriI2__w.js` 增加保守拦截：孤儿 recovery claim 场景不再重新写入 `restartRecoveryDeliveryRunId`，且只允许 `status === "running"` 的会话继续 claim。
+- 在 `agent-command-Lx4tsfII.js` 同步增加 `shouldSkipRestartRecoveryClaim`，并把当前运行链的 cleanup / claim 守卫收紧到 `status === "running"`。
+- 在 `openclaw-frontstage-recovery-watch.py` 增加孤儿 `restartRecoveryDelivery*` claim 兜底清理；同时保留 fake running grace / force-fail 收口逻辑。
+- 最终将主会话从 `running + hasActiveRun=false + endedAt=null` 收口为 `status=done`，并清空 `restartRecoveryDeliveryContext` / `restartRecoveryDeliveryRunId`。
+- 现场最终复查结果：
+- `status=done`
+- `hasActiveRun=false`
+- `endedAt` 已落盘
+- `pendingFinalDelivery=null`
+- `restartRecoveryDeliveryContext=null`
+- `restartRecoveryDeliveryRunId=null`
+- watcher 显示 `未发现明显异常`
+- 后续排查 / 恢复提示：
+- 若后续升级或重装 OpenClaw，这几处 dist 热修可能丢失；届时优先检查：
+  - `dist/session-accessor-DvSc996e.js`
+  - `dist/agent-runner.runtime-BriI2__w.js`
+  - `dist/agent-command-Lx4tsfII.js`
+  - `scripts/openclaw-frontstage-recovery-watch.py`
+- 若以后仍出现 `reply session initialization conflicted`，下一优先级是继续评估 `status` 是否也应从 reply init revision 中收窄语义。
+- 相关文件：
+- `~/.npm-global/lib/node_modules/openclaw/dist/session-accessor-DvSc996e.js`
+- `~/.npm-global/lib/node_modules/openclaw/dist/agent-runner.runtime-BriI2__w.js`
+- `~/.npm-global/lib/node_modules/openclaw/dist/agent-command-Lx4tsfII.js`
+- `scripts/openclaw-frontstage-recovery-watch.py`
+- `scripts/test-frontstage-recovery-watch.py`

@@ -1,0 +1,11 @@
+{
+  "trajectoryWarnMb": 5.0,
+  "staleWatcherHours": 1.0,
+  "backupWarnMinutes": 15,
+  "backupDeadmanMinutes": 25,
+  "healthStaleMinutes": 10,
+  "frontstageStaleMinutes": 10,
+  "healthCriticalGraceMinutes": 2,
+  "defaultCooldownMinutes": 30,
+  "auditEveryMinutes": 30
+}

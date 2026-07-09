@@ -40,6 +40,7 @@
 | 33 | 桌面 AI 宠物 — 反浩克装甲能量核心方案 | ? | 归档 | [33-桌面-AI-宠物--反浩克装甲能量核心方案.md](docs/plans/33-桌面-AI-宠物--反浩克装甲能量核心方案.md) |
 | 34 | Trae Linux 国内版 + trae-agent CLI — 待装方案 | 2026-06-23 | 备用 | [34-2026-06-23Trae-Linux-国内版--trae-agent-CLI-待装方案.md](docs/plans/34-2026-06-23Trae-Linux-国内版--trae-agent-CLI-待装方案.md) |
 | 34b | trae-agent 烟测报告 — 2026-06-23 10:55 | 2026-06-23 | 已通过 | [34-trae-agent-烟测报告-2026-06-23.md](docs/plans/34-trae-agent-烟测报告-2026-06-23.md) |
+| 35 | 2026-07-07：WebChat / Control UI 渲染异常排查与恢复方案 | 2026-07-07 → 2026-07-08 归档 | 归档 | [35-2026-07-07WebChat渲染异常排查与恢复方案.md](docs/plans/35-2026-07-07WebChat渲染异常排查与恢复方案.md) |
 
 ---
 

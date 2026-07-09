@@ -1,0 +1,27 @@
+HELLO preview: {"type":"event","event":"connect.challenge","payload":{"nonce":"9c0cac34-6188-4dd4-ae9a-26962c68a428","ts":1783412917075}}
+
+===== sessions.list sessions.list =====
+REQ: {"jsonrpc": "2.0", "id": "probe-sessions.list-sessions.list", "method": "sessions.list", "params": {}}
+Traceback (most recent call last):
+  File "/home/missyouangeled/.openclaw/workspace/docs/runtime-checks/2026-07-07-webchat-render/ws_probe.py", line 103, in <module>
+    asyncio.run(main())
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/missyouangeled/.openclaw/workspace/docs/runtime-checks/2026-07-07-webchat-render/ws_probe.py", line 90, in main
+    await call(ws, "sessions.list", {}, "sessions.list")
+  File "/home/missyouangeled/.openclaw/workspace/docs/runtime-checks/2026-07-07-webchat-render/ws_probe.py", line 34, in call
+    raw = await asyncio.wait_for(ws.recv(), timeout=15)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/missyouangeled/.local/lib/python3.12/site-packages/websockets/asyncio/connection.py", line 324, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: received 1008 (policy violation) invalid request frame; then sent 1008 (policy violation) invalid request frame

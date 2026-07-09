@@ -18,6 +18,7 @@ from .config import (
 from .utils import (
     _append_broker, _load_json, _now_iso, _now_ts, _save_json,
 )
+from .output_guard import trim_detail, trim_summary
 from .armor import armor_check, armor_compress
 from .logs import log_rotate
 
@@ -371,7 +372,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                 try:
                     file_key = str(event_file)
                     cursor_offset = cursor.get(file_key, 0)
-                    with open(event_file, "r") as f:
+                    with open(event_file, "r", encoding="utf-8", errors="replace") as f:
                         f.seek(cursor_offset)
                         new_lines = f.readlines()
                         cursor[file_key] = f.tell()
@@ -389,24 +390,24 @@ def engine_daemon(interval_s: int = 30) -> None:
                     if source_evt == "mark42.armor.compress.done":
                         usage = metadata.get("usagePercent", 0)
                         strategy = metadata.get("strategy", "?")
-                        print(f"[{ts}] 🧠 检测到铠甲压缩完成 (策略: {strategy}, 使用率: {usage}%)")
+                        print(trim_summary(f"[{ts}] 🧠 检测到铠甲压缩完成 (策略: {strategy}, 使用率: {usage}%)", 120))
                         _append_broker("engine", "mark42.engine.bridge.armor_compress_seen",
                                        f"Engine 已收到压缩完成信号", "ok",
-                                       f"策略: {strategy} | 使用率: {usage}%",
+                                       trim_detail(f"策略: {strategy} | 使用率: {usage}%", 160),
                                        {"bridgeEvent": "armor.compress.done", "usagePercent": usage})
                     # ── 压缩联动：上下文危险 → 建议 /compact ──
                     if "compaction.advised" in source_evt:
                         usage = metadata.get("usagePercent", 0)
-                        print(f"[{ts}] 🚨 上下文 {usage}% — 强烈建议在聊天中执行 /compact")
+                        print(trim_summary(f"[{ts}] 🚨 上下文 {usage}% — 强烈建议在聊天中执行 /compact", 120))
                         _append_broker("health", "engine.compaction.alerted",
                                        f"建议压缩: {usage}%", "warn",
-                                       f"Armor 建议手动执行 /compact",
+                                       trim_detail("Armor 建议手动执行 /compact", 160),
                                        {"usagePercent": usage})
                     # ── 系统级上下文告警 → 异步触发压缩（不阻塞 daemon 主循环） ──
                     if "context_monitor.alert" in source_evt or "context_monitor.critical" in source_evt:
                         usage = metadata.get("usagePercent", 0)
                         if usage >= THRESHOLD_ALERT:
-                            print(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，启动压缩子进程")
+                            print(trim_summary(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，启动压缩子进程", 120))
                             script = str(Path(__file__).resolve().parent.parent / "mark42.py")
                             try:
                                 subprocess.Popen(
@@ -415,15 +416,15 @@ def engine_daemon(interval_s: int = 30) -> None:
                                     start_new_session=True,
                                 )
                             except subprocess.SubprocessError as e:
-                                print(f"[{ts}] ❌ 启动压缩子进程失败: {e}")
+                                print(trim_summary(f"[{ts}] ❌ 启动压缩子进程失败: {e}", 140))
                     # ── 模型故障检测（只感知，不切换 — OpenClaw 内置 failover 接管） ──
                     if "model.fallback" in source_evt or "engine.model.fallback" in source_evt:
                         summary = event.get("summary", "")
-                        print(f"[{ts}] ⚠️ 检测到模型故障信号: {summary}")
+                        print(trim_summary(f"[{ts}] ⚠️ 检测到模型故障信号: {summary}", 140))
                         print(f"      OpenClaw 内置 failover 将自动切换备用模型")
                         _append_broker("health", "engine.model.fallback.detected",
-                                       f"模型故障: {summary}", "warn",
-                                       f"已记录，failover 由 OpenClaw 接管",
+                                       trim_summary(f"模型故障: {summary}", 120), "warn",
+                                       trim_detail("已记录，failover 由 OpenClaw 接管", 160),
                                        {"signal": source_evt, "summary": summary})
                     # ── Heavy 开工 → 自动创建 task-watch Loop（守卫：必须真实存在） ──
                     if "heavy.task.started" in source_evt:
@@ -442,9 +443,9 @@ def engine_daemon(interval_s: int = 30) -> None:
                             except Exception:
                                 pass
                         if not task_valid:
-                            print(f"[{ts}] ℹ️ Heavy 开工信号但任务文件无效/过期 ({task_name})，跳过创建 watch")
+                            print(trim_summary(f"[{ts}] ℹ️ Heavy 开工信号但任务文件无效/过期 ({task_name})，跳过创建 watch", 140))
                             continue
-                        print(f"[{ts}] ⚙️ 检测到 Heavy 任务开工: {task_name}")
+                        print(trim_summary(f"[{ts}] ⚙️ 检测到 Heavy 任务开工: {task_name}", 120))
                         loops2 = _load_loops()
                         watch_name = f"watch-{task_name}"
                         if watch_name not in loops2:
@@ -452,7 +453,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                                          template="task-watch")
                         _append_broker("engine", "mark42.engine.bridge.heavy_started",
                                        f"Engine 已为 Heavy 任务创建监控 Loop", "ok",
-                                       f"任务: {task_name}",
+                                       trim_detail(f"任务: {task_name}", 160),
                                        {"taskName": task_name})
             # ── 2. 重新加载 loops（处理 broker 事件中可能新增的） ──
             loops = _load_loops()

@@ -247,6 +247,7 @@ def main() -> int:
             assistant_tool_call("2026-05-15T08:33:48+08:00"),
         ],
         {"status": "running", "hasActiveRun": False, "endedAt": None},
+        allow_force_fail=False,
     )
     if not running_empty_turn_projection.get("pendingProjection") or running_empty_turn_projection.get("anomalyCode") is not None:
         failures.append(f"running_empty_assistant_turn_pending: expected pending without anomaly, got {running_empty_turn_projection}")
@@ -268,11 +269,127 @@ def main() -> int:
     else:
         print("PASS stale_active_run_done_not_pending")
 
-    if failures:
-        print("FAILURES:")
-        for item in failures:
-            print("-", item)
-        return 1
+    stale_running_gap_projection = mod.analyze_projection(
+        [
+            message("user", "继续修", "2026-05-15T08:00:00+08:00"),
+            assistant_tool_call("2026-05-15T08:00:01+08:00"),
+        ],
+        [
+            message("user", "继续修", "2026-05-15T08:00:00+08:00"),
+            assistant_tool_call("2026-05-15T08:00:01+08:00"),
+        ],
+        {"status": "running", "hasActiveRun": False, "endedAt": None},
+        allow_force_fail=False,
+    )
+    if not stale_running_gap_projection.get("pendingProjection") or stale_running_gap_projection.get("anomalyCode") is not None:
+        failures.append(f"stale_running_gap_grace: expected pending grace without anomaly, got {stale_running_gap_projection}")
+    else:
+        print("PASS stale_running_gap_grace")
+
+    stale_running_force_fail_projection = mod.analyze_projection(
+        [
+            message("user", "继续修", "2026-05-15T08:00:00+08:00"),
+            assistant_tool_call("2026-05-15T08:00:01+08:00"),
+        ],
+        [
+            message("user", "继续修", "2026-05-15T08:00:00+08:00"),
+            assistant_tool_call("2026-05-15T08:00:01+08:00"),
+        ],
+        {"status": "running", "hasActiveRun": False, "endedAt": None},
+        allow_force_fail=True,
+    )
+    if stale_running_force_fail_projection.get("anomalyCode") != "running_without_active_run_terminal_gap" or not stale_running_force_fail_projection.get("forceFail") or stale_running_force_fail_projection.get("forceFailReason") != "stale-running-terminal-gap":
+        failures.append(f"stale_running_gap_force_fail: expected terminal gap anomaly + forceFail, got {stale_running_force_fail_projection}")
+    else:
+        print("PASS stale_running_gap_force_fail")
+
+    fake_store = {
+        "agent:main:test": {
+            "status": "running",
+            "hasActiveRun": True,
+            "endedAt": None,
+            "updatedAt": 1,
+            "restartRecoveryDeliveryRunId": "run-123",
+            "pendingFinalDelivery": True,
+            "pendingFinalDeliveryText": "hello",
+        }
+    }
+    saved_store: dict[str, dict] = {}
+    original_load = mod._load_session_store
+    original_save = mod.save_session_store
+    try:
+        mod._load_session_store = lambda: json.loads(json.dumps(fake_store))
+        def _fake_save(store):
+            saved_store.clear()
+            saved_store.update(json.loads(json.dumps(store)))
+        mod.save_session_store = _fake_save
+        close_result = mod.maybe_force_close_session(
+            {
+                "forceFail": True,
+                "forceFailReason": "stale-running-terminal-gap",
+                "targetSessionKey": "agent:main:test",
+            },
+            Path("/tmp/frontstage-recovery-test.log"),
+        )
+    finally:
+        mod._load_session_store = original_load
+        mod.save_session_store = original_save
+    row = saved_store.get("agent:main:test", {})
+    if not close_result or not close_result.get("mutated") or row.get("status") != "failed" or row.get("hasActiveRun") is not False or row.get("pendingFinalDelivery") is not False or row.get("pendingFinalDeliveryText") is not None or row.get("restartRecoveryDeliveryRunId") is not None or not row.get("endedAt"):
+        failures.append(f"maybe_force_close_session_mutates_store: expected failed+cleared fields, got result={close_result} row={row}")
+    else:
+        print("PASS maybe_force_close_session_mutates_store")
+
+    fake_store_orphan = {
+        "agent:main:test-orphan": {
+            "status": "running",
+            "hasActiveRun": False,
+            "endedAt": None,
+            "updatedAt": 1,
+            "restartRecoveryDeliveryContext": {"channel": "webchat", "to": "u"},
+            "restartRecoveryDeliveryRunId": "run-orphan",
+            "pendingFinalDelivery": None,
+            "pendingFinalDeliveryText": None,
+            "runId": None,
+            "lifecycleGeneration": None,
+        }
+    }
+    saved_orphan_store: dict[str, dict] = {}
+    original_load = mod._load_session_store
+    original_save = mod.save_session_store
+    try:
+        mod._load_session_store = lambda: json.loads(json.dumps(fake_store_orphan))
+        def _fake_save_orphan(store):
+            saved_orphan_store.clear()
+            saved_orphan_store.update(json.loads(json.dumps(store)))
+        mod.save_session_store = _fake_save_orphan
+        orphan_clear_result = mod.maybe_clear_orphan_restart_recovery_claim(
+            {
+                "targetSessionKey": "agent:main:test-orphan",
+                "pendingProjection": False,
+                "forceFail": False,
+                "terminalGapAgeMs": 1,
+                "sessionSnapshot": {
+                    "status": "running",
+                    "hasActiveRun": False,
+                    "endedAt": None,
+                },
+                "transcriptLatestAssistantTurn": {
+                    "text": "正常可见回复",
+                    "rawText": "正常可见回复",
+                },
+            },
+            Path("/tmp/frontstage-recovery-test.log"),
+        )
+    finally:
+        mod._load_session_store = original_load
+        mod.save_session_store = original_save
+    orphan_row = saved_orphan_store.get("agent:main:test-orphan", {})
+    if not orphan_clear_result or not orphan_clear_result.get("mutated") or orphan_row.get("restartRecoveryDeliveryRunId") is not None or orphan_row.get("restartRecoveryDeliveryContext") is not None:
+        failures.append(f"maybe_clear_orphan_restart_recovery_claim_clears_orphan: expected restart recovery claim cleared, got result={orphan_clear_result} row={orphan_row}")
+    else:
+        print("PASS maybe_clear_orphan_restart_recovery_claim_clears_orphan")
+
 
     print("ALL PASS")
     return 0

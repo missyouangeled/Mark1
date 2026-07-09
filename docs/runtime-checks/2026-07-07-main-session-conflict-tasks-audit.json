@@ -1,0 +1,107 @@
+{
+  "count": 2,
+  "filteredCount": 2,
+  "displayed": 2,
+  "filters": {
+    "severity": null,
+    "code": null,
+    "limit": null
+  },
+  "summary": {
+    "total": 2,
+    "warnings": 2,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 2,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    },
+    "combined": {
+      "total": 2,
+      "errors": 0,
+      "warnings": 2
+    }
+  },
+  "findings": [
+    {
+      "kind": "task",
+      "severity": "warn",
+      "code": "lost",
+      "detail": "backing session missing",
+      "ageMs": 67887962,
+      "status": "lost",
+      "token": "384b7370-5695-40f7-8322-413051425710",
+      "task": {
+        "taskId": "384b7370-5695-40f7-8322-413051425710",
+        "runtime": "cli",
+        "sourceId": "eff328a1-6a6e-40fd-88ea-a7df04a7faf4",
+        "requesterSessionKey": "agent:main:main",
+        "ownerKey": "agent:main:main",
+        "scopeKind": "session",
+        "childSessionKey": "agent:main:main",
+        "agentId": "main",
+        "requesterAgentId": "main",
+        "runId": "eff328a1-6a6e-40fd-88ea-a7df04a7faf4",
+        "task": "[System] Your previous turn was interrupted by a gateway restart while OpenClaw was waiting on tool/model work. Continue from the existing transcript and finish the interrupted response.",
+        "status": "lost",
+        "deliveryStatus": "not_applicable",
+        "notifyPolicy": "silent",
+        "createdAt": 1783325017501,
+        "startedAt": 1783325018275,
+        "endedAt": 1783325381803,
+        "lastEventAt": 1783325381803,
+        "cleanupAfter": 1783411781803,
+        "error": "backing session missing"
+      }
+    },
+    {
+      "kind": "task",
+      "severity": "warn",
+      "code": "lost",
+      "detail": "backing session missing",
+      "ageMs": 67707958,
+      "status": "lost",
+      "token": "7f0cda84-d43f-4aa5-9d52-ef67af36478e",
+      "task": {
+        "taskId": "7f0cda84-d43f-4aa5-9d52-ef67af36478e",
+        "runtime": "cli",
+        "sourceId": "1d29f407-cb81-4545-a229-50730a8057b7",
+        "requesterSessionKey": "agent:main:main",
+        "ownerKey": "agent:main:main",
+        "scopeKind": "session",
+        "childSessionKey": "agent:main:main",
+        "agentId": "main",
+        "requesterAgentId": "main",
+        "runId": "1d29f407-cb81-4545-a229-50730a8057b7",
+        "task": "[System] Your previous turn was interrupted by a gateway restart while OpenClaw was waiting on tool/model work. Continue from the existing transcript and finish the interrupted response.",
+        "status": "lost",
+        "deliveryStatus": "not_applicable",
+        "notifyPolicy": "silent",
+        "createdAt": 1783325203883,
+        "startedAt": 1783325204420,
+        "endedAt": 1783325561807,
+        "lastEventAt": 1783325561807,
+        "cleanupAfter": 1783411961807,
+        "error": "backing session missing"
+      }
+    }
+  ]
+}

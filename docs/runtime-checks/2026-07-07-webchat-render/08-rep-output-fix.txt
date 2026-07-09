@@ -1,0 +1,30 @@
+===== C-fix: 多行输出（修）=====
+line 000: hello
+line 001: hello hello
+line 002: hello hello hello
+line 003: hello hello hello hello
+line 004: hello hello hello hello hello
+line 005: hello
+line 006: hello hello
+line 007: hello hello hello
+line 008: hello hello hello hello
+line 009: hello hello hello hello hello
+line 010: hello
+line 011: hello hello
+line 012: hello hello hello
+line 013: hello hello hello hello
+line 014: hello hello hello hello hello
+line 015: hello
+line 016: hello hello
+line 017: hello hello hello
+line 018: hello hello hello hello
+line 019: hello hello hello hello hello
+
+===== G: 含三反引号 code fence =====
+```
+some_code();
+```
+
+===== H: 包含 [[reply_to_current]] 之类 directive =====
+[[reply_to_current]] hi
+[[audio_as_voice]] test

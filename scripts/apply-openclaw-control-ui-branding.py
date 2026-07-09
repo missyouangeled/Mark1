@@ -452,11 +452,11 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
             continue
 
         # Legacy (<2026.5.22) patching
-            for pattern in CHAT_RUNNING_PATCH_PATTERNS:
-                if pattern in updated:
-                    updated = updated.replace(pattern, CHAT_RUNNING_PATCH_NEW, 1)
-                    changed = True
-                    break
+        for pattern in CHAT_RUNNING_PATCH_PATTERNS:
+            if pattern in updated:
+                updated = updated.replace(pattern, CHAT_RUNNING_PATCH_NEW, 1)
+                changed = True
+                break
 
         if INVALID_FINAL_RELOAD_PATCH_OLD in updated:
             updated = updated.replace(INVALID_FINAL_RELOAD_PATCH_OLD, INVALID_FINAL_RELOAD_PATCH_NEW, 1)

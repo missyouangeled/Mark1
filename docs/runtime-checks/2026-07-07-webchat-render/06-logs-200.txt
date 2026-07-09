@@ -1,0 +1,420 @@
+Log file: /tmp/openclaw/openclaw-2026-07-07.log
+2026-07-07T15:54:13.554+08:00 info gateway {"subsystem":"gateway"} http server listening (6 plugins: browser, github-copilot, litellm, memory-core, tavily, voice-reply-hard-default; 1.0s)
+2026-07-07T15:54:13.556+08:00 info gateway {"subsystem":"gateway"} log file: /tmp/openclaw/openclaw-2026-07-07.log
+2026-07-07T15:54:13.558+08:00 info gateway {"subsystem":"gateway"} starting channels and sidecars...
+2026-07-07T15:54:13.620+08:00 warn hooks:loader {"subsystem":"hooks:loader"} Loading managed hook code into the gateway process. Managed hooks are trusted local code.
+2026-07-07T15:54:13.669+08:00 info gateway/hooks {"subsystem":"gateway/hooks"} loaded 5 internal hook handlers
+2026-07-07T15:54:13.702+08:00 info gateway {"subsystem":"gateway"} gateway ready
+2026-07-07T15:54:13.796+08:00 info gateway/heartbeat {"subsystem":"gateway/heartbeat"} {"intervalMs":1800000} heartbeat: started
+2026-07-07T15:54:14.275+08:00 info cron {"module":"cron","storePath":"/home/missyouangeled/.openclaw/cron/jobs.json"} {"count":1,"jobIds":["b560cd2c-b4e3-415c-96f7-3074e8f11f62"]} cron: running missed jobs after restart
+2026-07-07T15:54:15.989+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=4a844cd6-181f-4b56-868e-dcdc55fef3d8 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T15:54:16.115+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.subscribe 107ms conn=4a844cd6…f3d8 id=01a5c400…a4d8
+2026-07-07T15:54:16.119+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.messages.subscribe 111ms conn=4a844cd6…f3d8 id=c4a32287…d9b3
+2026-07-07T15:54:16.270+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 262ms conn=4a844cd6…f3d8 id=296c817c…84d0
+2026-07-07T15:54:16.500+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ agent.identity.get 227ms conn=4a844cd6…f3d8 id=2591e11f…299a
+2026-07-07T15:54:16.504+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ health 231ms cached=true conn=4a844cd6…f3d8 id=2e40bd09…0ebe
+2026-07-07T15:54:17.137+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.metadata 500ms conn=4a844cd6…f3d8 id=d8dfddc8…30ed
+2026-07-07T15:54:18.143+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 1616ms conn=4a844cd6…f3d8 id=75b4bf88…ea44
+2026-07-07T15:54:19.822+08:00 info gateway {"subsystem":"gateway"} provider auth state pre-warmed in 1035ms eventLoopMax=13.1ms
+2026-07-07T15:54:21.535+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.inject 87ms conn=1eb41789…ffa1 id=993e7460…6f9b
+2026-07-07T15:54:21.900+08:00 info cron {"module":"cron","storePath":"/home/missyouangeled/.openclaw/cron/jobs.json"} {"enabled":true,"jobs":5,"nextWakeAtMs":1783410900000} cron: started
+2026-07-07T15:54:23.750+08:00 info gateway {"subsystem":"gateway"} agent runtime plugins pre-warmed in 50ms
+2026-07-07T15:57:32.636+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ commands.list 121ms conn=4a844cd6…f3d8 id=8c980aa8…15e9
+2026-07-07T15:57:39.335+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:00:34.674+08:00 warn agent/embedded {"subsystem":"agent/embedded"} {"errorMessage":"Compaction timed out"} context-engine compaction failed
+2026-07-07T16:00:34.677+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.compact 180136ms conn=4a844cd6…f3d8 id=84088852…32a1
+2026-07-07T16:00:34.687+08:00 warn agent/embedded {"subsystem":"agent/embedded"} [compaction-diag] end runId=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3 sessionKey=agent:main:main diagId=cmp-mracw8sp-zw9rkg trigger=manual provider=taotoken/gpt-5.4 attempt=1 maxAttempts=1 outcome=failed reason=timeout durationMs=179958
+2026-07-07T16:00:34.699+08:00 warn model-fallback/decision {"subsystem":"model-fallback/decision"} {"event":"model_fallback_decision","tags":["error_handling","model_fallback","candidate_failed"],"runId":"ee75c8fd-4036-43c0-9e18-82f8cc13ecc3","sessionId":"ee75c8fd-4036-43c0-9e18-82f8cc13ecc3","decision":"candidate_failed","requestedProvider":"taotoken","requestedModel":"gpt-5.4","candidateProvider":"taotoken","candidateModel":"gpt-5.4","attempt":1,"total":2,"reason":"timeout","status":408,"errorPreview":"Compaction timed out","errorHash":"sha256:244e8aad4d1d","fallbackStepType":"fallback_step","fallbackStepFromModel":"taotoken/gpt-5.4","fallbackStepToModel":"litellm/agnes-2.0-flash","fallbackStepFromFailureReason":"timeout","fallbackStepFromFailureDetail":"Compaction timed out","fallbackStepChainPosition":1,"fallbackStepFinalOutcome":"next_fallback","nextCandidateProvider":"litellm","nextCandidateModel":"agnes-2.0-flash","isPrimary":true,"requestedModelMatched":true,"fallbackConfigured":true} model fallback decision
+2026-07-07T16:00:34.843+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 138ms conn=4a844cd6…f3d8 id=ec7d34e4…4c02
+2026-07-07T16:00:35.029+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.metadata 176ms conn=4a844cd6…f3d8 id=6306f741…72a3
+2026-07-07T16:00:35.146+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:00:35.224+08:00 warn agent/embedded {"subsystem":"agent/embedded"} [compaction-diag] end runId=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3 sessionKey=agent:main:main diagId=cmp-mrad03nz-WpMCag trigger=manual provider=litellm/agnes-2.0-flash attempt=1 maxAttempts=1 outcome=failed reason=timeout durationMs=521
+2026-07-07T16:00:35.227+08:00 warn model-fallback/decision {"subsystem":"model-fallback/decision"} {"event":"model_fallback_decision","tags":["error_handling","model_fallback","candidate_failed"],"runId":"ee75c8fd-4036-43c0-9e18-82f8cc13ecc3","sessionId":"ee75c8fd-4036-43c0-9e18-82f8cc13ecc3","decision":"candidate_failed","requestedProvider":"taotoken","requestedModel":"gpt-5.4","candidateProvider":"litellm","candidateModel":"agnes-2.0-flash","attempt":2,"total":2,"reason":"timeout","status":408,"errorPreview":"Compaction timed out","errorHash":"sha256:244e8aad4d1d","fallbackStepType":"fallback_step","fallbackStepFromModel":"litellm/agnes-2.0-flash","fallbackStepFromFailureReason":"timeout","fallbackStepFromFailureDetail":"Compaction timed out","fallbackStepChainPosition":2,"fallbackStepFinalOutcome":"chain_exhausted","isPrimary":false,"requestedModelMatched":false,"fallbackConfigured":true} model fallback decision
+2026-07-07T16:00:36.259+08:00 warn compaction {"subsystem":"compaction"} Full summarization failed: Request was aborted.
+2026-07-07T16:00:45.972+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=4a844cd6-181f-4b56-868e-dcdc55fef3d8
+2026-07-07T16:00:46.252+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=bd89ab79-79a3-477e-9f0f-bd938a59b032 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:00:46.485+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 187ms conn=bd89ab79…b032 id=62625ea0…f471
+2026-07-07T16:00:47.725+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 1045ms conn=bd89ab79…b032 id=2005dca2…8c38
+2026-07-07T16:00:51.966+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=bd89ab79-79a3-477e-9f0f-bd938a59b032
+2026-07-07T16:00:52.267+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=3d42404d-2447-4693-ba36-a21c4b2c14f1 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:00:52.415+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 114ms conn=3d42404d…14f1 id=62879ffb…322c
+2026-07-07T16:03:52.254+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:03:52.514+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:04:02.714+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=10200 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:04:03.228+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:04:14.529+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=11301 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:04:14.970+08:00 info {
+  "mode": "apply",
+  "maintenance": {
+    "tasks": {
+      "reconciled": 0,
+      "recovered": 0,
+      "cleanupStamped": 0,
+      "pruned": 0
+    },
+    "taskFlows": {
+      "reconciled": 0,
+      "pruned": 0
+    },
+    "sessions": {
+      "retentionMs": 604800000,
+      "runningCronJobs": 0,
+      "pruned": 0,
+      "stores": [
+        {
+          "agentId": "main",
+          "storePath": "/home/missyouangeled/.openclaw/agents/main/sessions/sessions.json",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "pruned": 0,
+          "preservedRunning": 0
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "total": 239,
+    "active": 0,
+    "terminal": 239,
+    "failures": 22,
+    "byStatus": {
+      "queued": 0,
+      "running": 0,
+      "succeeded": 217,
+      "failed": 16,
+      "timed_out": 0,
+      "cancelled": 0,
+      "lost": 6
+    },
+    "byRuntime": {
+      "subagent": 10,
+      "acp": 0,
+      "cli": 37,
+      "cron": 192
+    }
+  },
+  "diagnostics": {
+    "staleRunningTasks": []
+  },
+  "auditBefore": {
+    "total": 6,
+    "warnings": 6,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 6,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  },
+  "auditAfter": {
+    "total": 6,
+    "warnings": 6,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 6,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  }
+}
+2026-07-07T16:04:21.066+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:04:31.213+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:04:34.628+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=3416 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:04:36.161+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=3d42404d-2447-4693-ba36-a21c4b2c14f1
+2026-07-07T16:04:36.477+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=6f9e6210-316a-4130-81ae-881780f22609 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:04:36.569+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 65ms conn=6f9e6210…2609 id=192adb0b…aa6c
+2026-07-07T16:04:37.491+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 825ms conn=6f9e6210…2609 id=ab890f09…d18e
+2026-07-07T16:04:38.680+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 78ms conn=6f9e6210…2609 id=4b65a198…72ba
+2026-07-07T16:04:38.760+08:00 error [tools] read failed: EISDIR: illegal operation on a directory, read raw_params={"limit":250,"offset":1,"path":"/home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs"}
+2026-07-07T16:04:38.762+08:00 error [tools] read failed: EISDIR: illegal operation on a directory, read raw_params={"limit":250,"offset":1,"path":"/home/missyouangeled/.npm-global/lib/node_modules/openclaw/docs"}
+2026-07-07T16:04:39.695+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:04:46.910+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=7215 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:04:47.398+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 108ms conn=6f9e6210…2609 id=6b74a08d…9ada
+2026-07-07T16:04:47.762+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:04:58.704+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=10943 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:05:04.857+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:05:12.650+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=7793 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:05:13.600+08:00 error [tools] web_fetch failed: fetch failed raw_params={"extractMode":"markdown","maxChars":6000,"url":"https://github.com/openclaw/openclaw/issues/55671"}
+2026-07-07T16:05:13.601+08:00 error [tools] web_fetch failed: fetch failed raw_params={"extractMode":"markdown","maxChars":6000,"url":"https://github.com/openclaw/openclaw/issues/55671"}
+2026-07-07T16:05:13.661+08:00 error [tools] web_fetch failed: fetch failed raw_params={"extractMode":"markdown","maxChars":6000,"url":"https://github.com/openclaw/openclaw/issues/46240"}
+2026-07-07T16:05:13.662+08:00 error [tools] web_fetch failed: fetch failed raw_params={"extractMode":"markdown","maxChars":6000,"url":"https://github.com/openclaw/openclaw/issues/46240"}
+2026-07-07T16:05:13.727+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:05:20.348+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=6621 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:05:20.814+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 152ms conn=6f9e6210…2609 id=4e920ddd…c457
+2026-07-07T16:05:23.975+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:05:34.890+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=10916 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:05:35.382+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 82ms conn=6f9e6210…2609 id=bcc91af4…9852
+2026-07-07T16:05:35.892+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=taotoken api=openai-completions model=gpt-5.4 method=POST url=https://taotoken.net/api/v1/chat/completions timeoutMs=undefined proxy=none policy=custom
+2026-07-07T16:05:41.351+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=taotoken api=openai-completions model=gpt-5.4 status=200 elapsedMs=5459 contentType=text/event-stream;charset=UTF-8
+2026-07-07T16:05:50.533+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=6f9e6210-316a-4130-81ae-881780f22609
+2026-07-07T16:05:50.785+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=a6aebc50-0ec9-4118-a5ab-cc6b235a5ef5 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:05:50.892+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 85ms conn=a6aebc50…5ef5 id=e068bd5e…ea6e
+2026-07-07T16:05:52.064+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 1044ms conn=a6aebc50…5ef5 id=bcebe51f…0ab1
+2026-07-07T16:06:05.267+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=a6aebc50-0ec9-4118-a5ab-cc6b235a5ef5
+2026-07-07T16:06:05.534+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=1921c087-52b2-4ed3-85be-2b016ee1a45b remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:06:05.616+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 54ms conn=1921c087…a45b id=4399edd5…b4d2
+2026-07-07T16:06:13.236+08:00 warn diagnostic {"subsystem":"diagnostic"} long-running session: sessionId=952acc24-eaa2-4772-9c5f-a57c9b42f058 sessionKey=agent:main:main state=processing age=141s queueDepth=1 reason=queued_behind_active_work classification=long_running activeWorkKind=model_call lastProgress=model_call:stream_progress lastProgressAge=0s recovery=none
+2026-07-07T16:06:23.081+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 442ms conn=1921c087…a45b id=d787cabe…696d
+2026-07-07T16:07:50.465+08:00 info gateway {"subsystem":"gateway"} signal SIGTERM received
+2026-07-07T16:07:50.468+08:00 info gateway {"subsystem":"gateway"} received SIGTERM; restarting
+2026-07-07T16:07:50.526+08:00 info gateway/shutdown {"subsystem":"gateway/shutdown"} shutdown started: gateway restarting
+2026-07-07T16:07:50.648+08:00 info gmail-watcher {"subsystem":"gmail-watcher"} gmail watcher stopped
+2026-07-07T16:07:50.680+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1012 reason=service restart conn=1921c087-52b2-4ed3-85be-2b016ee1a45b
+2026-07-07T16:07:50.683+08:00 info gateway/shutdown {"subsystem":"gateway/shutdown"} shutdown completed cleanly in 157ms
+2026-07-07T16:07:50.870+08:00 info gateway {"subsystem":"gateway"} restart mode: in-process restart (OPENCLAW_NO_RESPAWN)
+2026-07-07T16:07:51.261+08:00 info gateway {"subsystem":"gateway"} starting HTTP server...
+2026-07-07T16:07:51.268+08:00 info gateway/health-monitor {"subsystem":"gateway/health-monitor"} started (interval: 300s, startup-grace: 60s, channel-connect-grace: 120s)
+2026-07-07T16:07:51.279+08:00 info gateway {"subsystem":"gateway"} agent model: minimax/MiniMax-M3 (thinking=off, fast=off)
+2026-07-07T16:07:51.280+08:00 info gateway {"subsystem":"gateway"} http server listening (6 plugins: browser, github-copilot, litellm, memory-core, tavily, voice-reply-hard-default; 0.4s)
+2026-07-07T16:07:51.282+08:00 info gateway {"subsystem":"gateway"} log file: /tmp/openclaw/openclaw-2026-07-07.log
+2026-07-07T16:07:51.284+08:00 info gateway {"subsystem":"gateway"} starting channels and sidecars...
+2026-07-07T16:07:51.296+08:00 warn hooks:loader {"subsystem":"hooks:loader"} Loading managed hook code into the gateway process. Managed hooks are trusted local code.
+2026-07-07T16:07:51.297+08:00 info gateway/hooks {"subsystem":"gateway/hooks"} loaded 5 internal hook handlers
+2026-07-07T16:07:51.347+08:00 info gateway {"subsystem":"gateway"} gateway ready
+2026-07-07T16:07:51.351+08:00 info gateway/heartbeat {"subsystem":"gateway/heartbeat"} {"intervalMs":1800000} heartbeat: started
+2026-07-07T16:07:51.604+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=8e628976-5374-41e5-bcec-27b10489631d remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:07:51.634+08:00 info cron {"module":"cron","storePath":"/home/missyouangeled/.openclaw/cron/jobs.json"} {"enabled":true,"jobs":5,"nextWakeAtMs":1783411800000} cron: started
+2026-07-07T16:07:51.763+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 115ms conn=8e628976…631d id=f9ecdbb2…af64
+2026-07-07T16:07:52.672+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 829ms conn=8e628976…631d id=59953ff7…c7c3
+2026-07-07T16:07:57.491+08:00 info gateway {"subsystem":"gateway"} provider auth state pre-warmed in 1137ms eventLoopMax=22.5ms
+2026-07-07T16:08:01.356+08:00 info gateway {"subsystem":"gateway"} agent runtime plugins pre-warmed in 2ms
+2026-07-07T16:08:06.892+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=8e628976-5374-41e5-bcec-27b10489631d
+2026-07-07T16:08:07.225+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=674ea642-af08-4c74-bb87-a2be9b149bb8 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:08:07.337+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 71ms conn=674ea642…9bb8 id=4ed77737…c931
+2026-07-07T16:08:44.257+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=674ea642-af08-4c74-bb87-a2be9b149bb8
+2026-07-07T16:08:44.468+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=200d7f59-8071-4b16-8553-6aea363cb280 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:08:44.558+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 61ms conn=200d7f59…b280 id=b60cd1dc…8ee0
+2026-07-07T16:08:54.003+08:00 info gateway {"subsystem":"gateway"} loading configuration…
+2026-07-07T16:08:56.891+08:00 info gateway {"subsystem":"gateway"} loading configuration…
+2026-07-07T16:08:57.014+08:00 info gateway {"subsystem":"gateway"} resolving authentication…
+2026-07-07T16:08:57.028+08:00 info gateway {"subsystem":"gateway"} starting...
+2026-07-07T16:08:57.755+08:00 info gateway {"subsystem":"gateway"} starting HTTP server...
+2026-07-07T16:08:57.784+08:00 info gateway/health-monitor {"subsystem":"gateway/health-monitor"} started (interval: 300s, startup-grace: 60s, channel-connect-grace: 120s)
+2026-07-07T16:08:57.921+08:00 info gateway {"subsystem":"gateway"} agent model: minimax/MiniMax-M3 (thinking=off, fast=off)
+2026-07-07T16:08:57.922+08:00 info gateway {"subsystem":"gateway"} http server listening (6 plugins: browser, github-copilot, litellm, memory-core, tavily, voice-reply-hard-default; 0.9s)
+2026-07-07T16:08:57.923+08:00 info gateway {"subsystem":"gateway"} log file: /tmp/openclaw/openclaw-2026-07-07.log
+2026-07-07T16:08:57.926+08:00 info gateway {"subsystem":"gateway"} starting channels and sidecars...
+2026-07-07T16:08:57.999+08:00 warn hooks:loader {"subsystem":"hooks:loader"} Loading managed hook code into the gateway process. Managed hooks are trusted local code.
+2026-07-07T16:08:58.033+08:00 info gateway/hooks {"subsystem":"gateway/hooks"} loaded 5 internal hook handlers
+2026-07-07T16:08:58.058+08:00 info gateway {"subsystem":"gateway"} gateway ready
+2026-07-07T16:08:58.141+08:00 info gateway/heartbeat {"subsystem":"gateway/heartbeat"} {"intervalMs":1800000} heartbeat: started
+2026-07-07T16:08:58.599+08:00 info cron {"module":"cron","storePath":"/home/missyouangeled/.openclaw/cron/jobs.json"} {"enabled":true,"jobs":5,"nextWakeAtMs":1783411800000} cron: started
+2026-07-07T16:08:59.412+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=c664397a-b811-46b4-8ac3-0d6320155210 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-07T16:08:59.526+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.subscribe 97ms conn=c664397a…5210 id=6a249220…92a5
+2026-07-07T16:08:59.531+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.messages.subscribe 101ms conn=c664397a…5210 id=244e75df…a4c7
+2026-07-07T16:08:59.762+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ agent.identity.get 208ms conn=c664397a…5210 id=ee7db371…5e6b
+2026-07-07T16:08:59.766+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ health 213ms cached=true conn=c664397a…5210 id=0135b414…90a9
+2026-07-07T16:08:59.840+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 410ms conn=c664397a…5210 id=d754d06a…69bf
+2026-07-07T16:08:59.997+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.metadata 125ms conn=c664397a…5210 id=df8e9f73…76f1
+2026-07-07T16:09:00.898+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 899ms conn=c664397a…5210 id=1a8276aa…cd47
+2026-07-07T16:09:04.132+08:00 info gateway {"subsystem":"gateway"} provider auth state pre-warmed in 998ms eventLoopMax=12.7ms
+2026-07-07T16:09:08.109+08:00 info gateway {"subsystem":"gateway"} agent runtime plugins pre-warmed in 51ms
+2026-07-07T16:10:09.452+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:10:09.716+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:10:14.775+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=5059 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:10:50.144+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:10:53.661+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3517 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:10:56.038+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:10:59.433+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3396 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:05.342+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:08.767+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3425 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:09.295+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:12.751+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3455 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:15.921+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:26.042+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=10120 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:27.617+08:00 warn diagnostic {"subsystem":"diagnostic"} long-running session: sessionId=952acc24-eaa2-4772-9c5f-a57c9b42f058 sessionKey=agent:main:main state=processing age=138s queueDepth=1 reason=queued_behind_active_work classification=long_running activeWorkKind=tool_call lastProgress=tool:edit:started lastProgressAge=0s activeTool=edit activeToolCallId=call_019f3ba2b6dc7740b38c4965 activeToolAge=0s recovery=none
+2026-07-07T16:12:27.662+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:33.231+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=5569 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:40.968+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:52.547+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=11579 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:12:53.794+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:12:57.049+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3255 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:14:33.974+08:00 info {
+  "mode": "apply",
+  "maintenance": {
+    "tasks": {
+      "reconciled": 0,
+      "recovered": 0,
+      "cleanupStamped": 0,
+      "pruned": 0
+    },
+    "taskFlows": {
+      "reconciled": 0,
+      "pruned": 0
+    },
+    "sessions": {
+      "retentionMs": 604800000,
+      "runningCronJobs": 0,
+      "pruned": 0,
+      "stores": [
+        {
+          "agentId": "main",
+          "storePath": "/home/missyouangeled/.openclaw/agents/main/sessions/sessions.json",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "pruned": 0,
+          "preservedRunning": 0
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "total": 239,
+    "active": 0,
+    "terminal": 239,
+    "failures": 20,
+    "byStatus": {
+      "queued": 0,
+      "running": 0,
+      "succeeded": 219,
+      "failed": 16,
+      "timed_out": 0,
+      "cancelled": 0,
+      "lost": 4
+    },
+    "byRuntime": {
+      "subagent": 10,
+      "acp": 0,
+      "cli": 35,
+      "cron": 194
+    }
+  },
+  "diagnostics": {
+    "staleRunningTasks": []
+  },
+  "auditBefore": {
+    "total": 4,
+    "warnings": 4,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 4,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  },
+  "auditAfter": {
+    "total": 4,
+    "warnings": 4,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 4,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  }
+}
+2026-07-07T16:14:39.851+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:18:37.416+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-07T16:18:37.717+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:18:40.945+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3228 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:18:45.020+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:18:55.489+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=10469 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:18:59.558+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:03.074+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3516 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:06.744+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:10.268+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3525 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:11.122+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:21.327+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=10206 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:28.158+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:31.739+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3581 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:34.566+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:44.481+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=9914 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:47.322+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:19:50.444+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3121 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:19:56.659+08:00 info Stability bundle
+2026-07-07T16:19:56.685+08:00 info Path: /home/missyouangeled/.openclaw/logs/stability/openclaw-stability-2026-06-26T04-57-19-102Z-50689-gateway.startup_failed.json
+2026-07-07T16:19:56.688+08:00 info Generated: 2026-06-26T04:57:19.102Z
+2026-07-07T16:19:56.691+08:00 info Reason: gateway.startup_failed
+2026-07-07T16:19:56.692+08:00 info Process: pid=50689 node=22.23.0 linux/x64 uptime=2s
+2026-07-07T16:19:56.694+08:00 info Host: <redacted-hostname>
+2026-07-07T16:19:56.696+08:00 info Error: name=Error
+2026-07-07T16:19:56.697+08:00 info {"0":"","_meta":{"runtime":"node","runtimeVersion":"22.23.1","hostname":"missyouangeled-VMware-Virtual-Platform","name":"openclaw","date":"2026-07-07T08:19:56.696Z","logLevelId":3,"logLevelName":"INFO","path":{"fullFilePath":"file:///home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/console-qk0mTZIb.js:153:46","fileName":"console-qk0mTZIb.js","fileNameWithLine":"console-qk0mTZIb.js:153","fileColumn":"46","fileLine":"153","filePath":"/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/console-qk0mTZIb.js","filePathWithLine":"/home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/console-qk0mTZIb.js:153","method":"console.log"}},"time":"2026-07-07T16:19:56.697+08:00","hostname":"missyouangeled-VMware-Virtual-Platform"}
+2026-07-07T16:19:56.699+08:00 info Gateway Stability
+2026-07-07T16:19:56.700+08:00 info Events: 0/1000
+2026-07-07T16:19:56.702+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:00.338+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3637 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:01.645+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:05.025+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3379 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:05.575+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:09.067+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3493 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:14.179+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:17.635+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3456 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:18.725+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:26.335+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=7610 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:34.350+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:41.642+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=7292 contentType=text/event-stream; charset=utf-8
+2026-07-07T16:20:42.399+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-07T16:20:45.713+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=3315 contentType=text/event-stream; charset=utf-8
+Log tail truncated (increase --max-bytes).

@@ -1,0 +1,160 @@
+Log file: /tmp/openclaw/openclaw-2026-07-08.log
+2026-07-08T08:26:28.607+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ system-presence 74ms conn=6f482733…4bbb id=5d271c49…2181
+2026-07-08T08:26:30.224+08:00 info gateway {"subsystem":"gateway"} agent runtime plugins pre-warmed in 164ms
+2026-07-08T08:26:30.670+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ cron.get 53ms conn=7117965b…eca7 id=dd219184…a3f9
+2026-07-08T08:26:43.970+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.inject 866ms conn=e274ddd9…027b id=f897bd12…dc35
+2026-07-08T08:26:44.380+08:00 info cron {"module":"cron","storePath":"/home/missyouangeled/.openclaw/cron/jobs.json"} {"enabled":true,"jobs":5,"nextWakeAtMs":1783470524340} cron: started
+2026-07-08T08:27:08.055+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=2db808fc-6bf9-40dd-82f2-0f345821c02b remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+2026-07-08T08:27:08.590+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ sessions.subscribe 457ms conn=2db808fc…c02b id=99197968…7f88
+2026-07-08T08:27:09.526+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ agent.identity.get 934ms conn=2db808fc…c02b id=e5651545…e87b
+2026-07-08T08:27:09.530+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ health 938ms cached=true conn=2db808fc…c02b id=cc9e9be5…e1dc
+2026-07-08T08:27:09.913+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 1321ms conn=2db808fc…c02b id=718c69ab…a69a
+2026-07-08T08:27:12.910+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.metadata 2336ms conn=2db808fc…c02b id=acf5ea0c…f70b
+2026-07-08T08:27:13.998+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 3424ms conn=2db808fc…c02b id=f3f86925…6273
+2026-07-08T08:27:50.090+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:27:50.479+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:27:53.198+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2719 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:27:59.086+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:28:01.615+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2529 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:28:50.877+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:28:52.269+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=1391 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:28:57.125+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:28:58.836+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=1710 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:29:00.517+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:29:01.483+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:29:01.611+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:29:01.662+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=1144 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:29:04.513+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2902 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:29:06.152+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:29:07.687+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=1535 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:29:39.917+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:29:40.049+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:29:42.369+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2320 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:29:45.851+08:00 error [tools] image failed: Failed to fetch media from https://docs.openclaw.ai/webchat-control-ui.png: HTTP 404 Not Found; body: Not found raw_params={"prompt":"看这张 Control UI 截图。找出用于新建 session 的按钮或链接（比如 + 号、New Chat、New Session），告诉我它在画面里的具体位置（左右、上下），以及它附近的标签文字。如果画面里没看到，告诉我你能在哪里找到侧边栏或顶栏。","image":"https://docs.openclaw.ai/webchat-control-ui.png"}
+2026-07-08T08:29:45.853+08:00 error [tools] image failed: Failed to fetch media from https://docs.openclaw.ai/webchat-control-ui.png: HTTP 404 Not Found; body: Not found raw_params={"prompt":"看这张 Control UI 截图。找出用于新建 session 的按钮或链接（比如 + 号、New Chat、New Session），告诉我它在画面里的具体位置（左右、上下），以及它附近的标签文字。如果画面里没看到，告诉我你能在哪里找到侧边栏或顶栏。","image":"https://docs.openclaw.ai/webchat-control-ui.png"}
+2026-07-08T08:29:45.901+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:29:48.153+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2252 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:30:01.458+08:00 info {
+  "mode": "apply",
+  "maintenance": {
+    "tasks": {
+      "reconciled": 0,
+      "recovered": 0,
+      "cleanupStamped": 0,
+      "pruned": 0
+    },
+    "taskFlows": {
+      "reconciled": 0,
+      "pruned": 0
+    },
+    "sessions": {
+      "retentionMs": 604800000,
+      "runningCronJobs": 1,
+      "pruned": 0,
+      "stores": [
+        {
+          "agentId": "main",
+          "storePath": "/home/missyouangeled/.openclaw/agents/main/sessions/sessions.json",
+          "beforeCount": 23,
+          "afterCount": 23,
+          "pruned": 0,
+          "preservedRunning": 0
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "total": 253,
+    "active": 1,
+    "terminal": 252,
+    "failures": 20,
+    "byStatus": {
+      "queued": 0,
+      "running": 1,
+      "succeeded": 232,
+      "failed": 16,
+      "timed_out": 0,
+      "cancelled": 0,
+      "lost": 4
+    },
+    "byRuntime": {
+      "subagent": 10,
+      "acp": 0,
+      "cli": 35,
+      "cron": 208
+    }
+  },
+  "diagnostics": {
+    "staleRunningTasks": []
+  },
+  "auditBefore": {
+    "total": 4,
+    "warnings": 4,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 4,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  },
+  "auditAfter": {
+    "total": 4,
+    "warnings": 4,
+    "errors": 0,
+    "byCode": {
+      "stale_queued": 0,
+      "stale_running": 0,
+      "lost": 4,
+      "delivery_failed": 0,
+      "missing_cleanup": 0,
+      "inconsistent_timestamps": 0
+    },
+    "taskFlows": {
+      "total": 0,
+      "warnings": 0,
+      "errors": 0,
+      "byCode": {
+        "restore_failed": 0,
+        "stale_running": 0,
+        "stale_waiting": 0,
+        "stale_blocked": 0,
+        "cancel_stuck": 0,
+        "missing_linked_tasks": 0,
+        "blocked_task_missing": 0,
+        "inconsistent_timestamps": 0
+      }
+    }
+  }
+}
+2026-07-08T08:30:08.356+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:30:08.361+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ tools.invoke 102ms conn=92fc4da4…e9ce id=586dd4db…b4f4
+2026-07-08T08:30:26.949+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:30:27.101+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:30:29.836+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2736 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:30:32.756+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:30:35.574+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2818 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:31:28.943+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+2026-07-08T08:31:29.109+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:31:32.047+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2939 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:31:41.630+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:31:44.304+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2674 contentType=text/event-stream; charset=utf-8
+2026-07-08T08:31:49.912+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+2026-07-08T08:31:52.314+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=2401 contentType=text/event-stream; charset=utf-8

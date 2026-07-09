@@ -6,6 +6,124 @@
 
 ---
 
+## 保命聚合器实现留痕（14:32 更新）
+
+### 已落地内容
+
+- 新增主脚本：`scripts/emergency0-aggregator.py`
+- 新增通知脚本：`scripts/emergency0-notify.py`
+- 新增修复控制器：`scripts/emergency0-repair-runner.py`
+- 新增可插拔修复包：`skills/emergency-repair-pack`
+- 已接入现有 `scripts/emergency1.sh`，由“救命 1” cron 每 5 分钟统一调用
+- 新增运行文档：`docs/runtime/保命体系运行说明-2026-07-06.md`
+- 新增失败手册：`docs/runtime/EMERGENCY_FAILURES.md`
+- 运行输出落点：
+  - `~/.local/state/openclaw/emergency-aggregator/status.json`
+  - `~/.local/state/openclaw/emergency-aggregator/events.jsonl`
+  - `docs/runtime/保命状态快照.md`
+  - `docs/runtime/EMERGENCY_FAILURES.md`（仅 CRITICAL / DEADMAN 时追加）
+
+### 这轮修掉的关键误判
+
+1. `health-collector` 顶层 `summary` 和结构化子检查结果不一致时，改为结构化字段优先。
+2. `systemd` 一次性 service 的正常 `inactive/dead` 不再误判为故障，只把真正 `failed` 计入严重问题。
+3. watcher 历史 trajectory 告警不再长期卡住 `WARN`：若 watcher 后续已成功运行且当前 trajectory 已降到阈值以下，则归为“已消化历史告警”。
+
+### 最新烟测结果
+
+实际执行：
+- `python3 scripts/emergency0-aggregator.py`
+- `python3 scripts/emergency0-notify.py`
+- `python3 scripts/emergency0-repair-runner.py`
+- `bash scripts/emergency1.sh`
+- 强制触发一次现有救命 1 cron
+- 临时移走 repair pack 后再次执行 repair runner，确认核心层不会受影响
+- 新增执行 `python3 skills/emergency-repair-pack/scripts/repair_archive_resolved_watcher_alerts.py`
+- 新增执行 `python3 skills/emergency-repair-pack/scripts/repair_backup_kick_once.py`
+- 新增执行 `python3 skills/emergency-repair-pack/scripts/repair_health_collect_once.py`
+- 新增执行 `python3 skills/emergency-repair-pack/scripts/repair_frontstage_guardian_collect_once.py`
+- 受控构造一次 `backupAgeMinutes > 15` 场景，验证补跑备份插件能触发
+- 受控构造一次 `health.ageMinutes > 10` 场景，验证补跑健康采集插件能触发
+- 受控构造一次 `frontstage.ageMinutes > 10` 场景，验证补跑前台保护检查插件能触发
+
+结果：
+- `overall=OK`
+- `findings=0`
+- 第二个插件已成功归档并清理 20 条 watcher 历史已解决告警
+- 新归档文件：`~/.local/state/openclaw/emergency-aggregator/watcher-resolved-archive.jsonl`
+- `session-size-watcher/alerts.json` 已收敛为 `items=[]`
+- 第三个插件已在受控烟测里成功触发一次 backup 补跑
+- 第四个插件已在受控烟测里成功触发一次 health 补采集
+- 第五个插件已在受控烟测里成功触发一次 frontstage 补检查（带 `--no-notify`，避免额外前台打扰）
+- 补跑后 backup manifest 新增快照，health / frontstage 的 `checkedAt` 都刷新为最新时间，聚合器重新回到 `overall=OK`
+- 救命 1 cron：最近运行 `ok`
+- 删除 repair pack 后，repair runner 只会 `plugin_missing` 跳过，核心监测仍正常
+
+### 文档结论
+
+这轮已经从“方案”进入“真实实现 + 可验证运行”；当前保命体系由**核心保命层 + 可插拔修复层**组成：核心层只读、轻量、不动主会话，修复层可单独删除，删除后核心监测与告警仍继续工作。并且多个白名单插件已经真实执行过修复动作，不再只是空架子。
+
+### 15:04 运行期事件排查
+
+这轮没有继续扩修复插件，而是转去排查真实运行期告警 `HEALTH_STUCK_SESSION_DETECT`。
+
+排查结果：
+
+- 直接单跑 `python3 scripts/openclaw-stuck-session-detector.py --print-json`
+  - 返回：`totalStuck=0`
+  - `blockedMain=false`
+  - `summary=未发现卡住会话`
+- `openclaw-health-collector.service` 最近一次正常执行输出：
+  - `OK - 监工服务待命中；未发现卡住会话`
+- 说明此前聚合器读到的 `CRITICAL`，并不是当前仍在持续发生的卡死，而是**上一轮 health report 残留的瞬时状态**。
+
+进一步看 gateway 日志：
+
+- `/tmp/openclaw/openclaw-2026-07-06.log` 中确实存在多次主会话 long-running 记录
+- 最近一次命中当前主 session `be773bd3-a55e-4b95-898c-a88ca9513406` 的时间是：
+  - `2026-07-06T14:56:48+08:00`
+- 日志内容属于：
+  - `activeWorkKind=model_call`
+  - `queueDepth=1`
+  - `reason=queued_behind_active_work`
+  - `recovery=none`
+- 之后 detector 已恢复为 `0 stuck`，health collector 也重新给出 `OK`
+
+当前判断：
+
+- 这次更像是**真实发生过一次短时主会话阻塞 / 长模型调用**，随后已恢复
+- 问题不在 detector 完全瞎报，而在于**聚合器读取了一个已过时的坏快照**，没有在下一轮健康采集后及时被刷新掉
+- 因此这轮先不碰更高风险自动修复，而是把它归类为：
+  - `瞬时 CRITICAL 已恢复`
+  - 后续应继续优化“坏快照的过期/刷新策略”
+
+### 15:06 聚合器坏快照收敛修复
+
+已新增配置项：
+- `scripts/emergency0-config.json`
+  - `healthCriticalGraceMinutes=2`
+
+聚合器逻辑已更新：
+- 若 `health.degradedChecks` 命中 `blockedMain=true`
+- 但该坏快照本身已经超过 2 分钟宽限
+- 则不再继续按当前实时 `CRITICAL` 处理
+- 而是降级成：
+  - `HEALTH_STUCK_SESSION_DETECT_STALE_SNAPSHOT`
+  - 等级 `WARN`
+
+实际烟测：
+- 正常新鲜 health report 下，聚合器仍回到：
+  - `overall=OK`
+  - `findings=[]`
+- 人工构造一份“3 分钟前的坏 health 快照”后再跑聚合器：
+  - 不再给出实时 `CRITICAL`
+  - 而是按 `STALE_SNAPSHOT` 降级处理
+- 随后再次跑 `health-collector + aggregator`，状态恢复为：
+  - `overall=OK`
+  - `findings=[]`
+
+---
+
 ## 一、维护动作完成情况
 
 | # | 动作 | 结果 | 验证命令 |

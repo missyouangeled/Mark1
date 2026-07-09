@@ -1,0 +1,27 @@
+{
+  "capturedAtMs": 1783393260183,
+  "sessionKey": "agent:main:main",
+  "sessionId": "fafa714b-75df-4ffc-9148-2782441989d4",
+  "status": "running",
+  "startedAt": 1783393240711,
+  "updatedAt": 1783393240752,
+  "lastInteractionAt": 1783393240198,
+  "route": {
+    "channel": "webchat"
+  },
+  "deliveryContext": {
+    "channel": "webchat"
+  },
+  "origin": {
+    "provider": "webchat",
+    "surface": "webchat",
+    "chatType": "direct"
+  },
+  "restartRecoveryRuns": [
+    {
+      "runId": "fc49f11a-1c28-406f-80c7-3f21d543bc19",
+      "lifecycleGeneration": "4551d486-8176-4258-8aa5-e5976f722d64"
+    }
+  ],
+  "restartRecoveryDeliveryRunId": "128dfb03-463e-4f21-9579-e7f0c55db808"
+}

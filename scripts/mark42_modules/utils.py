@@ -21,6 +21,7 @@ from .config import (
     MAX_LOG_AGE_DAYS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE,
 )
+from .output_guard import trim_detail, trim_summary
 
 
 def _now_iso() -> str:
@@ -46,6 +47,7 @@ def _save_json(path: Path, data: dict[str, Any]) -> None:
 def _append_broker(source_view: str, event_type: str, label: str, level: str,
                    summary: str, metadata: dict[str, Any] | None = None) -> None:
     BROKER_DIR.mkdir(parents=True, exist_ok=True)
+    safe_metadata = dict(metadata) if isinstance(metadata, dict) else {}
     event = {
         "ts": _now_iso(),
         "source": BROKER_SOURCE,
@@ -53,9 +55,13 @@ def _append_broker(source_view: str, event_type: str, label: str, level: str,
         "sourceEventType": event_type,
         "label": label,
         "level": level,
-        "summary": summary,
-        "metadata": metadata or {},
+        "summary": trim_summary(summary),
+        "metadata": safe_metadata,
     }
+    if isinstance(event["metadata"], dict):
+        for key in ("summary", "detail", "preview", "message"):
+            if key in event["metadata"]:
+                event["metadata"][key] = trim_detail(event["metadata"][key])
     with open(str(MARK42_BROKER_EVENTS), "a") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 

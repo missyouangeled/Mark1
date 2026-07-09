@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""读 watcher alerts.json 输出 UNREAD_SUMMARY + WARN 行 + mark read。
+"""读 watcher alerts.json，输出未读摘要；是否 mark read 由调用方显式决定。
 
-被救命 1 v4 cron 调用：
-1. 读 alerts.json，输出未读告警摘要
-2. 立即把 unread 设回 False（避免下次 watcher raise_alert 又重置 True 后无人接收）
+默认：只读不改。
+加 --mark：输出后把 unread 置回 False。
 
-注意：watcher 自己 raise_alert 会把 unread=True 重新设回，所以 mark read 必须在
-紧急通知发出后立刻做。
+这样可以保证：只有真正完成转发后，调用方才标记已读，避免注入失败却把告警吃掉。
 """
 import json
 import sys
@@ -16,24 +14,20 @@ from pathlib import Path
 def mark_read(path: Path) -> None:
     if not path.exists():
         return
-    try:
-        d = json.loads(path.read_text())
-        d["unread"] = False
-        # 原子写：先写 tmp 再 rename
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2))
-        tmp.replace(path)
-    except Exception:
-        pass
+    d = json.loads(path.read_text())
+    d["unread"] = False
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2))
+    tmp.replace(path)
 
 
 def main():
     if len(sys.argv) < 2:
-        print("ERR: usage: emergency1-watcher-read.py <alerts.json> [--no-mark]")
+        print("ERR: usage: emergency1-watcher-read.py <alerts.json> [--mark]")
         sys.exit(1)
 
     alerts_path = Path(sys.argv[1])
-    mark = "--no-mark" not in sys.argv
+    do_mark = "--mark" in sys.argv
 
     try:
         d = json.loads(alerts_path.read_text())
@@ -53,16 +47,16 @@ def main():
         if msg in seen:
             continue
         seen.add(msg)
-        unique.append((it.get("level", "?"), msg))
-        levels[it.get("level", "?")] = levels.get(it.get("level", "?"), 0) + 1
+        level = it.get("level", "?")
+        unique.append((level, msg))
+        levels[level] = levels.get(level, 0) + 1
 
     summary = "; ".join([f"{k}={v}" for k, v in levels.items()])
     print(f"UNREAD_SUMMARY={summary}")
     for level, msg in unique[:3]:
         print(f"WARN: [{level}] {msg}")
 
-    # 标记已读（在输出之后，让 watcher 任何后续 raise_alert 也不会再次 unread 我们看过的内容）
-    if mark:
+    if do_mark:
         mark_read(alerts_path)
 
 

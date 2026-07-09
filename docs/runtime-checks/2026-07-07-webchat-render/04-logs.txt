@@ -1,0 +1,22 @@
+===== openclaw logs --tail 80 =====
+OpenClaw does not recognize option "--tail".
+Try: openclaw logs 80 --help
+
+===== ls stability dir =====
+total 88
+drwx------ 2 missyouangeled missyouangeled 4096 Jun 26 12:57 .
+drwx------ 3 missyouangeled missyouangeled 4096 Jul  2 07:49 ..
+-rw------- 1 missyouangeled missyouangeled 1028 Jun 18 12:31 openclaw-stability-2026-06-18T04-31-26-668Z-52893-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1028 Jun 18 12:31 openclaw-stability-2026-06-18T04-31-33-367Z-52913-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1028 Jun 18 12:31 openclaw-stability-2026-06-18T04-31-39-950Z-52932-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1028 Jun 18 16:54 openclaw-stability-2026-06-18T08-54-42-001Z-1885-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1027 Jun 18 16:54 openclaw-stability-2026-06-18T08-54-49-132Z-3203-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1027 Jun 18 16:54 openclaw-stability-2026-06-18T08-54-56-740Z-3601-gateway.startup_failed.json
+-rw------- 1 missyouangeled missyouangeled 1027 Jun 18 16:55 openclaw-stability-2026-06-18T08-55-04-102Z-3703-gateway.startup_failed.json
+
+===== gateway-restart.log =====
+[2026-06-21T23:15:52Z] openclaw restart attempt source=update target=openclaw-gateway.service
+Warning: The unit file, source configuration file or drop-ins of openclaw-gateway.service changed on disk. Run 'systemctl --user daemon-reload' to reload units.
+[2026-06-21T23:15:52Z] openclaw restart done source=update
+[2026-07-07T11:03:42+08:00] source=manual-repair reason=reply-session-initialization-conflict active=1 detail=agent:main:main fake running; tasks maintenance ineffective; preparing minimal gateway restart
+[2026-07-07T15:54:06+08:00] source=resume-watch reason=restart-gap-threshold active=0 gap=8480s detail=detected sleep/resume or long pause; restarting gateway

@@ -55,13 +55,13 @@
 
 ### PATCH-LINUX-RESUME-RECOVERY
 
-- **结果目标**:当公司(Linux)机器从休眠恢复、宿主机长时间暂停、或发生明显时间跳变后,自动重启 `openclaw-gateway.service`,尽量把"恢复后前台像没活过来"的情况收敛成可自愈的一次 gateway 恢复。
+- **结果目标**:当公司(Linux)机器从休眠恢复、宿主机长时间暂停、或发生明显时间跳变后,自动重启 `openclaw-gateway.service`,尽量把"恢复后前台像没活过来"的情况收敛成可自愈的一次 gateway 恢复。⚠️ 但当前用户长期要求是：`resume-watch` 保持关闭，不作为默认启用组件。
 - **当前实现**:`scripts/openclaw-resume-watch.sh` + `~/.config/systemd/user/openclaw-resume-watch.service` + `~/.config/systemd/user/openclaw-resume-watch.timer`
 - **自动触发**:user systemd timer;当前默认 `OnBootSec=2min`、`OnUnitActiveSec=1min`
 - **适用范围**:当前主落地为 公司(Linux)
 - **升级风险点**:`openclaw-gateway.service` 单元名变化;user systemd 行为变化;`/proc/sys/kernel/random/boot_id` 或时间跳变判定逻辑变化
-- **失效判断**:休眠/恢复后 gateway 没被自动拉起;`resume-watch.log` 长期无新记录;或 timer / service 不再处于正常启用状态
-- **最小验收**:执行 `systemctl --user show openclaw-resume-watch.service -p ActiveState -p SubState -p Result`、`systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState` 应正常;必要时手工执行 `bash scripts/openclaw-resume-watch.sh` 确认脚本可运行并会写状态文件/日志
+- **失效判断**:若未来明确重新启用该补丁,则休眠/恢复后 gateway 没被自动拉起;`resume-watch.log` 长期无新记录;或 timer / service 不再处于正常启用状态。当前默认状态应是关闭，若被意外启用也算异常。
+- **最小验收**:当前默认验收应确认 `openclaw-resume-watch.timer` 处于 disabled/inactive（符合用户长期要求）；若未来明确重新启用，再执行 `systemctl --user show openclaw-resume-watch.service -p ActiveState -p SubState -p Result`、`systemctl --user show openclaw-resume-watch.timer -p UnitFileState -p ActiveState -p SubState` 与手工脚本验收。
 - **维护落点**:
   - `scripts/openclaw-resume-watch.sh`
   - `docs/公司-Linux-OpenClaw-维护说明.md`
@@ -70,6 +70,8 @@
   - `~/.config/systemd/user/openclaw-resume-watch.timer`
   - `~/.local/state/openclaw/resume-watch.env`
   - `~/.local/state/openclaw/resume-watch.log`
+  - `~/.local/state/openclaw/gateway-restart-audit.jsonl`
+  - `~/.openclaw/logs/gateway-restart.log`
 
 ### PATCH-CTRLUI-BRANDING
 

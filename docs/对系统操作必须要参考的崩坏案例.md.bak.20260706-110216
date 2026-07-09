@@ -1,0 +1,289 @@
+# 对系统操作必须要参考的崩坏案例
+
+- 适用机器：通用
+- 系统 / OS：通用
+- 文档类型：高风险系统操作案例库
+
+## 用途
+
+这份文档专门记录：
+
+- 因系统级操作、硬件监控、驱动/内核级辅助、底层维护工具而导致的崩溃案例
+- 对工作环境、第三方电脑、朋友电脑造成高恢复成本的真实事故
+- 以后做类似操作前必须先对照的“禁动 / 慎动”参考
+
+## 使用规则
+
+凡是涉及以下任一类动作，在执行前都必须先阅读本文件并对照是否命中相似风险：
+
+- 硬件监控工具
+- 传感器读取
+- 驱动层 / 内核级辅助
+- Embedded Controller / EC / SMBus / Ring0 / 直接 I/O
+- 可能影响系统稳定性的清理、修复、调参、第三方底层工具
+
+若案例中已经出现过“直接导致系统崩溃 / 蓝屏 / 无法正常恢复”的相似模式，则默认：
+
+- 不主动继续尝试
+- 先明确说明风险
+- 需要用户再次确认
+- 优先退回低风险、可回滚方案
+
+---
+
+## 案例索引
+
+| 案例编号 | 日期 | 项目 | 机器 / 环境 | 结果 | 风险等级 |
+|---|---|---|---|---|---|
+| CASE-20260616-002 | 2026-06-16 | Python 脚本直写 openclaw.json 导致 Gateway 启动失败 | 公司 Linux / OpenClaw v2026.6.6 | Gateway 无法启动，配置重复键，手动恢复 | High |
+| CASE-20260513-001 | 2026-05-13 | Windows 宿主机温度读取接入（LibreHardwareMonitor） | Windows 宿主机 / 工作环境机器 | 系统崩溃，用户重装 Windows 并抢修工作环境 | Critical |
+| CASE-20260706-003 | 2026-07-06 | 从 OpenClaw 主会话内执行 `openclaw gateway restart` 把自己会话打断 | 公司 Linux / OpenClaw v2026.6.11 | 主会话连接被打断，需手动 systemctl --user restart 恢复 | High |
+
+---
+
+## CASE-20260706-003 — 从 OpenClaw 主会话内执行 `openclaw gateway restart` 会打断主会话
+
+### 项目
+全系统体检 + 维护。用户明确要求"只保稳定"，所以做了 3 项小改：cron timeout 90s→180s、cron fallback ollama→litellm/agnes-2.0-flash、全局模型 fallback 链补全。改完 config validate 显示正常，提示 "Restart the gateway to apply"。
+
+### 机器 / 环境
+- 机器：公司 Linux（VMware 客体）
+- OpenClaw 版本：v2026.6.11
+- Gateway 启动方式：systemd user service（`openclaw-gateway.service`）
+- 当前会话：`agent:main:main`，通过本地 127.0.0.1:18789 连 Gateway
+
+### 触发动作
+1. 修改 `agents.defaults.model.fallbacks` 后，`openclaw config set` 输出 "Updated agents.defaults.model.fallbacks. Restart the gateway to apply."
+2. 在当前 main session（正在执行 tool 调用）内运行 `openclaw gateway restart`
+3. main session 被 SIGTERM 中断，本轮 tool 调用全部丢失
+4. systemd 显示 gateway 状态 `deactivating (stop-sigterm)`，但不知道是因为自己把自己杀了
+
+### 结果
+- main session 连接被强制断开（`[System] Your previous turn was interrupted by a gateway restart` 系统提示）
+- 当前轮的所有未完成 exec、cron、模型验证结果都没保存
+- gateway 进程在 systemd 服务里被 kill 后要重新拉起
+- 因为 systemd 单元本身完整，几秒后 systemd 自动重启了 gateway（pid 从 1996 变成 8869），无需人工干预，但用户能看到 5-15 秒 gateway 不可达
+
+### 已知技术线索
+1. `openclaw gateway restart` 等价于 `systemctl --user restart openclaw-gateway`
+2. systemd restart 杀的是 main PID（节点进程），所有活动 WebSocket 连接都断
+3. 从 main session 内触发 restart = 自杀式操作，因为命令本身就是通过断掉的连接发起的
+4. systemd unit 有 `Restart=always` 或类似机制会自动拉起新的 gateway（这是这次没崩的原因）
+5. `openclaw config set` 修改需要 restart 才生效——这是设计如此
+
+### 最可能原因
+当 `openclaw config set` 输出的 "Restart the gateway to apply" 时，正确做法是从外部触发 restart（另一个 session、cron job 里、systemctl 直接），而不是从当前正在运行的 session 里。回滚改动不需要 restart；只想验证改动是否落盘，应该用 `openclaw config get` 而不是触发 gateway 重启。
+
+### 为什么会扩大成事故
+1. main session 被打断 → 当前轮的所有诊断信息丢了一半
+2. 用户看到 `[System] Your previous turn was interrupted by a gateway restart`，会怀疑系统不稳
+3. 如果 systemd 没有自动 restart 兜底，会变成 CASE-20260616-002 类似的 gateway 长时间不可达
+4. 在生产时间（早上 10:14，用户刚到公司）打断会话，可能错过早安问候 cron 的下一次注入
+
+### 结论
+**从 OpenClaw 主会话内**不要**主动跑 `openclaw gateway restart`。**
+
+### 后续默认规则
+1. 修改 `openclaw.json` 后，**先验收改动**：`openclaw config get <path>`、`openclaw config validate`，不放心可以 `openclaw cron get <id>` 看具体 job
+2. **不要为了"让改动生效"在当前 session 跑 gateway restart**。如果只是小改 fallback 链、timeout 等，Gateway 在下次 chat 请求时也会读到新配置（fork 进程或 reload 热加载）
+3. 真要 restart：
+   - 选项 A：让 cron job 自己触发（设个一次性 cron）
+   - 选项 B：起一个新的 isolated session 跑 restart
+   - 选项 C：保留 main session 不动，**手动从终端**（不是 OpenClaw 内）跑 `systemctl --user restart openclaw-gateway`
+4. restart 前必先确认：
+   - `systemctl --user status openclaw-gateway` 是 active
+   - 当前 main session 没有未提交的 tool 调用 / 用户输入
+   - 备份已经做了（cp openclaw.json openclaw.json.bak.<date>）
+5. 这次 case 必须加进启动协议：每次启动先读崩坏案例，读到这里
+
+### 复盘要求
+- 此案例列入「系统操作前必须参考的崩坏案例」
+- 每次涉及 `openclaw gateway restart` / `systemctl --user restart openclaw-gateway` 前必查本案例
+- 如果只是改 cron / agents / models 配置、且 config validate 已通过，可以**不 restart**——Gateway 在下个 chat 请求时会读最新配置
+
+---
+
+## CASE-20260616-002 — Python 脚本直写 openclaw.json 导致 Gateway 启动失败（配置重复键）
+
+### 项目
+
+为 Mark42 配置多 Agent 协作（researcher + coder + agentToAgent），用 Python 脚本直接 `json.dump` 写入 `openclaw.json`。
+
+### 机器 / 环境
+
+- 机器：公司 Linux（VMware 客体）
+- OpenClaw 版本：v2026.6.6
+- 重启方式：`systemctl --user restart openclaw-gateway`
+
+### 触发动作
+
+1. 用 Python `json.dump()` 直接追加 `agents.list`（researcher + coder）和 `agents.subagents.allowAgents` 和 `tools.agentToAgent`
+2. 写入后重启 Gateway
+3. Gateway 启动失败，报 JSON 解析错误
+
+### 结果
+
+- `openclaw.json` 中出现了两个重复的 `"agents"` 顶层键
+- Python `json.load` 加载时第二个 `agents` 覆盖第一个，导致 `defaults` 段丢失（只剩下 `agents.list`）
+- `openclaw gateway restart` 直接报错，前台连不上
+- 用户需要手动从终端重启并看到报错
+
+### 已知技术线索
+
+1. Python `json.dump` 本身不会对重复键报错
+2. `json.load` 时重复键以最后一个胜出
+3. OpenClaw Gateway 启动时解析 JSON 遇到重复键会直接报配置错误
+4. 用 `openclaw config set` 逐条追加则不会产生重复键，因为 OpenClaw 自己在做合并
+
+### 最可能原因
+
+直接写 JSON 文件绕过了 OpenClaw 的配置合并逻辑。脚本写入了第二个 `agents` 对象块（只含 `list`），但文件中已有完整的 `agents` 块（含 `defaults`）。结果 JSON 里出现两个 `agents` 键。
+
+### 为什么会扩大成事故
+
+1. JSON 重复键在 Python 里静默通过（不报错）
+2. 只在 Gateway 启动时才暴露，修复窗口在下次重启
+3. 如果手动恢复不及时，Gateway 会反复重启失败
+
+### 结论
+
+**以后修改 `openclaw.json` 一律用 `openclaw config set`，不直接写文件。**
+
+### 后续默认规则
+
+1. 任何 `openclaw.json` 修改：先用 `openclaw config validate` 确认当前配置干净
+2. 增量追加用 `openclaw config set <path> <value> --json`
+3. 修改前备份：`cp openclaw.json openclaw.json.bak.$(date +%Y%m%d-%H%M)`
+4. 修改后验证：`openclaw config validate`
+5. 严禁用 Python/`write`/`edit` 直接改写 `openclaw.json` 的 agents 段
+
+### 复盘要求
+
+- 此案例列入「系统操作前必须参考的崩坏案例」
+- 每次改 `openclaw.json` 前先查本案例
+- 如果已用正确方式（`openclaw config set`）写入，不再需要额外核对
+
+---
+
+## CASE-20260513-001 — Windows 宿主机温度读取导致系统崩溃
+
+### 项目
+
+为 OpenClaw 本地健康监督接入 Windows 宿主机温度读取能力，希望把宿主机真实 CPU 温度桥接到 Linux 客体的本地健康页。
+
+### 机器 / 环境
+
+- 机器角色：Windows 宿主机（承载当前工作环境）
+- 系统：Windows 10（从远程会话里看到 PowerShell 版本 `5.1.18362.145`，属于较老系统链路）
+- 连接关系：Linux VMware 客体通过 SSH 直连宿主机 `192.168.233.1:22`
+- 风险上下文：该机器承载工作环境，恢复成本高，不适合把底层硬件监控当成低风险试验
+
+### 触发动作
+
+1. 为读取宿主机温度，先在宿主机侧准备了温度桥接方案
+2. 由于 Windows 自带 WMI / ACPI 温度源拿不到可用 CPU 温度，转而引入第三方硬件监控工具 `LibreHardwareMonitor`
+3. 工具被落到：
+   - `E:\DESK\OpenClawBridgeTools\LibreHardwareMonitor\`
+4. 用户在宿主机上手动打开 `LibreHardwareMonitor.exe`
+
+### 结果
+
+- 宿主机随后出现严重系统级崩溃
+- 用户描述为：系统直接崩溃，且恢复成本高，最终需要重装 Windows，并花了较长时间抢修工作环境与工作资料
+- 该事故已经超过“普通软件崩溃 / 闪退”范围，应视为**系统稳定性事故**
+
+### 已知技术线索
+
+#### 1) 不是单纯“普通用户态读温度”
+
+对下载包做静态检查后，发现其中明确包含与底层硬件访问相关的符号/组件痕迹，例如：
+
+- `InstallPawnIO`
+- `PawnIO`
+- `IEmbeddedControllerIO`
+- `WindowsEmbeddedControllerIO`
+- `Embedded Controller`
+
+这说明该工具为了拿到更多硬件传感器信息，可能会下探到更底层的 I/O / EC / 传感器访问链路，而不只是安全地调用普通公开 API。
+
+#### 2) 社区存在相似公开报告
+
+本次调研中已看到外部公开讨论/问题报告与此模式相似，例如：
+
+- `pawnIO installation causes BSOD – LibreHardwareMonitor cannot ...`
+  - `https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/issues/2258`
+- `Use LibreHardwareMonitor without using PawnIO just for monitoring ...`
+  - `https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/discussions/2149`
+- 相关生态中也有类似反馈：某些机器在 PawnIO / 类似底层监控驱动链路下会蓝屏或系统崩溃
+
+> 注意：这些公开案例并不等于“已经精确证明本机就是同一个驱动点爆炸”，但足以证明这类工具链并非低风险。
+
+### 最可能原因（高概率解释，不装作精确法医结论）
+
+最可能的链路是：
+
+1. 用户想读取 CPU 温度
+2. Windows 自带接口无法稳定给出真实温度
+3. 第三方硬件监控工具为了拿到温度，走了更底层的驱动 / EC / 直接 I/O 链路
+4. 该链路与当前宿主机的系统版本、驱动栈、主板/EC/显卡/芯片组环境不兼容
+5. 结果不是“应用崩溃”，而是系统级崩溃
+6. 崩溃进一步导致高恢复成本，最终逼近“只能重装 / 大量抢修”的后果
+
+### 为什么会严重到“几乎不可修复”
+
+因为一旦问题发生在驱动/内核级，代价就不再是普通应用闪退，而可能扩展为：
+
+- 蓝屏 / 死机 / 强制重启
+- 系统状态损坏
+- 文件系统或注册表状态异常
+- 工作环境恢复成本极高
+- 即便理论上“可修”，实际也可能不如重装来得快
+
+对承载工作环境的机器来说，这种风险是不可接受的。
+
+### 结论
+
+这次事故说明：
+
+> 真正危险的不是“读取温度”这件事本身，而是为了读取温度而触发的底层硬件访问/驱动链路。
+
+因此以后在工作机器、宿主机、第三方电脑、朋友电脑上：
+
+- **不要再把硬件监控 / 温度读取 / 传感器工具当作低风险动作默认尝试**
+
+### 后续默认规则
+
+对类似任务，默认改为：
+
+1. 先停在低风险方案
+   - 只看已有日志 / 事件查看器 / 崩溃转储
+   - 不主动再装新的硬件监控工具
+2. 如果用户仍坚持继续
+   - 必须先再次确认
+   - 必须明确说明“有系统崩溃风险”
+   - 优先隔离到非工作环境、可回滚、可重装、无第三方重要数据的机器
+3. 对朋友/第三方电脑
+   - 默认更保守
+   - 不主动尝试此类底层工具
+
+### 复盘要求
+
+如果未来要继续分析这类事故，优先做：
+
+- 被动分析：事件查看器、可靠性监视器、崩溃转储、系统日志
+- 禁止默认做：再次主动拉起相同硬件监控工具复现
+
+---
+
+## 后续新增案例时的建议格式
+
+### 项目
+### 机器 / 环境
+### 触发动作
+### 结果
+### 已知技术线索
+### 最可能原因
+### 为什么会扩大成系统级事故
+### 结论
+### 后续默认规则
+### 复盘要求

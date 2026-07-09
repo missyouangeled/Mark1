@@ -1460,16 +1460,35 @@ def emit_via_infos_handle(source: str, event_key: str, session_key: str, message
     broker_payload = notify.get("broker") if isinstance(notify, dict) and isinstance(notify.get("broker"), dict) else {}
     recorded = broker_payload.get("delivery") if isinstance(broker_payload.get("delivery"), dict) else {}
     if not recorded:
-        recorded = record_delivery_event(
-            source,
-            event_key,
-            session_key,
-            handle_snapshot.get("targetSessionKey"),
-            handle_snapshot.get("messageId"),
-            message,
-            state_path,
-            broker_data_dir,
-        )
+        existing_state = load_json(state_path)
+        existing_sources = existing_state.get("sources") if isinstance(existing_state.get("sources"), dict) else {}
+        existing_previous = existing_sources.get(source) if isinstance(existing_sources.get(source), dict) else {}
+        if existing_previous.get("eventKey") == event_key:
+            recorded = {
+                "ok": True,
+                "skipped": True,
+                "reason": "duplicate-event",
+                "source": source,
+                "sourceEventType": source_contract(source)["sourceEventType"],
+                "sourceView": source_contract(source).get("sourceView"),
+                "eventKey": event_key,
+                "sessionKey": existing_previous.get("sessionKey") or session_key,
+                "targetSessionKey": existing_previous.get("targetSessionKey"),
+                "messageId": existing_previous.get("messageId"),
+                "message": existing_previous.get("message") or message,
+                "paths": {key: str(value) for key, value in broker_paths(state_path, broker_data_dir).items()},
+            }
+        else:
+            recorded = record_delivery_event(
+                source,
+                event_key,
+                session_key,
+                handle_snapshot.get("targetSessionKey"),
+                handle_snapshot.get("messageId"),
+                message,
+                state_path,
+                broker_data_dir,
+            )
     delivery = compat_bundle.get("delivery") if isinstance(compat_bundle.get("delivery"), dict) else {}
     return {
         **recorded,

@@ -283,6 +283,7 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 | INVALID_FINAL_RELOAD | 高 | Gl→qg | ✅ 已修复 |
 | yielded 历史回放 | 高 | 15+ 函数名更换 | ❌ 未适配（后续单补） |
 | resume-watch 被重新激活 | 低 | 升级触发 | ❌ 未发生（保持关闭） |
+| 重启留证据缺失 | 中 | 发生 gateway restart 但审计链不完整 | ✅ 已补（重启原因写审计日志/重启日志） |
 | infos-handle / 统一代理 | 低 | 不依赖前端 | ✅ 直接复用 |
 
 ### 补丁状态明细
@@ -371,7 +372,7 @@ journalctl --user -u openclaw-health-collector.service --since "10:44" --no-page
 | task-scheduler | ✅ timer active |
 | health-collector | ✅ timer active |
 | lifecycle-maintainer | ✅ timer active |
-| resume-watch | ⏸️ 保持关闭（用户要求） |
+| resume-watch | ⏸️ 保持关闭（用户要求，长期关闭） |
 | infos-handle sidecar | ✅ active, port 18790 |
 | 统一代理 (Caddy) | ✅ active, port 18788 |
 | 品牌注入 | ✅ 贾维斯 Control |
@@ -1099,3 +1100,149 @@ python3 scripts/apply-openclaw-frontstage-broker-data.py --verify-control-ui-inf
    - 如果 service 状态 PASS、proxy verify PASS、4 个最小回归 PASS，则优先视作启动窗口瞬时抖动，单独重跑 verify 再定性。
 4. **reply pipeline 当时并未“永久损坏”**。
    - 真正发生的是：gateway restart 中断当前 turn + 会话恢复期工具输出异常/漂移，后来日志已证明 gateway 正常 ready。
+
+
+## 2026-07-07 补充：主会话 reply recovery 冲突排查
+
+- 现象：主 WebChat 会话报错 `reply session initialization conflicted for agent:main:main`。
+- 证据：
+  - `sessions.json` 中主会话仍标记 `status=running`
+  - 但 `openclaw tasks maintenance --json` 显示 `active=0`、`staleRunningTasks=[]`
+  - `openclaw tasks audit --json` 仍有 2 条 `lost / backing session missing`，均指向 gateway restart 后的 reply recovery 系统任务残留
+- 判断：这是 **reply recovery 状态残留 / 主 session 假 running** 问题，不是 branding override 重复注入问题。
+- 已做：
+  - 证据落档到 `docs/runtime-checks/2026-07-07-main-session-conflict-*.json`
+  - 执行 `openclaw tasks maintenance --apply --json` 验证：只能清账，不能自动解除主会话假 running
+- 结论：后续遇到同类问题，**不要先怀疑 UI 品牌补丁**；优先检查 `sessions.json` 主会话状态、`tasks audit` 的 lost recovery 残留、以及 gateway restart 留证据链。
+
+
+### 2026-07-07 11:03 — reply session 冲突最小重启修复复盘
+
+- 已严格按 CASE-20260706-003 执行：先写 `gateway-restart-audit.jsonl` / `gateway-restart.log`，再从外部终端执行 `systemctl --user restart openclaw-gateway.service`。
+- 结果：gateway 重启成功，主会话收到系统恢复提示，但 `agent:main:main` 仍保持 `status=running`。
+- `restartRecoveryDeliveryRunId` 发生变化，证明重启后 reply recovery 确有再次介入。
+- `tasks audit` 仍残留 2 条 `lost / backing session missing` 历史恢复任务，说明 maintenance + restart 都不能自动清除这类旧账。
+- 当前判断：
+  - restart 留证据链已经可用
+  - 但 **reply session initialization conflicted** 的根因并不只是 gateway 进程本身，需要继续排查 session 元数据、历史恢复残留、以及上游 recovery 冲突逻辑。
+
+
+### 2026-07-07 11:06 — pendingFinalDelivery 残留导致主会话卡 running
+
+- 源码/打包产物对照确认：`reply session initialization conflicted` 的根因进一步收敛到 **主会话 pendingFinalDelivery 残留未清**。
+- 现场状态：
+  - `agent:main:main.status = running`
+  - `pendingFinalDelivery = true`
+  - `pendingFinalDeliveryText` 正是已经在 heartbeat 中发出去的那段进度汇报
+  - `restartRecoveryDeliveryRunId` 非空
+- 推断：回复已经被捕获/部分送达，但 session store 没把 `pendingFinalDelivery*` 与 `restartRecoveryDeliveryRunId` 清理掉，导致后续初始化持续把主会话视为“仍在交付最终回复”。
+- 已执行的最小修复：
+  - 备份 `sessions.json` 到 `sessions.json.bak.pending-clear.1783393763`
+  - 仅清空 `pendingFinalDelivery*` / `restartRecoveryDelivery*` 相关字段，不改别的会话元数据
+- 修复后确认：
+  - `pendingFinalDelivery = null`
+  - `pendingFinalDeliveryText = null`
+  - `restartRecoveryDeliveryRunId = null`
+- 经验更新：以后遇到主会话 restart recovery 冲突，**要优先检查 `pendingFinalDeliveryText` 是否其实已经送达却未清账**；这一步比单纯 restart 更关键。
+
+
+### 2026-07-07 11:15 — 手工补主会话终态，解除 running 残留
+
+- 在清空 `pendingFinalDelivery*` 之后，`agent:main:main` 仍保留 `status=running`。
+- 对照 `main-session-restart-recovery` 打包代码后确认：上游存在 `markSessionFailed()` 终态分支，正确行为应是把这类被 restart 打断且未恢复完成的主轮落到 `failed`，而不是长期停在 `running`。
+- 因自动流程未收口，已做第二步最小人工修复：
+  - 备份 `sessions.json` 到 `sessions.json.bak.failed-clear.1783394133`
+  - 将 `agent:main:main` 改为：
+    - `status = failed`
+    - `abortedLastRun = true`
+    - `endedAt / updatedAt / runtimeMs` 补齐
+    - `restartRecoveryRuns = null`
+- 结果：主会话不再维持“旧轮仍在 running / recovery 中”的元数据状态，后续新的 reply 初始化理论上更容易正常接管。
+- 经验：当 restart recovery 已经明显失效（pending 已清、recovery run 仍挂、状态不回落）时，**把旧轮显式收束到 failed** 比继续留在 running 更接近上游预期。
+
+
+### 2026-07-07 11:20 — 补 frontstage-recovery 对假 running 的异常识别
+
+- 发现 `openclaw-frontstage-recovery-watch.py` 存在漏判：当主会话处于
+  - `status=running`
+  - `hasActiveRun=false`
+  - `endedAt=null`
+  - latest assistant turn 为空文本/空 rawText
+  时，旧逻辑仍会返回 `ok=true`。
+- 这会导致 broker / frontstage / 保命快照把“终态没收口的坏状态”误判成正常，进一步掩盖 `reply session initialization conflicted` 的后续症状。
+- 已修：新增异常码 `running_without_active_run_terminal_gap`，将上述组合明确判为异常。
+- 验证结果：修后重新运行 `python3 scripts/openclaw-frontstage-recovery-watch.py --print-json`，当前主会话已正确报为：
+  - `ok=false`
+  - `anomalyCode=running_without_active_run_terminal_gap`
+- 经验：以后遇到主会话“表面 running、实际上没人跑、assistant turn 还是空壳”的情况，frontstage-recovery 不应再给出 OK。
+
+
+### 2026-07-07 11:31 — 主会话假 running 最终收敛为 recovery 窗口竞争，而非永久状态写脏
+
+- 进一步核实到：`agent:main:main` 当前已由系统补成健康终态：
+  - `status=done`
+  - `endedAt=1783394451138`
+  - `pendingFinalDelivery=None`
+  - `pendingFinalDeliveryText=None`
+  - `runId=None`
+  - `lifecycleGeneration=None`
+- `frontstage-recovery/last-report.json` 也已回到：
+  - `ok=true`
+  - `sessionSnapshot.status=done`
+  - `sessionSnapshot.hasActiveRun=false`
+- 说明此前看到的 `status=running + no active run + no endedAt` 并非永久坏账，而是恢复窗口中的中间态。
+
+#### 日志链路已基本钉住
+日志显示的主链为：
+1. `context-overflow-precheck` / `context-overflow-diag`
+2. `truncate_tool_results_only` / compaction / `rotated active transcript after compaction`
+3. `main-session-restart-recovery` 介入：
+   - `marked ... for restart recovery (gateway restart drain)`
+   - `marked interrupted main session failed: agent:main:main (transcript tail is not resumable)`
+   - 另一轮又出现：`marked ... from stale transcript locks` + `resumed interrupted main session: agent:main:main`
+4. 在恢复窗口期间，replyResolver 命中：
+   - `Error: reply session initialization conflicted for agent:main:main`
+
+#### 新判断
+- 更像的根因不是“某处永久把 session 写回 running”。
+- 更像是：
+  - **大上下文 / tool result 过多** 导致 overflow 与 compaction
+  - compaction / transcript rotate 又引出 `stale transcript locks` / `gateway restart drain`
+  - `main-session-restart-recovery` 在失败与恢复之间切换
+  - 新 reply 在这个窗口里撞上旧 session/recovery 初始化竞争，于是报 `reply session initialization conflicted`
+- 后续真正要修的，不再只是清 `pendingFinalDelivery*`，而是检查：
+  - recovery 窗口期间 replyResolver 是否应该更严格隔离旧 session
+  - `stale transcript locks` 与 main-session recovery 的解锁时机
+  - compaction/rotate transcript 之后 reply 初始化与主 session 元数据切换的竞态
+
+
+### 2026-07-07 11:47 — reply 初始化冲突的根因收敛为“整条 session entry 全量 revision 过粗”
+
+- 已确认 `createReplySessionInitializationRevision(entry)` 当前实现为：
+  - `JSON.stringify(entry ?? null)`
+- 这表示 reply 初始化提交使用的是**整条 session entry 全量乐观锁**。只要 entry 上任意字段变化，都会让 `expectedRevision` 失效，触发 `stale-snapshot`，重试失败后升级为：
+  - `reply session initialization conflicted for agent:main:main`
+
+#### 与 recovery 链对照后的关键结论
+- `main-session-restart-recovery` 会写：
+  - `status` / `abortedLastRun` / `endedAt` / `updatedAt`
+  - `pendingFinalDelivery*`
+  - `restartRecoveryDelivery*`
+- 但 `get-reply` 主路径中：
+  - `restartRecoveryDeliveryContext` = 0 次引用
+  - `restartRecoveryDeliveryRunId` = 0 次引用
+  说明这类 recovery 私有字段不参与 reply 初始化关键路径。
+- `pendingFinalDelivery*` 主要在 session 初始化之后的 heartbeat 清理分支消费，更像恢复后处理字段。
+- `updatedAt` 被多条链无差别刷新，很像伪冲突放大器。
+- `abortedLastRun` 影响下一轮提示语义，但不像 session 身份/路由级关键字段。
+
+#### 新判断
+- 当前问题更像是：**reply 初始化 revision 白名单过宽（甚至没有白名单，直接全量）**，导致 recovery 对非关键字段的合法写入，也会把 reply 初始化顶成冲突。
+
+#### 当前最小修点建议
+- 将 reply 初始化 revision 从整条 entry JSON 改为“字段白名单投影”。
+- 第一批建议明确排除出 revision：
+  - `pendingFinalDelivery*`
+  - `restartRecoveryDelivery*`
+  - `updatedAt`
+- `abortedLastRun` 也建议重新评估是否改为初始化成功后的轻量消费，而不是参与最严格初始化冲突判定。

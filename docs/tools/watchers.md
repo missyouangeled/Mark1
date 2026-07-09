@@ -33,3 +33,10 @@
 > 保留脚本（原入口未删，可回退）：`openclaw-frontstage-recovery-watch.py` / `openclaw-responsiveness-watch.py` / `openclaw-supervisor-status.py` / `openclaw-frontstage-broker.py` / `openclaw-local-health-diagnose.py` / `aggregate-daily-transcript.py` / `openclaw-cleanup-temp.sh`
 
 ### 监工相关
+
+## 保命聚合器对 watcher 告警的解释规则（2026-07-06）
+
+- `alerts.json` 中的未读项不再一律视为当前故障。
+- 若 `session-size-watcher` 在该告警之后已经再次成功运行，且主会话当前 `trajectory` 已低于 5 MB 阈值，则该告警视为“已消化历史告警”，只计入快照说明，不再抬高总体状态。
+- 只有“最近 1 小时内仍对应超阈值”的 watcher 告警，才会被保命聚合器记为 `WATCHER_ACTIVE_ALERTS` 并保持 `WARN`。
+- 这样做的目的是避免历史尾巴长期卡住总状态，同时保留原始 watcher 留痕，便于复盘。

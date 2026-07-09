@@ -32,12 +32,13 @@
 4. **infos-handle sidecar live 链仍正常**
 5. **统一入口 proxy verify 仍正常**
 6. **frontstage-guardian 测试通过**（替代旧 recovery-watch）
-7. **4 个 watcher timer 处于 enabled+active**：health-collector(60s) / task-scheduler(60s) / guardian(20s) / lifecycle-maintainer(5min)（resume-watch 用户明确要求不启用）
-8. **sidecar / unified proxy service 仍 active**
-9. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
-10. **耗时基线验证通过**：所有子检查含 elapsedMs
-11. **boot-health-check 通过**：核心服务/定时器/磁盘/内存/端口扫描无异常
-12. **模型配置检测通过**：所有 provider 的 apiKey 是否到位、models 数组格式（id/name/input）是否正确、imageModel 指向的模型是否 supports image input
+7. **4 个 watcher timer 处于 enabled+active**：health-collector(60s) / task-scheduler(60s) / guardian(20s) / lifecycle-maintainer(5min)（resume-watch 用户明确要求长期保持关闭，不启用）
+8. **重启留证据检查通过**：`~/.local/state/openclaw/gateway-restart-audit.jsonl` 与 `~/.openclaw/logs/gateway-restart.log` 可持续记录 restart / skip 原因
+9. **sidecar / unified proxy service 仍 active**
+10. **搜索短路验证通过**：本地预搜 "贾维斯" 应短路（0.1s），无匹配应降级
+11. **耗时基线验证通过**：所有子检查含 elapsedMs
+12. **boot-health-check 通过**：核心服务/定时器/磁盘/内存/端口扫描无异常
+13. **模型配置检测通过**：所有 provider 的 apiKey 是否到位、models 数组格式（id/name/input）是否正确、imageModel 指向的模型是否 supports image input
 
 ---
 

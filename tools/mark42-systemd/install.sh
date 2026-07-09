@@ -182,6 +182,9 @@ if [ "$APPLY" -ne 1 ]; then
   exit 0
 fi
 
+echo "应用 Mark42 context safety 基线..."
+"$PYTHON_BIN" "$MARK42_CLI" context-safety apply
+
 install -d "$USER_UNIT_DIR" "$STATE_DIR" "$LOG_DIR" "$SCRATCH_ROOT" "$STATE_DIR/engine"
 BACKUP_DIR=""
 BACKUP_COUNT=0

@@ -1,0 +1,11 @@
+[?2004h[>7u[?u[c[?25l[>4;2m[?2026h openclaw tui - local embedded - agent main (贾维斯) - session                  [0m]8;;
+ dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270                                 [0m]8;;
+ local ready | idle                                                             [0m]8;;
+ agent main (贾维斯) | session dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270 | [0m]8;;
+ unknown | tokens ?                                                             [0m]8;;
+────────────────────────────────────────────────────────────────────────────────[0m]8;;
+[7m [0m                                                                               [0m]8;;
+────────────────────────────────────────────────────────────────────────────────[0m]8;;[?2026l[1A[1G[?25l[<u[>4;0m[2B
+[?25h[?2004l[agents/tool-policy] tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+[provider-transport-fetch] [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+openclaw tui forcing process exit after return

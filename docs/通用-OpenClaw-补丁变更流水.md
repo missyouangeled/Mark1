@@ -30,7 +30,141 @@
 
 ---
 
-## 2026-05-20 08:18:44 CST (+08:00) — 建立补丁自动留痕模式
+## 2026-07-07 10:18:54 CST (+08:00) — resume-watch 重启审计补口：记录 gap / 连接态 / 原因
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 为 `scripts/openclaw-resume-watch.sh` 增加 gateway restart 审计：无论是命中 gap 阈值后的重启，还是因“仍有活跃连接”而跳过重启，都会写入 `~/.local/state/openclaw/gateway-restart-audit.jsonl`，记录 `source/reason/detail/hasActiveConnections/bootId/gapSeconds`。
+- 同时把 resume-watch 的关键信息同步追加到现有 `~/.openclaw/logs/gateway-restart.log`，避免重启原因只散在脚本私有日志里。
+- 本次改动先解决“下次出了重启不知道是谁触发”的可追责问题，不改变当前 restart 判定阈值与行为。
+- 验收 / 验证：
+- `bash -n scripts/openclaw-resume-watch.sh` 通过
+- 人工写入审计样本，确认 `gateway-restart-audit.jsonl` 可正常追加 JSON 行
+- 相关文件：
+- `scripts/openclaw-resume-watch.sh`
+
+## 2026-07-07 09:50:55 CST (+08:00) — frontstage broker 重复 sent 止血：同 source 同 eventKey 直接跳过补记
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 继续收口 `scripts/openclaw-frontstage-broker.py` 的重复投递留痕问题：确认 `emit_via_infos_handle()` 在 infos-handle 回包未携带 broker.delivery 时，会每次再次调用 `record_delivery_event()`，即使 `sources[source].eventKey` 已经和当前事件一致，也会把同一个 source/eventKey 的 `frontstage.delivery.sent` 反复追加到 `events.jsonl`。
+- 在补记 delivery 前增加当前 source 快照检查：若 broker state 中该 source 的最近 `eventKey` 已等于本次 `event_key`，则直接返回 `duplicate-event/skipped` 快照，不再追加新的 sent 记录。
+- 这一步修的是 broker 核心补记分支，可同时覆盖 `supervisor`、`emergency-aggregator`、`local-health` 等所有通过 infos-handle 但偶尔缺少 delivery 回填的 source。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/openclaw-frontstage-broker.py` 通过
+- 逻辑校验：当 `sources[source].eventKey == event_key` 时，返回 `skipped=true / reason=duplicate-event` 的既有记录快照，不再走 `record_delivery_event()` 追加 sent
+- 相关文件：
+- `scripts/openclaw-frontstage-broker.py`
+
+## 2026-07-07 09:38:07 CST (+08:00) — boot-health broker 事件去重补口：稳定 eventKey + message 回填
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 继续收口 `scripts/openclaw-boot-health-check.py` 的前台噪音链：确认 broker 侧虽然自带 `eventKey` 去重，但 `boot-health` 之前发射到 `~/.local/state/openclaw/broker/events.jsonl` 的记录里 `eventKey` 与 `message` 为空，导致重复的 boot-health 事件无法通过 broker dedupe 合并。
+- 为 boot-health 增加稳定 `eventKey` 生成器：基于 `ok + issues + bootMessage` 计算固定 SHA-256 指纹，写成 `boot-health|<digest>`；同时把 `message` 明确回填为 `full_boot_msg`，避免后续 broker / frontstage 视图拿到空消息。
+- 这一步不直接改 broker 核心逻辑，只修正 boot-health 作为 source 的上游输入，让现有 dedupe 机制真正生效。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/openclaw-boot-health-check.py` 通过
+- 人工验证 `compute_boot_event_key()`：同样输入生成相同 key，不同健康状态/issue 生成不同 key
+- 相关文件：
+- `scripts/openclaw-boot-health-check.py`
+
+## 2026-07-07 09:19:11 CST (+08:00) — boot-health 启动事件注入止血：冷却窗口 + 同消息指纹去重
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 为 `scripts/openclaw-boot-health-check.py` 增加启动事件注入止血逻辑：把主会话 `chat.inject` 前置到单独状态文件判断，按同消息 SHA-256 指纹 + 30 分钟冷却窗口去重，避免系统启动后/恢复后短时间重复向 `agent:main:main` 注入完全相同的“🎬 系统启动事件”消息。
+- 保留原 broker 启动事件发射逻辑，不改 frontstage 展示链；本次只收紧最可疑的主会话注入路径。
+- 注入成功后写入 `~/.local/state/openclaw/boot-health/last-startup-inject.json`，为后续排查留痕。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/openclaw-boot-health-check.py` 通过
+- 人工验证 `should_skip_startup_inject()`：首次返回 `False`，写入状态后第二次返回 `True`，说明冷却窗口与消息指纹去重生效
+- 相关文件：
+- `scripts/openclaw-boot-health-check.py`
+
+## 2026-07-07 08:56:19 CST (+08:00) — incident-recovery 回归链止血：并发锁、冷却窗口、异常退出清锁
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 为 `scripts/openclaw-incident-recovery-regression.py` 增加回归级防重跑保护：同一时刻只允许一份回归脚本运行，并在最近一次完整执行后的冷却窗口内直接跳过，避免 `plan/evidence/status` 被短时间重复堆入 incident-recovery 状态目录。
+- 增加锁文件自愈：旧锁会检查 pid 是否仍存活，死进程残留锁自动清理；同时补 `atexit + SIGTERM/SIGINT` 清锁兜底，减少工具/外部终止后留下僵尸锁。
+- 本次补丁只动回归脚本，不改主会话、不改 broker、不改 gateway 注入逻辑，属于最小止血修复。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/openclaw-incident-recovery-regression.py` 通过
+- 重复触发回归脚本时可返回 `lock_active`，说明并发闸门生效
+- 强制启动后再终止，`regression.lock` 能被清掉，说明异常退出清锁生效
+- 相关文件：
+- `scripts/openclaw-incident-recovery-regression.py`
+
+## 2026-07-06 15:30:00 CST (+08:00) — 保命系统平台化收口：Python 编排、统一总览接入、OpenClaw 故障回归、正式文档留痕
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 将 `scripts/emergency1.sh` 收缩成薄壳入口，新增 `scripts/emergency1-orchestrator.py` 统一串行执行 `emergency0-aggregator.py`、`emergency0-notify.py`、`emergency0-repair-runner.py`，并承接主 session 行数检查与 watcher 未读转发，减少 shell glue。
+- 将 emergency 状态正式接入 `scripts/openclaw-system-summary.py`，系统总览新增 `emergency` 检查项，直接展示 `overall/findings/repairSummary`。
+- 新增 `scripts/openclaw-emergency-regression.py`，覆盖 OpenClaw 特有故障回归：health `/exception/timeout`、`sessions.json` 缺失 `sessionFile`、`/mnt/data/openclaw/session-backup/backup-manifest.json` 损坏。
+- 补齐 runtime 文档，明确 Python 编排入口、总览接入和回归脚本位置；保留通知仍经 `openclaw-proactive-inject.py`，但由 `emergency0-notify.py` 统一 cooldown / 去重 / 事件语义。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/emergency1-orchestrator.py scripts/openclaw-emergency-regression.py scripts/openclaw-system-summary.py scripts/emergency0-aggregator.py scripts/emergency0-notify.py scripts/emergency0-repair-runner.py` 通过
+- `bash scripts/emergency1.sh` 输出正常：`[救命 1 静默] ...` / `watcher 告警 cooldown`
+- `python3 scripts/openclaw-system-summary.py --print-human` 已出现 `emergency overall=OK findings=0 ...`
+- `python3 scripts/openclaw-emergency-regression.py` 返回 `ok=true`
+- `python3 scripts/emergency0-delete-pack-regression.py` 继续保持 `DELETE_PACK_REGRESSION_OK`
+- 相关文件：
+- `scripts/emergency1.sh`
+- `scripts/emergency1-orchestrator.py`
+- `scripts/openclaw-system-summary.py`
+- `scripts/openclaw-emergency-regression.py`
+- `docs/runtime/保命体系运行说明-2026-07-06.md`
+- `docs/runtime/保命修复插件索引.md`
+- `docs/runtime/保命修复运行现状.md`
+
+## 2026-07-06 15:46:00 CST (+08:00) — 独立事故自救链第一版：留证、快照候选、恢复计划、隔离排障 prompt、独立回归
+
+- 类型：patch
+- 适用范围：公司-Linux
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 新增独立入口 `scripts/openclaw-incident-recovery.py`，不揉进现有 `emergency0-*` / repair runner，单独管理 `~/.local/state/openclaw/incident-recovery/`。
+- 第一版已实现：抓取事故证据、读取 OpenClaw 现网状态、选择 `/mnt/data/openclaw/session-backup` 最近可用快照、生成恢复计划、生成隔离排障 prompt。
+- 新增独立回归脚本 `scripts/openclaw-incident-recovery-regression.py`，当前覆盖：计划生成状态、状态回读、无快照 manifest 场景。
+- 新增独立运行说明 `docs/runtime/事故自救链运行说明-2026-07-06.md`，明确它与现有保命层并列、职责分离。
+- 验收 / 验证：
+- `python3 -m py_compile scripts/openclaw-incident-recovery.py scripts/openclaw-incident-recovery-regression.py` 通过
+- `python3 scripts/openclaw-incident-recovery.py plan --reason 'm3-self-recovery-flow'` 已产出 evidence / plan / isolated prompt
+- `python3 scripts/openclaw-incident-recovery-regression.py` 返回 `ok=true`
+- 相关文件：
+- `scripts/openclaw-incident-recovery.py`
+- `scripts/openclaw-incident-recovery-regression.py`
+- `docs/runtime/事故自救链运行说明-2026-07-06.md`
+- `docs/runtime/保命体系运行说明-2026-07-06.md`
+
 
 - 类型：process
 - 适用范围：通用

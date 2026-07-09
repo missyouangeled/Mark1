@@ -1,0 +1,64 @@
+OpenClaw status
+
+Overview
+┌──────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Item                 │ Value                                                                                         │
+├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+│ OS                   │ linux 6.17.0-35-generic (x64) · node 22.23.1                                                  │
+│ Dashboard            │ http://127.0.0.1:18789/                                                                       │
+│ Tailscale exposure   │ off                                                                                           │
+│ Channel              │ stable (default)                                                                              │
+│ Update               │ npm · deps ok                                                                                 │
+│ Gateway              │ local · ws://127.0.0.1:18789 (local loopback) · reachable 51ms · auth token · missyouangeled- │
+│                      │ VMware-Virtual-Platform (192.168.79.128) app 2026.6.11 linux 6.17.0-35-generic                │
+│ Gateway self         │ missyouangeled-VMware-Virtual-Platform (192.168.79.128) app 2026.6.11 linux 6.17.0-35-generic │
+│ Gateway service      │ systemd user installed · enabled · running (pid 2014, state active)                           │
+│ Node service         │ systemd user not installed                                                                    │
+│ Agents               │ 3 · no workspaces bootstrapping · sessions 23 · default main active just now                  │
+│ Memory               │ enabled (plugin memory-core) · not checked                                                    │
+│ Plugin compatibility │ none                                                                                          │
+│ Probes               │ skipped (use --deep)                                                                          │
+│ Events               │ none                                                                                          │
+│ Tasks                │ 0 active · 0 queued · 0 running · 16 issues · audit clean · 253 tracked                       │
+│ Heartbeat            │ 30m (main), disabled (coder), disabled (researcher)                                           │
+│ Sessions             │ 23 active · default MiniMax-M3 (1.0m ctx) · 3 stores                                          │
+└──────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Security audit
+Skipped in fast status. Full report: openclaw security audit
+Deep probe: openclaw status --deep
+
+Channels
+No channels configured
+
+Sessions
+┌───────────────────────┬─────────────┬──────────┬─────────────────┬──────────────────┬────────────────────────────────┐
+│ Key                   │ Kind        │ Age      │ Model           │ Runtime          │ Tokens                         │
+├───────────────────────┼─────────────┼──────────┼─────────────────┼──────────────────┼────────────────────────────────┤
+│ agent:main:main       │ direct      │ just now │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ agent:main:dashboard: │ direct      │ 2m ago   │ MiniMax-M3      │ OpenClaw Default │ 62k/131k (47%) · 🗄️ 55% cached │
+│ 293bd72d-4…           │             │          │                 │                  │                                │
+│ agent:main:cron:341af │ cron        │ 3m ago   │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ ca2-01b7-4…           │             │          │                 │                  │                                │
+│ agent:main:cron:1fbeb │ cron        │ 21h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ bc0-31e9-4…           │             │          │                 │                  │                                │
+│ agent:main:subagent:5 │ spawn-child │ 21h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ 0d1c288-1e…           │             │          │                 │                  │                                │
+│ agent:main:subagent:a │ spawn-child │ 25h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ 1db59b2-5d…           │             │          │                 │                  │                                │
+│ agent:main:subagent:4 │ spawn-child │ 25h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ 1d4bc7f-a5…           │             │          │                 │                  │                                │
+│ agent:main:subagent:3 │ spawn-child │ 41h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ 6ce69a8-ec…           │             │          │                 │                  │                                │
+│ agent:main:openai:613 │ direct      │ 46h ago  │ agnes-2.0-flash │ OpenClaw Default │ 21k/524k (4%)                  │
+│ 74572-fad8…           │             │          │                 │                  │                                │
+│ agent:main:openai:8f8 │ direct      │ 46h ago  │ agnes-2.0-flash │ OpenClaw Default │ 21k/524k (4%)                  │
+│ d095a-19be…           │             │          │                 │                  │                                │
+└───────────────────────┴─────────────┴──────────┴─────────────────┴──────────────────┴────────────────────────────────┘
+
+FAQ: https://docs.openclaw.ai/faq
+Troubleshooting: https://docs.openclaw.ai/troubleshooting
+Next steps:
+  Need to share?      openclaw status --all
+  Need to debug live? openclaw logs --follow
+  Need to test channels? openclaw status --deep

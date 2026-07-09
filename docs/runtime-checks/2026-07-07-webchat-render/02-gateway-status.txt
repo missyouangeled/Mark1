@@ -1,0 +1,128 @@
+===== openclaw status =====
+OpenClaw status
+
+Overview
+┌──────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Item                 │ Value                                                                                         │
+├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+│ OS                   │ linux 6.17.0-35-generic (x64) · node 22.23.1                                                  │
+│ Dashboard            │ http://127.0.0.1:18789/                                                                       │
+│ Tailscale exposure   │ off                                                                                           │
+│ Channel              │ stable (default)                                                                              │
+│ Update               │ npm · deps ok                                                                                 │
+│ Gateway              │ local · ws://127.0.0.1:18789 (local loopback) · reachable 104ms · auth token ·                │
+│                      │ missyouangeled-VMware-Virtual-Platform (192.168.79.128) app 2026.6.11 linux 6.17.0-35-generic │
+│ Gateway self         │ missyouangeled-VMware-Virtual-Platform (192.168.79.128) app 2026.6.11 linux 6.17.0-35-generic │
+│ Gateway service      │ systemd user installed · enabled · running (pid 12393, state active)                          │
+│ Node service         │ systemd user not installed                                                                    │
+│ Agents               │ 3 · no workspaces bootstrapping · sessions 23 · default main active 1m ago                    │
+│ Memory               │ enabled (plugin memory-core) · not checked                                                    │
+│ Plugin compatibility │ none                                                                                          │
+│ Probes               │ skipped (use --deep)                                                                          │
+│ Events               │ none                                                                                          │
+│ Tasks                │ 0 active · 0 queued · 0 running · 16 issues · audit clean · 240 tracked                       │
+│ Heartbeat            │ 30m (main), disabled (coder), disabled (researcher)                                           │
+│ Sessions             │ 23 active · default MiniMax-M3 (1.0m ctx) · 3 stores                                          │
+└──────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Security audit
+Skipped in fast status. Full report: openclaw security audit
+Deep probe: openclaw status --deep
+
+Channels
+No channels configured
+
+Sessions
+┌────────────────────────┬─────────────┬─────────┬─────────────────┬──────────────────┬────────────────────────────────┐
+│ Key                    │ Kind        │ Age     │ Model           │ Runtime          │ Tokens                         │
+├────────────────────────┼─────────────┼─────────┼─────────────────┼──────────────────┼────────────────────────────────┤
+│ agent:main:main        │ direct      │ 1m ago  │ MiniMax-M3      │ OpenClaw Default │ 66k/1.0m (7%) · 🗄️ 17% cached  │
+│ agent:main:dashboard:2 │ direct      │ 4m ago  │ MiniMax-M3      │ OpenClaw Default │ 62k/131k (47%) · 🗄️ 55% cached │
+│ 93bd72d-4…             │             │         │                 │                  │                                │
+│ agent:main:cron:1fbebb │ cron        │ 4h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ c0-31e9-4…             │             │         │                 │                  │                                │
+│ agent:main:subagent:50 │ spawn-child │ 5h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ d1c288-1e…             │             │         │                 │                  │                                │
+│ agent:main:cron:341afc │ cron        │ 8h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ a2-01b7-4…             │             │         │                 │                  │                                │
+│ agent:main:subagent:a1 │ spawn-child │ 8h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ db59b2-5d…             │             │         │                 │                  │                                │
+│ agent:main:subagent:41 │ spawn-child │ 9h ago  │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ d4bc7f-a5…             │             │         │                 │                  │                                │
+│ agent:main:subagent:36 │ spawn-child │ 24h ago │ MiniMax-M3      │ OpenClaw Default │ unknown/1.0m (?%)              │
+│ ce69a8-ec…             │             │         │                 │                  │                                │
+│ agent:main:openai:6137 │ direct      │ 30h ago │ agnes-2.0-flash │ OpenClaw Default │ 21k/524k (4%)                  │
+│ 4572-fad8…             │             │         │                 │                  │                                │
+│ agent:main:openai:8f8d │ direct      │ 30h ago │ agnes-2.0-flash │ OpenClaw Default │ 21k/524k (4%)                  │
+│ 095a-19be…             │             │         │                 │                  │                                │
+└────────────────────────┴─────────────┴─────────┴─────────────────┴──────────────────┴────────────────────────────────┘
+
+FAQ: https://docs.openclaw.ai/faq
+Troubleshooting: https://docs.openclaw.ai/troubleshooting
+Next steps:
+  Need to share?      openclaw status --all
+  Need to debug live? openclaw logs --follow
+  Need to test channels? openclaw status --deep
+
+===== openclaw health =====
+Gateway event loop: ok max=23ms p99=23ms util=0.036 cpu=0.062
+Agents: main (default), researcher, coder
+Heartbeat interval: 30m (main)
+Session store (main): /home/missyouangeled/.openclaw/agents/main/sessions/sessions.json (23 entries)
+- agent:main:main (1m ago)
+- agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270 (4m ago)
+- agent:main:cron:1fbebbc0-31e9-4346-9520-4d7f79330117 (259m ago)
+- agent:main:subagent:50d1c288-1ed8-4c69-b6fc-069e5ba40221 (302m ago)
+- agent:main:cron:341afca2-01b7-4106-969e-e137424dd24b (484m ago)
+
+===== openclaw help =====
+
+OpenClaw 2026.6.11 (e085fa1) — All your chats, one OpenClaw.
+
+Usage: openclaw [options] [command]
+
+Options:
+  --container <name>   Run the CLI inside a running Podman/Docker container
+                       named <name> (default: env OPENCLAW_CONTAINER)
+  --dev                Dev profile: isolate state under ~/.openclaw-dev, default
+                       gateway port 19001, and shift derived ports
+                       (browser/canvas)
+  -h, --help           Display help for command
+  --log-level <level>  Global log level override for file + console
+                       (silent|fatal|error|warn|info|debug|trace)
+  --no-color           Disable ANSI colors
+  --profile <name>     Use a named profile (isolates
+                       OPENCLAW_STATE_DIR/OPENCLAW_CONFIG_PATH under
+                       ~/.openclaw-<name>)
+  -V, --version        output the version number
+
+Commands:
+  Hint: commands suffixed with * have subcommands. Run <command> --help for details.
+  acp *                Run and manage ACP-backed coding agents
+  agent                Run one agent turn via the Gateway
+  agents *             Manage isolated agents (workspaces, auth, routing)
+  approvals *          Manage exec approvals (gateway or node host)
+  backup *             Create and verify local backup archives for OpenClaw
+                       state
+  capability *         Run provider capability commands (fallback alias: infer)
+  channels *           Add, remove, login, and inspect messaging channels
+  chat                 Open a local terminal UI (alias for tui --local)
+  clawbot *            Legacy clawbot command aliases
+  commitments *        List and manage inferred follow-up commitments
+  completion           Generate shell completion script
+  config *             Non-interactive config helpers
+                       (get/set/unset/file/validate). Default: starts guided
+                       setup.
+  configure            Interactive configuration for credentials, channels,
+                       gateway, and agent defaults
+  crestodian           Open the interactive setup and repair assistant
+  cron *               Schedule and inspect Gateway background jobs
+  daemon *             Manage the Gateway service (legacy alias)
+  dashboard            Open the Control UI with your current token
+  devices *            Device pairing + token management
+  directory *          Lookup contact and group IDs (self, peers, groups) for
+                       supported chat channels
+  dns *                DNS helpers for wide-area discovery (Tailscale + CoreDNS)
+  docs                 Search the live OpenClaw docs
+  doctor               Diagnose and repair config, Gateway, plugin, and channel
+                       problems

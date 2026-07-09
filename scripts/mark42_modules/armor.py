@@ -25,6 +25,7 @@ from .utils import (
     _append_broker, _estimate_tokens_smart, _find_active_session,
     _get_context_window, _load_json, _now_iso, _now_ts, _save_json,
 )
+from .output_guard import compact_preview, trim_detail
 
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
@@ -178,7 +179,7 @@ def _classify_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
             text = str(raw_content)
         if not text:
             continue
-        entry = {"index": i, "role": role, "preview": text[:120]}
+        entry = {"index": i, "role": role, "preview": compact_preview(text, 120)}
         if role == "user" or role == "assistant":
             if any(kw in text for kw in PRESERVE_KW):
                 preserved.append(entry)
@@ -532,10 +533,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     _append_broker("armor", "mark42.armor.compress.done",
                    f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
                    "ok" if index.get('strategyUsed') == 'llm-analyze' else "warn",
-                   f"策略: {index.get('strategyUsed', '?')} | "
-                   f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) +
-                            len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
-                   f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
+                   trim_detail(
+                       f"策略: {index.get('strategyUsed', '?')} | "
+                       f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) + len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
+                       f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
+                       180,
+                   ),
                    {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
                     "modelGenerated": index.get('modelGenerated', False)})
     # ── 实际压缩：通过 OpenClaw 合法 CLI 通道触发 /compact ──
@@ -728,14 +731,14 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     "armor", "mark42.armor.compact.ineffective",
                     f"连续 {ineffective_count}/{total_count} 次压缩未生效",
                     "warn",
-                    f"建议检查 contextWindow 配置 / LLM 可用性 / session fence 状态",
+                    trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / session fence 状态", 160),
                     {"ineffectiveCount": ineffective_count, "totalCount": total_count,
                      "preUsage": usage},
                 )
-                print(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件")
+                print(trim_detail(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件", 120))
     except Exception as e:
         # 升级逻辑本身的错误不能影响主流程
-        print(f"⚠️ 连续无效检查失败 (非致命): {e}")
+        print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
 
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
@@ -748,7 +751,7 @@ def armor_guard(interval_s: int = 300) -> None:
             check = armor_check()
             usage = check.get("usagePercent", 0)
             ts = datetime.now().strftime("%H:%M:%S")
-            print(f"[{ts}] 上下文 {usage}% — {check.get('summary', '')}")
+            print(trim_detail(f"[{ts}] 上下文 {usage}% — {check.get('summary', '')}", 120))
             if usage >= THRESHOLD_ALERT:
                 print(f"[{ts}] 🟠 自动触发压缩")
                 result = armor_compress()

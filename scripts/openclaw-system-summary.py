@@ -21,6 +21,7 @@ from typing import Any
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 SCRIPTS = WORKSPACE / "scripts"
+HOME = Path.home()
 
 
 def now_iso() -> str:
@@ -83,6 +84,15 @@ def git_dirty_summary() -> dict[str, Any]:
     }
 
 
+def load_json(path: Path) -> Any:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="OpenClaw 系统一眼总览")
     parser.add_argument("--print-human", action="store_true")
@@ -125,6 +135,19 @@ def main() -> int:
         "ok": verify["ok"] and parsed_verify["ok"],
         "summary": parsed_verify["summary"],
     }
+
+    emergency_status = load_json(HOME / '.local' / 'state' / 'openclaw' / 'emergency-aggregator' / 'status.json')
+    if isinstance(emergency_status, dict):
+        findings = emergency_status.get('findings') or []
+        checks["emergency"] = {
+            "ok": emergency_status.get('overall') == 'OK',
+            "summary": f"overall={emergency_status.get('overall')} findings={len(findings)} repair={emergency_status.get('repairSummary') or 'unknown'}",
+        }
+    else:
+        checks["emergency"] = {
+            "ok": False,
+            "summary": 'emergency status missing',
+        }
 
     local_health = run([sys.executable, str(SCRIPTS / "openclaw-local-health-diagnose.py"), "--print-human"], timeout=90)
     local_health_first_line = local_health["stdout"].splitlines()[0].strip() if local_health["stdout"].splitlines() else ""

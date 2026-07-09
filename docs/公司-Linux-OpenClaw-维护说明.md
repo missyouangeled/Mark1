@@ -52,6 +52,7 @@
 
 - 本文档 `docs/公司-Linux-OpenClaw-维护说明.md`
 - Linux 专用脚本（例如 `scripts/openclaw-resume-watch.sh`）
+- 所有 gateway restart 必须留证据：至少同步写入 `~/.local/state/openclaw/gateway-restart-audit.jsonl` 或 `~/.openclaw/logs/gateway-restart.log`，能够追溯触发来源、原因、是否因在线连接而跳过
 - Linux systemd 用户单元说明
 - `TOOLS.md` 中 Linux 相关条目
 

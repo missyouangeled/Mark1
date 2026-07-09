@@ -1,0 +1,17 @@
+===== which openclaw =====
+/home/missyouangeled/.npm-global/bin/openclaw
+
+===== command -v openclaw =====
+/home/missyouangeled/.npm-global/bin/openclaw
+
+===== ls -la /home/missyouangeled/.npm-global/bin/openclaw =====
+lrwxrwxrwx 1 missyouangeled missyouangeled 41 Jul  1 16:15 /home/missyouangeled/.npm-global/bin/openclaw -> ../lib/node_modules/openclaw/openclaw.mjs
+
+===== openclaw --version =====
+OpenClaw 2026.6.11 (e085fa1)
+
+===== node --version =====
+v22.23.1
+
+===== python3 --version =====
+Python 3.12.3

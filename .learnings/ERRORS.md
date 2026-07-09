@@ -25746,3 +25746,333 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260706-001] user-reported-error
+
+**Logged**: 2026-07-06T09:07:37.759Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 总报这个错。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260706-002] user-reported-error
+
+**Logged**: 2026-07-06T09:09:39.222Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 总报这个错。 能不能放后台执行任务。并且开监工。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-001] user-reported-error
+
+**Logged**: 2026-07-07T00:08:46.694Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 出现这个问题了。解决一下 然后继续刚才的工作
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-002] user-reported-error
+
+**Logged**: 2026-07-07T00:09:52.015Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 出现这个问题了。解决一下 然后
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-003] user-reported-error
+
+**Logged**: 2026-07-07T00:19:57.674Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 重启前又是这个问题。 继续做。感觉最近系统问题真的有点多。 好好修理一下。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-004] user-reported-error
+
+**Logged**: 2026-07-07T02:54:03.597Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+Error: reply session initialization conflicted for agent:main:main 刚才出了这个问题。修理一下 然后继续 先备份当前 branding override 检查它是否重复注入/内容异常 然后把这层清干净并做最小验证 。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-005] user-reported-error
+
+**Logged**: 2026-07-07T08:03:51.229Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+这次连 process(action=poll) 都返回"附件"——也就是说，当前 exec / process / read 三条工具的输出渲染都坏了。 上一轮我自己判断"单行 python3 -c 可用、复合命令不可用"也是不完整的——更准确地说： 这条对话通道里，工具输出渲染异常已经大到让我没法可靠地看到 stdout / stderr / log / 文件内容。 我之前能看到的"OK"、"DONE2"、"REPLACED 1"，是刚好这三条单行极短输出逃过了渲染异常。这不是正常工具表现，是宿主侧渲染层坏了。 我必须在这里停下，不能继续假装"在修…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-006] user-reported-error
+
+**Logged**: 2026-07-07T08:34:08.941Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+这是返回的 $ ls /home/missyouangeled/.openclaw/workspace/docs/runtime-checks/[redacted]/ cat /tmp/r3.txt cat /tmp/r1.txt cat /home/missyouangeled/.openclaw/workspace/docs/runtime-checks/[redacted]/WS_PROBE_STATUS.md cat /home/missyouangeled/.openclaw/workspace/memory/daily/2026-07-07…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260707-007] user-reported-error
+
+**Logged**: 2026-07-07T08:58:46.922Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+跑TTY 的返回 $ wc -l /home/missyouangeled/.openclaw/workspace/docs/plans/35-2026-07-07WebChat渲染异常排查与恢复方案.md /home/missyouangeled/.openclaw/workspace/memory/daily/2026-07-07.md 188 /home/missyouangeled/.openclaw/workspace/docs/plans/35-2026-07-07WebChat渲染异常排查与恢复方案.md 42 /home/missyou…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260708-001] user-reported-error
+
+**Logged**: 2026-07-08T00:29:01.240Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+返回结果 发给你 cat /tmp/r1.txt cat /tmp/r3.txt cat /home/missyouangeled/.openclaw/workspace/docs/runtime-checks/[redacted]/12-ws-probe.txt | head -20 openclaw logs --limit 20 --no-color | tail -20 cat: /tmp/r1.txt: No such file or directory cat: /tmp/r3.txt: No such file or directory …
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260708-002] user-reported-error
+
+**Logged**: 2026-07-08T01:05:15.287Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+R0：armor_guard() 守护每 5 分钟检查时，usage ≥ 85% 会自动调 armor_compress()（不传 dry_run → 走真压缩路径）。 之前我以为是"理论风险"，现在确认是在线行为——只是当前 usage=3.6% 远低于 85% 阈值没触发。代码本身处理超时/异常的兜底是完善的（不会让守护挂），但 compact 超时本身是 OpenClaw issue #43661 的已知 bug。 先修改这个问题吧。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

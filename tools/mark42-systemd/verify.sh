@@ -206,6 +206,12 @@ else
   warn "未找到 openclaw 命令；无法补充读取 Gateway 状态面"
 fi
 
+if "$PYTHON_BIN" "$MARK42_CLI" context-safety verify >/dev/null 2>&1; then
+  pass "Mark42 context safety verify 通过"
+else
+  fail "Mark42 context safety verify 未通过"
+fi
+
 STATUS_TMP="$(mktemp)"
 if "$PYTHON_BIN" "$MARK42_CLI" status --json >"$STATUS_TMP" 2>&1; then
   pass "mark42.py status --json 可运行"

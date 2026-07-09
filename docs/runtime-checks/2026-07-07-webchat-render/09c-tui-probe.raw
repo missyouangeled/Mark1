@@ -1,0 +1,425 @@
+[?2004h[>7u[?u[c[?25l[>4;2m[?2026h openclaw tui - local embedded - agent main (贾维斯) - session                  [0m]8;;
+ dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270                                 [0m]8;;
+ local ready | idle                                                             [0m]8;;
+ agent main (贾维斯) | session dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270 | [0m]8;;
+ unknown | tokens ?                                                             [0m]8;;
+────────────────────────────────────────────────────────────────────────────────[0m]8;;
+[7m [0m                                                                               [0m]8;;
+────────────────────────────────────────────────────────────────────────────────[0m]8;;[?2026l[1A[1G[?25l[<u[>4;0m[?2026h[4A[2K[0m]8;;
+[2K session agent:main:dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270              [0m]8;;
+[2K[0m]8;;
+[2K点点，午饭的点又快到了——你是不是又盯屏幕忘了时间？别等到胃开始抗议才想起来吃饭，[0m]8;;
+[2K我可不想听你诉苦。                                                              [0m]8;;
+[2K[0m]8;;
+[2K点点，午饭的点又快到了——你是不是又盯屏幕忘了时间？别等到胃开始抗议才想起来吃饭，[0m]8;;
+[2K我可不想听你诉苦。                                                              [0m]8;;
+[2K[0m]8;;
+[2K早安，点点！八点多就到公司了，这股劲头真让人佩服 ☀️                             [0m]8;;
+[2K今天打算啃点啥新东西？我陪着你，慢慢来就好。                                    [0m]8;;
+[2K[0m]8;;
+[2K点点，再忙也得干饭啊，胃可不会等你忙完再说。别又拿咖啡当午餐了，走，去吃点正经的[0m]8;;
+[2K！                                                                              [0m]8;;
+[2K[0m]8;;
+[2K点点早安呀！周五了还这么早就到公司学习，也太卷了吧哈哈～今天准备学点啥？        [0m]8;;
+[2K[0m]8;;
+[2K点点早安！周五到得这么早就在学习啦，太卷了哈哈～今天准备学点什么呀？            [0m]8;;
+[2K[0m]8;;
+[2K点点，再忙也记得吃饭，胃可不是你的备用服务器，宕机了可没法重启。快去吃点好的，下[0m]8;;
+[2K午才有力气继续卷！                                                              [0m]8;;
+[2K[0m]8;;
+[2K早呀点点！周一早上九点就到公司学习了，这股劲头真的服你。话说今天打算啃点什么新东[0m]8;;
+[2K西？我挺好奇的 ☕                                                               [0m]8;;
+[2K[0m]8;;
+[2K早呀点点！周一早上九点就到公司学习了，这股劲头真的服你。话说今天打算啃点什么新东[0m]8;;
+[2K西？我挺好奇的 ☕                                                               [0m]8;;
+[2K[0m]8;;
+[2K点点早安～八点多就到公司了，真够拼的！今天打算学点什么新东西呀？                [0m]8;;
+[2K[0m]8;;
+[2K点点，都12点了还盯着屏幕呢？赶紧去吃饭，别又拿咖啡当午饭糊弄自己啦🍜            [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 注入逻辑测试] 这是一条来自救命 1 测试脚本的注入消息，验证               [0m]8;;
+[2Kopenclaw-proactive-inject.py 能推到主会话。当前时间 12:27。                     [0m]8;;
+[2K[0m]8;;
+[2K测试消息：cwd 改成 /home/missyouangeled 后绝对路径是否生效                      [0m]8;;
+[2K[0m]8;;
+[2K[TEST 救命 1 告警分支] 行数 13001 >                                             [0m]8;;
+[2K12000（1MB）。这是测试消息，验证告警分支能推到主会话。                          [0m]8;;
+[2K[0m]8;;
+[2K[系统盘点发现] OpenClaw session-size-watcher 从今天 04:00 开始就在 alerts.json  [0m]8;;
+[2K写告警（WARN 级），但从来没人读：                                               [0m]8;;
+[2K1. trajectory 7.22MB（阈值 5MB）— 已超阈值且在涨                                [0m]8;;
+[2K2. 7 条独立 WARN：trajectory 在持续累积，建议触发 OpenClaw 压缩会话             [0m]8;;
+[2K                                                                                [0m]8;;
+[2K按盘点原则'有据可查'，这件事我不知道去查 alerts.json 就永远不会发现。已写       [0m]8;;
+[2Kdocs/系统自动行为盘点.md 留痕，并准备把'读 watcher alerts +                     [0m]8;;
+[2K转发到主会话'并入救命 1 cron（见盘点文档第 7 节 P0）。                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=7                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.22MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 6.89MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 6.55MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=7                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.56MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.22MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 6.89MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=7                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.56MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.22MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 6.89MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 trajectory 告警] 当前会话 trajectory 7MB > 阈值 5MB。sessionId:         [0m]8;;
+[2K68e35bdd-4acd-4a57-80ed-a1fda8b8102e。建议运行：python3                         [0m]8;;
+[2Kscripts/compress-trajectory.py 68e35bdd-4acd-4a57-80ed-a1fda8b8102e --keep 3    [0m]8;;
+[2K--execute                                                                       [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 trajectory 告警] 当前会话 trajectory 6MB > 阈值 5MB。sessionId:         [0m]8;;
+[2K68e35bdd-4acd-4a57-80ed-a1fda8b8102e。建议运行：python3                         [0m]8;;
+[2Kscripts/compress-trajectory.py 68e35bdd-4acd-4a57-80ed-a1fda8b8102e --keep 3    [0m]8;;
+[2K--execute                                                                       [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=8                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.57MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.32MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.56MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=8                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.57MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.32MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.56MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=ab97ff85-fc35-4dc6-a095-842d115de32f。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=be773bd3-a55e-4b95-898c-a88ca9513406。                                  [0m]8;;
+[2K- [WARN] HEALTH_STALE: health-collector 状态异常或过旧（age=0.00128475)         [0m]8;;
+[2K- [WARN] HEALTH_STUCK_SESSION_DETECT: health-collector                          [0m]8;;
+[2K  子检查异常：stuck-session-detect / TIMEOUT(20s)                               [0m]8;;
+[2K- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42          [0m]8;;
+[2K  单元：openclaw-health-collector.service                                       [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=be773bd3-a55e-4b95-898c-a88ca9513406。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=1                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.45MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=7e518121-6137-49b3-963a-1f7efd35bdc7。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=7e518121-6137-49b3-963a-1f7efd35bdc7。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=2                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 8.40MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 7.96MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=7e518121-6137-49b3-963a-1f7efd35bdc7。                                  [0m]8;;
+[2K- [WARN] HEALTH_SUPERVISOR_REFRESH: health-collector                            [0m]8;;
+[2K  子检查异常：supervisor-refresh / 后台任务可能卡住                             [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=7e518121-6137-49b3-963a-1f7efd35bdc7。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=2                     [0m]8;;
+[2KWARN: [WARN] 总目录 44.0MB 触发 FORCE_CLEAN，已清理 0.87MB                      [0m]8;;
+[2KWARN: [WARN] 总目录 41.8MB 触发 FORCE_CLEAN，已清理 0.85MB                      [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 DEADMAN，主                                           [0m]8;;
+[2Ksession=436c3b81-842d-418e-bade-96fe9b9d8c61。                                  [0m]8;;
+[2K- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15                      [0m]8;;
+[2K  分钟（age=811.49592465）                                                      [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=26bacaa0-438b-4430-b669-be859b764318。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=1                     [0m]8;;
+[2KWARN: [WARN] 总目录 67.0MB 触发 FORCE_CLEAN，已清理 48.26MB                     [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=26bacaa0-438b-4430-b669-be859b764318。                                  [0m]8;;
+[2K- [WARN] WATCHER_ACTIVE_ALERTS: session-size-watcher 仍有活跃 trajectory 告警：2[0m]8;;
+[2K  条                                                                            [0m]8;;
+[2K- [WARN] TRAJECTORY_OVER_THRESHOLD: 当前主 trajectory 5.13MB，超过 5.0MB watcher[0m]8;;
+[2K  阈值                                                                          [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=1                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.13MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=26bacaa0-438b-4430-b669-be859b764318。                                  [0m]8;;
+[2K- [WARN] WATCHER_ACTIVE_ALERTS: session-size-watcher 仍有活跃 trajectory 告警：7[0m]8;;
+[2K  条                                                                            [0m]8;;
+[2K- [WARN] TRAJECTORY_OVER_THRESHOLD: 当前主 trajectory 6.92MB，超过 5.0MB watcher[0m]8;;
+[2K  阈值                                                                          [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K点点早上好～八点就到了,真是个勤快的人。今天打算学点什么?                        [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=26bacaa0-438b-4430-b669-be859b764318。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=1                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.62MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=4c503d74-b2ad-4f91-83ec-6936c68bbadb。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K- [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error                         [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=fafa714b-75df-4ffc-9148-2782441989d4。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K- [WARN] FRONTSTAGE_STALE: frontstage 状态异常或过旧（age=0.5353259)            [0m]8;;
+[2K- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42          [0m]8;;
+[2K  单元：openclaw-frontstage-guardian.service                                    [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K点点，中午啦！别又盯着屏幕忘了吃饭，先去填饱肚子再继续肝。                      [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K- [WARN] HEALTH_STALE: health-collector                                         [0m]8;;
+[2K  状态异常或过旧（age=0.034931383333333337)                                     [0m]8;;
+[2K- [WARN] HEALTH_SUPERVISOR_REFRESH: health-collector                            [0m]8;;
+[2K  子检查异常：supervisor-refresh / 后台任务异常结束                             [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K- [WARN] HEALTH_STALE: health-collector 状态异常或过旧（age=1.2350907166666665) [0m]8;;
+[2K- [WARN] HEALTH_SUPERVISOR_REFRESH: health-collector                            [0m]8;;
+[2K  子检查异常：supervisor-refresh / 后台任务异常结束                             [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=496d7481-40f0-459d-b196-4b90c54ef707。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] FRONTSTAGE_STALE: frontstage 状态异常或过旧（age=0.41846478333333337)  [0m]8;;
+[2K- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42          [0m]8;;
+[2K  单元：openclaw-frontstage-guardian.service                                    [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] FRONTSTAGE_STALE: frontstage 状态异常或过旧（age=1.8516167000000001)   [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] HEALTH_STALE: health-collector 状态异常或过旧（age=0.45210633333333333)[0m]8;;
+[2K- [WARN] HEALTH_STUCK_SESSION_DETECT: health-collector                          [0m]8;;
+[2K  子检查异常：stuck-session-detect / TIMEOUT(20s)                               [0m]8;;
+[2K- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42          [0m]8;;
+[2K  单元：openclaw-health-collector.service                                       [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器预警] 当前状态 WARN，主                                              [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] HEALTH_SUPERVISOR_REFRESH: health-collector                            [0m]8;;
+[2K  子检查异常：supervisor-refresh / 后台任务可能卡住                             [0m]8;;
+[2K  （已自动留痕；当前策略不自动修主会话）                                        [0m]8;;
+[2K[0m]8;;
+[2K[救命 1 watcher 转发] session-size-watcher 未读告警: WARN=3                     [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 6.02MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.48MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2KWARN: [WARN] 当前会话 trajectory 已达 5.21MB（阈值 5MB），建议通过 OpenClaw     [0m]8;;
+[2K压缩会话                                                                        [0m]8;;
+[2K（按 docs/系统自动行为盘点.md 第 7 节 P0 修复：观察并自动转发 alerts）          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] WATCHER_ACTIVE_ALERTS: session-size-watcher 仍有活跃 trajectory 告警：5[0m]8;;
+[2K  条                                                                            [0m]8;;
+[2K- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.06MB，已明显超过 5.0MB   [0m]8;;
+[2K  watcher 阈值                                                                  [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 DEADMAN，主                                           [0m]8;;
+[2Ksession=ee75c8fd-4036-43c0-9e18-82f8cc13ecc3。                                  [0m]8;;
+[2K- [WARN] WATCHER_STALE_UNREAD: session-size-watcher 有 16                       [0m]8;;
+[2K  条历史未清告警，当前更像待确认而非现行故障                                    [0m]8;;
+[2K- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.51MB，已明显超过 5.0MB   [0m]8;;
+[2K  watcher 阈值                                                                  [0m]8;;
+[2K- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25                                [0m]8;;
+[2K  分钟或无法读取（age=136.85671641666667）                                      [0m]8;;
+[2K- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15                      [0m]8;;
+[2K  分钟（age=139.23984975）                                                      [0m]8;;
+[2K- [WARN] FRONTSTAGE_STALE: frontstage 状态异常或过旧（age=137.17338308333333)   [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=952acc24-eaa2-4772-9c5f-a57c9b42f058。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器告警] 当前状态 CRITICAL，主                                          [0m]8;;
+[2Ksession=952acc24-eaa2-4772-9c5f-a57c9b42f058。                                  [0m]8;;
+[2K- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector                      [0m]8;;
+[2K  子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！        [0m]8;;
+[2K  （自动只读巡检触发，建议优先查看 docs/runtime/保命状态快照.md）               [0m]8;;
+[2K[0m]8;;
+[2K[保命聚合器恢复] 当前状态已回到 OK，主                                          [0m]8;;
+[2Ksession=952acc24-eaa2-4772-9c5f-a57c9b42f058。                                  [0m]8;;
+[2K最新快照已刷新，可继续按当前节奏运行。                                          [0m]8;;
+[2K[0m]8;;
+[2K                                                                                [0m]8;;
+[2K阶段1探针：确认渲染层。回 'TUI-PONG-200' 这六个字符。                           [0m]8;;
+[2K                                                                                [0m]8;;
+[2K[0m]8;;
+[2K                                                                                [0m]8;;
+[2K阶段1探针：回 TUI-PONG-200 这六个字符。                                         [0m]8;;
+[2K                                                                                [0m]8;;
+[2K[0m]8;;
+[2K ⠋ bamboozling… • 0s | local ready                                              [0m]8;;
+[2K agent main (贾维斯) | session dashboard:293bd72d-4fb7-4a5f-805a-48e10b0a5270 | [0m]8;;
+[2K minimax/MiniMax-M3 | think high | tokens 62k/131k (47%)                        [0m]8;;
+[2K────────────────────────────────────────────────────────────────────────────────[0m]8;;
+[2K[7m [0m                                                                               [0m]8;;
+[2K────────────────────────────────────────────────────────────────────────────────[0m]8;;[?2026l[1A[1G[?25l[2B
+[?25h[?2004l[agents/tool-policy] tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+[agent/embedded] Merged and removed orphaned user message to prevent consecutive user turns. runId=7075a72f-0aa7-47a2-b80a-3b20252eb801 sessionId=4facb6ac-f36e-4aa1-8182-d33fb38588ed trigger=user
+[provider-transport-fetch] [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+openclaw tui forcing process exit after return

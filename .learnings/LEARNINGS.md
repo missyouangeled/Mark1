@@ -1366,3 +1366,51 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260707-001] correction
+
+**Logged**: 2026-07-07T00:33:40.465Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 能继续，而且我已经把这两个问题的关系摸出来了。 现在最通俗的结论是： 1）你刚报的这个错误，不是孤立的 Error: reply session initialization conflicted for agent:main:main 它现在很像是被主会话太胖诱发的。 我刚查到： 主 session jsonl 本身不算夸张：0.75MB 但主会话的 trajectory 已经 6.31MB 监工已经连续在报这个超阈值告警 这就很像： 前台每次要恢复/初始化 reply session 时，要重放的运行轨迹太重，导致初始化更容易撞车。 2）“总是重读…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260708-001] correction
+
+**Logged**: 2026-07-08T01:51:28.988Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 如果要做的话 顺序 应该是 先会话裁剪（Pruning）然后 compaction.model 做总结 或者 做 compaction 前的 memory flush 同时 Mark42 也有自己的主动判断 什么时候 触发 compaction 对吧。 应该是这个流程顺序。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

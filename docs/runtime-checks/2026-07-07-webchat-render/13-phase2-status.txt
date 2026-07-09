@@ -1,0 +1,78 @@
+===== 阶段 2.5 状态采样  2026-07-07 16:38:54 CST =====
+
+## A. 后端健康（不改任何东西）
+### A.1 Gateway 是否在跑
+  active
+      PID     ELAPSED CMD
+    12393       30:00 /usr/bin/node /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/index.js gateway --port 18789
+
+### A.2 最近 30 条 Gateway 日志（只看事件，不重启）
+          "missing_linked_tasks": 0,
+          "blocked_task_missing": 0,
+          "inconsistent_timestamps": 0
+        }
+      }
+    }
+  }
+  2026-07-07T16:35:20.667+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+  2026-07-07T16:35:23.624+08:00 warn gateway/ws {"subsystem":"gateway/ws"} unauthorized conn=0cb0e80d-f270-4a37-90a7-06bfea5e8826 peer=127.0.0.1:54670->127.0.0.1:18789 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui role=operator scopes=5 auth=none device=yes platform=Linux x86_64 instance=5dc76ab1-4a73-4054-8bc0-bc4c089fa10c host=127.0.0.1:18789 origin=http://127.0.0.1:18789 ua=Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0 reason=token_missing
+  2026-07-07T16:35:23.634+08:00 warn gateway/ws {"subsystem":"gateway/ws"} {"cause":"unauthorized","handshake":"failed","durationMs":97,"lastFrameType":"req","lastFrameMethod":"connect","lastFrameId":"d7a7011e-c87d-46e6-8351-57062a989501","host":"127.0.0.1:18789","origin":"http://127.0.0.1:18789","userAgent":"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0","remoteAddr":"127.0.0.1","remotePort":54670,"localAddr":"127.0.0.1","localPort":18789,"endpoint":"127.0.0.1:54670->127.0.0.1:18789","authMode":"token","authProvided":"none","authReason":"token_missing","allowTailscale":false,"peer":"127.0.0.1:54670->127.0.0.1:18789","role":"operator","scopeCount":5,"hasDeviceIdentity":true,"client":"openclaw-control-ui","mode":"webchat","version":"control-ui","platform":"Linux x86_64","instanceId":"5dc76ab1-4a73-4054-8bc0-bc4c089fa10c"} closed before connect conn=0cb0e80d-f270-4a37-90a7-06bfea5e8826 peer=127.0.0.1:54670->127.0.0.1:18789 remote=127.0.0.1 fwd=n/a origin=http://127.0.0.1:18789 host=127.0.0.1:18789 ua=Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0 code=4008 reason=connect failed
+  2026-07-07T16:36:20.329+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=6c18ce17-5758-4b75-8923-cbd91121835f remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+  2026-07-07T16:36:20.470+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 75ms conn=6c18ce17…835f id=7d91ba9f…4e4b
+  2026-07-07T16:36:21.783+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 1023ms conn=6c18ce17…835f id=1eae3400…40b4
+  2026-07-07T16:36:29.661+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+  2026-07-07T16:36:29.765+08:00 info agent/embedded {"subsystem":"agent/embedded"} [tool-result-truncation] Truncated 2 tool result(s) for prompt history (maxChars=64000 aggregateBudgetChars=256000) sessionKey=agent:main:main
+  2026-07-07T16:36:29.944+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.history 66ms conn=1ed5b2e6…d6dc id=934dd392…cf36
+  2026-07-07T16:36:29.974+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+  2026-07-07T16:36:34.003+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=4029 contentType=text/event-stream; charset=utf-8
+  2026-07-07T16:36:57.527+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=6c18ce17-5758-4b75-8923-cbd91121835f
+  2026-07-07T16:37:38.145+08:00 info agents/tool-policy {"subsystem":"agents/tool-policy"} {"rule":"tools.profile (coding)","ruleKind":"allow","removedToolCount":5,"removedTools":["agents_list","gateway","message","nodes","tts"],"removedToolsTruncated":false} tool policy removed 5 tool(s) via tools.profile (coding): agents_list, gateway, message, nodes, tts
+  2026-07-07T16:37:38.255+08:00 info agent/embedded {"subsystem":"agent/embedded"} [tool-result-truncation] Truncated 2 tool result(s) for prompt history (maxChars=64000 aggregateBudgetChars=256000) sessionKey=agent:main:main
+  2026-07-07T16:37:38.434+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+  2026-07-07T16:37:45.268+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=6834 contentType=text/event-stream; charset=utf-8
+  2026-07-07T16:38:16.189+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] start provider=minimax api=openai-completions model=MiniMax-M3 method=POST url=https://api.minimax.chat/v1/chat/completions timeoutMs=600000 proxy=none policy=custom
+  2026-07-07T16:38:16.429+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat disconnected code=1001 reason=n/a conn=1ed5b2e6-9d3e-4e35-8326-ecc7a2bad6dc
+  2026-07-07T16:38:16.737+08:00 info gateway/ws {"subsystem":"gateway/ws"} webchat connected conn=4095fa14-c05b-4512-b404-56aca9bd0ff7 remote=127.0.0.1 client=openclaw-control-ui webchat vcontrol-ui
+  2026-07-07T16:38:16.866+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ chat.startup 100ms conn=4095fa14…0ff7 id=aa2b551b…6287
+  2026-07-07T16:38:18.055+08:00 info gateway/ws {"subsystem":"gateway/ws"} ⇄ res ✓ models.authStatus 866ms conn=4095fa14…0ff7 id=bb63c3c5…bf7c
+  2026-07-07T16:38:23.900+08:00 info provider-transport-fetch {"subsystem":"provider-transport-fetch"} [model-fetch] response provider=minimax api=openai-completions model=MiniMax-M3 status=200 elapsedMs=7712 contentType=text/event-stream; charset=utf-8
+  Log tail truncated (increase --max-bytes).
+
+### A.3 Dashboard 可达性（不改）
+  http_code=200 time=0.001698s
+
+## B. 渲染层静态资源快照（只读）
+### B.1 Control UI 关键 bundle 文件 mtime（看是否最近被动过）
+  2026-07-01 16:15  /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/client-DAhwsiMS.js
+  2026-07-01 16:15  /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/client-bootstrap-G6LMePzt.js
+  2026-07-01 16:15  /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/client-48bOJus2.js
+  2026-07-07 16:08  /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/control-ui/index.html
+  2026-07-01 16:15  /home/missyouangeled/.npm-global/lib/node_modules/openclaw/dist/canvas-host/a2ui/index.html
+
+## C. 当前文件落盘清单（验证我们的文件都在）
+  total 180
+  drwxrwxr-x 2 missyouangeled missyouangeled  4096 Jul  7 16:38 .
+  drwxrwxr-x 3 missyouangeled missyouangeled  4096 Jul  7 16:18 ..
+  -rw-rw-r-- 1 missyouangeled missyouangeled   511 Jul  7 16:19 01-env-basic.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled 11110 Jul  7 16:19 02-gateway-status.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1010 Jul  7 16:19 03-stability.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1956 Jul  7 16:20 04-logs.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1187 Jul  7 16:20 05-logs-help.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled 45506 Jul  7 16:20 06-logs-200.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  2551 Jul  7 16:21 07-rep-output.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled   773 Jul  7 16:21 08-rep-output-fix.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled   378 Jul  7 16:22 09b-tui-probe.scriptlog
+  -rw-rw-r-- 1 missyouangeled missyouangeled 39239 Jul  7 16:23 09c-tui-probe.raw
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1537 Jul  7 16:21 09-tui-probe.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  8002 Jul  7 16:23 10-summary-evidence.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1460 Jul  7 16:24 11-phase1-summary.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  1758 Jul  7 16:28 12-ws-probe.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  7604 Jul  7 16:38 13-phase2-status.txt
+  -rw-rw-r-- 1 missyouangeled missyouangeled  2005 Jul  7 16:38 probe-render.sh
+  -rw-rw-r-- 1 missyouangeled missyouangeled  4365 Jul  7 16:27 ws_probe.py
+  -rw-rw-r-- 1 missyouangeled missyouangeled  3822 Jul  7 16:30 WS_PROBE_STATUS.md
+
+## D. OpenClaw 安装版本（确认是否跟 16:18 一致）
+  OpenClaw 2026.6.11 (e085fa1)
+
+===== 采样完成 =====

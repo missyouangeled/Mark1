@@ -1,0 +1,21 @@
+===== openclaw gateway stability --bundle latest =====
+Stability bundle
+Path: /home/missyouangeled/.openclaw/logs/stability/openclaw-stability-2026-06-26T04-57-19-102Z-50689-gateway.startup_failed.json
+Generated: 2026-06-26T04:57:19.102Z
+Reason: gateway.startup_failed
+Process: pid=50689 node=22.23.0 linux/x64 uptime=2s
+Host: <redacted-hostname>
+Error: name=Error
+
+Gateway Stability
+Events: 0/1000
+
+===== ls logs dir =====
+total 160
+drwx------  3 missyouangeled missyouangeled   4096 Jul  2 07:49 .
+drwx------ 31 missyouangeled missyouangeled  12288 Jul  7 16:19 ..
+-rw-------  1 missyouangeled missyouangeled   9512 Jun 12 07:33 commands.log
+-rw-------  1 missyouangeled missyouangeled 115671 Jul  6 11:26 config-audit.jsonl
+-rw-------  1 missyouangeled missyouangeled   1050 Jul  1 15:17 config-health.json.manual-archived.2026-07-02T07-49-46+08-00
+-rw-rw-r--  1 missyouangeled missyouangeled    678 Jul  7 15:54 gateway-restart.log
+drwx------  2 missyouangeled missyouangeled   4096 Jun 26 12:57 stability

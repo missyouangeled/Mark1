@@ -3,6 +3,8 @@
 import argparse
 import sys
 
+from .output_guard import trim_detail, trim_summary
+
 
 def _trim_daemon_logs(log_dir):
     """检查 daemon 日志大小：单个文件超限则截尾保留最新部分。"""
@@ -239,7 +241,7 @@ def assemble() -> None:
 └──────────────────────────────────────────┘
 """)
     check = armor_check()
-    print(f"📊 启动时上下文: {check.get('usagePercent', 0)}% — {check.get('summary', '')}\n")
+    print(f"📊 启动时上下文: {check.get('usagePercent', 0)}% — {trim_summary(check.get('summary', ''), 100)}\n")
 
     # ── Fork 子进程 ──
     script = str(Path(__file__).resolve().parent.parent / "mark42.py")
@@ -365,7 +367,7 @@ def assemble() -> None:
         _shutdown(None, None)
 
 
-def status_dashboard(json_mode: bool = False) -> dict | None:
+def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | None:
     """一屏聚合 Armor/Engine/Heavy/Logs 状态。
     json_mode=True 返回 dict，不打印。
     """
@@ -433,7 +435,7 @@ def status_dashboard(json_mode: bool = False) -> dict | None:
         print("="*56)
         print(f"  检查时间: {now_str}\n")
         print(f"  🛡️ 上下文铠甲")
-        print(f"     {status_icon} {usage}% ({check.get('summary', '')})")
+        print(f"     {status_icon} {usage}% ({trim_summary(check.get('summary', ''), 100)})")
         if idx:
             print(f"     🧠 索引: {strat} ({gen_time[:16] if gen_time else '?'})")
         else:
@@ -447,6 +449,8 @@ def status_dashboard(json_mode: bool = False) -> dict | None:
                 stat = loop.get("status")
                 icon = "▶️" if stat == "running" else ("⏸️" if stat == "registered" else "⏹")
                 print(f"     {icon} {name}: {stat} (cycle {cyc}/{max_c or '∞'})")
+                if verbose and loop.get("task"):
+                    print(f"        task: {trim_detail(loop.get('task'), 160)}")
         print(f"\n  ⚙️ 重型战甲")
         if heavy_tasks:
             for tf in sorted(heavy_tasks):
@@ -455,7 +459,9 @@ def status_dashboard(json_mode: bool = False) -> dict | None:
                 stat = ts.get("status", "?")
                 tsum = ts.get("summary", "")
                 icon = "🔄" if stat == "started" else ("✅" if stat == "finished" else "⏳")
-                print(f"     {icon} {name}: {stat} — {tsum}")
+                print(f"     {icon} {name}: {stat} — {trim_summary(tsum, 100)}")
+                if verbose and ts.get("checkedAt"):
+                    print(f"        checkedAt: {ts.get('checkedAt')}")
         else:
             print(f"     ℹ️ 无活跃任务")
         print(f"\n  🧹 日志轮替")
@@ -561,6 +567,9 @@ def main() -> None:
   mark42.py heavy --start /path/to/project --task-name my-task
   mark42.py heavy --finish --task-name my-task
   mark42.py heavy --cleanup --task-name my-task
+  mark42.py context-safety status
+  mark42.py context-safety apply
+  mark42.py context-safety verify
   mark42.py assemble
         """,
     )
@@ -635,8 +644,12 @@ def main() -> None:
     assemble_p.add_argument("--status", action="store_true", help="查看 assemble/guard/daemon 状态")
     assemble_p.add_argument("--stop", action="store_true", help="停止 assemble 及其子进程")
     assemble_p.add_argument("--restart", action="store_true", help="重启 assemble 及其子进程")
+    context_p = sub.add_parser("context-safety", help="🧯 OpenClaw context 安全基线")
+    context_p.add_argument("action", nargs="?", choices=["status", "apply", "verify"], default="status")
+    context_p.add_argument("--verbose", action="store_true", help="输出更详细的检查/变更信息")
     status_p = sub.add_parser("status", help="一屏聚合系统状态")
     status_p.add_argument("--json", action="store_true", help="输出 JSON 格式")
+    status_p.add_argument("--verbose", action="store_true", help="输出更详细的状态信息")
 
     args = parser.parse_args()
 
@@ -692,7 +705,7 @@ def main() -> None:
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
-            print(f"   {result.get('summary', '')}")
+            print(f"   {trim_summary(result.get('summary', ''), 100)}")
         elif args.dry_run or args.compress:
             result = armor_compress(dry_run=args.dry_run)
             import json as _j
@@ -730,7 +743,7 @@ def main() -> None:
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
-            print(f"   {result.get('summary', '')}")
+            print(f"   {trim_summary(result.get('summary', ''), 100)}")
         return
 
     if args.module == "engine":
@@ -826,13 +839,29 @@ def main() -> None:
             assemble()
         return
 
+    if args.module == "context-safety":
+        from .context_safety import (
+            context_safety_apply,
+            context_safety_status,
+            context_safety_verify,
+        )
+        if args.action == "apply":
+            result = context_safety_apply(verbose=getattr(args, 'verbose', False))
+            if not result.get("validateOk", False):
+                sys.exit(1)
+        elif args.action == "verify":
+            sys.exit(context_safety_verify(verbose=getattr(args, 'verbose', False)))
+        else:
+            context_safety_status(verbose=getattr(args, 'verbose', False))
+        return
+
     if args.module == "status":
         if getattr(args, 'json', False):
             import json as _j
             result = status_dashboard(json_mode=True)
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         else:
-            status_dashboard()
+            status_dashboard(verbose=getattr(args, 'verbose', False))
         return
 
 

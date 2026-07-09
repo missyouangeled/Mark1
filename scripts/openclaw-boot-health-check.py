@@ -7,9 +7,11 @@ boot-health-check.py — 开机后自动体检 + 自愈
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SERVICES = {
@@ -28,7 +30,10 @@ TIMERS = {
 
 STATE_DIR = Path.home() / ".local/state/openclaw/boot-health"
 STATE_FILE = STATE_DIR / "last-check.json"
+INJECT_STATE_FILE = STATE_DIR / "last-startup-inject.json"
 SCRIPT_DIR = Path(__file__).resolve().parent
+SH = timezone(timedelta(hours=8))
+STARTUP_INJECT_COOLDOWN_SECONDS = 30 * 60
 
 
 def run(cmd: list[str], timeout: int = 5) -> tuple[int, str, str]:
@@ -39,6 +44,77 @@ def run(cmd: list[str], timeout: int = 5) -> tuple[int, str, str]:
         return 124, "", "timeout"
     except Exception as e:
         return 1, "", str(e)
+
+
+def now_sh() -> datetime:
+    return datetime.now(SH)
+
+
+def parse_iso(text: str | None) -> datetime | None:
+    if not text:
+        return None
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        return datetime.fromisoformat(text).astimezone(SH)
+    except Exception:
+        return None
+
+
+def load_json(path: Path):
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def save_json(path: Path, data: dict) -> None:
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def compute_message_digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def compute_boot_event_key(ok: bool, issues: list[str], boot_message: str) -> str:
+    fingerprint_source = json.dumps(
+        {
+            "ok": bool(ok),
+            "issues": list(issues),
+            "bootMessage": boot_message,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    digest = compute_message_digest(fingerprint_source)[:16]
+    return f"boot-health|{digest}"
+
+
+def should_skip_startup_inject(message: str) -> tuple[bool, dict]:
+    state = load_json(INJECT_STATE_FILE)
+    digest = compute_message_digest(message)
+    now = now_sh()
+    info = {
+        "digest": digest,
+        "checkedAt": now.isoformat(),
+        "cooldownSeconds": STARTUP_INJECT_COOLDOWN_SECONDS,
+    }
+    if not isinstance(state, dict):
+        return False, info
+
+    last_at = parse_iso(state.get("lastInjectedAt"))
+    last_digest = state.get("messageDigest")
+    if last_at is None or last_digest != digest:
+        return False, info
+
+    age = (now - last_at).total_seconds()
+    info["lastInjectedAt"] = last_at.isoformat()
+    info["ageSeconds"] = round(age, 3)
+    if 0 <= age < STARTUP_INJECT_COOLDOWN_SECONDS:
+        return True, info
+    return False, info
 
 
 def check_service(name: str, unit: str) -> dict:
@@ -266,6 +342,8 @@ def main():
         "detail": str(STATE_FILE),
     }, ensure_ascii=False))
 
+    boot_event_key = compute_boot_event_key(results["all_ok"], issues, full_boot_msg)
+
     # ── 发射 broker 启动事件，让 frontstage broker 推送到聊天 ──
     try:
         from datetime import datetime, timezone
@@ -278,12 +356,14 @@ def main():
             "ok": results["all_ok"],
             "issues": issues,
             "bootMessage": full_boot_msg,
+            "eventKey": boot_event_key,
+            "message": full_boot_msg,
         }
         with open(broker_dir / "events.jsonl", "a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
         # 设 dirty flag 触发 frontstage broker 重建
         (broker_dir / "dirty").write_text(datetime.now(timezone.utc).isoformat())
-        print(f"[boot] broker 启动事件已发射")
+        print(f"[boot] broker 启动事件已发射 key={boot_event_key}")
     except Exception as e:
         print(f"[boot] broker 事件发射失败: {e}")
 
@@ -299,13 +379,32 @@ def main():
             "3. 读取完成后向用户发送「✅ 系统已就绪，我在。需要我的话，直接说。」\n"
             "4. 回复 NO_REPLY"
         )
-        subprocess.run(
-            ["openclaw", "gateway", "call", "chat.inject",
-             "--params", json.dumps({"sessionKey": "agent:main:main", "message": startup_msg}),
-             "--json"],
-            capture_output=True, timeout=15
-        )
-        print("[boot] 启动流程系统事件已注入主会话")
+        skip, inject_info = should_skip_startup_inject(startup_msg)
+        if skip:
+            print(
+                "[boot] 启动系统事件跳过：命中冷却窗口 "
+                f"({inject_info.get('ageSeconds')}s < {STARTUP_INJECT_COOLDOWN_SECONDS}s)"
+            )
+        else:
+            proc = subprocess.run(
+                ["openclaw", "gateway", "call", "chat.inject",
+                 "--params", json.dumps({"sessionKey": "agent:main:main", "message": startup_msg}),
+                 "--json"],
+                capture_output=True, text=True, timeout=15
+            )
+            if proc.returncode == 0:
+                save_json(
+                    INJECT_STATE_FILE,
+                    {
+                        "lastInjectedAt": now_sh().isoformat(),
+                        "messageDigest": inject_info["digest"],
+                        "sessionKey": "agent:main:main",
+                        "stdout": proc.stdout.strip()[:2000],
+                    },
+                )
+                print("[boot] 启动流程系统事件已注入主会话")
+            else:
+                print(f"[boot] 启动事件注入失败(returncode={proc.returncode}): {proc.stderr.strip()[:500]}")
     except Exception as e:
         print(f"[boot] 启动事件注入失败: {e}")
 

@@ -30,6 +30,7 @@ TOOL_XML_PATTERNS = [
 ]
 INLINE_TAG_PATTERN = re.compile(r"\[\[\s*(reply_to_current|reply_to:[^\]]+|audio_as_voice)\s*\]\]", re.I)
 OVERSIZED_PLACEHOLDER = "[chat.history omitted: message too large]"
+TERMINAL_GAP_FORCE_FAIL_SECONDS = 45
 
 
 def now_iso() -> str:
@@ -53,6 +54,14 @@ def load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
     return data if isinstance(data, dict) else {}
+
+
+def save_session_store(store: dict[str, Any]) -> None:
+    store_path = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = store_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(store_path)
 
 
 def save_text(path: Path, content: str) -> None:
@@ -433,7 +442,7 @@ def pick_after_user(messages: list[dict[str, Any]], user_timestamp: Any) -> dict
     return filtered[-1] if filtered else None
 
 
-def analyze_projection(transcript_messages: list[dict[str, Any]], history_messages: list[dict[str, Any]], session_snapshot: dict[str, Any]) -> dict[str, Any]:
+def analyze_projection(transcript_messages: list[dict[str, Any]], history_messages: list[dict[str, Any]], session_snapshot: dict[str, Any], *, allow_force_fail: bool = True) -> dict[str, Any]:
     transcript_user_ts = latest_user_timestamp(transcript_messages)
     history_user_ts = latest_user_timestamp(history_messages)
     transcript_assistant_turns = assistant_turn_messages(transcript_messages)
@@ -478,6 +487,7 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
     latest_empty_turn_ms = timestamp_to_ms((latest_empty_turn or {}).get("timestamp"))
     empty_assistant_turn = bool(latest_empty_turn) and not transcript_latest and not history_latest and not (transcript_latest_yielded or history_latest_yielded)
     recent_empty_turn_window = latest_empty_turn_ms is not None and now_ms - latest_empty_turn_ms <= PENDING_CATCHUP_SECONDS * 1000
+    terminal_gap_age_ms = now_ms - latest_empty_turn_ms if latest_empty_turn_ms is not None else None
 
     pending_projection = False
     pending_reason = None
@@ -557,6 +567,36 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
             anomaly_code = "assistant_turn_missing_visible_text"
             detail = 'latest assistant turn 已经发生，但稳定可见文本为空（例如 silent NO_REPLY 或只剩工具阶段内容）；前台可能会出现"边回边消失"。'
 
+    # Guard against a false-OK stuck projection: session still says running,
+    # but there is no active run, no endedAt, and the latest assistant turn is empty.
+    # This usually means the session lifecycle got stuck before a proper terminal state landed.
+    force_fail = False
+    force_fail_reason = None
+    if (
+        anomaly_code is None
+        and session_status == "running"
+        and not session_has_active_run
+        and not session_snapshot.get("endedAt")
+    ):
+        latest_turn = transcript_latest_turn or history_latest_turn or {}
+        latest_turn_raw = str(latest_turn.get("rawText") or "").strip()
+        latest_turn_text = str(latest_turn.get("text") or "").strip()
+        if not latest_turn_raw and not latest_turn_text:
+            if terminal_gap_age_ms is not None and terminal_gap_age_ms >= TERMINAL_GAP_FORCE_FAIL_SECONDS * 1000:
+                if allow_force_fail:
+                    anomaly_code = "running_without_active_run_terminal_gap"
+                    detail = "session 仍显示 running，但 active run 已消失、endedAt 为空，且 latest assistant turn 为空壳；已超过收口窗口，判定为假 running 终态缺口。"
+                    force_fail = True
+                    force_fail_reason = "stale-running-terminal-gap"
+                else:
+                    pending_projection = True
+                    pending_reason = "running-terminal-gap-grace"
+                    detail = "session 仍显示 running，但 active run 已消失、endedAt 为空，且 latest assistant turn 为空壳；离线样本/测试场景不执行强制收口，仅保留观察态。"
+            else:
+                pending_projection = True
+                pending_reason = "running-terminal-gap-grace"
+                detail = "session 仍显示 running，但 active run 已消失、endedAt 为空，且 latest assistant turn 为空壳；先给一个短暂收口窗口，超时后将判定为假 running。"
+
     return {
         "ok": anomaly_code is None,
         "pendingProjection": pending_projection,
@@ -573,6 +613,9 @@ def analyze_projection(transcript_messages: list[dict[str, Any]], history_messag
         "historyAssistantCount": len(history_assistants),
         "transcriptAssistantTurnCount": len(transcript_assistant_turns),
         "historyAssistantTurnCount": len(history_assistant_turns),
+        "forceFail": force_fail,
+        "forceFailReason": force_fail_reason,
+        "terminalGapAgeMs": terminal_gap_age_ms,
     }
 
 
@@ -657,6 +700,75 @@ def build_notification_candidate(previous_report: dict[str, Any], previous_notif
 
     return None
 
+def maybe_force_close_session(report: dict[str, Any], event_log_path: Path) -> dict[str, Any] | None:
+    if not report.get("forceFail"):
+        return None
+    target_session_key = str(report.get("targetSessionKey") or "")
+    if not target_session_key:
+        return None
+    store = _load_session_store()
+    row = store.get(target_session_key)
+    if not isinstance(row, dict):
+        return None
+    if str(row.get("status") or "") != "running":
+        return {"ok": True, "mutated": False, "reason": "status-already-changed"}
+    ended_at = int(datetime.now(timezone.utc).timestamp() * 1000)
+    row["status"] = "failed"
+    row["endedAt"] = ended_at
+    row["updatedAt"] = ended_at
+    row["hasActiveRun"] = False
+    row["restartRecoveryDeliveryContext"] = None
+    row["restartRecoveryDeliveryRunId"] = None
+    row["pendingFinalDelivery"] = False
+    row["pendingFinalDeliveryText"] = None
+    store[target_session_key] = row
+    save_session_store(store)
+    append_log(event_log_path, f"[{now_iso()}] force_closed session={target_session_key} reason={report.get('forceFailReason')} endedAt={ended_at}")
+    return {"ok": True, "mutated": True, "endedAt": ended_at, "status": "failed", "reason": report.get("forceFailReason")}
+
+
+def maybe_clear_orphan_restart_recovery_claim(report: dict[str, Any], event_log_path: Path) -> dict[str, Any] | None:
+    target_session_key = str(report.get("targetSessionKey") or "")
+    snapshot = report.get("sessionSnapshot") if isinstance(report.get("sessionSnapshot"), dict) else {}
+    latest_turn = report.get("transcriptLatestAssistantTurn") if isinstance(report.get("transcriptLatestAssistantTurn"), dict) else {}
+    terminal_gap_age_ms = report.get("terminalGapAgeMs")
+    if not target_session_key:
+        return None
+    if str(snapshot.get("status") or "") != "running":
+        return None
+    if bool(snapshot.get("hasActiveRun")):
+        return None
+    if snapshot.get("endedAt") is not None:
+        return None
+    if report.get("pendingProjection"):
+        return None
+    if report.get("forceFail"):
+        return None
+    latest_turn_text = str(latest_turn.get("text") or "").strip()
+    latest_turn_raw = str(latest_turn.get("rawText") or "").strip()
+    if not latest_turn_text and not latest_turn_raw:
+        return None
+    store = _load_session_store()
+    row = store.get(target_session_key)
+    if not isinstance(row, dict):
+        return None
+    if row.get("pendingFinalDelivery") not in (None, False):
+        return None
+    if not row.get("restartRecoveryDeliveryRunId"):
+        return None
+    if row.get("runId") not in (None, ""):
+        return None
+    if row.get("lifecycleGeneration") not in (None, ""):
+        return None
+    row["restartRecoveryDeliveryContext"] = None
+    row["restartRecoveryDeliveryRunId"] = None
+    row["updatedAt"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+    store[target_session_key] = row
+    save_session_store(store)
+    append_log(event_log_path, f"[{now_iso()}] cleared_orphan_restart_recovery_claim session={target_session_key}")
+    return {"ok": True, "mutated": True, "reason": "orphan-restart-recovery-claim-cleared"}
+
+
 def maybe_send_frontstage(previous_report: dict[str, Any], current_report: dict[str, Any], state_dir: Path, event_log_path: Path, enabled: bool) -> None:
     if not enabled:
         return
@@ -733,7 +845,7 @@ def main() -> int:
     history_payload = fetch_chat_history_local(target_session_key, args.limit, session_file)
     history_messages = history_payload.get("messages") if isinstance(history_payload.get("messages"), list) else []
     session_snapshot = fetch_session_snapshot_local(target_session_key, session_file)
-    analysis = analyze_projection(transcript_messages, history_messages, session_snapshot)
+    analysis = analyze_projection(transcript_messages, history_messages, session_snapshot, allow_force_fail=True)
 
     report = {
         "checkedAt": now_iso(),
@@ -758,6 +870,18 @@ def main() -> int:
         },
         **analysis,
     }
+    orphan_clear_result = maybe_clear_orphan_restart_recovery_claim(report, event_log_path)
+    if orphan_clear_result:
+        report["orphanRestartRecoveryClearResult"] = orphan_clear_result
+    force_close_result = maybe_force_close_session(report, event_log_path)
+    if force_close_result:
+        report["forceCloseResult"] = force_close_result
+        if force_close_result.get("mutated"):
+            report["sessionSnapshot"]["status"] = "failed"
+            report["sessionSnapshot"]["hasActiveRun"] = False
+            report["sessionSnapshot"]["endedAt"] = force_close_result.get("endedAt")
+            report["ok"] = False
+            report["pendingProjection"] = False
     save_json(report_path, report)
     maybe_send_frontstage(previous_report, report, state_dir, event_log_path, args.notify_frontstage)
 
