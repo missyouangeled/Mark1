@@ -17,6 +17,7 @@
 | 视觉 | #21 视觉识别, #18 陪看片 |
 | 待用 | #2 SkillOpt, #3 TouchDesigner, #31 QMD, #32 gemini-web2api, #33 AI宠物, #34 Trae Linux |
 | 渲染/前端 Bug | #35 WebChat 渲染异常排查 |
+| 提交导航/归档 | #36 提交 1865c59 主题索引 |
 | 本地推理/AI | ds4 (antirez DeepSeek V4 Flash)
 | TTS/语音合成 | VoxCPM (OpenBMB tokenizer-free)
 | Skill 库 / Agent 生态 | mattpocock/skills (Vercel Labs  生态)
