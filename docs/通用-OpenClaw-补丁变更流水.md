@@ -30,6 +30,34 @@
 
 ---
 
+## 2026-07-09 10:18:47 CST (+08:00) — GitHub 全量同步提交：将工作区当前状态完整对齐到远端 master
+
+- 类型：maintenance
+- 适用范围：通用
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 按用户要求执行一次“全量同步提交”，目标不是拆分单一补丁，而是让 GitHub 上的 `origin/master` 与当时工作区的本地当前状态完全一致。
+- 本次同步提交为 `1865c59 chore: sync workspace to current local state`，提交前确认本地 `master` 与 `origin/master` 原本处于同一基线提交，避免把远端较新历史误覆盖。
+- 同步范围覆盖本轮之前已存在于工作区但尚未提交的全部内容，包括：Mark42 context-safety 基线与输出 token 优化、emergency0/emergency1 编排与回归脚本、incident-recovery 链路、runtime / runtime-checks 证据文档、daily / plans / learnings 追加、以及若干备份与运行说明文件。
+- 这次动作的性质是“仓库状态对齐 + 留痕归档”，不是新的正式补丁发布，因此只记录进变更流水，不把整笔提交直接登记成单个 PATCH 项。
+- 验收 / 验证：
+- 提交前执行 `bash tools/mark42-systemd/verify.sh` 通过，结果为 `pass=22 warn=0 fail=0`
+- 推送后确认 `git rev-parse HEAD` 与 `git rev-parse origin/master` 一致，均为 `1865c59f5f35c1a2325a33bf32ce75f5d231a065`
+- `git status --short --branch` 显示本地分支与远端分支已对齐，无额外未提交差异
+- 相关文件：
+- `docs/通用-OpenClaw-补丁变更流水.md`
+- `scripts/mark42_modules/context_safety.py`
+- `scripts/mark42_modules/output_guard.py`
+- `scripts/emergency1-orchestrator.py`
+- `scripts/openclaw-incident-recovery.py`
+- `docs/runtime/`
+- `docs/runtime-checks/`
+- `memory/daily/2026-07-07.md`
+- `memory/daily/2026-07-08.md`
+- `memory/daily/2026-07-09.md`
+
 ## 2026-07-07 10:18:54 CST (+08:00) — resume-watch 重启审计补口：记录 gap / 连接态 / 原因
 
 - 类型：patch
