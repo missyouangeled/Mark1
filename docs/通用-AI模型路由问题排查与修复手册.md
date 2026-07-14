@@ -275,3 +275,48 @@ systemctl --user restart openclaw-gateway.service
 ---
 
 *本手册由 2026-06-22 模型路由大排查自动生成，后续如有更新请追加日期标记。*
+
+
+---
+
+## 6. multimodal 模型 input 字段配置规范(2026-07-14 12:37 加)
+
+**踩过的坑**:MiniMax-M3 是原生多模态模型(支持 text/image/video),但 OpenClaw `~/.openclaw/openclaw.json` 里 `minimax` provider 的 `MiniMax-M3` 模型定义 `input` 字段只声明了 `["text"]`,导致:
+- image 工具调用失败,错误 `Model does not support images: ... input: text`
+- 会话元数据写 `capabilities=none`
+- 即使联网确认 M3 是多模态,OpenClaw 工具链仍拒绝
+
+**修法**(对任何 multimodal 模型都适用):
+
+```json
+{
+  "id": "MiniMax-M3",
+  "name": "MiniMax-M3",
+  "input": ["text", "image", "video"],   // ← 必须显式声明
+  "reasoning": true,
+  "contextWindow": 1000000,
+  "maxTokens": 65536
+}
+```
+
+**对照 NVIDIA 已配对的多模态模型**(可参考):
+
+| 模型 | input 字段 |
+|---|---|
+| nvidia/nemotron-nano-12b-v2-vl | `["text", "image"]` |
+| google/gemma-4-31b-it | `["text", "image"]` |
+| **minimax/MiniMax-M3(本手册钉死的修复)** | `["text", "image", "video"]` |
+
+**诊断步骤**(image 工具失败时):
+1. 错误信息里有 `Model does not support images: ... input: <字段>`
+2. 打开 `~/.openclaw/openclaw.json`,找该模型的 input 字段
+3. 如果是 `["text"]`,改为 `["text", "image"]`(多模态加)
+4. `openclaw config validate` 验证
+5. **重启 gateway 或新开会话**才能生效(会话级能力缓存)
+
+**注意事项**:
+- 改配置前必须 **cp 备份** `~/.openclaw/openclaw.json`
+- 不确定模型是否支持 multimodal 时,先查官方文档,不要凭印象加
+- 改完不 restart gateway 是最安全的(避免 CASE-20260706-003)
+- 验证时建议在 Control UI 新开会话发图,不在主会话 restart
+

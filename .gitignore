@@ -50,3 +50,6 @@ openclaw-workspace-state.json
 # Pre-push backup files (2026-07-14 added to prevent backup pollution)
 *.bak-pre-*
 *.bak-yyyymmdd*
+
+# Backup directories (pre-upgrade systemd unit backups, etc.)
+docs/backup/
