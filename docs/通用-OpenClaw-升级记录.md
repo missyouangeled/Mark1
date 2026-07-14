@@ -1629,7 +1629,7 @@ const softThresholdTokens = memoryFlushPlan?.softThresholdTokens ?? 4e3;  // 硬
 - **聊天体验优化失效**：`yielded history replay`（历史消息里显示 NO_REPLY 的展开）和 `pending reading indicator`（长任务时显示"阅读中"）这两个细节功能在 7.1 不工作
 - 自检不再持续误报
 
-**TODO**：下个维护窗口做完整的 7.1 branding 适配（需要新加 `is_v7_1` 分支到 `apply-openclaw-control-ui-branding.py`）。
+**TODO**：~~下个维护窗口做完整的 7.1 branding 适配（需要新加 `is_v7_1` 分支到 `apply-openclaw-control-ui-branding.py`）。~~ → **2026-07-14 用户决策不修**：这两个是页面装饰（聊天体验优化），不影响业务，不修复。
 
 ### 附录 B · `task_scheduler_test` idle/active 都算 pass
 
@@ -1662,4 +1662,4 @@ checks.append(run_cmd_check(
 
 ### ⚠️ 仍待解决
 
-- **7.1 jarvis helpers 完整适配**（yielded history replay + pending reading indicator）：下次维护窗口
+- **（已调整为无需修复）** 7.1 jarvis helpers 完整适配（yielded history replay + pending reading indicator）：**2026-07-14 用户决策不修**——这两个贴纸是聊天体验装饰（NO_REPLY 在 UI 上展开 + “阅读中”图标），页面精简后不贴属于正常精简；后台业务不受影响（NO_REPLY 仍写进 daily，记忆 / 工具调用 / 主对话全部正常）。后续升级如果 OpenClaw 保留这三个装饰，调回即可。
