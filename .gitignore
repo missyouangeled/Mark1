@@ -50,6 +50,8 @@ openclaw-workspace-state.json
 # Pre-push backup files (2026-07-14 added to prevent backup pollution)
 *.bak-pre-*
 *.bak-yyyymmdd*
+# Backup files created during config-change operations (e.g. upgrade repair)
+*.bak.2026*
 
 # Backup directories (pre-upgrade systemd unit backups, etc.)
 docs/backup/

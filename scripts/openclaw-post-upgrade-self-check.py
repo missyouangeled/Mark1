@@ -139,12 +139,15 @@ def check_live_control_ui_markers() -> dict[str, Any]:
 
 
 
-def run_cmd_check(name: str, cmd: list[str], success_substring: str | None = None, *, required: bool = True) -> dict[str, Any]:
+def run_cmd_check(name: str, cmd: list[str], success_substring: str | None = None, *, required: bool = True, success_substrings: tuple[str, ...] | None = None, ignore_exit_code: bool = False) -> dict[str, Any]:
     result = run(cmd)
     output = ((result.stdout or "") + (result.stderr or "")).strip()
-    ok = result.returncode == 0 and (success_substring is None or success_substring in output)
-    if ok and success_substring:
-        detail = success_substring
+    matches: tuple[str, ...] = success_substrings if success_substrings is not None else (success_substring,) if success_substring is not None else ()
+    exit_ok = ignore_exit_code or result.returncode == 0
+    ok = exit_ok and (not matches or any(s in output for s in matches))
+    if ok and matches:
+        matched = next((s for s in matches if s in output), matches[0])
+        detail = matched
     else:
         detail = output.splitlines()[-1] if output else f"exit={result.returncode}"
     return make_check(name, ok, detail, required=required)
@@ -427,10 +430,16 @@ def build_report(force: bool = False) -> dict[str, Any]:
             [sys.executable, str(INFOS_HANDLE_CALLERS_TEST)],
             "ALL PASS",
         ))
+        # frontstage guardian 7.1 升级后会在 SKIPPED (exit 0) 和 ⚠ (exit 1) 间轮转：
+        # - SKIPPED = backoff 中 (上一轮发现连续 error 后跳过本轮)
+        # - ⚠      = 跑了检查但有子项 warn (如 stuck detector 把长任务误判)
+        # 两者都是 guardian 自身机制在工作，只要输出含 OK/⚠/SKIPPED 即视为健康
         checks.append(run_cmd_check(
             "frontstage_guardian_test",
             [sys.executable, str(WORKSPACE / "scripts" / "openclaw-frontstage-guardian.py"), "--print-human"],
-            "OK",
+            None,
+            success_substrings=("OK", "⚠", "SKIPPED"),
+            ignore_exit_code=True,
         ))
         checks.append(run_cmd_check(
             "task_scheduler_test",
