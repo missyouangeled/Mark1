@@ -669,3 +669,8 @@
 
 - [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error
 
+## 2026-07-14T14:20:02.742704+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=15.024495066666667）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
