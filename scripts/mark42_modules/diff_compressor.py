@@ -18,6 +18,8 @@
 import re
 from typing import Any
 
+from mark42_modules.utils import safe_call
+
 
 class DiffCompressor:
     """git diff 压缩器"""
@@ -84,6 +86,7 @@ class DiffCompressor:
         stats["mode"] = "compressed"
         return result, stats
 
+    @safe_call(default="", label="compress_diff")
     def _compress_diff(self, content: str, stats: dict) -> str:
         """主体压缩逻辑"""
         out_lines = []
@@ -191,6 +194,7 @@ def get_diff_compressor() -> DiffCompressor:
     return _instance
 
 
+@safe_call(default=None, label="diff_compress")
 def diff_compress(content: str) -> tuple[str, dict]:
     return get_diff_compressor().compress(content)
 

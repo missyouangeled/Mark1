@@ -12,6 +12,7 @@ from .config import (
     MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_DAEMON_LOG_MB,
     MAX_DAEMON_LOG_LINES, MAX_HISTORY_FILES, MAX_LOG_AGE_DAYS,
 )
+from .utils import safe_call
 
 LOG_ROTATION_STATE = ARMOR_STATE.parent / "log-rotation.json"
 
@@ -26,6 +27,7 @@ def _load_state() -> dict:
     return {"lastRotation": None, "rotationCount": 0}
 
 
+@safe_call(default=None, label="log_save_state")
 def _save_state(state: dict) -> None:
     LOG_ROTATION_STATE.parent.mkdir(parents=True, exist_ok=True)
     with open(LOG_ROTATION_STATE, "w") as f:
@@ -40,6 +42,7 @@ def _age_days(path: Path) -> float:
         return 999
 
 
+@safe_call(default={"cleaned": 0, "error": "rotate_history_files failed"}, label="rotate_history_files")
 def rotate_history_files() -> dict:
     """清理旧的历史索引文件（超过 MAX_HISTORY_FILES 个或 MAX_LOG_AGE_DAYS 天）。"""
     history_dir = ARMOR_STATE / "history"
@@ -153,6 +156,7 @@ def rotate_daemon_logs() -> dict:
     return {"trimmed_files": trimmed_files, "trimmed_lines": trimmed_lines}
 
 
+@safe_call(default={"cleaned": 0, "error": "rotate_scratch_old failed"}, label="rotate_scratch_old")
 def rotate_scratch_old() -> dict:
     """清理超过 MAX_LOG_AGE_DAYS 天且无 .keep 标记的 scratch 目录。"""
     from .config import SCRATCH
@@ -171,6 +175,7 @@ def rotate_scratch_old() -> dict:
     return {"cleaned": cleaned}
 
 
+@safe_call(default={"status": "error"}, label="log_rotate")
 def log_rotate(target: str = "all") -> dict:
     """执行日志轮替。target: all / history / actions / broker / scratch"""
     targets = ["daemon", "history", "actions", "broker", "scratch"] if target == "all" else [target]

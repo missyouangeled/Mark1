@@ -17,6 +17,8 @@ import ast
 import re
 from typing import Any
 
+from mark42_modules.utils import safe_call
+
 
 class CodeCompressor:
     """代码压缩器"""
@@ -123,7 +125,7 @@ class CodeCompressor:
         return "generic"
 
     def _compress_python(self, code: str, stats: dict) -> str:
-        """Python AST 级压缩"""
+        """Python AST 级压缩。异常不上传装饰器（上层 compress() 有 try/except 拾回)"""
         tree = ast.parse(code)
         out_lines = []
 
@@ -226,7 +228,7 @@ class CodeCompressor:
         return lines
 
     def _compress_regex(self, content: str, stats: dict) -> str:
-        """正则 fallback (其他语言)"""
+        """正则 fallback（其他语言)。同上不上传装饰器，上层 compress() 拾回"""
         result = content
 
         if self.remove_comments:
@@ -253,6 +255,7 @@ def get_code_compressor() -> CodeCompressor:
     return _code_singleton
 
 
+@safe_call(default=("", {"error": "codecrush failed"}), label="codecrush")
 def codecrush(content: str) -> tuple[str, dict]:
     """公开 API: 代码压缩"""
     return get_code_compressor().compress(content)

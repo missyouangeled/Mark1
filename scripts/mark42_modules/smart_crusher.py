@@ -12,6 +12,9 @@
 import json
 from typing import Any
 
+# 【2026-07-13】不能用相对路径, 因为 algo_scheduler 从外部 `from smart_crusher import smartcrush`
+from mark42_modules.utils import safe_call
+
 
 class SmartCrusher:
     """借鉴 Headroom JSON compressor：JSON 工具输出压缩"""
@@ -130,6 +133,7 @@ def get_smartcrusher() -> SmartCrusher:
     return _smartcrusher_singleton
 
 
+@safe_call(default=("", {"error": "smartcrush failed"}), label="smartcrush")
 def smartcrush(content: str) -> tuple[str, dict]:
     return get_smartcrusher().crush(content)
 

@@ -46,3 +46,7 @@ memory/.????-??-??-*.fallback.tmp
 memory/daily/*-transcript.md
 openclaw-workspace-state.json
 .coverage
+
+# Pre-push backup files (2026-07-14 added to prevent backup pollution)
+*.bak-pre-*
+*.bak-yyyymmdd*

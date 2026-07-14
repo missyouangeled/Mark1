@@ -1,8 +1,10 @@
 """Mark42 工具函数模块。"""
 
+import functools
 import json
 import os
 import time
+import traceback
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -16,12 +18,97 @@ LOCK_MAX_AGE = 120
 # - MAX_BROKER_EVENTS_MB: 仅 logs.py 调, utils import 后无人调
 from .config import (
     ARMOR_STATE, BROKER_DIR, BROKER_SOURCE, BYTES_PER_KTOKEN,
-    CONFIG_PATH, DEFAULT_CONTEXT_WINDOW, HEAVY_STATE, MARK42_STATE,
-    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_HISTORY_FILES,
+    CONFIG_PATH, DEFAULT_CONTEXT_WINDOW, ERRORS_FILE, HEAVY_STATE, MARK42_STATE,
+    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_ERRORS_LINES, MAX_HISTORY_FILES,
     MAX_LOG_AGE_DAYS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE,
 )
 from .output_guard import trim_detail, trim_summary
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 【2026-07-13 新增】safe_call 统一错误处理装饰器
+# ═══════════════════════════════════════════════════════════════════════════
+# 目的：给 IO / LLM / subprocess / state 写入函数统一加 try/except + 留痕。
+# 之前 50 个关键函数 100% 裸奔，任何环节出错都会"半成品状态"或直接 traceback。
+# 解决后：异常被捕获 → 写 errors.jsonl 留痕 → 返回 default → 业务可优雅降级。
+#
+# 设计取舍：
+# - default=None 是保守选择（写操作失败返回 None，调用方要处理 None 风险）
+# - label=func.__name__ 默认；显式传 label 可聚合同类失败
+# - 不捕获 KeyboardInterrupt / SystemExit（让 Ctrl+C 仍能中断）
+# - 不捕获 BaseException 类的"非真错误"信号
+# - 提前到这里定义，是为了下面 _save_json / _append_broker 等函数能使用装饰器
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _append_error_log(label: str, exc: BaseException) -> None:
+    """把一次失败写入 ERRORS_FILE。失败也用 _save_json 包裹，绝不让留痕本身再炸。"""
+    try:
+        entry = {
+            "ts": _now_iso(),
+            "label": label,
+            "excType": type(exc).__name__,
+            "excMsg": str(exc)[:500],
+            "tb": traceback.format_exc(limit=8).splitlines()[-12:],
+        }
+        ERRORS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(ERRORS_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        # 留痕失败时绝不能再炸（避免 safe_call 反而引入新崩溃点）
+        # 用 print 兜底，至少能在终端/日志看到
+        print(f"[safe_call] 无法写 errors.jsonl: {exc!r}", flush=True)
+
+
+def _rotate_errors_file() -> None:
+    """当 errors.jsonl 超过 MAX_ERRORS_LINES 时，截尾保留后半段。"""
+    try:
+        if not ERRORS_FILE.exists():
+            return
+        # 简单按行截尾（不并发安全，但 daemon 单进程足够）
+        with open(ERRORS_FILE, encoding="utf-8") as f:
+            lines = f.readlines()
+        if len(lines) > MAX_ERRORS_LINES:
+            keep = lines[-MAX_ERRORS_LINES // 2:]  # 保留后一半
+            with open(ERRORS_FILE, "w", encoding="utf-8") as f:
+                f.writelines(keep)
+    except Exception as e:
+        print(f"[safe_call] 截尾 errors.jsonl 失败: {e!r}", flush=True)
+
+
+def safe_call(default=None, label: str | None = None, reraise: bool = False):
+    """统一错误处理装饰器。
+
+    Args:
+        default: 异常时返回的默认值（默认 None）
+        label:   错误日志中的分类标签（默认用函数名）
+        reraise: True 时仍然向上抛（不推荐，仅特殊场景）
+
+    用法：
+        @safe_call(default={}, label="save_state")
+        def _save_state(...): ...
+
+        @safe_call()  # 默认返回 None，label=函数名
+        def _call_llm(...): ...
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            tag = label or func.__name__
+            try:
+                return func(*args, **kwargs)
+            except (KeyboardInterrupt, SystemExit):
+                # 用户主动中断，必须让信号传出去
+                raise
+            except Exception as e:
+                _append_error_log(tag, e)
+                _rotate_errors_file()
+                if reraise:
+                    raise
+                return default
+        return wrapper
+    return decorator
 
 
 def _now_iso() -> str:
@@ -39,11 +126,13 @@ def _load_json(path: Path) -> dict[str, Any]:
     except (json.JSONDecodeError, OSError):
         return {}
 
+@safe_call(default=None, label="save_json")
 def _save_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+@safe_call(default=None, label="append_broker")
 def _append_broker(source_view: str, event_type: str, label: str, level: str,
                    summary: str, metadata: dict[str, Any] | None = None) -> None:
     BROKER_DIR.mkdir(parents=True, exist_ok=True)

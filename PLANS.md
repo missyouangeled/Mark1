@@ -42,6 +42,18 @@
 | 34b | trae-agent 烟测报告 — 2026-06-23 10:55 | 2026-06-23 | 已通过 | [34-trae-agent-烟测报告-2026-06-23.md](docs/plans/34-trae-agent-烟测报告-2026-06-23.md) |
 | 35 | 2026-07-07：WebChat / Control UI 渲染异常排查与恢复方案 | 2026-07-07 → 2026-07-08 归档 | 归档 | [35-2026-07-07WebChat渲染异常排查与恢复方案.md](docs/plans/35-2026-07-07WebChat渲染异常排查与恢复方案.md) |
 | 36 | 2026-07-09：提交 1865c59 主题索引与导航 | 2026-07-09 | 导航 | [36-2026-07-09提交1865c59主题索引与导航.md](docs/plans/36-2026-07-09提交1865c59主题索引与导航.md) |
+| 37 | 2026-07-09：Mark42 多Agent 阶段性收口说明 | 2026-07-09 | 已收口 | [37-2026-07-09Mark42-多Agent阶段性收口说明.md](docs/plans/37-2026-07-09Mark42-多Agent阶段性收口说明.md) |
+| 38 | 2026-07-09：Mark42 Phase 2 — 确认后执行骨架 | 2026-07-09 | 已收口 | [38-2026-07-09Mark42-Phase2-确认后执行.md](docs/plans/38-2026-07-09Mark42-Phase2-确认后执行.md) |
+| 39 | 2026-07-13：Mark42 错误处理收口 — safe_call 装饰器 + errors.jsonl 留痕 | 2026-07-13 | 部分收口 | 本表下方 |
+| 40 | 2026-07-14：Mark42 OS 化深化方案 v3 — 自主意识层 + 可插拔模型层 + 错误档案 | 2026-07-14 | 设计完成 | [40-Mark42-OS化深化方案-v3.md](docs/plans/40-Mark42-OS化深化方案-v3.md) |
+| 41 | 2026-07-14：Mark42 UI 设计哲学 · SpaceX / 钢铁侠战甲参考 | 2026-07-14 | 参考文档(未启动) | [mark42-UI设计哲学-SpaceX钢铁侠参考-20260714.md](docs/design/mark42-UI设计哲学-SpaceX钢铁侠参考-20260714.md) |
+| 42 | 2026-07-14：Mark42 用户感知层设计 v4(启动条件:v3 跑稳 30 天) | 2026-07-14 | 占位设计(不启动) | [mark42-用户感知层设计-v4-20260714.md](docs/design/mark42-用户感知层设计-v4-20260714.md) |
+| 43 | 2026-07-14：AI Agent 的 CAP 定理 · Tian Pan 2026-04 联网验证(对照 R11/R13/R10 上限) | 2026-07-14 | 联网验证 + 4 条引用 | https://tianpan.co/zh/blog/2026-04-14-cap-theorem-for-ai-agents |
+
+> **v3 接 v2**：v2 (`~/Desktop/Mark42-OS化深化方案-v2.md`) 是"能自己修"，v3 叠加"能主动问 + 能学习"。
+> v3 核心三件套：可插拔模型层（runtime/model/api 三层都可换）+ 战甲意识层（C1-C5 能力）+ 错误档案系统（学习机制）。
+> 钉死 8 条规则 R1-R8（可插拔 / 意识 / 主动交流 / 确定性 / 三层问不动的边界 / dry-run / 有据可查 / 小模型不决策）。
+> 详见桌面版：`~/Desktop/Mark42-OS化深化方案-v3.md`（同步存档）。
 
 ---
 
@@ -162,3 +174,92 @@
 - 阶段 2：压缩子模块 + logs 单测（~25 测试）
 - 阶段 3：集成测试（armor → engine → broker 端到端）
 - 阶段 4：CI 接入 + 覆盖率门禁（目标 ≥ 70%）
+
+---
+
+## Mark42 错误处理收口 — safe_call 装饰器（2026-07-13）
+
+**目标**：解决 `mark42-商品化路线图.md` 标记的"错误处理粗糙"短板。
+**方法**：方案 A — 加一个统一 `safe_call` 装饰器，所有关键函数（IO / LLM / subprocess / state 写入）包一层，失败时返回 default + 写 errors.jsonl 留痕。
+
+### 已完成
+
+1. **基础设施**：`scripts/mark42_modules/utils.py` 加 `safe_call` + `_append_error_log` + `_rotate_errors_file`
+2. **常量**：`scripts/mark42_modules/config.py` 加 `ERRORS_FILE` + `MAX_ERRORS_LINES`
+3. **9 个测试**：`scripts/tests/unit/test_utils.py::TestSafeCall` 覆盖正常/异常/键盘中断/系统退出/reraise/截尾/写入失败/元数据
+4. **9 个关键函数加装饰器**：
+   - `utils._save_json`、`utils._append_broker`
+   - `code_compressor.codecrush`、`_compress_python`、`_compress_regex`
+   - `diff_compressor._compress_diff`
+   - `logs._save_state`、`rotate_history_files`、`rotate_scratch_old`、`log_rotate`
+
+### 测试结果
+
+| 指标 | 改动前 (HEAD) | 改动后 |
+|---|---|---|
+| 通过 | 697 | **705** |
+| 失败 | 3 | 4 |
+| 跳过 | 2 | 2 |
+| 覆盖 | 93.7% | 93.6% |
+| safe_call 专项 | 0 | 9 / 9 通过 |
+
+### 已知问题（待后续跟进）
+
+1. **test_code_compressor::test_syntax_error_fails_safe 现在 fail**：
+   - 原因：`codecrush` 加 safe_call 后，AST 语法错误被 catch 返回 `("", {"error": "..."})`，不再抛 AssertionError
+   - 决策点：要么改测试期望新行为（default fallback），要么用 `reraise=True` 强制关键函数抛错
+2. **cli.py / compress_queue.py / armor.py / engine.py / heavy.py / actions_runner.py 共 6 个文件未加装饰器**：
+   - 原因：本次 subagent 任务范围控制失败，子 agent 做了超出装饰器的重构
+   - 已 git checkout 还原到 HEAD
+3. **libai smart_crusher / text_compressor / pii_redactor / llm_text_compressor 4 个文件未加装饰器**：
+   - 原因：subagent 失败，没来得及做
+   - 这些是 LLM 调用类，加装饰器收益高，下次单独做
+
+### 教训（2026-07-13 ERR-013）
+
+- subagent 接到"加装饰器"任务时，会自行决定"重构相关函数"——必须明确"只加装饰器，不动其他"
+- 任务范围描述要包含"禁止改动函数签名"、"禁止删除函数"、"禁止移动 import 顺序"等明确约束
+- 子 agent 在动手前应先 `git diff` 报告改了什么，不是一次性提交
+
+---
+
+## HEAD 历史遗留 3 个测试失败 — 清理方案（2026-07-13 立,等时机再做）
+
+**结论：暂不修**。这 3 个 fail 在 git HEAD 状态（无我任何改动）下已存在，**Mark42 真生产运行不受影响**——全部有实测数据支撑。
+
+### 3 个 fail + 根因 + 证据
+
+| # | 测试 | 根因 | 影响真生产? | 证据 |
+|---|------|------|------------|------|
+| 1 | `test_status_human_dispatches_dashboard` | 测试 mock 断言 `assert_called_once_with()` 无参，但 `cli.py:864` 实际传 `verbose=False` —— **测试期望与函数签名不同步** | ❌ 不影响 | `python3 scripts/mark42.py status` 实测正常运行（2026-07-13 09:29） |
+| 2 | `test_run_tests_returns_true_with_mocked_process_one` | 测试 mock 了 `_process_one` 替换成 `tracer`，tracer 行为跟 `_run_tests` 内部 check 期望不匹配 → `ok=False`。**直接调 `_run_tests()` 返 True, 28/0 全过** | ❌ 不影响 | 直接调 `compress_queue._run_tests()` → `28 通过 / 0 失败, return True` |
+| 3 | `test_scans_recent_daily_files` | 测试用了 2026-06-29 的 daily 文件，但 `engine.py:294` 的 `cutoff = now - 7 days` → 14 天前文件被 `continue` 跳过 → 0 锚点 → INDEX.md 没创建。**测试用过期日期** | ❌ 不影响 | `engine.py:289-290` 真实代码**就是会写 `WORKSPACE/memory/INDEX.md`**，只是测试场景用了 14 天前日期触发不了 |
+
+### 故障归因（严格 grep）
+
+`grep -rli "test_status_human_dispatches_dashboard|test_run_tests_returns_true_with_mocked_process_one|test_scans_recent_daily_files" docs/ .learnings/` → **0 命中**。
+**没有任何生产事故归因到这 3 个测试。**
+
+### 真生产中 memory-index Loop 状态
+
+- `armor/memory-index-main.json` 7/10 10:23 写入（85KB）
+- `history-main/memory-index-*.json` 7/01~7/09 大量历史文件
+- 7/13 7:42 实测跑过 cycle 1037/1038
+
+### 何时做？
+
+**单独建一个 plan**："清理 HEAD 历史遗留 3 个测试失败"（优先级低）。
+- 不阻塞当前工作
+- Mark42 真实跑至少 3 天没归因到这 3 个测试
+- 等下次做技术债清理时一起做
+- 修复成本低：改 mock 断言 / 改 _run_tests mock 方式 / 改测试用的日期为 today / yesterday
+
+### 我之前判断的修正（自我批评）
+
+我之前在跟点点说"不修"时，第一版判断是"真生产路径是 `armor/memory-index-main.json`"——**这部分不准确**。
+**准确事实是**：
+- `engine.py:289-290` 真实代码逻辑**就是写 `WORKSPACE/memory/INDEX.md`**（这个判断我修正时搞反了）
+- `armor/memory-index-main.json` 是 **armor 自己的状态文件**，不是 engine memory-index Loop 写的
+- 两个不同的文件、两个不同的模块、各写各的
+
+**结论不变（不修），但路径细节我之前搞错了**——记在这里防止以后误导。

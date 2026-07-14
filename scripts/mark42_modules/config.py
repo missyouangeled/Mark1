@@ -68,6 +68,10 @@ BROKER_SOURCE = "mark42"
 
 CONFIG_PATH = MARK42_STATE / "config.json"
 
+# 【2026-07-13 新增】safe_call 错误日志路径（统一留痕，所有 @safe_call 包裹的函数失败都写这里）
+ERRORS_FILE = MARK42_STATE / "errors.jsonl"
+MAX_ERRORS_LINES = 1000  # 错误日志最多保留 1000 行，避免无限增长
+
 MAX_LOG_AGE_DAYS = 30
 MAX_BROKER_EVENTS_MB = 10
 MAX_HISTORY_FILES = 50

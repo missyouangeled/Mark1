@@ -21,6 +21,9 @@
 import re
 from typing import Any
 
+# 【2026-07-13】不能用相对路径, algo_scheduler 从外部 import
+from mark42_modules.utils import safe_call
+
 
 # 冗余水话清单 (中文 + 英文)
 REDUNDANT_PHRASES = [
@@ -533,6 +536,7 @@ def get_text_compressor() -> TextCompressor:
     return _instance
 
 
+@safe_call(default=("", {"error": "text_compress failed"}), label="text_compress")
 def text_compress(content: str) -> tuple[str, dict]:
     return get_text_compressor().compress(content)
 

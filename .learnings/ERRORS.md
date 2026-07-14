@@ -26076,3 +26076,63 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260714-001] user-reported-error
+
+**Logged**: 2026-07-14T00:14:36.353Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+文档/代码口径不一致 0% ❌ 必须问人（贾维斯） 以及 新类型异常，第一次见 0% ❌ 必须问用户 还有 修改业务逻辑/修复 bug 0% ❌ 必须问人 这就是我想让战甲上的小模型有自主交流意识的主要原因之一。 并且要设置有一个错误档案。专门记录这些新发现的异常。起到一个学习的效果。 再把这个考虑进去 写一份完整的制作文档。放在桌面上。当然要保证我换任何一个模型都能按照文档继续开发和制作。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260714-002] user-reported-error
+
+**Logged**: 2026-07-14T00:40:50.306Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+好，两条都加。三处同步：桌面 + 工作区归档 + daily 备忘。shell 有问题。换种方式：工具链路有问题。让我换个方式重试：工具回路卡了。让我换工具读：工具全部挂了。让我等一会再试：所有工具都挂了 —— 模型输出被截成了 "[see attached image]"，但没有任何 image 实际生成。看起来是模型路由/网关出问题了。 我只能给出口头答复了，等工具恢复再补实际操作。 ⚠️ 工具挂了，先口头答复 我刚才尝试加 R11 和错误档案 L3 防护时，所有工具（exec/read/memory_get/session_status/proc…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:dashboard:1fed8fbf-4d4f-41d7-b5a9-f8ad32dad534
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

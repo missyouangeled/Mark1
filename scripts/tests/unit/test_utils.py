@@ -395,3 +395,109 @@ class TestContextWindowLookup:
 
         monkeypatch.setattr(utils, "_load_json", lambda _path: (_ for _ in ()).throw(RuntimeError("bad cfg")))
         assert utils._get_context_window() == utils.DEFAULT_CONTEXT_WINDOW
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 【2026-07-13 新增】safe_call 装饰器 + 错误日志留痕 测试
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestSafeCall:
+    """safe_call 装饰器是本次错误处理收口的核心。"""
+
+    def test_safe_call_passes_through_success(self):
+        @utils.safe_call(default=-1)
+        def ok():
+            return 42
+        assert ok() == 42
+
+    def test_safe_call_returns_default_on_exception(self, monkeypatch, tmp_path):
+        err_log = tmp_path / "errors.jsonl"
+        monkeypatch.setattr(utils, "ERRORS_FILE", err_log)
+
+        @utils.safe_call(default="fallback", label="boom_test")
+        def boom():
+            raise RuntimeError("kaboom")
+        assert boom() == "fallback"
+        assert err_log.exists()
+        lines = err_log.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["label"] == "boom_test"
+        assert entry["excType"] == "RuntimeError"
+        assert "kaboom" in entry["excMsg"]
+
+    def test_safe_call_uses_func_name_as_label_by_default(self, monkeypatch, tmp_path):
+        err_log = tmp_path / "errors.jsonl"
+        monkeypatch.setattr(utils, "ERRORS_FILE", err_log)
+
+        @utils.safe_call(default=None)
+        def my_named_func():
+            raise ValueError("x")
+        my_named_func()
+        entry = json.loads(err_log.read_text(encoding="utf-8").strip())
+        assert entry["label"] == "my_named_func"
+
+    def test_safe_call_does_not_swallow_keyboard_interrupt(self):
+        @utils.safe_call(default=None)
+        def interrupted():
+            raise KeyboardInterrupt("user pressed ctrl+c")
+        try:
+            interrupted()
+        except KeyboardInterrupt:
+            pass
+        else:
+            raise AssertionError("safe_call 不应吞 KeyboardInterrupt")
+
+    def test_safe_call_does_not_swallow_systemexit(self):
+        @utils.safe_call(default=None)
+        def exiting():
+            raise SystemExit(1)
+        try:
+            exiting()
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("safe_call 不应吞 SystemExit")
+
+    def test_safe_call_reraise_propagates_exception(self):
+        @utils.safe_call(default=None, reraise=True)
+        def boom():
+            raise RuntimeError("must propagate")
+        try:
+            boom()
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("reraise=True 应该向上抛")
+
+    def test_safe_call_rotate_truncates_when_over_max(self, monkeypatch, tmp_path):
+        err_log = tmp_path / "errors.jsonl"
+        monkeypatch.setattr(utils, "ERRORS_FILE", err_log)
+        monkeypatch.setattr(utils, "MAX_ERRORS_LINES", 10)
+
+        @utils.safe_call(default=0)
+        def n():
+            raise RuntimeError("n")
+        for _ in range(20):
+            n()
+        lines = err_log.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) <= 2 * (utils.MAX_ERRORS_LINES // 2)
+        assert len(lines) > 0
+
+    def test_safe_call_handles_errors_jsonl_write_failure_silently(self, monkeypatch, tmp_path):
+        bad_path = tmp_path / "nonexistent_dir" / "errors.jsonl"
+        monkeypatch.setattr(utils, "ERRORS_FILE", bad_path)
+
+        @utils.safe_call(default="x")
+        def boom():
+            raise RuntimeError("y")
+        assert boom() == "x"
+
+    def test_safe_call_preserves_function_metadata(self):
+        @utils.safe_call(default=None, label="meta")
+        def documented_func():
+            """my docstring"""
+            return 1
+        assert documented_func.__name__ == "documented_func"
+        assert "my docstring" in (documented_func.__doc__ or "")

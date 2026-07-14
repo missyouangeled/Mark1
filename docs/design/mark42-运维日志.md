@@ -194,3 +194,5 @@ export MARK42_LLM_AUTO_THRESHOLD=5120
 - **2026-06-25** 阶段 1 收官
 - **2026-06-26 ~ 2026-06-28** 守护持续运行
 - **2026-06-29** Phase 1 测试体系上线（111 个测试 / 37.8% 覆盖）
+- **2026-07-10 P0 修复**:watchdog 心跳路径适配 agent 拆分后的 daemon-heartbeat-main.json;`loops_check` 走 MARK42_QUIET_JSON=1 静默通道;`/mnt/data/openclaw/scratch/memory-embed-index/` 加入声明性占位 README + `.mark42-known-missing`(embeddings.npy 是已知能力缺口)。伴随有 09:55~10:04 的级联事故(详见当日 daily)。备份 `*.bak-20260710-095014`。
+- **2026-07-10 系统首次事后回溯快照**:`/home/missyouangeled/backups/backup-2026-07-10-1032/`(workspace 477M + openclaw-config 603M + openclaw-state 16M = 1.1G)。包含:P0 watchdog 修复版 + mark42-tests.py 36/0 pass + armor LLM 索引重生 + dry-run 事故入档。Manifest 含可重现 rsync 脚本。下次建议:工作日 18:00 打一次同样 snapshot。

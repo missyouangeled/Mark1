@@ -33,6 +33,9 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+# 【2026-07-13】不能用相对路径, perf_bench/algo_scheduler 从外部 import
+from mark42_modules.utils import safe_call
+
 
 log = logging.getLogger("mark42.llm_text_compressor")
 
@@ -74,6 +77,7 @@ _THINK_PATTERN = re.compile(r"<think>.*?</think>", re.DOTALL)
 _MD_BLOCK_PATTERN = re.compile(r"^```[a-zA-Z]*\s*\n(.*?)\n```\s*$", re.DOTALL)
 
 
+@safe_call(default="", label="clean_llm_output")
 def _clean_llm_output(content: str) -> str:
     """剥离 <think> 块、markdown 包裹、空白"""
     if not content:
@@ -303,6 +307,7 @@ def get_llm_text_compressor(mode: str = "summarize") -> LLMTextCompressor:
     return _instance
 
 
+@safe_call(default=("", {"error": "llm_text_compress failed"}), label="llm_text_compress")
 def llm_text_compress(content: str, mode: str = "summarize") -> tuple[str, dict]:
     """函数式入口"""
     return get_llm_text_compressor(mode=mode).compress(content)

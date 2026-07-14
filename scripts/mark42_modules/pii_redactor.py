@@ -26,6 +26,9 @@ import json
 import re
 from typing import Any
 
+# 【2026-07-13】不能用相对路径, algo_scheduler 从外部 import
+from mark42_modules.utils import safe_call
+
 
 # ============================================================================
 # PII 模式定义 - 按类型分组的正则
@@ -292,18 +295,20 @@ def get_redactor() -> PIIRedactor:
     return _redactor_singleton
 
 
+@safe_call(default=("", {"error": "redact_pii failed"}), label="redact_pii")
 def redact_pii(content: str) -> tuple[str, dict]:
     """公开 API: 对字符串进行 PII 脱敏.
-    
+
     Args:
         content: 原始字符串
-    
+
     Returns:
         (脱敏后字符串, 统计信息)
     """
     return get_redactor().redact(content)
 
 
+@safe_call(default=(None, {"error": "redact_pii_in_dict failed"}), label="redact_pii_in_dict")
 def redact_pii_in_dict(obj: Any) -> tuple[Any, dict]:
     """公开 API: 对字典/列表中的字符串值进行 PII 脱敏."""
     return get_redactor().redact_dict_values(obj)
