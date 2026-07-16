@@ -1,0 +1,17 @@
+# 测试用 stub 配置（不调真实 API）
+mark42:
+  consciousness:
+    runtime: stub
+    model: stub-model
+    base_url: ""
+    api_key: ""
+    timeout_seconds: 60
+    max_retries: 1
+  fallback_chain:
+    - stub
+  advisor:
+    enabled: false
+    runtime: api
+    model: ""
+    base_url: ""
+    api_key: ""

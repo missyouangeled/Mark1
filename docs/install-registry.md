@@ -402,3 +402,23 @@
 - **3 个坑固化**：401（占位 key）/ 404（provider: openai 改 openrouter）/ 缺字段（top_k + parallel_tool_calls）
 - **配套**：trae_config.yaml 标准模板走 DeepSeek V4 Flash
 - **备注**：✅ 已于 2026-06-23 11:53 apply。贾维斯以后遇到工程任务自动走这套流程。
+
+## 2026-07-16
+
+### ✅ 配置：火山方舟 Agent Plan 接入 GLM-5.2
+- **时间**：2026-07-16 08:49 CST
+- **触发**：点点买了火山方舟 Agent Plan 套餐，给新 key
+- **endpoint**：`https://ark.cn-beijing.volces.com/api/plan/v3`（注意：不是 `coding/v3`，也不是 `/v3`）
+- **key**：`ark-4c81407d-…-6a338`（46 字符）
+- **模型**：`glm-5.2`（真实版本 `glm-5-2-260617`，1M 上下文，支持 thinking）
+- **接入方式**：openclaw.json -> models.providers.`volcengine-agent` -> baseUrl + apiKey
+- **OpenClaw fallback**：#4 (`ark-code-latest`) + #5 (`glm-5.2`)
+- **Mark42 advisor**：model.yaml -> advisor.enabled=true, model=glm-5.2
+- **备份**：`~/.openclaw/credentials/.volcengine-agent.key`（chmod 600）
+- **备注**：另有 Coding Plan key `ark-482b…4975d`，但 Coding Plan 不允许通用 API 调用（违规封号），暂存不用
+
+### ✅ 配置：Mark42 model.yaml 从 stub 切到 api
+- **时间**：2026-07-16 09:51 CST
+- **改动**：consciousness.runtime: stub -> api, model: agnes-2.0-flash
+- **原因**：本机 7.7G 内存跑不了 Qwen3-4B，先用 Agnes 2.0 flash 云端 API 替代
+- **可插拔**：以后换回本地模型改 1 行配置（runtime: ollama），代码不用动

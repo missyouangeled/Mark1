@@ -674,3 +674,498 @@
 - [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=15.024495066666667）
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
 
+## 2026-07-14T15:20:08.341002+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.095133366666666）
+
+## 2026-07-14T16:20:14.813417+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.11092361666667）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-frontstage-guardian.service
+
+## 2026-07-14T17:30:14.480546+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=69.9985591）
+
+## 2026-07-15T08:31:53.069772+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=901.6453961999999）
+
+## 2026-07-15T08:50:00.104088+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T08:55:00.101944+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T10:20:00.101865+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T10:25:00.101095+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:15:00.111273+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:20:00.095841+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:30:00.109977+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:35:00.099243+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.07MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:40:00.096807+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.07MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-15T14:45:00.111785+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.07MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-15T14:50:00.086844+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 8.15MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T14:55:00.118606+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 8.68MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-15T15:00:00.098930+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 8.68MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-15T15:05:00.097750+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 8.68MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-15T15:10:00.106057+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.21MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T08:29:47.049871+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.21MB，已明显超过 5.0MB watcher 阈值
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=1039.2008311833333）
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=1039.78389785）
+
+## 2026-07-16T08:33:53.033925+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=1043.3005654166668）
+
+## 2026-07-16T08:35:00.092618+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=1044.4182103）
+
+## 2026-07-16T08:55:00.096960+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T09:00:00.087129+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T09:05:00.118055+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-frontstage-guardian.service
+
+## 2026-07-16T09:15:00.101776+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 8.29MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:20:00.113050+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.42MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T09:25:00.115067+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T09:30:00.088927+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.96MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:35:00.087298+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:40:00.115016+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:45:00.122086+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:50:00.086263+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T09:55:00.136755+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.93MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:00:00.107496+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T10:05:00.096678+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T10:10:02.089325+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-16T10:15:00.139920+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:20:00.103366+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:25:00.095134+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:30:00.119906+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:35:00.096599+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.92MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:40:00.106969+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.91MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:45:00.107527+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.91MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:50:00.088657+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T10:55:00.106442+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:00:00.115614+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-16T11:05:00.082301+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:10:00.090784+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:15:00.081971+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:20:00.103467+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:25:00.090981+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:30:00.110110+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:35:00.095872+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:40:00.125938+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:45:00.096092+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:50:00.093748+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T11:55:00.094684+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:00:00.119809+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:05:00.091786+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:10:00.091518+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:15:00.137930+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:20:00.116538+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:25:00.094835+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:30:00.112143+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:35:00.099683+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:40:00.093029+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:45:00.097560+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:50:00.090797+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T12:55:00.100233+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:00:00.108957+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:05:00.111371+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:10:00.099586+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:15:00.093507+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:20:00.129041+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:25:00.095998+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:30:00.111721+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:35:00.090921+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:40:00.103734+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:45:00.093065+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:50:00.094007+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T13:55:00.096608+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:00:00.103207+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:05:00.101617+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:10:28.410427+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:15:00.087475+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:20:00.092067+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:25:00.116278+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:30:00.110792+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:35:00.095114+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:40:00.086374+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:45:00.109894+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:50:00.122563+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T14:55:00.085075+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:00:00.107608+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:05:00.092313+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:10:00.121213+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-frontstage-guardian.service
+
+## 2026-07-16T15:15:00.110709+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-16T15:20:00.105507+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:25:00.093677+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:30:00.090936+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:35:00.091772+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:40:00.087919+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.84MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error
+
+## 2026-07-16T15:45:00.082430+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:50:00.080753+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T15:55:00.082012+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.97MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:00:00.108683+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:05:00.126774+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:10:00.127835+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:15:00.108409+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T16:20:00.334335+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T16:25:00.425854+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T16:30:00.082910+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-16T16:35:00.163786+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:40:00.097909+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:45:00.087371+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:50:00.383970+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T16:55:00.088556+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-16T17:00:00.090791+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+

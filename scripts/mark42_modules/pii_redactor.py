@@ -37,22 +37,24 @@ from mark42_modules.utils import safe_call
 
 PII_PATTERNS: dict[str, dict[str, Any]] = {
     "email": {
+        # 用 (?<![A-Za-z0-9._%+-]) 替代 \b，避免中文紧贴时边界不生效
         "regex": re.compile(
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+            r'(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z])'
         ),
         "replacement": "[REDACTED:email]",
         "description": "Email address",
     },
     "phone_cn": {
+        # 用 (?<!\d) 替代 \b，避免中文紧贴数字时 \b 不生效
         "regex": re.compile(
-            r'\b(?:\+?86[-\s]?)?1[3-9]\d{9}\b'
+            r'(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)'
         ),
         "replacement": "[REDACTED:phone_cn]",
         "description": "Chinese mobile (11 digits starting with 1[3-9])",
     },
     "id_card_cn": {
         "regex": re.compile(
-            r'\b[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b'
+            r'(?<!\d)[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)'
         ),
         "replacement": "[REDACTED:id_card_cn]",
         "description": "Chinese ID card (18 digits)",

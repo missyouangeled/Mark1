@@ -16,3 +16,9 @@
   - 若后续再次卡住需要重连,先从这里定位到本地凭据文件,再 SSH 上去看 `/root/autodl-tmp/voice-lab/install_chattts_gpu.log`
 
 ## Why Separate?
+## 火山方舟 Agent Plan
+- 用途: Mark42 advisor + OpenClaw fallback 模型（GLM-5.2）
+- endpoint: https://ark.cn-beijing.volces.com/api/plan/v3
+- key 本地保存: ~/.openclaw/credentials/.volcengine-agent.key（chmod 600）
+- openclaw.json 里也有: models.providers.volcengine-agent.apiKey
+- 备注: Agent Plan 允许 OpenClaw 接入（官方文档确认）；Coding Plan key 不允许通用 API 调用

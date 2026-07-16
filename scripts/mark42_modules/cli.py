@@ -651,6 +651,53 @@ def main() -> None:
     status_p.add_argument("--json", action="store_true", help="输出 JSON 格式")
     status_p.add_argument("--verbose", action="store_true", help="输出更详细的状态信息")
 
+    # ── v3-2 错误档案（archive）──
+    archive_p = sub.add_parser("archive", help="📚 错误档案管理（v3-2）")
+    archive_p.add_argument("action", choices=["list", "show", "approve", "reject", "stats"], help="子动作")
+    archive_p.add_argument("entry_id", nargs="?", default="", help="条目 ID（show/approve/reject 用）")
+    archive_p.add_argument("--status", choices=["NEW", "RESOLVED", "AUTO_APPROVED", "REJECTED"], help="按状态过滤（list）")
+    archive_p.add_argument("--category", help="按 category 过滤（list）")
+    archive_p.add_argument("--limit", type=int, default=20, help="最多显示多少条（list）")
+    archive_p.add_argument("--scope", choices=["exact_match", "similar_match"], default="exact_match", help="匹配范围（approve）")
+    archive_p.add_argument("--notes", default="", help="备注（reject）")
+
+    # ── v3-3/v3-4 战甲意识层（consciousness + advisor）──
+    cs_p = sub.add_parser("consciousness", help="🧠 战甲意识层（C1-C5 · v3-3 + advisor · v3-4）")
+    cs_p.add_argument("action", choices=["check", "eval", "handle", "advisor", "revalidate"], help="子动作")
+    cs_p.add_argument("--source", help="issue source（eval/handle 用）")
+    cs_p.add_argument("--category", help="issue category（eval/handle 用）")
+    cs_p.add_argument("--msg", default="", help="issue 描述")
+    cs_p.add_argument("--severity", default="warning", choices=["info", "warning", "critical"])
+    cs_p.add_argument("--json", action="store_true", help="check JSON 输出")
+    cs_p.add_argument("--execute-now", action="store_true", help="handle 真跑 auto_remediate（默认 dry-run）")
+
+    # ── v3 §4.8 核心位注册表 ──
+    cores_p = sub.add_parser("cores", help="🖥️ 核心位注册表（§4.8）")
+    cores_p.add_argument("action", choices=["list", "probe", "quarantine", "restore"], help="子动作")
+    cores_p.add_argument("--core-id", help="核心 ID")
+    cores_p.add_argument("--reason", default="", help="隔离原因")
+
+    # ── v3 R11 混沌工程 ──
+    chaos_p = sub.add_parser("chaos", help="🔥 混沌工程（R11）")
+    chaos_p.add_argument("action", choices=["list", "run", "history"], help="子动作")
+    chaos_p.add_argument("--scenario", default="", help="场景 ID")
+    chaos_p.add_argument("--execute-now", action="store_true", help="真实注入（默认 dry-run）")
+
+    # ── v3 §3.7 模块级协议 ──
+    mod_p = sub.add_parser("module", help="🔌 模块级协议（§3.7）")
+    mod_p.add_argument("action", choices=["check", "summary"], help="子动作")
+
+    # ── v3 R14 集群思维 ──
+    clu_p = sub.add_parser("cluster", help="🏗️ 集群思维（R14）")
+    clu_p.add_argument("action", choices=["list", "replace", "status"], help="子动作")
+    clu_p.add_argument("--name", default="", help="集群名")
+    clu_p.add_argument("--source", default="backup", choices=["backup", "git"], help="替换来源")
+
+    # ── v3 R-CAND-02 熔断器 ──
+    brk_p = sub.add_parser("breaker", help="⚡ 熔断器（R-CAND-02）")
+    brk_p.add_argument("action", choices=["list", "status", "reset", "reset-all"], help="子动作")
+    brk_p.add_argument("--core-id", default="", help="核心 ID（reset 时必填）")
+
     args = parser.parse_args()
 
     if not args.module:
@@ -862,6 +909,260 @@ def main() -> None:
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         else:
             status_dashboard(verbose=getattr(args, 'verbose', False))
+        return
+
+    if args.module == "archive":
+        # v3-2 错误档案 — 委派给 error_archive 子模块
+        from .error_archive import (
+            ErrorArchive, ALL_STATUSES, _print_entry_row,
+        )
+        arc = ErrorArchive()
+        if args.action == "list":
+            entries = arc.list_entries(status=args.status, category=args.category)[:args.limit]
+            import json as _j2
+            print(f"\n{'ID':32s} | {'CATEGORY':32s} | {'CNT':3s} | {'STATUS':15s} | LAST_SEEN")
+            print("-" * 100)
+            for e in entries:
+                _print_entry_row(e)
+            print(f"\n共 {len(entries)} 条（总 {arc.stats()['total']} 条）\n")
+        elif args.action == "show":
+            e = arc.get(args.entry_id)
+            if e is None:
+                print(f"❌ 找不到 {args.entry_id}")
+                return 1
+            import json as _j3
+            print(_j3.dumps(e.to_dict(), indent=2, ensure_ascii=False))
+        elif args.action == "approve":
+            r = arc.approve_for_auto(args.entry_id, scope=args.scope)
+            print(r["reason"])
+            for w in r.get("warnings", []):
+                print(w)
+            return 0 if r["ok"] else 2
+        elif args.action == "reject":
+            r = arc.reject(args.entry_id, notes=args.notes)
+            print(r["reason"])
+            return 0 if r["ok"] else 2
+        elif args.action == "stats":
+            s = arc.stats()
+            print(f"\n总条目: {s['total']}")
+            print(f"按状态:")
+            for k, v in s["by_status"].items():
+                print(f"  {k:18s} {v}")
+            print(f"已授权自动执行: {s['auto_approved_count']}\n")
+        return
+
+    if args.module == "consciousness":
+        # v3-3 战甲意识层 — 委派给 consciousness 子模块
+        from .consciousness import Consciousness
+        import json as _j4
+        cs = Consciousness()
+        if args.action == "check":
+            r = cs.self_check()
+            if args.json:
+                print(_j4.dumps(r.to_dict(), indent=2, ensure_ascii=False))
+            else:
+                icon = "🟢" if r.healthy else "🟠"
+                print(f"\n{icon} C1 自检 [{r.checked_at}]")
+                print(f"   健康: {r.healthy}")
+                print(f"   发现 {len(r.issues)} 个问题:")
+                for i, iss in enumerate(r.issues, 1):
+                    print(f"     {i}. [{iss['severity']}] {iss['source']}/{iss['category']}: {iss.get('msg','-')}")
+        elif args.action == "eval":
+            if not args.source or not args.category:
+                print("❌ --source 和 --category 必填")
+                return 1
+            issue = {"source": args.source, "category": args.category,
+                     "msg": args.msg, "severity": args.severity}
+            a = cs.assess_certainty(issue)
+            print(_j4.dumps(a.to_dict(), indent=2, ensure_ascii=False))
+        elif args.action == "handle":
+            if not args.source or not args.category:
+                print("❌ --source 和 --category 必填")
+                return 1
+            issue = {"source": args.source, "category": args.category,
+                     "msg": args.msg, "severity": args.severity}
+            result = cs.handle_issue(issue, dry_run=not args.execute_now)
+            print(_j4.dumps(result, indent=2, ensure_ascii=False))
+        elif args.action == "advisor":
+            # v3-4 主动交流协议
+            from .advisor_client import cli_advisor_status, cli_advisor_test
+            print("🧠 Mark42 Advisor (v3-4)")
+            print()
+            status = cli_advisor_status()
+            if status["enabled"]:
+                print(f"  状态: ✅ 已启用")
+                print(f"  模型: {status['model']}")
+                print(f"  端点: {status['base_url']}")
+                print(f"  API Key: {'✅ 有' if status['has_api_key'] else '❌ 无'}")
+                print(f"  置信阈值: {status['confidence_threshold']}")
+                print()
+                print("正在 ping advisor...")
+                test_result = cli_advisor_test()
+                if test_result["success"]:
+                    v = test_result.get("verdict", {})
+                    print(f"  ✅ Ping 成功 ({test_result.get('elapsed_ms', 0)}ms)")
+                    print(f"  verdict: {v.get('verdict', 'N/A')}")
+                    print(f"  confidence: {v.get('confidence', 'N/A')}")
+                else:
+                    print(f"  ❌ Ping 失败: {test_result.get('reason', 'unknown')}")
+            else:
+                print(f"  状态: ⬜ 未启用")
+                print()
+                print("启用方法: 编辑 ~/.config/mark42/model.yaml")
+                print("  mark42.advisor.enabled: true")
+                print("  mark42.advisor.model: <模型名>")
+                print("  mark42.advisor.base_url: <API 端点>")
+                print("  mark42.advisor.api_key: <API Key>")
+        elif args.action == "revalidate":
+            # v3 R9 强制读协议验证
+            import json as _j5
+            result = cs.verify_read_protocol(force=True)
+            if result.get("skipped"):
+                print(f"⏭️ 跳过: {result.get('reason', '')}")
+            elif result.get("passed"):
+                print(f"✅ 读协议验证通过: {result.get('score')}/{result.get('total')} 题")
+            else:
+                print(f"❌ 读协议验证未通过: {result.get('score')}/{result.get('total')} 题")
+                print(f"   需要答对 {result.get('min_correct')} 题")
+            print()
+            print(_j5.dumps(result, indent=2, ensure_ascii=False, default=str)[:500])
+        return
+
+    if args.module == "cores":
+        from .core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
+        import json as _j6
+        if args.action == "list":
+            r = cli_cores_list()
+            print(f"🖥️ 核心位注册表 ({r['summary']['total']} 核)\n")
+            for c in r["cores"]:
+                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(c["status"], "?")
+                print(f"  {icon} {c['core_id']:<35} {c['model_name']:<25} {c['status']}")
+            s = r["summary"]
+            print(f"\n  健康: {s['statuses'].get('healthy',0)} | 降级: {s['statuses'].get('degraded',0)} | 挂: {s['statuses'].get('down',0)} | 隔离: {s['statuses'].get('quarantined',0)}")
+            if s["critical_down"]:
+                print(f"  ⚠️ Critical 核心挂: {', '.join(s['critical_down'])}")
+        elif args.action == "probe":
+            r = cli_cores_probe()
+            print(f"🔍 探活完成 ({len(r)} 核)\n")
+            for cid, res in r.items():
+                icon = "🟢" if res["status"] == "healthy" else "🔴" if res["status"] == "down" else "⬜"
+                print(f"  {icon} {cid}: {res['status']} {res.get('reason','')}")
+        elif args.action == "quarantine":
+            if not args.core_id:
+                print("❌ --core-id 必填")
+                return 1
+            r = cli_cores_quarantine(args.core_id, args.reason)
+            print(f"{'✅' if r['ok'] else '❌'} 隔离 {args.core_id}: {r['ok']}")
+        elif args.action == "restore":
+            if not args.core_id:
+                print("❌ --core-id 必填")
+                return 1
+            r = cli_cores_restore(args.core_id)
+            print(f"{'✅' if r['ok'] else '❌'} 恢复 {args.core_id}: {r['ok']}")
+        return
+
+    if args.module == "chaos":
+        from .governance import ChaosTester
+        import json as _j7
+        ct = ChaosTester()
+        if args.action == "list":
+            scenarios = ct.list_scenarios()
+            print(f"🔥 混沌工程场景 ({len(scenarios)} 个)\n")
+            for s in scenarios:
+                print(f"  {s['id']:<20} {s['name']:<20} -> {s['target']}")
+        elif args.action == "run":
+            if not args.scenario:
+                print("❌ --scenario 必填。可用场景:")
+                for s in ct.list_scenarios():
+                    print(f"  {s['id']}")
+                return 1
+            r = ct.run(args.scenario, dry_run=not args.execute_now)
+            print(f"{'✅' if r.passed else '❌'} {r.test_name}")
+            print(f"  检测: {r.detection_time_ms}ms | 恢复: {r.recovery_time_ms or 'N/A'}ms")
+            print(f"  备注: {r.notes}")
+        elif args.action == "history":
+            h = ct.history()
+            print(f"📜 Chaos Test 历史 ({len(h)} 条)\n")
+            for r in h:
+                print(f"  {r.get('test_id','')} | {r.get('test_name','')} | {'✅' if r.get('passed') else '❌'} | {r.get('started_at','')}")
+        return
+
+    if args.module == "module":
+        from .governance import ModuleHealthMonitor
+        import json as _j8
+        mhm = ModuleHealthMonitor()
+        if args.action == "check":
+            results = mhm.check_all()
+            print(f"🔌 模块级协议检查 ({len(results)} 模块)\n")
+            for h in results:
+                icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(h.status, "?")
+                lat = f"{h.latency_ms}ms" if h.latency_ms is not None else "-"
+                fb = f" [fallback: {h.fallback_active}]" if h.fallback_active else ""
+                print(f"  {icon} {h.module_name:<15} {lat:<8} {h.status}{fb}")
+        elif args.action == "summary":
+            s = mhm.summary()
+            print(f"🔌 模块级协议摘要\n")
+            print(f"  总计: {s['total']} | 🟢 {s['green']} | 🟡 {s['yellow']} | 🔴 {s['red']}")
+        return
+
+    if args.module == "cluster":
+        from .governance import ClusterManager
+        import json as _j9
+        cm = ClusterManager()
+        if args.action == "list":
+            clusters = cm.list_clusters()
+            print(f"🏗️ 集群列表 ({len(clusters)} 个)\n")
+            for c in clusters:
+                print(f"  {c['name']:<30} {c['core_id']:<35} {c['criticality']}")
+        elif args.action == "status":
+            statuses = cm.status()
+            print(f"🏗️ 集群状态 ({len(statuses)} 个)\n")
+            for s in statuses:
+                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(s["status"], "?")
+                print(f"  {icon} {s['cluster']:<30} {s['model']:<25} {s['status']}")
+        elif args.action == "replace":
+            if not args.name:
+                print("❌ --name 必填。可用集群:")
+                for c in cm.list_clusters():
+                    print(f"  {c['name']}")
+                return 1
+            r = cm.replace(args.name, source=args.source)
+            print(f"{'✅' if r['ok'] else '❌'} {r.get('note','')} (action recorded)")
+        return
+
+    if args.module == "breaker":
+        from .circuit_breaker import CircuitBreaker
+        cb = CircuitBreaker()
+        if args.action == "list":
+            states = cb.list_all()
+            if not states:
+                print("⚡ 熔断器状态\n  全部 closed（正常）")
+            else:
+                print(f"⚡ 熔断器状态（{len(states)} 个非 closed）\n")
+                for s in states:
+                    icon = {"open": "🔴", "half_open": "🟡"}.get(s["status"], "?")
+                    print(f"  {icon} {s['core_id']:<35} {s['status']} (failures={s['consecutive_failures']})")
+        elif args.action == "status":
+            if args.core_id:
+                st = cb.get_state(args.core_id)
+                print(f"⚡ {args.core_id}: {st['status']} (failures={st['consecutive_failures']})")
+            else:
+                states = cb.list_all()
+                if not states:
+                    print("⚡ 熔断器状态\n  全部 closed（正常）")
+                else:
+                    for s in states:
+                        icon = {"open": "🔴", "half_open": "🟡"}.get(s["status"], "?")
+                        print(f"  {icon} {s['core_id']:<35} {s['status']}")
+        elif args.action == "reset":
+            if not args.core_id:
+                print("❌ --core-id 必填")
+                return 1
+            cb.reset(args.core_id)
+            print(f"✅ 熔断器 {args.core_id} 已重置")
+        elif args.action == "reset-all":
+            cb.reset_all()
+            print("✅ 所有熔断器已重置")
         return
 
 

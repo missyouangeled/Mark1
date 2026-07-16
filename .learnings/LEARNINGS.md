@@ -1414,3 +1414,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260716-001] correction
+
+**Logged**: 2026-07-16T00:44:09.038Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 这是一个新key 也是火山引擎的 Agent Plan [redacted] 联网搜索一下如何使用 然后帮我配上。 应该是能用 GLM-5.2 模型。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
