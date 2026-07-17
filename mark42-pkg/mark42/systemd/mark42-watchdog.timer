@@ -1,0 +1,10 @@
+[Unit]
+Description=Mark42 Watchdog Timer
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=120
+AccuracySec=10
+
+[Install]
+WantedBy=default.target

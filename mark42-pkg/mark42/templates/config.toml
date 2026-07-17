@@ -1,0 +1,94 @@
+# ────────────────────────────────────────────────────────────
+# Mark42 配置文件
+# 路径: ~/.config/mark42/config.toml
+#
+# 修改此文件后重启 Mark42 服务生效:
+#   systemctl --user restart mark42-armor-guard
+#   systemctl --user restart mark42-engine-daemon
+#
+# 查看当前配置: mark42 config
+# 重新生成默认配置: mark42 init --force
+# ────────────────────────────────────────────────────────────
+
+# ── 路径设置 ──────────────────────────────────────────────
+[paths]
+# OpenClaw 工作区路径
+workspace = "~/.openclaw/workspace"
+# OpenClaw 配置文件路径（API key 从这里读取）
+openclaw_config = "~/.openclaw/openclaw.json"
+# 临时文件/任务目录（默认用 XDG，有数据盘可指定）
+scratch = "~/.local/state/openclaw/scratch"
+# XDG 状态目录（Mark42 状态文件存放处）
+xdg_state = "~/.local/state"
+
+# ── 上下文监控阈值 ──────────────────────────────────────
+[thresholds]
+# 上下文使用率百分比，达到时触发对应行为
+warn  = 70    # 🟡 发送预警 + 自动 LLM 压缩
+alert = 85    # 🟠 强制再次压缩
+crit  = 95    # 🔴 紧急处理
+# token 估算参数：每千 token 对应字节数
+bytes_per_ktoken = 2048
+
+# ── LLM 模型配置 ────────────────────────────────────────
+# provider 对应 openclaw.json 中 providers 下的 key
+# apiKey 和 baseUrl 从 openclaw.json 读取，这里不存
+[models.llmAnalyze]
+model = "doubao-seed-2.0-pro"
+provider = "volcengine-agent"
+max_tokens = 2000
+temperature = 0.1
+timeout = 120
+base_url_fallback = "https://ark.cn-beijing.volces.com/api/plan/v3"
+endpoint = "/chat/completions"
+
+[models.llmCompress]
+model = "doubao-seed-2.0-pro"
+provider = "volcengine-agent"
+max_tokens = 4000
+temperature = 0.0
+timeout = 120
+base_url_fallback = "https://ark.cn-beijing.volces.com/api/plan/v3"
+endpoint = "/chat/completions"
+
+# ── 守护进程 ─────────────────────────────────────────────
+[daemon]
+# 引擎扫描间隔（秒）
+scan_interval = 30
+# 上下文铠甲检查间隔（秒）
+armor_check_interval = 300
+# 是否自动触发压缩
+auto_armor_compress = true
+# 是否自动监控 Heavy 任务
+auto_task_watch = true
+
+# ── 日志轮替 ─────────────────────────────────────────────
+[logs]
+# 历史文件最大保留数
+max_history_files = 50
+# 日志最大保留天数
+max_age_days = 30
+# broker 事件最大体积（MB）
+max_broker_events_mb = 10
+# actions 日志最大行数
+max_actions_lines = 500
+# daemon 日志最大行数
+max_daemon_log_lines = 10000
+
+# ── 压缩算法 ─────────────────────────────────────────────
+[compress]
+# 是否启用 SmartCrusher 压缩算法
+smart_crusher_enabled = false
+# 是否使用调度器
+use_scheduler = true
+# 是否启用 PII 脱敏
+pii_enabled = true
+# 是否启用安全护栏
+fail_safe = true
+# 实验模式
+experiment_mode = false
+
+# ── 日志级别 ─────────────────────────────────────────────
+[logging]
+# DEBUG / INFO / WARNING / ERROR
+level = "INFO"

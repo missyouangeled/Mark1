@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mark42"
+version = "2.3.0"
+description = "Mark42 模块化智能铠甲系统 - OpenClaw 上下文守护与循环引擎"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "袁文涛"}
+]
+keywords = ["openclaw", "context-guard", "ai-agent", "armor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: No Input/Output (Daemon)",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    # Mark42 仅依赖 Python 标准库，无第三方依赖
+]
+
+[project.scripts]
+mark42 = "mark42.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mark42*"]
+
+[tool.setuptools.package-data]
+mark42 = ["systemd/*.tmpl", "templates/*.json"]

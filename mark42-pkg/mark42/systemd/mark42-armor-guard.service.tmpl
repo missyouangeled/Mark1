@@ -1,0 +1,28 @@
+[Unit]
+Description=Mark42 Armor Guard - 上下文铠甲守护进程
+After=openclaw-gateway.service
+Wants=openclaw-gateway.service
+Requires=mark42-bootstrap.service
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
+Environment=MARK42_CLI=__MARK42_BIN__
+Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
+Environment=XDG_STATE_HOME=__MARK42_XDG_STATE__
+Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
+Environment=MARK42_LOG_DIR=__MARK42_LOG_DIR__
+Environment=MARK42_SCRATCH=__MARK42_SCRATCH__
+ExecStart=__MARK42_PYTHON__ -u __MARK42_BIN__ armor --guard --interval 300
+ExecStop=/bin/sh -c 'test -n "$MAINPID" && kill -TERM "$MAINPID" || true'
+Restart=always
+RestartSec=15
+StandardOutput=append:__MARK42_LOG_DIR__/armor-guard.log
+StandardError=append:__MARK42_LOG_DIR__/armor-guard.log
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

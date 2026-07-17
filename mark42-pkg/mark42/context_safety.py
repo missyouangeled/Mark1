@@ -5,12 +5,33 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import shutil
+import pathlib
+
+
+def _find_openclaw() -> str:
+    """动态查找 openclaw CLI 路径。"""
+    path = shutil.which("openclaw")
+    if path:
+        return path
+    for candidate in [
+        pathlib.Path.home() / ".npm-global" / "bin" / "openclaw",
+        pathlib.Path("/usr/local/bin/openclaw"),
+        pathlib.Path("/usr/bin/openclaw"),
+    ]:
+        if candidate.exists():
+            return str(candidate)
+    return "openclaw"
+
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .log_setup import get_logger
 from .output_guard import trim_detail, trim_json_short
 from .utils import _now_iso
+
+logger = get_logger(__name__)
 
 
 OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
@@ -80,7 +101,7 @@ def _backup_openclaw_config() -> Path:
 
 def _run_openclaw_validate() -> tuple[bool, str]:
     proc = subprocess.run(
-        ["/home/missyouangeled/.npm-global/bin/openclaw", "config", "validate"],
+        [_find_openclaw(), "config", "validate"],
         capture_output=True,
         text=True,
         check=False,
@@ -184,7 +205,7 @@ def _print_checks(checks: list[dict[str, Any]], verbose: bool = False) -> dict[s
         }.get(severity, "[INFO]")
         if severity == "info":
             shown = item['actual'] if verbose else trim_json_short(item['actual'], 120)
-            print(f"{prefix} {item['name']}: {shown}")
+            logger.info(f"{prefix} {item['name']}: {shown}")
         else:
             if verbose:
                 actual = repr(item['actual'])
@@ -192,17 +213,17 @@ def _print_checks(checks: list[dict[str, Any]], verbose: bool = False) -> dict[s
             else:
                 actual = trim_detail(repr(trim_json_short(item['actual'], 120)), 160)
                 expected = trim_detail(repr(trim_json_short(item['expected'], 120)), 160)
-            print(f"{prefix} {item['name']}: actual={actual} expected={expected}")
+            logger.info(f"{prefix} {item['name']}: actual={actual} expected={expected}")
     return counts
 
 
 def context_safety_status(verbose: bool = False) -> dict[str, Any]:
     config = _load_openclaw_config()
     checks = _status_checks(config)
-    print("== Mark42 Context Safety Status ==")
-    print(f"config: {OPENCLAW_CONFIG}")
+    logger.info("== Mark42 Context Safety Status ==")
+    logger.info(f"config: {OPENCLAW_CONFIG}")
     counts = _print_checks(checks, verbose=verbose)
-    print(f"summary: pass={counts['pass']} warn={counts['warn']} fail={counts['fail']} info={counts['info']}")
+    logger.info(f"summary: pass={counts['pass']} warn={counts['warn']} fail={counts['fail']} info={counts['info']}")
     return {"checks": checks, "summary": counts, "checkedAt": _now_iso()}
 
 
@@ -259,20 +280,20 @@ def context_safety_apply(verbose: bool = False) -> dict[str, Any]:
         backup = _backup_openclaw_config()
         _save_openclaw_config(new_config)
     valid, output = _run_openclaw_validate()
-    print("== Mark42 Context Safety Apply ==")
-    print(f"backup: {backup if backup else 'none'}")
+    logger.info("== Mark42 Context Safety Apply ==")
+    logger.info(f"backup: {backup if backup else 'none'}")
     if changed:
-        print("changed:")
+        logger.info("changed:")
         if verbose:
             for item in changed:
-                print(f"  - {item}")
+                logger.info(f"  - {item}")
         else:
-            print(f"  - {len(changed)} 项变更")
+            logger.info(f"  - {len(changed)} 项变更")
     else:
-        print("changed: none")
-    print(f"validate: {'PASS' if valid else 'FAIL'}")
+        logger.info("changed: none")
+    logger.info(f"validate: {'PASS' if valid else 'FAIL'}")
     if output:
-        print(output)
+        logger.info(output)
     return {
         "backup": str(backup) if backup else None,
         "changed": changed,
@@ -285,19 +306,19 @@ def context_safety_apply(verbose: bool = False) -> dict[str, Any]:
 def context_safety_verify(verbose: bool = False) -> int:
     result = context_safety_status(verbose=verbose)
     valid, output = _run_openclaw_validate()
-    print("== Validate ==")
-    print(f"status: {'PASS' if valid else 'FAIL'}")
+    logger.info("== Validate ==")
+    logger.info(f"status: {'PASS' if valid else 'FAIL'}")
     if output and verbose:
-        print(output)
+        logger.info(output)
     smoke_ok, smoke_lines = _run_light_smoke_checks()
-    print("== Smoke ==")
+    logger.info("== Smoke ==")
     if verbose:
         for line in smoke_lines:
-            print(line)
+            logger.info(line)
     else:
         pass_count = sum(1 for line in smoke_lines if line.startswith("[PASS]"))
         fail_count = sum(1 for line in smoke_lines if line.startswith("[FAIL]"))
-        print(f"summary: pass={pass_count} fail={fail_count}")
+        logger.info(f"summary: pass={pass_count} fail={fail_count}")
     summary = result["summary"]
     if not valid:
         return 1

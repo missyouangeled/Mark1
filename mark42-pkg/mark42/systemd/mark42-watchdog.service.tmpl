@@ -1,0 +1,20 @@
+[Unit]
+Description=Mark42 Watchdog - 检查 daemon 存活并自动重启
+After=openclaw-gateway.service mark42-engine-daemon.service mark42-armor-guard.service
+
+[Service]
+Type=oneshot
+Environment=PYTHONUNBUFFERED=1
+Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
+Environment=MARK42_CLI=__MARK42_BIN__
+Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
+Environment=XDG_STATE_HOME=__MARK42_XDG_STATE__
+Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
+Environment=MARK42_LOG_DIR=__MARK42_LOG_DIR__
+Environment=MARK42_SCRATCH=__MARK42_SCRATCH__
+ExecStart=__MARK42_PYTHON__ __MARK42_BIN__ watchdog --check
+StandardOutput=append:__MARK42_STATE_DIR__/watchdog.log
+StandardError=append:__MARK42_STATE_DIR__/watchdog.log
+
+[Install]
+WantedBy=default.target
