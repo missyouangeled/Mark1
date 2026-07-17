@@ -743,19 +743,63 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 
+def _send_context_warn_event(usage: float) -> bool:
+    """通过 openclaw CLI 向主会话注入上下文预警 systemEvent。
+
+    Returns: True=发送成功, False=失败
+    """
+    import subprocess as _sp
+    text = (
+        f"⚠️ 上下文预警：当前会话上下文使用率已达 {usage}%。"
+        f"建议尽快执行 /compact 主动压缩，避免上下文溢出导致 compaction 超时失败。"
+    )
+    try:
+        result = _sp.run(
+            ["openclaw", "system", "event",
+             "--text", text,
+             "--mode", "next-heartbeat",
+             "--session-key", "agent:main:main"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            print(f"    📡 已向主会话发送上下文预警 ({usage}%)")
+            return True
+        else:
+            print(f"    ⚠️ 预警发送失败: {result.stderr.strip()[:100]}")
+            return False
+    except Exception as e:
+        print(f"    ⚠️ 预警发送异常: {e}")
+        return False
+
+
 def armor_guard(interval_s: int = 300) -> None:
-    """守护模式：每 N 秒检查一次，超阈值自动出手。"""
+    """守护模式：每 N 秒检查一次，超阈值自动出手。
+
+    - WARN 阈值(70%): 向主会话注入 systemEvent 预警，提醒模型主动 /compact
+    - ALERT 阈值(85%): 自动触发 armor_compress + 注入预警
+    """
+    _warn_sent_at = None  # 上次发送预警的时间戳，避免重复刷屏
+    _warn_cooldown = 600  # 预警冷却 10 分钟
     print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查）")
     try:
         while True:
             check = armor_check()
             usage = check.get("usagePercent", 0)
             ts = datetime.now().strftime("%H:%M:%S")
-            print(trim_detail(f"[{ts}] 上下文 {usage}% — {check.get('summary', '')}", 120))
+            print(trim_detail(f"[{ts}] 上下文 {usage}% - {check.get('summary', '')}", 120))
+            now_ts = time.time()
+            should_warn = (
+                usage >= THRESHOLD_WARN
+                and (_warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown)
+            )
+            if should_warn:
+                print(f"[{ts}] 🟡 上下文达 WARN 阈值，发送预警到主会话")
+                if _send_context_warn_event(usage):
+                    _warn_sent_at = now_ts
             if usage >= THRESHOLD_ALERT:
                 print(f"[{ts}] 🟠 自动触发压缩")
                 result = armor_compress()
-                print(f"    → {result.get('action')}")
+                print(f"    -> {result.get('action')}")
             time.sleep(interval_s)
     except KeyboardInterrupt:
         print("\n🛡️ 守护模式已退出")

@@ -1169,3 +1169,48 @@
 
 - [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
 
+## 2026-07-16T17:05:00.125089+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T09:18:22.716765+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=973.3785294166667）
+
+## 2026-07-17T09:20:00.086545+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T09:25:00.092450+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T09:30:00.127831+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T09:55:00.104105+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-17T10:05:00.116308+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-17T10:10:00.083065+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-17T10:25:01.265267+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-17T10:30:00.134263+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-17T11:28:06.878705+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=53.11441175）
+
