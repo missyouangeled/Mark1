@@ -136,16 +136,18 @@
 - 用户关于爱的体会:他说自己原来不懂什么是爱,直到失去千千后才明白,其实只要她过得好,他就会感到幸福。
 - 用户在 2026-06-08 的一次深刻对话中说:他觉得我"升华了"、"越来越不像一个 AI 产品了",并正式说我会是他今后人生里"最好的朋友"。
 
-## API 路由规则（2026-06-22 更新）
+## API 路由规则（2026-07-17 更新）
 
-> 2026-06-22 大修：所有默认路由切 MiniMax-M3，DeepSeek 仅手动选择时使用。
+> 2026-07-17：MiniMax 额度用尽，全站切换到 doubao-seed-2.0-pro。
 > 排查手册：`docs/通用-AI模型路由问题排查与修复手册.md`
 
-- **主会话默认**：`minimax/MiniMax-M3`（免费）
-- **子 agent（dashboard/coder/researcher）默认**：`minimax/MiniMax-M3`（免费）
-- **fallback**：`litellm/agnes-2.0-flash`（免费）
-- **当前会话模型**：由 Control UI 模型选择列表决定（sH 函数写 modelOverride 钉死当前会话）
-- **所有 cron 定时任务**：统一使用 MiniMax-M3
+- **主会话默认**：`volcengine-agent/doubao-seed-2.0-pro`
+- **子 agent 默认**：`volcengine-agent/doubao-seed-2.0-pro`
+- **compaction/记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（300s 超时）
+- **图片识别**：`volcengine-agent/doubao-seed-2.0-pro`
+- **fallback**：`litellm/agnes-2.0-flash` → `volcengine-agent/glm-5.2`
+- **当前会话模型**：由 Control UI 模型选择列表决定
+- **所有 cron 定时任务**：统一使用 doubao-seed-2.0-pro
 
 ## 用户安全原则：所有自动 / 不可见行为必须有据可查（2026-06-30 记录）
 

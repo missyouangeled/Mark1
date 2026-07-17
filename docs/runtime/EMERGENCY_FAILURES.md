@@ -1214,3 +1214,79 @@
 
 - [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=53.11441175）
 
+## 2026-07-17T12:00:00.108276+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.67MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:05:00.080383+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.67MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:10:00.083932+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:15:00.086846+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:20:00.083244+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:25:00.088254+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:30:00.087272+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:35:00.114030+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:40:00.086902+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:45:00.087884+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:50:00.151351+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.98MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T12:55:00.127224+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.99MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:00:00.227771+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:05:00.089399+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:10:00.135894+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:15:00.118709+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:20:00.091960+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:25:00.091671+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.89MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-17T13:30:00.109358+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.88MB，已明显超过 5.0MB watcher 阈值
+
