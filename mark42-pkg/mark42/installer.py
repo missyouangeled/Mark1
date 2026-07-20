@@ -52,7 +52,7 @@ def install_systemd(workspace: str = "") -> None:
     log_dir = f"{state_dir}/logs"
 
     # scratch 路径 - 使用环境变量或 XDG 回退，不硬编码 /mnt/data
-    scratch = os.environ.get("MARK42_SCRATCH", str(xdg_state / "openclaw" / "scratch"))
+    scratch = os.environ.get("MARK42_SCRATCH", str(Path(xdg_state) / "openclaw" / "scratch"))
 
     # mark42 命令路径
     mark42_bin = shutil.which("mark42") or str(home / ".local" / "bin" / "mark42")

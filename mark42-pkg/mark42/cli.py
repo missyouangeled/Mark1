@@ -709,6 +709,10 @@ def main() -> None:
     install_p.add_argument("--uninstall", action="store_true", help="卸载 systemd 服务")
     install_p.add_argument("--workspace", default="", help="OpenClaw 工作区路径（默认 ~/.openclaw/workspace）")
 
+    # watchdog 子命令：检查 daemon 存活并自动重启
+    watchdog_p = sub.add_parser("watchdog", help="🐕 Watchdog - 检查 daemon 存活")
+    watchdog_p.add_argument("--check", action="store_true", help="执行一次检查")
+
     parser.add_argument("--version", action="version", version=f"Mark42 v{__version__}")
     args = parser.parse_args()
 
@@ -763,6 +767,11 @@ def main() -> None:
         else:
             ws = args.workspace if args.workspace else ""
             install_systemd(workspace=ws)
+        return
+
+    if args.module == "watchdog":
+        from .watchdog import watchdog_check
+        watchdog_check()
         return
 
     if args.module == "logs":
