@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mark42"
-version = "2.4.0"
+version = "2.5.0"
 description = "Mark42 模块化智能铠甲系统 - OpenClaw 上下文守护与循环引擎"
 readme = "README.md"
 license = {text = "MIT"}

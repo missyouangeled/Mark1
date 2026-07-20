@@ -5,6 +5,29 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.5.0] - 2026-07-20
+
+### 新增
+- 🧪 测试补全：59 -> 311 用例（+252），覆盖 9 个新模块
+  - test_utils.py, test_output_guard.py, test_smart_crusher.py
+  - test_circuit_breaker.py, test_error_archive.py
+  - test_context_safety.py, test_compaction_diag.py
+  - test_heavy.py, test_watchdog.py
+- 🔧 ruff lint + format 配置（pyproject.toml），自动修复 651 个问题
+- 🐳 Dockerfile 加 HEALTHCHECK（mark42 status --json，60s 间隔）
+- 🔧 install.sh 改用 wheel 安装（pip wheel -> pip install *.whl）
+- 🔧 MANIFEST.in 确保 templates/*.toml + systemd/*.timer 打包
+
+### 修复
+- 🔧 daemon 函数 print -> logger（cli.py 31 处）
+- 🔧 Dockerfile 去掉重复代码复制（scripts/mark42_modules/）
+- 🔧 docker-build.sh 构建上下文改为 mark42-pkg 自身
+- 🔧 pyproject.toml package-data 补 templates/*.toml
+- 🔧 CI workflow 清除旧 scripts/mark42_modules/ 路径引用
+
+### 变更
+- 🔄 pyproject.toml 加 [tool.ruff] 配置（E/W/F/I/UP/B/S 规则集）
+
 ## [2.4.0] - 2026-07-20
 
 ### 新增
