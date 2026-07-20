@@ -155,7 +155,7 @@ def main():
     checks = []
 
     # 1. 前台恢复观察
-    recovery_flags = ["--notify-frontstage", "--print-human"]
+    recovery_flags = ["--limit", "500", "--notify-frontstage", "--print-human"]
     if args.no_notify:
         recovery_flags.remove("--notify-frontstage")
     checks.append(run_sub_check("frontstage-recovery", RECOVERY_SCRIPT, recovery_flags))

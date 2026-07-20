@@ -52,7 +52,7 @@ def _dual_subprocess_mock(du_size_kb: int, cli_result: MagicMock = None,
             fake = MagicMock()
             fake.stdout = f"{du_size_kb}\t/sessions"
             return fake
-        elif isinstance(args, (list, tuple)) and args and args[0] == "openclaw":
+        elif isinstance(args, (list, tuple)) and args and args[0].endswith("openclaw"):
             # 区分 openclaw agent / openclaw sessions compact
             if len(args) >= 2 and args[1] == "agent":
                 # 老路径（理论上不再调, 但保留兼容）
@@ -304,7 +304,7 @@ class TestArmorCompress:
                 fake = _MM()
                 fake.stdout = f"{int(initial_size/1024)}\t/sessions"
                 return fake
-            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+            elif isinstance(args, (list, tuple)) and args[0].endswith("openclaw") and args[1] == "sessions":
                 # 模拟压缩后变小
                 session_mock.set_size(compact_size)
                 fake = _MM()
@@ -356,7 +356,7 @@ class TestArmorCompress:
         def run_side(args, **kwargs):
             if isinstance(args, (list, tuple)) and args[0] == "du":
                 fake = _MM(); fake.stdout = f"{int(initial_size/1024)}\t/sessions"; return fake
-            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+            elif isinstance(args, (list, tuple)) and args[0].endswith("openclaw") and args[1] == "sessions":
                 fake = _MM(); fake.returncode = 0; fake.stdout = '{"ok":true}'; fake.stderr = ""
                 return fake
             fake = _MM(); fake.returncode = 0; fake.stdout = ""; fake.stderr = ""; return fake
@@ -396,7 +396,7 @@ class TestArmorCompress:
         def run_side(args, **kwargs):
             if isinstance(args, (list, tuple)) and args[0] == "du":
                 fake = _MM(); fake.stdout = f"{int(initial_size/1024)}\t/sessions"; return fake
-            elif isinstance(args, (list, tuple)) and args[0] == "openclaw" and args[1] == "sessions":
+            elif isinstance(args, (list, tuple)) and args[0].endswith("openclaw") and args[1] == "sessions":
                 session_mock.set_size(compact_size)
                 fake = _MM(); fake.returncode = 0; fake.stdout = '{"ok":true}'; fake.stderr = ""
                 return fake
@@ -483,7 +483,7 @@ class TestArmorCompress:
                 f.stdout = "80000\t/sessions"
                 return f
             # openclaw sessions compact - 模拟后会让 session 变小
-            if args and args[0] == "openclaw" and len(args) > 1 and args[1] == "sessions":
+            if args and args[0].endswith("openclaw") and len(args) > 1 and args[1] == "sessions":
                 fake_session.set_size(after_b)
                 f = MagicMock()
                 f.returncode = 0
@@ -607,7 +607,7 @@ class TestArmorCompress:
                 fake = MagicMock()
                 fake.stdout = "80000\t/sessions"
                 return fake
-            elif isinstance(args, (list, tuple)) and args and args[0] == "openclaw":
+            elif isinstance(args, (list, tuple)) and args and args[0].endswith("openclaw"):
                 raise FileNotFoundError("openclaw not found")
             return MagicMock()
 
@@ -639,7 +639,7 @@ class TestArmorCompress:
                 fake = MagicMock()
                 fake.stdout = "80000\t/sessions"
                 return fake
-            elif isinstance(args, (list, tuple)) and args and args[0] == "openclaw":
+            elif isinstance(args, (list, tuple)) and args and args[0].endswith("openclaw"):
                 raise sp.TimeoutExpired(cmd="openclaw", timeout=180)
             return MagicMock()
 
@@ -704,7 +704,7 @@ class TestArmorCompress:
         cli_called = [False]
 
         def side_effect(args, **kwargs):
-            if isinstance(args, (list, tuple)) and args and args[0] == "openclaw":
+            if isinstance(args, (list, tuple)) and args and args[0].endswith("openclaw"):
                 cli_called[0] = True
                 raise RuntimeError("不应该调用 CLI")
             fake = MagicMock()

@@ -506,7 +506,7 @@ class TestRunTests:
                 "duration_ms": int(elapsed * 1000),
                 "elapsed": elapsed,
                 "enqueuedAt": request._enqueued_at or 0.0,
-                "finishedAt": 0.0,
+                "finishedAt": __import__('time').time(),
             }
             request.set_result(payload)
             self_.stats["processed"] += 1
@@ -583,7 +583,7 @@ class TestRunTests:
                 "duration_ms": int(elapsed * 1000),
                 "elapsed": elapsed,
                 "enqueuedAt": request._enqueued_at or 0.0,
-                "finishedAt": 0.0,
+                "finishedAt": __import__('time').time(),
             }
             request.set_result(payload)
             self_.stats["processed"] += 1

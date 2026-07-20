@@ -1717,3 +1717,120 @@
 
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
 
+## 2026-07-20T13:45:00.349338+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T13:50:00.109105+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:55:00.153701+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T14:00:00.110373+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:05:00.088658+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:10:00.116265+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:15:00.108546+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:20:00.115805+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T14:25:00.110263+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T14:35:00.118304+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T14:40:00.104627+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:45:00.102795+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T14:50:00.110678+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T14:55:00.095075+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T15:00:00.104382+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T15:05:00.098616+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T15:10:00.089861+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T15:15:00.133994+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T15:20:00.138365+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-20T15:25:00.101147+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-20T15:30:00.096156+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-frontstage-guardian.service
+
+## 2026-07-20T15:45:00.114295+08:00
+
+- [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error
+
+## 2026-07-20T15:50:00.137216+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-20T15:55:00.146822+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-20T16:05:00.082503+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+
+## 2026-07-20T16:10:00.099429+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-20T16:30:03.455530+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-20T16:55:00.085778+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-20T17:00:00.101515+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-task-scheduler.service
+
