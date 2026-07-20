@@ -5,6 +5,26 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.4.0] - 2026-07-20
+
+### 新增
+- 🔧 GitHub Actions CI（`mark42-ci.yml`）：多 Python 版本测试 + coverage 门禁 50% + lint 检查
+- 🔧 GitHub Actions 自动发版（`mark42-release.yml`）：tag 触发 -> 测试 -> CHANGELOG -> Release
+- 🐳 Docker 镜像支持（`Dockerfile` + `docker-build.sh`）：python3.12-slim 非root
+- 🔒 pip-audit 依赖漏洞扫描集成到 CI
+- 🔒 硬编码 API key / 路径安全检查集成到 CI
+- 📖 README 重写：Quick Start 5 步 + 命令速查表
+
+### 修复
+- 🔧 `install.sh`：`pip install` 改用 venv/pipx 方案，解决 `externally-managed-environment`
+- 🔧 修复 15 个失败测试（config 模型断言更新 + CLI dispatch + engine 日期过期 + integration 参数适配）
+- 🔒 `shell=True` 3 处清零（governance.py + cli.py）
+- 🔒 `mark42-pkg` 中 `/mnt/data` 硬编码清零（config/installer/engine）
+
+### 变更
+- 🔄 README 仓库地址改为真实地址 `github.com/missyouangeled/Mark1`
+- 🔄 测试模型断言：MiniMax-M3/minimax -> doubao-seed-2.0-pro/volcengine-agent
+
 ## [2.3.0] - 2026-07-17
 
 ### 新增
