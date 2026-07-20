@@ -48,8 +48,8 @@ SCRIPTS = WORKSPACE / "scripts"
 XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", cfg_get("paths", "xdg_state", str(Path.home() / ".local" / "state"))))
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
 
-# SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
-# 优先级：MARK42_SCRATCH env > /mnt/data/openclaw/scratch > XDG_STATE fallback
+# SCRATCH 路径（7/01 修： env 路由 + XDG_STATE fallback）
+# 优先级：MARK42_SCRATCH env > XDG_STATE fallback
 # 避免非点点机器 /mnt/data 不存在时 hard-fail
 SCRATCH = Path(os.environ.get(
     "MARK42_SCRATCH",
@@ -58,8 +58,7 @@ SCRATCH = Path(os.environ.get(
 if not SCRATCH.parent.exists():
     SCRATCH = XDG_STATE / "openclaw" / "scratch"
 
-# 数据盘路径（优先 /mnt/data，回退 ~/.local/state）
-# 数据目录优先用 SCRATCH 同级，不再硬编码 /mnt/data
+# 数据盘路径（优先 SCRATCH 同级，回退 XDG_STATE）
 DATA_ROOT = SCRATCH.parent / "mark42" if SCRATCH.parent.exists() else XDG_STATE / "openclaw" / "mark42"
 
 ARMOR_STATE = MARK42_STATE / "armor"

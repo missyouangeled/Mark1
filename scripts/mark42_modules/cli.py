@@ -43,8 +43,7 @@ def _find_mark42_processes() -> dict:
     result = {"parent": None, "children": []}
     try:
         out = subprocess.check_output(
-            "ps -eo pid=,ppid=,args= | grep -E 'mark42.py (assemble|armor --guard|engine --daemon)' | grep -v grep",
-            shell=True,
+            ["ps", "-eo", "pid=,ppid=,args="],
             text=True,
         )
     except Exception:

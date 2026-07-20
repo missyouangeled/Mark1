@@ -119,7 +119,7 @@ class ChaosTester:
         elif injection and injection != "none":
             # 真实注入
             try:
-                subprocess.run(injection, shell=True, timeout=10)
+                subprocess.run(injection, shell=False, timeout=10, executable="/bin/bash")
                 notes.append(f"注入: {injection}")
             except Exception as e:
                 notes.append(f"注入失败: {e}")
@@ -145,7 +145,7 @@ class ChaosTester:
         if not dry_run and scenario.get("recovery") and scenario["recovery"] != "none":
             t_recover = time.monotonic()
             try:
-                subprocess.run(scenario["recovery"], shell=True, timeout=30)
+                subprocess.run(scenario["recovery"], shell=False, timeout=30, executable="/bin/bash")
                 recovery_ms = int((time.monotonic() - t_recover) * 1000)
                 notes.append(f"恢复: {scenario['recovery']}")
             except Exception as e:

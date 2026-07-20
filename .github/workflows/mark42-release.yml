@@ -1,0 +1,84 @@
+name: Mark42 发版
+
+on:
+  push:
+    tags:
+      - 'v*'
+    paths:
+      - 'scripts/mark42_modules/**'
+      - 'scripts/tests/**'
+      - 'mark42-pkg/**'
+
+jobs:
+  release:
+    name: 发布 Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史用于 CHANGELOG
+      
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: 提取版本号
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "版本: $VERSION"
+      
+      - name: 运行测试
+        run: |
+          pip install pytest pytest-cov pytest-mock
+          pip install -e mark42-pkg
+          python -m pytest scripts/tests/ --no-cov --tb=short -q
+          python -m pytest mark42-pkg/tests/ --no-cov --tb=short -q
+      
+      - name: 生成 Release Notes
+        id: notes
+        run: |
+          # 从 CHANGELOG.md 提取当前版本的变更记录
+          VERSION="${{ steps.version.outputs.version }}"
+          python3 -c "
+          import re, sys
+          version = '$VERSION'
+          with open('mark42-pkg/CHANGELOG.md', 'r') as f:
+              content = f.read()
+          # 找 ## [version] 或 ## [v...] 的块
+          pattern = rf'## \[?{re.escape(version)}\]?.*?(?=\n## \[|\Z)'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              print(match.group(0).strip())
+          else:
+              print(f'Version {version} not found in CHANGELOG.md')
+          " > release_notes.md
+          cat release_notes.md
+      
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Mark42 ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+      
+      - name: 构建 sdist + wheel
+        run: |
+          pip install build
+          cd mark42-pkg
+          python -m build
+      
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark42-${{ steps.version.outputs.version }}-dist
+          path: mark42-pkg/dist/

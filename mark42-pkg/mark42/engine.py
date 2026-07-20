@@ -257,7 +257,9 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
             root_usage = shutil.disk_usage("/")
             disk_root_gb = root_usage.free / (1024**3)
             disk_root = f"{disk_root_gb:.1f}G"
-            data_usage = shutil.disk_usage("/mnt/data") if Path("/mnt/data").exists() else None
+            # 数据盘检查：使用 SCRATCH 同级路径，不硬编码 /mnt/data
+            _data_path = str(SCRATCH.parent) if SCRATCH.parent.exists() else None
+            data_usage = shutil.disk_usage(_data_path) if _data_path and _data_path != "/" else None
             disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
             with open("/proc/meminfo") as f:
                 meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}
