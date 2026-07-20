@@ -39,7 +39,7 @@ def _make_loop(name="test-loop", template="", task="test task",
             "cycle": cycle,
             "lastRun": None,
             "lastResult": None,
-            "createdAt": "2026-06-29T09:00:00",
+            "createdAt": "2026-07-20T09:00:00",
         }
     }
 
@@ -284,7 +284,7 @@ class TestEngineRunLoopMemoryIndex:
         memory_dir = tmp_path / "memory"
         daily_dir = memory_dir / "daily"
         daily_dir.mkdir(parents=True)
-        (daily_dir / "2026-06-29.md").write_text("## Test Topic A\n## Test Topic B\n")
+        (daily_dir / "2026-07-20.md").write_text("## Test Topic A\n## Test Topic B\n")
         # mock WORKSPACE 指向 tmp_path
         mocker.patch.object(engine, "WORKSPACE", tmp_path)
         loops = _make_loop(name="mi", template="memory-index")
@@ -295,8 +295,8 @@ class TestEngineRunLoopMemoryIndex:
         index_file = memory_dir / "INDEX.md"
         assert index_file.exists()
         content = index_file.read_text()
-        assert "2026-06-29] Test Topic A" in content
-        assert "2026-06-29] Test Topic B" in content
+        assert "2026-07-20] Test Topic A" in content
+        assert "2026-07-20] Test Topic B" in content
         assert loops["mi"]["lastResult"]["scannedDays"] >= 1
 
 
@@ -797,7 +797,7 @@ class TestEngineAdditionalBranches:
                 "cycle": 0,
                 "lastRun": None,
                 "lastResult": None,
-                "createdAt": "2026-06-29T09:00:00",
+                "createdAt": "2026-07-20T09:00:00",
             },
             "recent-loop": {
                 "task": "noop",
@@ -808,7 +808,7 @@ class TestEngineAdditionalBranches:
                 "cycle": 0,
                 "lastRun": now_iso,
                 "lastResult": None,
-                "createdAt": "2026-06-29T09:00:00",
+                "createdAt": "2026-07-20T09:00:00",
             },
             "bad-time-loop": {
                 "task": "noop",
@@ -819,7 +819,7 @@ class TestEngineAdditionalBranches:
                 "cycle": 0,
                 "lastRun": "not-an-iso-time",
                 "lastResult": None,
-                "createdAt": "2026-06-29T09:00:00",
+                "createdAt": "2026-07-20T09:00:00",
             },
         }
 

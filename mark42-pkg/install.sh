@@ -53,30 +53,43 @@ fi
 # ── 安装 Mark42 ──
 info "安装 Mark42..."
 
-# 确定安装方式
+# 确定安装方式：优先 pipx，回退 venv
 if [[ "$EUID" -eq 0 ]]; then
-    PIP_INSTALL="pip3 install ."
     SYSTEMD_USER="--system"
     SYSTEMD_DIR="/etc/systemd/system"
 else
-    PIP_INSTALL="pip3 install --user ."
     SYSTEMD_USER="--user"
     SYSTEMD_DIR="$HOME/.config/systemd/user"
 fi
 
-# 执行 pip 安装
-info "执行 pip install..."
-( cd "$(dirname "$0")" && eval "$PIP_INSTALL" ) || fail "pip install 失败"
-
-# 找到安装后的 mark42 命令
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARK42_BIN=""
-if command -v mark42 >/dev/null 2>&1; then
+
+if command -v pipx >/dev/null 2>&1; then
+    # pipx 方式
+    info "使用 pipx 安装..."
+    pipx install --force "$SCRIPT_DIR" || fail "pipx install 失败"
+    MARK42_BIN="$(command -v mark42 2>/dev/null || echo "$HOME/.local/bin/mark42")"
+elif [[ -x "$HOME/.local/bin/mark42" ]] && mark42 --version >/dev/null 2>&1; then
+    # 已安装，跳过
+    info "检测到已安装的 mark42，跳过安装步骤"
     MARK42_BIN="$(command -v mark42)"
-elif [[ -x "$HOME/.local/bin/mark42" ]]; then
+else
+    # venv 方式
+    VENV_DIR="$HOME/.local/share/mark42-venv"
+    info "创建虚拟环境: $VENV_DIR"
+    python3 -m venv "$VENV_DIR" || fail "创建 venv 失败"
+    info "执行 pip install (venv)..."
+    "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
+    "$VENV_DIR/bin/pip" install "$SCRIPT_DIR" || fail "pip install 失败"
+
+    # 创建 symlink 到 ~/.local/bin
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$VENV_DIR/bin/mark42" "$HOME/.local/bin/mark42"
     MARK42_BIN="$HOME/.local/bin/mark42"
 fi
 
-[[ -n "$MARK42_BIN" ]] || fail "mark42 命令未找到，请检查 pip 安装路径是否在 PATH 中"
+[[ -n "$MARK42_BIN" ]] || fail "mark42 命令未找到"
 
 ok "Mark42 已安装: $MARK42_BIN"
 $MARK42_BIN --version 2>/dev/null || true

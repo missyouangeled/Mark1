@@ -191,8 +191,8 @@ class TestModelConfig:
         monkeypatch.setattr(cfg, "CONFIG_PATH", tmp_path / "config.json")
         result = cfg.get_model_config("llmAnalyze")
         assert result is not None
-        assert result["model"] == "MiniMax-M3"
-        assert result["provider"] == "minimax"
+        assert result["model"] == "doubao-seed-2.0-pro"
+        assert result["provider"] == "volcengine-agent"
 
     def test_get_model_config_merges_runtime_dict_override(self, monkeypatch, tmp_path):
         config_path = tmp_path / "config.json"
@@ -209,7 +209,7 @@ class TestModelConfig:
         assert result is not None
         assert result["model"] == "Custom-M3"
         assert result["timeout"] == 99
-        assert result["provider"] == "minimax"
+        assert result["provider"] == "volcengine-agent"
 
     def test_get_model_config_supports_legacy_string_entry(self, monkeypatch, tmp_path):
         config_path = tmp_path / "config.json"
@@ -222,7 +222,7 @@ class TestModelConfig:
         result = cfg.get_model_config("llmAnalyze")
         assert result is not None
         assert result["model"] == "Legacy-Model"
-        assert result["provider"] == "minimax"
+        assert result["provider"] == "volcengine-agent"
 
     def test_get_model_config_invalid_json_falls_back(self, monkeypatch, tmp_path):
         config_path = tmp_path / "config.json"
@@ -230,7 +230,7 @@ class TestModelConfig:
         monkeypatch.setattr(cfg, "CONFIG_PATH", config_path)
         result = cfg.get_model_config("llmCompress")
         assert result is not None
-        assert result["model"] == "MiniMax-M3"
+        assert result["model"] == "doubao-seed-2.0-pro"
 
     def test_resolve_model_returns_none_for_unknown_key(self):
         assert cfg.resolve_model("not-exist") is None
@@ -239,7 +239,7 @@ class TestModelConfig:
         fake_home = tmp_path / "home"
         (fake_home / ".openclaw").mkdir(parents=True)
         (fake_home / ".openclaw" / "openclaw.json").write_text(json.dumps({
-            "models": {"providers": {"minimax": {}}}
+            "models": {"providers": {"volcengine-agent": {}}}
         }), encoding="utf-8")
         monkeypatch.setattr(cfg.Path, "home", lambda: fake_home)
         result = cfg.resolve_model("llmAnalyze")
@@ -252,7 +252,7 @@ class TestModelConfig:
         (openclaw_dir / "openclaw.json").write_text(json.dumps({
             "models": {
                 "providers": {
-                    "minimax": {
+                    "volcengine-agent": {
                         "apiKey": "sk-test",
                         "baseUrl": "https://example.invalid/v1"
                     }
@@ -264,7 +264,7 @@ class TestModelConfig:
         assert result is not None
         assert result["apiKey"] == "sk-test"
         assert result["baseUrl"] == "https://example.invalid/v1"
-        assert result["model"] == "MiniMax-M3"
+        assert result["model"] == "doubao-seed-2.0-pro"
         assert result["endpoint"] == "/chat/completions"
 
     def test_resolve_model_falls_back_to_default_base_url(self, monkeypatch, tmp_path):
@@ -274,7 +274,7 @@ class TestModelConfig:
         (openclaw_dir / "openclaw.json").write_text(json.dumps({
             "models": {
                 "providers": {
-                    "minimax": {
+                    "volcengine-agent": {
                         "apiKey": "sk-test"
                     }
                 }
@@ -283,7 +283,7 @@ class TestModelConfig:
         monkeypatch.setattr(cfg.Path, "home", lambda: fake_home)
         result = cfg.resolve_model("llmCompress")
         assert result is not None
-        assert result["baseUrl"] == "https://api.minimax.chat/v1"
+        assert result["baseUrl"] == "https://ark.cn-beijing.volces.com/api/plan/v3"
         assert result["maxTokens"] == 4000
         assert result["temperature"] == 0.0
 
@@ -349,7 +349,7 @@ class TestConfigLifecycle:
             "bytesPerKtoken": 2048,
             "thresholds": {"warn": 70, "alert": 85, "crit": 95},
             "models": {
-                "llmAnalyze": {"model": "MiniMax-M3", "provider": "minimax"},
+                "llmAnalyze": {"model": "doubao-seed-2.0-pro", "provider": "volcengine-agent"},
                 "legacyModel": "old-format-model",
             },
             "daemon": {"scanInterval": 30, "autoArmorCompress": True, "autoTaskWatch": False},
@@ -359,7 +359,7 @@ class TestConfigLifecycle:
         out = capsys.readouterr().out
         assert "⚙️ Mark42 配置" in out
         assert "版本: 2.3.0" in out
-        assert "llmAnalyze: MiniMax-M3" in out
+        assert "llmAnalyze: doubao-seed-2.0-pro" in out
         assert "legacyModel: old-format-model  (旧格式)" in out
         assert "扫描间隔: 30s" in out
         assert "大工程检测: 启用" in out

@@ -123,17 +123,20 @@ class TestOpenClawSessionsCompactIntegration:
         sessions_compact_calls = [
             (args, kwargs) for args, kwargs in calls
             if args and args[0] and isinstance(args[0], list)
-            and args[0][0] == "openclaw"
+            and args[0][0].endswith("openclaw")
             and len(args[0]) >= 2 and args[0][1] == "sessions"
         ]
         assert len(sessions_compact_calls) >= 1, (
             f"armor 必须调 openclaw sessions compact, 实际调用: {calls}"
         )
 
-        # 验证调用参数含 --max-lines
+        # 验证调用参数含 agent:main:main 和 --json
         cmd_args = sessions_compact_calls[0][0][0]
-        assert "--max-lines" in cmd_args, (
-            f"应传 --max-lines, 实际: {cmd_args}"
+        assert "agent:main:main" in cmd_args, (
+            f"应含 agent:main:main, 实际: {cmd_args}"
+        )
+        assert "--json" in cmd_args, (
+            f"应传 --json, 实际: {cmd_args}"
         )
 
     def test_armor_compress_real_run_dry_run_does_not_modify_session(self, mocker, armor_state):

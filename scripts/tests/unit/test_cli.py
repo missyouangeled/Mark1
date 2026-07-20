@@ -862,4 +862,4 @@ class TestMainDispatchCoveragePush:
 
         cli.main()
 
-        mock_status.assert_called_once_with()
+        mock_status.assert_called_once_with(verbose=False)
