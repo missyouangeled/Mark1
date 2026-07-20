@@ -75,13 +75,16 @@ elif [[ -x "$HOME/.local/bin/mark42" ]] && mark42 --version >/dev/null 2>&1; the
     info "检测到已安装的 mark42，跳过安装步骤"
     MARK42_BIN="$(command -v mark42)"
 else
-    # venv 方式
+    # venv 方式：先构建 wheel，再从 wheel 安装（可复现）
     VENV_DIR="$HOME/.local/share/mark42-venv"
     info "创建虚拟环境: $VENV_DIR"
     python3 -m venv "$VENV_DIR" || fail "创建 venv 失败"
-    info "执行 pip install (venv)..."
-    "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
-    "$VENV_DIR/bin/pip" install "$SCRIPT_DIR" || fail "pip install 失败"
+    info "构建 wheel..."
+    "$VENV_DIR/bin/pip" install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+    WHEELHOUSE="$VENV_DIR/wheelhouse"
+    "$VENV_DIR/bin/pip" wheel --no-deps -w "$WHEELHOUSE" "$SCRIPT_DIR" || fail "wheel 构建失败"
+    info "安装 mark42 (from wheel)..."
+    "$VENV_DIR/bin/pip" install "$WHEELHOUSE"/*.whl || fail "pip install 失败"
 
     # 创建 symlink 到 ~/.local/bin
     mkdir -p "$HOME/.local/bin"

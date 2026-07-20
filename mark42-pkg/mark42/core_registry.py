@@ -12,17 +12,16 @@ Mark42 v3 §4.8 · 核心位注册表 (Core Registry)
 from __future__ import annotations
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import json
 import logging
-import os
-import time
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ REGISTRY_DIR = Path.home() / ".local" / "state" / "openclaw" / "mark42" / "core-
 REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
 # 8 个核心位定义（§3.6 + §3.6.2 R13-D）
-CORE_DEFINITIONS: List[Dict[str, Any]] = [
+CORE_DEFINITIONS: list[dict[str, Any]] = [
     {
         "core_id": "core_1_main_consciousness",
         "core_role": "main_consciousness",
@@ -110,50 +109,52 @@ CORE_DEFINITIONS: List[Dict[str, Any]] = [
 
 # ── 数据类 ───────────────────────────────────────────
 
+
 @dataclass
 class CoreEntry:
     """单个核心位的注册信息。"""
+
     core_id: str
     core_role: str
     model_name: str
     runtime: str
     base_url: str
     criticality: str  # critical | degradable | optional
-    fallback_chain: List[str] = field(default_factory=list)
+    fallback_chain: list[str] = field(default_factory=list)
     status: str = "unknown"  # unknown | healthy | degraded | down | quarantined
-    last_used_at: Optional[str] = None
+    last_used_at: str | None = None
     total_invocations: int = 0
     total_failures: int = 0
-    last_failure_reason: Optional[str] = None
+    last_failure_reason: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 # ── 探活函数 ─────────────────────────────────────────
+
 
 def _probe_http(url: str, timeout: int = 3) -> bool:
     """HTTP 探活。"""
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.status == 200
-    except Exception as e:
+    except Exception:
         return False
 
 
 def _probe_systemd(service: str) -> str:
     """systemd service 探活。返回 active/inactive/unknown。"""
     import subprocess
+
     try:
-        r = subprocess.run(
-            ["systemctl", "--user", "is-active", service],
-            capture_output=True, text=True, timeout=3)
+        r = subprocess.run(["systemctl", "--user", "is-active", service], capture_output=True, text=True, timeout=3)
         return r.stdout.strip()
-    except Exception as e:
+    except Exception:
         return "unknown"
 
 
-def probe_core(core_id: str) -> Dict[str, Any]:
+def probe_core(core_id: str) -> dict[str, Any]:
     """探活单个核心。返回 {status, reason}。"""
     core = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
     if not core:
@@ -172,12 +173,10 @@ def probe_core(core_id: str) -> Dict[str, Any]:
         if core_id == "core_1_main_consciousness":
             # 主意识走 OpenClaw gateway
             ok = _probe_http("http://127.0.0.1:18788/healthz")
-            return {"status": "healthy" if ok else "down",
-                    "reason": "" if ok else "gateway 不可达"}
+            return {"status": "healthy" if ok else "down", "reason": "" if ok else "gateway 不可达"}
         elif core_id == "core_3_memory_vector_engine":
             ok = _probe_http("http://127.0.0.1:18792/healthz")
-            return {"status": "healthy" if ok else "down",
-                    "reason": "" if ok else "embed-sidecar /healthz 不可达"}
+            return {"status": "healthy" if ok else "down", "reason": "" if ok else "embed-sidecar /healthz 不可达"}
         elif core_id == "core_2_armor_consciousness":
             # 意识层走 API，不直接探活（太慢），默认 healthy
             return {"status": "healthy", "reason": "api provider (skip probe)"}
@@ -186,32 +185,39 @@ def probe_core(core_id: str) -> Dict[str, Any]:
             return {"status": "healthy", "reason": "code_analyzer (api provider, skip probe)"}
         else:
             ok = _probe_http(url)
-            return {"status": "healthy" if ok else "down",
-                    "reason": "" if ok else f"{url} 不可达"}
+            return {"status": "healthy" if ok else "down", "reason": "" if ok else f"{url} 不可达"}
 
     # Python 模块探活（核心 4 和 7）
     if rt == "local_python":
         try:
             if core_id == "core_4_text_compressor":
                 from .text_compressor import TextCompressor
+
                 TextCompressor()
                 return {"status": "healthy", "reason": "text_compressor loaded"}
             elif core_id == "core_7_pii_redact":
                 from .pii_redactor import PIIRedactor
+
                 PIIRedactor()
                 return {"status": "healthy", "reason": "pii_redactor loaded"}
             elif core_id == "core_6_log_classify":
                 from .log_classifier import LogClassifier
+
                 clf = LogClassifier()
                 ok = clf.health_check()
-                return {"status": "healthy" if ok else "down",
-                        "reason": "log_classifier loaded" if ok else "health_check failed"}
+                return {
+                    "status": "healthy" if ok else "down",
+                    "reason": "log_classifier loaded" if ok else "health_check failed",
+                }
             elif core_id == "core_8_anomaly_detect":
                 from .anomaly_detector import AnomalyDetector
+
                 ad = AnomalyDetector()
                 ok = ad.health_check()
-                return {"status": "healthy" if ok else "down",
-                        "reason": "anomaly_detector loaded" if ok else "health_check failed"}
+                return {
+                    "status": "healthy" if ok else "down",
+                    "reason": "anomaly_detector loaded" if ok else "health_check failed",
+                }
         except Exception as e:
             return {"status": "down", "reason": f"import failed: {e}"}
 
@@ -219,6 +225,7 @@ def probe_core(core_id: str) -> Dict[str, Any]:
 
 
 # ── CoreRegistry 主类 ───────────────────────────────
+
 
 class CoreRegistry:
     """核心位注册表。"""
@@ -232,12 +239,12 @@ class CoreRegistry:
             try:
                 data = json.loads(REGISTRY_FILE.read_text())
                 self.cores = {k: CoreEntry(**v) for k, v in data.get("cores", {}).items()}
-            except Exception as e:
+            except Exception:
                 self.cores = self._init_defaults()
         else:
             self.cores = self._init_defaults()
 
-    def _init_defaults(self) -> Dict[str, CoreEntry]:
+    def _init_defaults(self) -> dict[str, CoreEntry]:
         return {c["core_id"]: CoreEntry(**c) for c in CORE_DEFINITIONS}
 
     def _save(self):
@@ -247,14 +254,14 @@ class CoreRegistry:
         }
         REGISTRY_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def list_cores(self) -> List[Dict[str, Any]]:
+    def list_cores(self) -> list[dict[str, Any]]:
         """列出所有核心。"""
         return [c.to_dict() for c in self.cores.values()]
 
-    def get_core(self, core_id: str) -> Optional[CoreEntry]:
+    def get_core(self, core_id: str) -> CoreEntry | None:
         return self.cores.get(core_id)
 
-    def probe_all(self) -> Dict[str, Any]:
+    def probe_all(self) -> dict[str, Any]:
         """探活所有核心，更新状态。"""
         results = {}
         for core_id in self.cores:
@@ -302,7 +309,7 @@ class CoreRegistry:
             c.last_failure_reason = reason
         self._save()
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """摘要统计。"""
         statuses = {}
         for c in self.cores.values():
@@ -310,27 +317,32 @@ class CoreRegistry:
         return {
             "total": len(self.cores),
             "statuses": statuses,
-            "critical_down": [c.core_id for c in self.cores.values()
-                              if c.criticality == "critical" and c.status == "down"],
+            "critical_down": [
+                c.core_id for c in self.cores.values() if c.criticality == "critical" and c.status == "down"
+            ],
         }
 
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_cores_list() -> Dict[str, Any]:
+
+def cli_cores_list() -> dict[str, Any]:
     reg = CoreRegistry()
     return {"cores": reg.list_cores(), "summary": reg.summary()}
 
-def cli_cores_probe() -> Dict[str, Any]:
+
+def cli_cores_probe() -> dict[str, Any]:
     reg = CoreRegistry()
     return reg.probe_all()
 
-def cli_cores_quarantine(core_id: str, reason: str = "") -> Dict[str, Any]:
+
+def cli_cores_quarantine(core_id: str, reason: str = "") -> dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.quarantine(core_id, reason)
     return {"ok": ok, "core_id": core_id}
 
-def cli_cores_restore(core_id: str) -> Dict[str, Any]:
+
+def cli_cores_restore(core_id: str) -> dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.restore(core_id)
     return {"ok": ok, "core_id": core_id}

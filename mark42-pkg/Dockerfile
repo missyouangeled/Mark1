@@ -13,18 +13,18 @@ RUN useradd -m -u 1000 mark42
 USER mark42
 WORKDIR /home/mark42
 
-# 复制源码
-COPY --chown=mark42:mark42 mark42-pkg/ ./mark42-pkg/
-COPY --chown=mark42:mark42 scripts/mark42_modules/ ./scripts/mark42_modules/
+# 复制源码（context 为 mark42-pkg 自身）
+COPY --chown=mark42:mark42 . ./mark42-pkg/
 
-# 安装 mark42
+# 安装 mark42（含 CLI 入口 + systemd 模板）
 RUN pip install --user ./mark42-pkg
-
-# 安装 mark42_modules（从 workspace 根）
-RUN pip install --user -e ./mark42-pkg
 
 # 配置目录
 RUN mkdir -p .config/mark42 .local/state/openclaw/mark42
+
+# 健康检查
+HEALTHCHECK --interval=60s --timeout=10s --start-period=15s --retries=3 \
+    CMD mark42 status --json >/dev/null 2>&1 || exit 1
 
 # 默认入口
 ENTRYPOINT ["mark42"]

@@ -15,17 +15,16 @@ Mark42 v3 · 混沌工程 + 模块级协议 + 集群思维
 from __future__ import annotations
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import json
-import logging
-import os
 import subprocess
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 STATE_DIR = Path.home() / ".local" / "state" / "openclaw" / "mark42"
 CHAOS_LOG = STATE_DIR / "chaos-test" / "results.jsonl"
@@ -36,21 +35,23 @@ CLUSTER_DIR = STATE_DIR / "clusters"
 # R11 混沌工程
 # ══════════════════════════════════════════════════════
 
+
 @dataclass
 class ChaosTestResult:
     """单次 chaos test 结果。"""
+
     test_id: str
     test_name: str
-    target: str           # 注入目标
-    action: str           # 注入动作
+    target: str  # 注入目标
+    action: str  # 注入动作
     started_at: str
-    finished_at: Optional[str] = None
+    finished_at: str | None = None
     passed: bool = False
-    detection_time_ms: Optional[int] = None
-    recovery_time_ms: Optional[int] = None
+    detection_time_ms: int | None = None
+    recovery_time_ms: int | None = None
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -96,7 +97,7 @@ class ChaosTester:
     def __init__(self):
         CHAOS_LOG.parent.mkdir(parents=True, exist_ok=True)
 
-    def list_scenarios(self) -> List[Dict[str, Any]]:
+    def list_scenarios(self) -> list[dict[str, Any]]:
         return [{"id": k, **v} for k, v in self.SCENARIOS.items()]
 
     def run(self, scenario_id: str, dry_run: bool = True) -> ChaosTestResult:
@@ -104,9 +105,14 @@ class ChaosTester:
         scenario = self.SCENARIOS.get(scenario_id)
         if not scenario:
             return ChaosTestResult(
-                test_id=scenario_id, test_name="unknown",
-                target="", action="", started_at=datetime.now().isoformat(),
-                passed=False, notes=f"未知场景: {scenario_id}")
+                test_id=scenario_id,
+                test_name="unknown",
+                target="",
+                action="",
+                started_at=datetime.now().isoformat(),
+                passed=False,
+                notes=f"未知场景: {scenario_id}",
+            )
 
         test_id = f"chaos-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         started_at = datetime.now().isoformat()
@@ -120,7 +126,7 @@ class ChaosTester:
         elif injection and injection != "none":
             # 真实注入
             try:
-                subprocess.run(['bash', '-c', injection], timeout=10)
+                subprocess.run(["bash", "-c", injection], timeout=10)
                 notes.append(f"注入: {injection}")
             except Exception as e:
                 notes.append(f"注入失败: {e}")
@@ -130,6 +136,7 @@ class ChaosTester:
         try:
             # 调 consciousness check 检测故障
             from .consciousness import Consciousness
+
             cs = Consciousness()
             check_result = cs.self_check()
             detected = not check_result.healthy
@@ -169,13 +176,13 @@ class ChaosTester:
         try:
             with open(CHAOS_LOG, "a") as f:
                 f.write(json.dumps(result.to_dict(), ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception:
             logger.exception("Unhandled exception")
             pass
 
         return result
 
-    def history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def history(self, limit: int = 10) -> list[dict[str, Any]]:
         """查看历史 chaos test 记录。"""
         if not CHAOS_LOG.exists():
             return []
@@ -184,7 +191,7 @@ class ChaosTester:
             for line in f:
                 try:
                     results.append(json.loads(line.strip()))
-                except Exception as e:
+                except Exception:
                     continue
         return results[-limit:]
 
@@ -193,21 +200,23 @@ class ChaosTester:
 # §3.7 模块级协议
 # ══════════════════════════════════════════════════════
 
+
 @dataclass
 class ModuleHealth:
     """模块三态健康度（§3.7.1）。"""
+
     module_id: str
     module_name: str
     status: str = "green"  # green | yellow | red
-    latency_ms: Optional[int] = None
+    latency_ms: int | None = None
     error_rate: float = 0.0  # 0.0-1.0
     saturation: float = 0.0  # 0.0-1.0
     traffic_per_min: int = 0
     contract_passed: bool = True
-    fallback_active: Optional[str] = None
-    last_check: Optional[str] = None
+    fallback_active: str | None = None
+    last_check: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @property
@@ -246,7 +255,7 @@ class ModuleHealthMonitor:
     def __init__(self):
         MODULE_HEALTH_DIR.mkdir(parents=True, exist_ok=True)
 
-    def check_all(self) -> List[ModuleHealth]:
+    def check_all(self) -> list[ModuleHealth]:
         """检查所有模块三态 + 4 Golden Signals。"""
         results = []
         for mod in self.MODULES:
@@ -254,7 +263,7 @@ class ModuleHealthMonitor:
             results.append(health)
         return results
 
-    def _check_module(self, mod: Dict[str, Any]) -> ModuleHealth:
+    def _check_module(self, mod: dict[str, Any]) -> ModuleHealth:
         """检查单个模块。"""
         mid = mod["id"]
         name = mod["name"]
@@ -262,13 +271,15 @@ class ModuleHealthMonitor:
         t0 = time.monotonic()
 
         health = ModuleHealth(
-            module_id=mid, module_name=name,
+            module_id=mid,
+            module_name=name,
             last_check=datetime.now().isoformat(),
         )
 
         try:
             if check == "armor_check":
                 from .armor import armor_check
+
                 r = armor_check()
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
                 usage = r.get("usagePercent", 0)
@@ -277,12 +288,12 @@ class ModuleHealthMonitor:
 
             elif check == "engine_status":
                 from .engine import _load_loops
+
                 loops = _load_loops()
                 # registered = 活跃（daemon 在周期性执行）
                 # running = 执行中（瞬态）
                 # killed / completed = 不活跃
-                active = sum(1 for l in loops.values()
-                             if l.get("status") in ("registered", "running"))
+                active = sum(1 for l in loops.values() if l.get("status") in ("registered", "running"))
                 total = len(loops)
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
                 health.traffic_per_min = active
@@ -296,6 +307,7 @@ class ModuleHealthMonitor:
 
             elif check == "consciousness_check":
                 from .consciousness import Consciousness
+
                 cs = Consciousness()
                 r = cs.self_check()
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
@@ -304,6 +316,7 @@ class ModuleHealthMonitor:
 
             elif check == "advisor_ping":
                 from .advisor_client import AdvisorClient
+
                 client = AdvisorClient()
                 if not client.enabled:
                     health.status = "yellow"
@@ -317,17 +330,19 @@ class ModuleHealthMonitor:
 
             elif check == "embed_healthz":
                 import urllib.request
+
                 try:
                     with urllib.request.urlopen("http://127.0.0.1:18792/healthz", timeout=3) as r:
                         ok = r.status == 200
                     health.status = "green" if ok else "red"
-                except Exception as e:
+                except Exception:
                     health.status = "red"
                     health.fallback_active = "L1_keyword_only"
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
 
             elif check == "archive_list":
                 from .error_archive import ErrorArchive
+
                 ea = ErrorArchive()
                 entries = ea.list_entries()
                 health.status = "green"
@@ -347,7 +362,7 @@ class ModuleHealthMonitor:
 
         return health
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """摘要。"""
         results = self.check_all()
         green = sum(1 for r in results if r.status == "green")
@@ -366,6 +381,7 @@ class ModuleHealthMonitor:
 # R14 集群思维
 # ══════════════════════════════════════════════════════
 
+
 class ClusterManager:
     """R14 集群管理：cluster replace 一键替换。"""
 
@@ -380,10 +396,10 @@ class ClusterManager:
         {"name": "cluster-anomaly-detect", "core_id": "core_8_anomaly_detect", "criticality": "optional"},
     ]
 
-    def list_clusters(self) -> List[Dict[str, Any]]:
+    def list_clusters(self) -> list[dict[str, Any]]:
         return self.CLUSTERS
 
-    def replace(self, cluster_name: str, source: str = "backup") -> Dict[str, Any]:
+    def replace(self, cluster_name: str, source: str = "backup") -> dict[str, Any]:
         """替换集群（R14: 坏了就换不修）。"""
         cluster = next((c for c in self.CLUSTERS if c["name"] == cluster_name), None)
         if not cluster:
@@ -403,7 +419,7 @@ class ClusterManager:
         try:
             with open(actions_file, "a") as f:
                 f.write(json.dumps(action, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception:
             logger.exception("Unhandled exception")
             pass
 
@@ -415,18 +431,21 @@ class ClusterManager:
             "action_recorded": True,
         }
 
-    def status(self) -> List[Dict[str, Any]]:
+    def status(self) -> list[dict[str, Any]]:
         """查看所有集群状态。"""
         from .core_registry import CoreRegistry
+
         reg = CoreRegistry()
         results = []
         for c in self.CLUSTERS:
             core = reg.get_core(c["core_id"])
-            results.append({
-                "cluster": c["name"],
-                "core_id": c["core_id"],
-                "criticality": c["criticality"],
-                "status": core.status if core else "unknown",
-                "model": core.model_name if core else "",
-            })
+            results.append(
+                {
+                    "cluster": c["name"],
+                    "core_id": c["core_id"],
+                    "criticality": c["criticality"],
+                    "status": core.status if core else "unknown",
+                    "model": core.model_name if core else "",
+                }
+            )
         return results

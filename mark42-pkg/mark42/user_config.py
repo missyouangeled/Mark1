@@ -18,11 +18,13 @@ from typing import Any
 
 # ── TOML 解析 ─────────────────────────────────────────────
 
+
 def _parse_toml(text: str) -> dict[str, Any]:
     """解析 TOML 文本。优先用标准库 tomllib，否则用内置轻量解析器。"""
     # Python 3.11+ 有 tomllib
     if sys.version_info >= (3, 11):
         import tomllib
+
         return tomllib.loads(text)
 
     # Python 3.10 fallback: 轻量 TOML 解析器（支持基本语法）
@@ -60,8 +62,7 @@ def _lite_toml_parse(text: str) -> dict[str, Any]:
             val = val.strip()
 
             # 去引号
-            if (val.startswith('"') and val.endswith('"')) or \
-               (val.startswith("'") and val.endswith("'")):
+            if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
                 val = val[1:-1]
                 # 处理 ~ 展开
                 if val.startswith("~"):
@@ -84,6 +85,7 @@ def _lite_toml_parse(text: str) -> dict[str, Any]:
 
 # ── 配置路径 ──────────────────────────────────────────────
 
+
 def get_config_path() -> Path:
     """获取用户配置文件路径。"""
     # 1. 环境变量
@@ -97,6 +99,7 @@ def get_config_path() -> Path:
 def get_default_config_path() -> Path:
     """获取包内默认配置模板路径。"""
     import mark42
+
     pkg_dir = Path(mark42.__file__).parent
     return pkg_dir / "templates" / "config.toml"
 
@@ -152,6 +155,7 @@ def _deep_merge(base: dict, override: dict) -> None:
 
 # ── 便捷读取 ─────────────────────────────────────────────
 
+
 def get(section: str, key: str, default: Any = None) -> Any:
     """读取配置值。如 get("thresholds", "warn", 70)。"""
     cfg = load_config()
@@ -165,6 +169,7 @@ def get_section(section: str) -> dict[str, Any]:
 
 
 # ── 配置初始化 ────────────────────────────────────────────
+
 
 def init_user_config(force: bool = False) -> Path:
     """生成用户配置文件。默认复制包内模板到 ~/.config/mark42/config.toml。"""

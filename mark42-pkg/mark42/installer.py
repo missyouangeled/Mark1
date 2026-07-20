@@ -25,6 +25,7 @@ def _find_openclaw() -> str | None:
 def _get_pkg_systemd_dir() -> Path:
     """获取包内 systemd 模板目录。"""
     import mark42
+
     pkg_dir = Path(mark42.__file__).parent
     return pkg_dir / "systemd"
 
@@ -99,15 +100,12 @@ def install_systemd(workspace: str = "") -> None:
     timer_src = tmpl_dir / "mark42-watchdog.timer"
     if timer_src.exists():
         shutil.copy(timer_src, systemd_dir / "mark42-watchdog.timer")
-        print(f"  ✅ mark42-watchdog.timer")
+        print("  ✅ mark42-watchdog.timer")
 
     # daemon-reload + enable
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
     for svc in installed:
-        subprocess.run(
-            ["systemctl", "--user", "enable", svc],
-            capture_output=True, check=False
-        )
+        subprocess.run(["systemctl", "--user", "enable", svc], capture_output=True, check=False)
 
     print()
     print("✅ 安装完成！已启用以下服务：")
@@ -139,14 +137,8 @@ def uninstall_systemd() -> None:
 
     # stop + disable
     for svc in services:
-        subprocess.run(
-            ["systemctl", "--user", "stop", svc],
-            capture_output=True, check=False
-        )
-        subprocess.run(
-            ["systemctl", "--user", "disable", svc],
-            capture_output=True, check=False
-        )
+        subprocess.run(["systemctl", "--user", "stop", svc], capture_output=True, check=False)
+        subprocess.run(["systemctl", "--user", "disable", svc], capture_output=True, check=False)
 
     # 删除文件
     for svc in services:

@@ -29,7 +29,6 @@ import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
 
 from .log_setup import get_logger
 
@@ -42,10 +41,11 @@ QUEUE_POLL_TIMEOUT = 0.05
 @dataclass
 class CompressRequest:
     """压缩请求封装"""
+
     content: str
     session_id: str = "unknown"
-    content_type: str = "auto"          # auto | json | code | diff | log | text
-    priority: int = 0                    # 0=normal, 1=urgent, 2=low (数值小优先级高)
+    content_type: str = "auto"  # auto | json | code | diff | log | text
+    priority: int = 0  # 0=normal, 1=urgent, 2=low (数值小优先级高)
     request_id: str = field(default_factory=lambda: f"req-{uuid.uuid4().hex[:8]}")
     created_at: float = field(default_factory=time.time)
     # 【M 修复 2026-06-30】加 _enqueued_at: 记录该 request 实际入队时间戳
@@ -193,9 +193,7 @@ class CompressQueue:
     def _process_one(self, request: CompressRequest) -> None:
         """处理单个请求 (带 try/except 防护)"""
         with self._lock:
-            self.stats["active_workers"] = sum(
-                1 for w in self._workers if w.is_alive()
-            )
+            self.stats["active_workers"] = sum(1 for w in self._workers if w.is_alive())
         t0 = time.time()
         try:
             # Phase 2 目标 1: content_type="llm:..." 走 LLM 压缩
@@ -224,8 +222,10 @@ class CompressQueue:
                 }
                 request.set_result(payload)
                 self.stats["processed"] += 1
-                log.debug(f"processed {request.request_id} LLM({mode}) "
-                          f"status={payload['status']} ratio={payload['ratio']:.1%}")
+                log.debug(
+                    f"processed {request.request_id} LLM({mode}) "
+                    f"status={payload['status']} ratio={payload['ratio']:.1%}"
+                )
                 return
 
             # 默认: 走 algo_scheduler 智能路由
@@ -251,8 +251,7 @@ class CompressQueue:
             }
             request.set_result(payload)
             self.stats["processed"] += 1
-            log.debug(f"processed {request.request_id} route={payload['route_algo']} "
-                      f"ratio={payload['ratio']:.1%}")
+            log.debug(f"processed {request.request_id} route={payload['route_algo']} ratio={payload['ratio']:.1%}")
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             request.set_error(err)
@@ -299,6 +298,7 @@ def shutdown_compress_queue() -> None:
 # ----------------------------------------------------------------------
 def _run_tests() -> bool:
     import json as _json
+
     passed = 0
     failed = 0
 
@@ -327,8 +327,9 @@ def _run_tests() -> bool:
     check("1.4 成功无 error", req.error is None)
     check("1.5 changed=True (JSON 大输入应被压缩)", req.result.get("changed") is True)
     check("1.6 route_algo=smartcrush", req.result.get("route_algo") == "smartcrush")
-    log.info(f"  → route={req.result['route_algo']} ratio={req.result['ratio']:.1%} "
-          f"elapsed={req.result['elapsed']:.2f}s")
+    log.info(
+        f"  → route={req.result['route_algo']} ratio={req.result['ratio']:.1%} elapsed={req.result['elapsed']:.2f}s"
+    )
     q.shutdown()
 
     # ---- 测试 2: 多 worker 并发 ----
@@ -449,8 +450,7 @@ def _run_tests() -> bool:
     q8 = CompressQueue(max_workers=2)
     q8.start()
     n_ok = 5
-    reqs = [CompressRequest(content=_json.dumps({"i": i, "v": "x" * 30}))
-            for i in range(n_ok)]
+    reqs = [CompressRequest(content=_json.dumps({"i": i, "v": "x" * 30})) for i in range(n_ok)]
     for r in reqs:
         q8.enqueue(r)
     for r in reqs:
@@ -482,6 +482,7 @@ def _run_tests() -> bool:
 
 if __name__ == "__main__":
     import sys
+
     # 配置 logging 让错误可见
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     sys.exit(0 if _run_tests() else 1)

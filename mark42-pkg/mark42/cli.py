@@ -1,18 +1,20 @@
 """Mark42 CLI 入口。"""
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import argparse
-from . import __version__
 import sys
 
+from . import __version__
 from .output_guard import trim_detail, trim_summary
 
 
 def _trim_daemon_logs(log_dir):
     """检查 daemon 日志大小：单个文件超限则截尾保留最新部分。"""
-    from .config import MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+    from .config import MAX_DAEMON_LOG_LINES, MAX_DAEMON_LOG_MB
+
     max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
     for fpath in sorted(log_dir.glob("*.log")):
         try:
@@ -25,7 +27,7 @@ def _trim_daemon_logs(log_dir):
             keep = min(MAX_DAEMON_LOG_LINES // 2, len(lines) // 2)
             with open(fpath, "w") as f:
                 f.writelines(lines[-keep:])
-            print(f"   🧹 截尾 {fpath.name}: {size/1024/1024:.1f}MB → {keep} 行")
+            logger.info(f"🧹 截尾 {fpath.name}: {size / 1024 / 1024:.1f}MB -> {keep} 行")
         except OSError:
             pass
 
@@ -33,6 +35,7 @@ def _trim_daemon_logs(log_dir):
 def _pid_alive(pid: int) -> bool:
     """检查 PID 是否存活。"""
     import os
+
     try:
         os.kill(pid, 0)
         return True
@@ -47,10 +50,14 @@ def _find_mark42_processes() -> dict:
     result = {"parent": None, "children": []}
     try:
         out = subprocess.check_output(
-            ["bash", "-c", "ps -eo pid=,ppid=,args= | grep -E 'mark42.py (assemble|armor --guard|engine --daemon)' | grep -v grep"],
+            [
+                "bash",
+                "-c",
+                "ps -eo pid=,ppid=,args= | grep -E 'mark42.py (assemble|armor --guard|engine --daemon)' | grep -v grep",
+            ],
             text=True,
         )
-    except Exception as e:
+    except Exception:
         return result
 
     for line in out.splitlines():
@@ -79,7 +86,6 @@ def _find_mark42_processes() -> dict:
 
 def assemble_status() -> dict:
     """查看 assemble / armor-guard / engine-daemon 当前状态。"""
-    import json
     from .config import ARMOR_STATE
     from .utils import _load_json
 
@@ -133,6 +139,7 @@ def assemble_stop() -> dict:
     import os
     import signal
     import time
+
     from .config import ARMOR_STATE
     from .utils import _load_json
 
@@ -179,24 +186,24 @@ def assemble_stop() -> dict:
             missing.append({"name": name, "pid": pid})
 
     pid_file.unlink(missing_ok=True)
-    print("🛑 Mark42 assemble 已停止")
+    logger.info("🛑 Mark42 assemble 已停止")
     if stopped:
         for item in stopped:
-            print(f"   已停止: {item['name']} (PID {item['pid']})")
+            logger.info(f"已停止: {item['name']} (PID {item['pid']})")
     if missing:
         for item in missing:
-            print(f"   已不在运行: {item['name']} (PID {item['pid']})")
+            logger.info(f"已不在运行: {item['name']} (PID {item['pid']})")
 
     return {"stopped": stopped, "missing": missing}
 
 
 def assemble_restart() -> dict:
     """重启 assemble：先停旧进程，再后台拉起新 assemble。"""
-    import os
     import subprocess
     import sys
     import time
     from pathlib import Path
+
     from .config import LOG_DIR
 
     assemble_stop()
@@ -212,26 +219,30 @@ def assemble_restart() -> dict:
         start_new_session=True,
         cwd=str(Path(__file__).resolve().parent.parent.parent),
     )
-    print(f"🔄 Mark42 assemble 已重启")
-    print(f"   新 PID: {proc.pid}")
-    print(f"   日志: {LOG_DIR / 'assemble.log'}")
+    logger.info("🔄 Mark42 assemble 已重启")
+    logger.info(f"新 PID: {proc.pid}")
+    logger.info(f"日志: {LOG_DIR / 'assemble.log'}")
     return {"pid": proc.pid, "log": str(LOG_DIR / "assemble.log")}
 
 
 def assemble() -> None:
     """全甲启动入口 — fork 子进程拉起 armor guard + engine daemon。"""
-    import subprocess, sys, time, signal, os
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
     from pathlib import Path
-    from .utils import _now_iso, _save_json, _load_json
-    from .config import ARMOR_STATE, mark42_config, mark42_init
-    from .utils import _now_iso, _save_json
+
     from .armor import armor_check
+    from .config import ARMOR_STATE, mark42_init
+    from .utils import _load_json, _now_iso, _save_json
 
     if not ARMOR_STATE.exists():
-        print("❌ 尚未初始化，请先运行: mark42.py --init\n")
+        logger.warning("尚未初始化，请先运行: mark42 --init")
         mark42_init()
 
-    print("""
+    logger.info("""
 ┌──────────────────────────────────────────┐
 │         🦾 Mark42 完整战甲启动            │
 │                                          │
@@ -244,12 +255,13 @@ def assemble() -> None:
 └──────────────────────────────────────────┘
 """)
     check = armor_check()
-    print(f"📊 启动时上下文: {check.get('usagePercent', 0)}% — {trim_summary(check.get('summary', ''), 100)}\n")
+    logger.info(f"📊 启动时上下文: {check.get('usagePercent', 0)}% - {trim_summary(check.get('summary', ''), 100)}")
 
     # ── Fork 子进程 ──
     script = str(Path(__file__).resolve().parent.parent / "mark42.py")
     children = []
-    from .config import ARMOR_STATE, LOG_DIR, MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+    from .config import ARMOR_STATE, LOG_DIR
+
     pid_file = ARMOR_STATE / "assemble.pids"
     log_dir = LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -258,29 +270,31 @@ def assemble() -> None:
     _trim_daemon_logs(log_dir)
 
     # 1. Armor 守护（间隔 300s）
-    print("🛡️ 启动上下文铠甲守护...")
+    logger.info("🛡️ 启动上下文铠甲守护...")
     armor_log = open(str(log_dir / "armor-guard.log"), "a")
     armor_proc = subprocess.Popen(
         [sys.executable, "-u", script, "armor", "--guard", "--interval", "300"],
-        stdout=armor_log, stderr=subprocess.STDOUT,
+        stdout=armor_log,
+        stderr=subprocess.STDOUT,
         start_new_session=True,
     )
     children.append(("armor-guard", armor_proc.pid, armor_log))
-    print(f"   PID: {armor_proc.pid}")
+    logger.info(f"armor-guard PID: {armor_proc.pid}")
 
     # 2. Engine daemon（扫描间隔 30s）
-    print("🔄 启动循环引擎 daemon...")
+    logger.info("🔄 启动循环引擎 daemon...")
     engine_log = open(str(log_dir / "engine-daemon.log"), "a")
     engine_proc = subprocess.Popen(
         [sys.executable, "-u", script, "engine", "--daemon", "--interval", "30"],
-        stdout=engine_log, stderr=subprocess.STDOUT,
+        stdout=engine_log,
+        stderr=subprocess.STDOUT,
         start_new_session=True,
     )
     children.append(("engine-daemon", engine_proc.pid, engine_log))
-    print(f"   PID: {engine_proc.pid}")
+    logger.info(f"engine-daemon PID: {engine_proc.pid}")
 
     # 3. 健康检查（等 3 秒）
-    print("\n⏳ 3 秒后健康检查...")
+    logger.info("⏳ 3 秒后健康检查...")
     time.sleep(3)
     alive = []
     dead = []
@@ -291,9 +305,9 @@ def assemble() -> None:
         except OSError:
             dead.append(name)
     if alive:
-        print(f"✅ 存活: {', '.join(alive)}")
+        logger.info(f"✅ 存活: {', '.join(alive)}")
     if dead:
-        print(f"❌ 死亡: {', '.join(dead)}")
+        logger.warning(f"❌ 死亡: {', '.join(dead)}")
 
     # 保存 PID 文件
     pid_data = {
@@ -305,43 +319,42 @@ def assemble() -> None:
     # 校验写入
     verify_data = _load_json(pid_file)
     if not verify_data or not verify_data.get("children"):
-        print(f"\n⚠️ PID 文件写入校验失败，但子进程已在运行")
+        logger.warning("PID 文件写入校验失败，但子进程已在运行")
     else:
-        print(f"\n📄 PID 文件: {pid_file} (已验证)")
+        logger.info(f"📄 PID 文件: {pid_file} (已验证)")
 
     # ── 优雅关闭 ──
     def _shutdown(sig, frame):
-        print("\n\n🛑 收到信号，正在优雅关闭...")
+        logger.info("🛑 收到信号，正在优雅关闭...")
         for name, pid, log_fd in children:
             try:
                 os.kill(pid, signal.SIGTERM)
-                print(f"   已发送 SIGTERM → {name} (PID {pid})")
+                logger.info(f"已发送 SIGTERM -> {name} (PID {pid})")
             except OSError:
-                print(f"   {name} 已退出")
+                logger.info(f"{name} 已退出")
             # 关闭父进程持有的日志文件句柄
             try:
                 log_fd.close()
-            except Exception as e:
+            except Exception:
                 logger.exception("Unhandled exception")
                 pass
         pid_file.unlink(missing_ok=True)
-        print("👋 Mark42 战甲已关闭")
+        logger.info("👋 Mark42 战甲已关闭")
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    print("\n✅ Mark42 战甲已启动。拆开是刀，拼上是甲。")
-    print(f"   📋 日志: {log_dir}")
-    print("   按 Ctrl+C 关闭所有守护进程")
-    print(f"   查看状态: python3 scripts/mark42.py status")
+    logger.info("✅ Mark42 战甲已启动。拆开是刀，拼上是甲。")
+    logger.info(f"📋 日志: {log_dir}")
+    logger.info("按 Ctrl+C 关闭所有守护进程")
+    logger.info("查看状态: mark42 status")
 
     # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
-    import signal as _sig
     engine_state = ARMOR_STATE.parent / "engine"
     heartbeat_file = engine_state / "daemon-heartbeat.json"
     heartbeat_timeout = 120  # 超过 120s 无心跳视为僵死
-    print("\n👁️ assemble 监护中（30s 轮询）...")
+    logger.info("👁️ assemble 监护中（30s 轮询）...")
     try:
         while True:
             # 检查所有子进程是否仍在运行
@@ -351,21 +364,23 @@ def assemble() -> None:
                     os.kill(pid, 0)
                 except OSError:
                     all_alive = False
-                    print(f"⚠️ {name} (PID {pid}) 已退出！")
+                    logger.warning(f"{name} (PID {pid}) 已退出！")
                     # 检查心跳文件判断是否僵死已久
                     if name == "engine-daemon" and heartbeat_file.exists():
                         hb = _load_json(heartbeat_file)
                         if hb:
-                            from datetime import datetime as _dt, timezone as _tz
+                            from datetime import datetime as _dt
+                            from datetime import timezone as _tz
+
                             try:
                                 last_tick = _dt.fromisoformat(hb.get("lastTick", ""))
                                 gap = (_dt.now(_tz.utc) - last_tick).total_seconds()
-                                print(f"   最后一次心跳: {gap:.0f}s 前")
-                            except Exception as e:
+                                logger.info(f"最后一次心跳: {gap:.0f}s 前")
+                            except Exception:
                                 logger.exception("Unhandled exception")
                                 pass
             if not all_alive:
-                print("🛑 子进程异常退出，assemble 退出")
+                logger.error("子进程异常退出，assemble 退出")
                 break
             time.sleep(30)
     except KeyboardInterrupt:
@@ -376,14 +391,22 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     """一屏聚合 Armor/Engine/Heavy/Logs 状态。
     json_mode=True 返回 dict，不打印。
     """
-    import json, os
     from datetime import datetime
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ── Armor ──
     from .armor import armor_check
-    from .config import ARMOR_STATE, ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, SCRATCH, THRESHOLD_WARN, THRESHOLD_ALERT, CONFIG_PATH
+    from .config import (
+        ARMOR_STATE,
+        CONFIG_PATH,
+        ENGINE_STATE,
+        HEAVY_STATE,
+        MARK42_BROKER_EVENTS,
+        SCRATCH,
+        THRESHOLD_ALERT,
+        THRESHOLD_WARN,
+    )
     from .utils import _load_json
 
     check = armor_check()
@@ -415,6 +438,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
     # ── Logs ──
     from .logs import _load_state as _logs_state
+
     ls = _logs_state()
     last_rot = ls.get("lastRotation", "从未")
     count = ls.get("rotationCount", 0)
@@ -435,17 +459,17 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
     # ── 人类可读输出 ──
     if not json_mode:
-        print("\n" + "="*56)
+        print("\n" + "=" * 56)
         print("  🦾 Mark42 系统状态")
-        print("="*56)
+        print("=" * 56)
         print(f"  检查时间: {now_str}\n")
-        print(f"  🛡️ 上下文铠甲")
+        print("  🛡️ 上下文铠甲")
         print(f"     {status_icon} {usage}% ({trim_summary(check.get('summary', ''), 100)})")
         if idx:
             print(f"     🧠 索引: {strat} ({gen_time[:16] if gen_time else '?'})")
         else:
-            print(f"     🧠 索引: 无")
-        print(f"\n  🔄 循环引擎")
+            print("     🧠 索引: 无")
+        print("\n  🔄 循环引擎")
         print(f"     Loop: {active} 活跃 / {total} 注册")
         if loops:
             for name, loop in sorted(loops.items()):
@@ -456,7 +480,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 print(f"     {icon} {name}: {stat} (cycle {cyc}/{max_c or '∞'})")
                 if verbose and loop.get("task"):
                     print(f"        task: {trim_detail(loop.get('task'), 160)}")
-        print(f"\n  ⚙️ 重型战甲")
+        print("\n  ⚙️ 重型战甲")
         if heavy_tasks:
             for tf in sorted(heavy_tasks):
                 ts = _load_json(tf)
@@ -468,19 +492,19 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 if verbose and ts.get("checkedAt"):
                     print(f"        checkedAt: {ts.get('checkedAt')}")
         else:
-            print(f"     ℹ️ 无活跃任务")
-        print(f"\n  🧹 日志轮替")
+            print("     ℹ️ 无活跃任务")
+        print("\n  🧹 日志轮替")
         print(f"     上次: {last_rot} (累计 {count} 次)")
         if MARK42_BROKER_EVENTS.exists():
-            print(f"     Mark42 Broker: {broker_size/1024:.1f}KB ({broker_lines} 行)")
+            print(f"     Mark42 Broker: {broker_size / 1024:.1f}KB ({broker_lines} 行)")
         if SCRATCH.exists():
             print(f"     Scratch: {len(dirs)} 目录 ({kept} 受保护)")
-        print(f"\n  ── 快速操作 ──")
+        print("\n  ── 快速操作 ──")
         if usage >= THRESHOLD_WARN:
-            print(f"     ⚠️ 上下文偏高 → 建议: /compact")
+            print("     ⚠️ 上下文偏高 → 建议: /compact")
         if active == 0:
-            print(f"     💡 引擎空闲 → 注册: engine --start")
-        print("="*56 + "\n")
+            print("     💡 引擎空闲 → 注册: engine --start")
+        print("=" * 56 + "\n")
 
     # ── 构建 JSON 输出数据 ──
     status_data = {
@@ -497,7 +521,9 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 "strategy": idx.get("strategyUsed", "?") if idx else "none",
                 "generatedAt": idx.get("generatedAt") if idx else None,
                 "modelGenerated": idx.get("modelGenerated", False) if idx else False,
-            } if idx else None,
+            }
+            if idx
+            else None,
         },
         "engine": {
             "activeLoops": active,
@@ -521,7 +547,8 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                     "status": ts.get("status"),
                     "summary": ts.get("summary"),
                 }
-                for tf in heavy_tasks for ts in [_load_json(tf)]
+                for tf in heavy_tasks
+                for ts in [_load_json(tf)]
             ],
         },
         "logs": {
@@ -583,12 +610,9 @@ def main() -> None:
     parser.add_argument("--config", action="store_true", help="查看当前配置")
     parser.add_argument("--tune-compaction", action="store_true", help="诊断并调优 OpenClaw 压缩配置")
     parser.add_argument("--apply", action="store_true", help="实际应用调优（默认仅预览）")
-    parser.add_argument("--token-aware", action="store_true",
-                       help="启用令牌感知检测 (v2.0)")
-    parser.add_argument("--probe", action="store_true",
-                       help="启用摘要质量探针 (v2.0)")
-    parser.add_argument("--drift-check", action="store_true",
-                       help="启用上下文降解检测 (v2.0)")
+    parser.add_argument("--token-aware", action="store_true", help="启用令牌感知检测 (v2.0)")
+    parser.add_argument("--probe", action="store_true", help="启用摘要质量探针 (v2.0)")
+    parser.add_argument("--drift-check", action="store_true", help="启用上下文降解检测 (v2.0)")
 
     sub = parser.add_subparsers(dest="module", help="模块选择")
 
@@ -624,8 +648,13 @@ def main() -> None:
     # ── Heavy ──
     heavy_p = sub.add_parser("heavy", help="⚙️ 重型战甲")
     heavy_p.add_argument("--detect", type=str, help="自动检测工程是否为大工程")
-    heavy_p.add_argument("--auto", type=str, choices=["ask","semi","full"], default="ask",
-                        help="大工程检测后的行为：ask(默认,询问) / semi(半自动,30s倒计时) / full(全自动)")
+    heavy_p.add_argument(
+        "--auto",
+        type=str,
+        choices=["ask", "semi", "full"],
+        default="ask",
+        help="大工程检测后的行为：ask(默认,询问) / semi(半自动,30s倒计时) / full(全自动)",
+    )
     heavy_p.add_argument("--preflight", type=str, help="大工程预检")
     heavy_p.add_argument("--start", type=str, help="大工程开工")
     heavy_p.add_argument("--task-name", type=str, help="任务名")
@@ -635,17 +664,18 @@ def main() -> None:
     heavy_p.add_argument("--execute-all", action="store_true", help="执行所有 pending 批次 (默认 dry-run)")
     heavy_p.add_argument("--batch", type=str, default="", help="指定批次ID (配合 --execute)")
     heavy_p.add_argument("--command", type=str, default="", help="每个文件执行的自定义命令，{f} 替换为文件路径")
-    heavy_p.add_argument("--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动")
+    heavy_p.add_argument(
+        "--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动"
+    )
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
     compaction_p = sub.add_parser("compaction", help="📊 OpenClaw 压缩配置诊断 & 调优 (v2.0)")
-    compaction_p.add_argument("--token-aware", action="store_true",
-                             help="启用令牌感知检测（从 session jsonl 读取实际 token 消耗）")
-    compaction_p.add_argument("--probe", action="store_true",
-                             help="启用摘要质量探针（检测压缩后关键信息留存率）")
-    compaction_p.add_argument("--drift-check", action="store_true",
-                             help="启用上下文降解检测（分析连续压缩趋势）")
+    compaction_p.add_argument(
+        "--token-aware", action="store_true", help="启用令牌感知检测（从 session jsonl 读取实际 token 消耗）"
+    )
+    compaction_p.add_argument("--probe", action="store_true", help="启用摘要质量探针（检测压缩后关键信息留存率）")
+    compaction_p.add_argument("--drift-check", action="store_true", help="启用上下文降解检测（分析连续压缩趋势）")
     assemble_p = sub.add_parser("assemble", help="一键启动完整战甲")
     assemble_p.add_argument("--status", action="store_true", help="查看 assemble/guard/daemon 状态")
     assemble_p.add_argument("--stop", action="store_true", help="停止 assemble 及其子进程")
@@ -661,10 +691,14 @@ def main() -> None:
     archive_p = sub.add_parser("archive", help="📚 错误档案管理（v3-2）")
     archive_p.add_argument("action", choices=["list", "show", "approve", "reject", "stats"], help="子动作")
     archive_p.add_argument("entry_id", nargs="?", default="", help="条目 ID（show/approve/reject 用）")
-    archive_p.add_argument("--status", choices=["NEW", "RESOLVED", "AUTO_APPROVED", "REJECTED"], help="按状态过滤（list）")
+    archive_p.add_argument(
+        "--status", choices=["NEW", "RESOLVED", "AUTO_APPROVED", "REJECTED"], help="按状态过滤（list）"
+    )
     archive_p.add_argument("--category", help="按 category 过滤（list）")
     archive_p.add_argument("--limit", type=int, default=20, help="最多显示多少条（list）")
-    archive_p.add_argument("--scope", choices=["exact_match", "similar_match"], default="exact_match", help="匹配范围（approve）")
+    archive_p.add_argument(
+        "--scope", choices=["exact_match", "similar_match"], default="exact_match", help="匹配范围（approve）"
+    )
     archive_p.add_argument("--notes", default="", help="备注（reject）")
 
     # ── v3-3/v3-4 战甲意识层（consciousness + advisor）──
@@ -718,15 +752,17 @@ def main() -> None:
 
     if not args.module:
         if args.init:
-            from .user_config import init_user_config
             from .config import mark42_init
-            config_path = init_user_config(force=args.force if hasattr(args, 'force') else False)
+            from .user_config import init_user_config
+
+            config_path = init_user_config(force=args.force if hasattr(args, "force") else False)
             print(f"✅ 配置文件: {config_path}")
             mark42_init()
             return
         if args.config:
-            from .user_config import get_config_path
             from .config import mark42_config
+            from .user_config import get_config_path
+
             config_path = get_config_path()
             print(f"📋 配置文件: {config_path}")
             if config_path.exists():
@@ -737,9 +773,10 @@ def main() -> None:
             mark42_config()
             return
         if args.tune_compaction:
-            from .compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
-            token_aware = getattr(args, 'token_aware', False)
-            probe = getattr(args, 'probe', False)
+            from .compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
+
+            token_aware = getattr(args, "token_aware", False)
+            probe = getattr(args, "probe", False)
             if token_aware or probe:
                 # 先做一次 v2.0 诊断
                 diag = compaction_diagnose(token_aware=token_aware, probe=probe)
@@ -762,6 +799,7 @@ def main() -> None:
 
     if args.module == "install":
         from .installer import install_systemd, uninstall_systemd
+
         if args.uninstall:
             uninstall_systemd()
         else:
@@ -771,11 +809,13 @@ def main() -> None:
 
     if args.module == "watchdog":
         from .watchdog import watchdog_check
+
         watchdog_check()
         return
 
     if args.module == "logs":
         from .logs import log_rotate, log_rotate_status
+
         if args.rotate:
             log_rotate("all")
         elif args.status:
@@ -785,18 +825,22 @@ def main() -> None:
         return
 
     if args.module == "armor":
-        from .armor import armor_check, armor_compress, armor_guard, armor_compress_queue_stats
+        from .armor import armor_check, armor_compress, armor_compress_queue_stats, armor_guard
         from .smart_crusher import smartcrush
+
         if args.check:
             result = armor_check()
-            print(f"🛡️ 上下文铠甲")
+            print("🛡️ 上下文铠甲")
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
-            print(f"   使用率: {result.get('usagePercent', 0)}% "
-                  f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
+            print(
+                f"   使用率: {result.get('usagePercent', 0)}% "
+                f"({result.get('estimatedTokens', 0) / 1000:.0f}K / {result.get('contextWindow', 0) / 1000:.0f}K)"
+            )
             print(f"   {trim_summary(result.get('summary', ''), 100)}")
         elif args.dry_run or args.compress:
             result = armor_compress(dry_run=args.dry_run)
             import json as _j
+
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         elif args.guard:
             armor_guard(args.interval)
@@ -810,13 +854,14 @@ def main() -> None:
                 print(f"   {k}: {v}")
         elif args.smartcrush:
             import json as _sj
-            demo = _sj.dumps({
-                "users": [
-                    {"id": i, "name": f"user_{i}", "bio": "x" * 300}
-                    for i in range(40)
-                ],
-                "meta": {"version": "2.3.3", "note": "smartcrush CLI 演示"},
-            }, ensure_ascii=False)
+
+            demo = _sj.dumps(
+                {
+                    "users": [{"id": i, "name": f"user_{i}", "bio": "x" * 300} for i in range(40)],
+                    "meta": {"version": "2.3.3", "note": "smartcrush CLI 演示"},
+                },
+                ensure_ascii=False,
+            )
             crushed, cstats = smartcrush(demo)
             print("🧪 smartcrush 演示")
             print(f"   原始: {cstats.get('original_bytes', len(demo.encode()))} bytes")
@@ -827,18 +872,26 @@ def main() -> None:
             print(f"   深度截断: {cstats.get('depth_truncated', 0)}")
         else:
             result = armor_check()
-            print(f"🛡️ 上下文铠甲")
+            print("🛡️ 上下文铠甲")
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
-            print(f"   使用率: {result.get('usagePercent', 0)}% "
-                  f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
+            print(
+                f"   使用率: {result.get('usagePercent', 0)}% "
+                f"({result.get('estimatedTokens', 0) / 1000:.0f}K / {result.get('contextWindow', 0) / 1000:.0f}K)"
+            )
             print(f"   {trim_summary(result.get('summary', ''), 100)}")
         return
 
     if args.module == "engine":
         from .engine import (
-            engine_daemon, engine_kill, engine_list, engine_run_loop,
-            engine_start, engine_templates, engine_watch_task,
+            engine_daemon,
+            engine_kill,
+            engine_list,
+            engine_run_loop,
+            engine_start,
+            engine_templates,
+            engine_watch_task,
         )
+
         if args.templates:
             engine_templates()
         elif args.list:
@@ -864,33 +917,39 @@ def main() -> None:
 
     if args.module == "heavy":
         from .heavy import (
-            heavy_cleanup, heavy_execute, heavy_execute_all,
-            heavy_finish, heavy_preflight, heavy_start, heavy_detect_human,
+            heavy_cleanup,
+            heavy_detect_human,
+            heavy_execute,
+            heavy_execute_all,
+            heavy_finish,
+            heavy_preflight,
+            heavy_start,
         )
+
         path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
         if args.detect:
-            auto_mode = getattr(args, 'auto', 'ask') or 'ask'
+            auto_mode = getattr(args, "auto", "ask") or "ask"
             heavy_detect_human(args.detect, auto_mode=auto_mode)
         elif args.preflight:
             heavy_preflight(args.preflight)
         elif args.start and task_name:
-            heavy_start(args.start, task_name,
-                       context_aware=not args.no_context_aware)
+            heavy_start(args.start, task_name, context_aware=not args.no_context_aware)
         elif args.execute and task_name:
-            heavy_execute(task_name, args.batch or None,
-                          command=args.command or None,
-                          execute_now=getattr(args, 'execute_now', False))
+            heavy_execute(
+                task_name,
+                args.batch or None,
+                command=args.command or None,
+                execute_now=getattr(args, "execute_now", False),
+            )
         elif args.execute_all and task_name:
-            heavy_execute_all(task_name,
-                              command=args.command or None,
-                              execute_now=getattr(args, 'execute_now', False))
+            heavy_execute_all(task_name, command=args.command or None, execute_now=getattr(args, "execute_now", False))
         elif args.finish and task_name:
             heavy_finish(task_name)
         elif args.cleanup and task_name:
             heavy_cleanup(task_name)
         elif args.start:
-            print(f"❌ --task-name 不能为空")
+            print("❌ --task-name 不能为空")
         elif args.preflight:
             heavy_preflight(args.preflight)
         else:
@@ -898,13 +957,14 @@ def main() -> None:
         return
 
     if args.module == "compaction":
-        from .compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
+        from .compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
+
         diag = compaction_diagnose(
-            token_aware=getattr(args, 'token_aware', False),
-            probe=getattr(args, 'probe', False),
+            token_aware=getattr(args, "token_aware", False),
+            probe=getattr(args, "probe", False),
         )
         print_diagnose(diag)
-        if hasattr(args, 'drift_check') and args.drift_check and diag.get("issues"):
+        if hasattr(args, "drift_check") and args.drift_check and diag.get("issues"):
             # 如果显式启用 drift-check，额外提醒
             drift = [i for i in diag["issues"] if i.get("key") == "drift_detection"]
             if drift:
@@ -933,34 +993,37 @@ def main() -> None:
             context_safety_status,
             context_safety_verify,
         )
+
         if args.action == "apply":
-            result = context_safety_apply(verbose=getattr(args, 'verbose', False))
+            result = context_safety_apply(verbose=getattr(args, "verbose", False))
             if not result.get("validateOk", False):
                 sys.exit(1)
         elif args.action == "verify":
-            sys.exit(context_safety_verify(verbose=getattr(args, 'verbose', False)))
+            sys.exit(context_safety_verify(verbose=getattr(args, "verbose", False)))
         else:
-            context_safety_status(verbose=getattr(args, 'verbose', False))
+            context_safety_status(verbose=getattr(args, "verbose", False))
         return
 
     if args.module == "status":
-        if getattr(args, 'json', False):
+        if getattr(args, "json", False):
             import json as _j
+
             result = status_dashboard(json_mode=True)
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         else:
-            status_dashboard(verbose=getattr(args, 'verbose', False))
+            status_dashboard(verbose=getattr(args, "verbose", False))
         return
 
     if args.module == "archive":
         # v3-2 错误档案 — 委派给 error_archive 子模块
         from .error_archive import (
-            ErrorArchive, ALL_STATUSES, _print_entry_row,
+            ErrorArchive,
+            _print_entry_row,
         )
+
         arc = ErrorArchive()
         if args.action == "list":
-            entries = arc.list_entries(status=args.status, category=args.category)[:args.limit]
-            import json as _j2
+            entries = arc.list_entries(status=args.status, category=args.category)[: args.limit]
             print(f"\n{'ID':32s} | {'CATEGORY':32s} | {'CNT':3s} | {'STATUS':15s} | LAST_SEEN")
             print("-" * 100)
             for e in entries:
@@ -972,6 +1035,7 @@ def main() -> None:
                 print(f"❌ 找不到 {args.entry_id}")
                 return 1
             import json as _j3
+
             print(_j3.dumps(e.to_dict(), indent=2, ensure_ascii=False))
         elif args.action == "approve":
             r = arc.approve_for_auto(args.entry_id, scope=args.scope)
@@ -986,7 +1050,7 @@ def main() -> None:
         elif args.action == "stats":
             s = arc.stats()
             print(f"\n总条目: {s['total']}")
-            print(f"按状态:")
+            print("按状态:")
             for k, v in s["by_status"].items():
                 print(f"  {k:18s} {v}")
             print(f"已授权自动执行: {s['auto_approved_count']}\n")
@@ -994,8 +1058,10 @@ def main() -> None:
 
     if args.module == "consciousness":
         # v3-3 战甲意识层 — 委派给 consciousness 子模块
-        from .consciousness import Consciousness
         import json as _j4
+
+        from .consciousness import Consciousness
+
         cs = Consciousness()
         if args.action == "check":
             r = cs.self_check()
@@ -1007,31 +1073,30 @@ def main() -> None:
                 print(f"   健康: {r.healthy}")
                 print(f"   发现 {len(r.issues)} 个问题:")
                 for i, iss in enumerate(r.issues, 1):
-                    print(f"     {i}. [{iss['severity']}] {iss['source']}/{iss['category']}: {iss.get('msg','-')}")
+                    print(f"     {i}. [{iss['severity']}] {iss['source']}/{iss['category']}: {iss.get('msg', '-')}")
         elif args.action == "eval":
             if not args.source or not args.category:
                 print("❌ --source 和 --category 必填")
                 return 1
-            issue = {"source": args.source, "category": args.category,
-                     "msg": args.msg, "severity": args.severity}
+            issue = {"source": args.source, "category": args.category, "msg": args.msg, "severity": args.severity}
             a = cs.assess_certainty(issue)
             print(_j4.dumps(a.to_dict(), indent=2, ensure_ascii=False))
         elif args.action == "handle":
             if not args.source or not args.category:
                 print("❌ --source 和 --category 必填")
                 return 1
-            issue = {"source": args.source, "category": args.category,
-                     "msg": args.msg, "severity": args.severity}
+            issue = {"source": args.source, "category": args.category, "msg": args.msg, "severity": args.severity}
             result = cs.handle_issue(issue, dry_run=not args.execute_now)
             print(_j4.dumps(result, indent=2, ensure_ascii=False))
         elif args.action == "advisor":
             # v3-4 主动交流协议
             from .advisor_client import cli_advisor_status, cli_advisor_test
+
             print("🧠 Mark42 Advisor (v3-4)")
             print()
             status = cli_advisor_status()
             if status["enabled"]:
-                print(f"  状态: ✅ 已启用")
+                print("  状态: ✅ 已启用")
                 print(f"  模型: {status['model']}")
                 print(f"  端点: {status['base_url']}")
                 print(f"  API Key: {'✅ 有' if status['has_api_key'] else '❌ 无'}")
@@ -1047,7 +1112,7 @@ def main() -> None:
                 else:
                     print(f"  ❌ Ping 失败: {test_result.get('reason', 'unknown')}")
             else:
-                print(f"  状态: ⬜ 未启用")
+                print("  状态: ⬜ 未启用")
                 print()
                 print("启用方法: 编辑 ~/.config/mark42/model.yaml")
                 print("  mark42.advisor.enabled: true")
@@ -1057,6 +1122,7 @@ def main() -> None:
         elif args.action == "revalidate":
             # v3 R9 强制读协议验证
             import json as _j5
+
             result = cs.verify_read_protocol(force=True)
             if result.get("skipped"):
                 print(f"⏭️ 跳过: {result.get('reason', '')}")
@@ -1071,15 +1137,19 @@ def main() -> None:
 
     if args.module == "cores":
         from .core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
-        import json as _j6
+
         if args.action == "list":
             r = cli_cores_list()
             print(f"🖥️ 核心位注册表 ({r['summary']['total']} 核)\n")
             for c in r["cores"]:
-                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(c["status"], "?")
+                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(
+                    c["status"], "?"
+                )
                 print(f"  {icon} {c['core_id']:<35} {c['model_name']:<25} {c['status']}")
             s = r["summary"]
-            print(f"\n  健康: {s['statuses'].get('healthy',0)} | 降级: {s['statuses'].get('degraded',0)} | 挂: {s['statuses'].get('down',0)} | 隔离: {s['statuses'].get('quarantined',0)}")
+            print(
+                f"\n  健康: {s['statuses'].get('healthy', 0)} | 降级: {s['statuses'].get('degraded', 0)} | 挂: {s['statuses'].get('down', 0)} | 隔离: {s['statuses'].get('quarantined', 0)}"
+            )
             if s["critical_down"]:
                 print(f"  ⚠️ Critical 核心挂: {', '.join(s['critical_down'])}")
         elif args.action == "probe":
@@ -1087,7 +1157,7 @@ def main() -> None:
             print(f"🔍 探活完成 ({len(r)} 核)\n")
             for cid, res in r.items():
                 icon = "🟢" if res["status"] == "healthy" else "🔴" if res["status"] == "down" else "⬜"
-                print(f"  {icon} {cid}: {res['status']} {res.get('reason','')}")
+                print(f"  {icon} {cid}: {res['status']} {res.get('reason', '')}")
         elif args.action == "quarantine":
             if not args.core_id:
                 print("❌ --core-id 必填")
@@ -1104,7 +1174,7 @@ def main() -> None:
 
     if args.module == "chaos":
         from .governance import ChaosTester
-        import json as _j7
+
         ct = ChaosTester()
         if args.action == "list":
             scenarios = ct.list_scenarios()
@@ -1125,12 +1195,14 @@ def main() -> None:
             h = ct.history()
             print(f"📜 Chaos Test 历史 ({len(h)} 条)\n")
             for r in h:
-                print(f"  {r.get('test_id','')} | {r.get('test_name','')} | {'✅' if r.get('passed') else '❌'} | {r.get('started_at','')}")
+                print(
+                    f"  {r.get('test_id', '')} | {r.get('test_name', '')} | {'✅' if r.get('passed') else '❌'} | {r.get('started_at', '')}"
+                )
         return
 
     if args.module == "module":
         from .governance import ModuleHealthMonitor
-        import json as _j8
+
         mhm = ModuleHealthMonitor()
         if args.action == "check":
             results = mhm.check_all()
@@ -1142,13 +1214,13 @@ def main() -> None:
                 print(f"  {icon} {h.module_name:<15} {lat:<8} {h.status}{fb}")
         elif args.action == "summary":
             s = mhm.summary()
-            print(f"🔌 模块级协议摘要\n")
+            print("🔌 模块级协议摘要\n")
             print(f"  总计: {s['total']} | 🟢 {s['green']} | 🟡 {s['yellow']} | 🔴 {s['red']}")
         return
 
     if args.module == "cluster":
         from .governance import ClusterManager
-        import json as _j9
+
         cm = ClusterManager()
         if args.action == "list":
             clusters = cm.list_clusters()
@@ -1159,7 +1231,9 @@ def main() -> None:
             statuses = cm.status()
             print(f"🏗️ 集群状态 ({len(statuses)} 个)\n")
             for s in statuses:
-                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(s["status"], "?")
+                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(
+                    s["status"], "?"
+                )
                 print(f"  {icon} {s['cluster']:<30} {s['model']:<25} {s['status']}")
         elif args.action == "replace":
             if not args.name:
@@ -1168,11 +1242,12 @@ def main() -> None:
                     print(f"  {c['name']}")
                 return 1
             r = cm.replace(args.name, source=args.source)
-            print(f"{'✅' if r['ok'] else '❌'} {r.get('note','')} (action recorded)")
+            print(f"{'✅' if r['ok'] else '❌'} {r.get('note', '')} (action recorded)")
         return
 
     if args.module == "breaker":
         from .circuit_breaker import CircuitBreaker
+
         cb = CircuitBreaker()
         if args.action == "list":
             states = cb.list_all()

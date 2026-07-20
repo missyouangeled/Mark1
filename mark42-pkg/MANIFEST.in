@@ -1,0 +1,5 @@
+include LICENSE
+include README.md
+recursive-include mark42/templates *.json *.toml
+recursive-include mark42/systemd *.tmpl *.timer
+recursive-include tests *.py

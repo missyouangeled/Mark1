@@ -14,11 +14,11 @@
 """
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import ast
 import re
-from typing import Any
 
 from .utils import safe_call
 
@@ -26,13 +26,15 @@ from .utils import safe_call
 class CodeCompressor:
     """代码压缩器"""
 
-    def __init__(self,
-                 language: str = "python",
-                 preserve_signatures: bool = True,
-                 remove_docstrings: bool = True,
-                 remove_comments: bool = True,
-                 max_stmts_per_func: int = 20,
-                 min_code_size: int = 200):
+    def __init__(
+        self,
+        language: str = "python",
+        preserve_signatures: bool = True,
+        remove_docstrings: bool = True,
+        remove_comments: bool = True,
+        max_stmts_per_func: int = 20,
+        min_code_size: int = 200,
+    ):
         self.language = language
         self.preserve_signatures = preserve_signatures
         self.remove_docstrings = remove_docstrings
@@ -45,14 +47,28 @@ class CodeCompressor:
         if not content or len(content) < 50:
             return False
         # python 关键 token
-        py_kw = sum(1 for kw in ["def ", "class ", "import ", "from ", "return ",
-                                  "if __name__", "    self.", "lambda ", "yield ",
-                                  "raise ", "except ", "with "]
-                    if kw in content)
+        py_kw = sum(
+            1
+            for kw in [
+                "def ",
+                "class ",
+                "import ",
+                "from ",
+                "return ",
+                "if __name__",
+                "    self.",
+                "lambda ",
+                "yield ",
+                "raise ",
+                "except ",
+                "with ",
+            ]
+            if kw in content
+        )
         # js / shell
-        other_kw = sum(1 for kw in ["function ", "const ", "let ", "var ",
-                                     "console.log", "echo ", "export "]
-                       if kw in content)
+        other_kw = sum(
+            1 for kw in ["function ", "const ", "let ", "var ", "console.log", "echo ", "export "] if kw in content
+        )
         return (py_kw >= 2) or (other_kw >= 2)
 
     def compress(self, content: str) -> tuple[str, dict]:
@@ -169,9 +185,12 @@ class CodeCompressor:
             lines.append(f"def {node.name}(...):")
 
         # docstring
-        if (self.remove_docstrings and node.body
-                and isinstance(node.body[0], ast.Expr)
-                and isinstance(node.body[0].value, (ast.Constant, ast.Str))):
+        if (
+            self.remove_docstrings
+            and node.body
+            and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, (ast.Constant, ast.Str))
+        ):
             stats["removed_docstrings"] += 1
             body = node.body[1:]
         else:
@@ -185,12 +204,12 @@ class CodeCompressor:
         # 截断大函数
         if len(body) > self.max_stmts_per_func:
             stats["truncated_functions"] += 1
-            shown = body[:self.max_stmts_per_func]
+            shown = body[: self.max_stmts_per_func]
             for stmt in shown:
                 try:
                     src = ast.unparse(stmt)
                     lines.append(f"    {src}")
-                except Exception as e:
+                except Exception:
                     lines.append("    ...")
             lines.append(f"    # ... {len(body) - self.max_stmts_per_func} more statements")
         else:
@@ -198,20 +217,23 @@ class CodeCompressor:
                 try:
                     src = ast.unparse(stmt)
                     lines.append(f"    {src}")
-                except Exception as e:
+                except Exception:
                     lines.append("    ...")
 
         return lines
 
     def _process_class(self, node, stats: dict) -> list[str]:
         """处理类定义"""
-        bases = ('(' + ', '.join(ast.unparse(b) for b in node.bases) + ')') if node.bases else ''
+        bases = ("(" + ", ".join(ast.unparse(b) for b in node.bases) + ")") if node.bases else ""
         lines = [f"class {node.name}{bases}:"]
         # 类自己的 docstring 剥离 (与 _process_function 同样的判定)
         body = node.body
-        if (self.remove_docstrings and body
-                and isinstance(body[0], ast.Expr)
-                and isinstance(body[0].value, (ast.Constant, ast.Str))):
+        if (
+            self.remove_docstrings
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, (ast.Constant, ast.Str))
+        ):
             stats["removed_docstrings"] += 1
             body = body[1:]
         # 类体: 简单展开 (不递归处理方法)
@@ -226,7 +248,7 @@ class CodeCompressor:
             else:
                 try:
                     lines.append(f"    {ast.unparse(stmt)}")
-                except Exception as e:
+                except Exception:
                     logger.exception("Unhandled exception")
                     pass
         return lines
@@ -237,14 +259,14 @@ class CodeCompressor:
 
         if self.remove_comments:
             # 行注释 (//, #)
-            result = re.sub(r'(?m)^\s*(?:#|//).*?$', '', result)
+            result = re.sub(r"(?m)^\s*(?:#|//).*?$", "", result)
             # 块注释 /* ... */ 和 """ ... """
-            result = re.sub(r'/\*.*?\*/', '', result, flags=re.DOTALL)
-            result = re.sub(r'"""[\s\S]*?"""', '', result)
-            stats["removed_comments"] = content.count('#') + content.count('//')
+            result = re.sub(r"/\*.*?\*/", "", result, flags=re.DOTALL)
+            result = re.sub(r'"""[\s\S]*?"""', "", result)
+            stats["removed_comments"] = content.count("#") + content.count("//")
 
         # 移除连续空行 (留一行)
-        result = re.sub(r'\n\s*\n+', '\n\n', result)
+        result = re.sub(r"\n\s*\n+", "\n\n", result)
         return result
 
 
@@ -268,6 +290,7 @@ def codecrush(content: str) -> tuple[str, dict]:
 # ============================================================================
 # 单元测试
 # ============================================================================
+
 
 def _run_tests():
     logger.info("=" * 60)
@@ -309,8 +332,8 @@ class Bar:
         return self.x
 '''
     out, stats = cc.compress(py_code)
-    logger.info(f"\n[测试 1] Python 函数+类 (含 docstring)")
-    logger.info(f"  原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B (压缩率 {stats['ratio']*100:.1f}%)")
+    logger.info("\n[测试 1] Python 函数+类 (含 docstring)")
+    logger.info(f"  原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B (压缩率 {stats['ratio'] * 100:.1f}%)")
     logger.info(f"  removed_docstrings={stats['removed_docstrings']}")
     check("1.1 is_code=True", stats["is_code"])
     check("1.2 language=python", stats["language"] == "python")
@@ -325,12 +348,12 @@ class Bar:
         big_func += f"    x_{i} = {i}\n"
     big_func += "    return x_49\n"
     out, stats = cc.compress(big_func)
-    logger.info(f"\n[测试 2] 大函数截断 (50 条语句)")
+    logger.info("\n[测试 2] 大函数截断 (50 条语句)")
     check("2.1 标记 truncated_functions", stats["truncated_functions"] >= 1)
     check("2.2 输出含截断标记", "more statements" in out)
 
     # ---- 测试 3: 装饰器 + async ----
-    deco_code = '''
+    deco_code = """
 @property
 def my_prop(self):
     return self._x
@@ -338,14 +361,14 @@ def my_prop(self):
 @staticmethod
 async def fetch():
     return await something()
-'''
+"""
     out, stats = cc.compress(deco_code)
-    logger.info(f"\n[测试 3] 装饰器 + async")
+    logger.info("\n[测试 3] 装饰器 + async")
     check("3.1 保留装饰器", "@property" in out)
     check("3.2 保留 async", "async def fetch" in out)
 
     # ---- 测试 4: JavaScript (正则 fallback) ----
-    js_code = '''
+    js_code = """
 // 这是注释
 function foo(x) {
     // 内部注释
@@ -355,16 +378,16 @@ function foo(x) {
 
 /* 块注释 */
 const bar = 42;
-'''
+"""
     out, stats = cc.compress(js_code)
-    logger.info(f"\n[测试 4] JavaScript 正则压缩")
+    logger.info("\n[测试 4] JavaScript 正则压缩")
     check("4.1 注释被移除", "这是注释" not in out)
     check("4.2 块注释被移除", "块注释" not in out)
     check("4.3 保留 function", "function foo" in out)
 
     # ---- 测试 5: 非代码 passthrough ----
     out, stats = cc.compress("hello world this is just text\nnothing here\n")
-    logger.info(f"\n[测试 5] 非代码 passthrough")
+    logger.info("\n[测试 5] 非代码 passthrough")
     check("5.1 is_code=False", stats["is_code"] is False)
     check("5.2 mode=passthrough", stats["mode"] == "passthrough")
 
@@ -372,7 +395,7 @@ const bar = 42;
     # 多关键词, 超过 min_code_size, 强制走 AST 路径并报错
     bad_code = "def broken(:\n" + "    pass\n" * 20 + "\n"
     out, stats = cc.compress(bad_code)
-    logger.info(f"\n[测试 6] 语法错误 fail-safe")
+    logger.info("\n[测试 6] 语法错误 fail-safe")
     logger.info(f"  mode={stats['mode']}, is_code={stats['is_code']}")
     check("6.1 不崩溃", stats["mode"] in ("error", "passthrough"))
     check("6.2 返回原文 (fail-safe)", "broken" in out)
@@ -380,7 +403,7 @@ const bar = 42;
     # ---- 测试 7: 小代码 passthrough ----
     small = "def f(): pass\n"
     out, stats = cc.compress(small)
-    logger.info(f"\n[测试 7] 小代码 passthrough")
+    logger.info("\n[测试 7] 小代码 passthrough")
     check("7.1 mode=passthrough", stats["mode"] == "passthrough")
 
     # ---- 测试 8: 空内容 ----
@@ -396,4 +419,5 @@ const bar = 42;
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(0 if _run_tests() else 1)

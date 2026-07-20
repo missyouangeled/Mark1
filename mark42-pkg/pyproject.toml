@@ -37,4 +37,34 @@ mark42 = "mark42.cli:main"
 include = ["mark42*"]
 
 [tool.setuptools.package-data]
-mark42 = ["systemd/*.tmpl", "templates/*.json"]
+mark42 = ["systemd/*.tmpl", "templates/*.json", "templates/*.toml"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+]
+ignore = [
+    "E501",   # line too long (formatter handles)
+    "S101",   # use of assert (tests use it)
+    "S603",   # subprocess call (checked separately in CI)
+    "S607",   # partial path executable
+    "E402",   # module-import-not-at-top (工程代码中函数内导入是常见模式)
+    "B008",   # function call in default argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "B", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

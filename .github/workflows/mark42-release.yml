@@ -4,10 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    paths:
-      - 'scripts/mark42_modules/**'
-      - 'scripts/tests/**'
-      - 'mark42-pkg/**'
 
 jobs:
   release:
@@ -19,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史用于 CHANGELOG
+          fetch-depth: 0
       
       - name: 安装 Python
         uses: actions/setup-python@v5
@@ -39,20 +35,17 @@ jobs:
         run: |
           pip install pytest pytest-cov pytest-mock
           pip install -e mark42-pkg
-          python -m pytest scripts/tests/ --no-cov --tb=short -q
           python -m pytest mark42-pkg/tests/ --no-cov --tb=short -q
       
       - name: 生成 Release Notes
         id: notes
         run: |
-          # 从 CHANGELOG.md 提取当前版本的变更记录
           VERSION="${{ steps.version.outputs.version }}"
           python3 -c "
-          import re, sys
+          import re
           version = '$VERSION'
           with open('mark42-pkg/CHANGELOG.md', 'r') as f:
               content = f.read()
-          # 找 ## [version] 或 ## [v...] 的块
           pattern = rf'## \[?{re.escape(version)}\]?.*?(?=\n## \[|\Z)'
           match = re.search(pattern, content, re.DOTALL)
           if match:

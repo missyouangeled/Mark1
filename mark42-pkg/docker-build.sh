@@ -7,7 +7,7 @@ TAG="${1:-latest}"
 IMAGE="mark42"
 
 echo "🔨 构建 ${IMAGE}:${TAG}..."
-docker build -t "${IMAGE}:${TAG}" -f Dockerfile .. || {
+docker build -t "${IMAGE}:${TAG}" -f Dockerfile . || {
     echo "❌ 构建失败"
     exit 1
 }

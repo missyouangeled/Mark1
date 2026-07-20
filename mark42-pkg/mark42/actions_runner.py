@@ -20,9 +20,10 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .log_setup import get_logger
 
@@ -57,9 +58,11 @@ class ActionResult:
 
 # ─────────────────────── 路径 & broker 桥接 ───────────────────────
 
+
 def actions_queue_path() -> Path:
     """最近一次 status 生成的 suggestedActions 桥接文件路径。"""
     from .config import MARK42_STATE
+
     return MARK42_STATE / "actions-pending.json"
 
 
@@ -73,6 +76,7 @@ def _read_pending_actions() -> list[dict[str, Any]]:
         return []
     try:
         import json
+
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
@@ -85,14 +89,16 @@ def _read_pending_actions() -> list[dict[str, Any]]:
 def _write_pending_actions(actions: list[dict[str, Any]]) -> None:
     """写入当前 suggestedActions 桥接。"""
     import json
+
     path = actions_queue_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(actions, f, indent=2, ensure_ascii=False)
 
 
-def _append_broker_event(action_id: str, executed: bool, agent: str | None,
-                          summary: str, command_preview: str = "") -> None:
+def _append_broker_event(
+    action_id: str, executed: bool, agent: str | None, summary: str, command_preview: str = ""
+) -> None:
     """写一条 broker 事件，记录动作执行/预览结果。"""
     try:
         from .utils import _append_broker
@@ -115,6 +121,7 @@ def _append_broker_event(action_id: str, executed: bool, agent: str | None,
 
 # ─────────────────────── 动作执行器 ───────────────────────
 
+
 class _ActionNotFoundError(Exception):
     pass
 
@@ -132,23 +139,27 @@ def list_actions() -> list[dict[str, Any]]:
         if not action_id:
             continue
         executable = action_id in EXECUTABLE_WHITELIST
-        out.append({
-            "actionId": action_id,
-            "title": item.get("title", ""),
-            "reason": item.get("reason", ""),
-            "commandPreview": item.get("commandPreview", ""),
-            "priority": item.get("priority", "low"),
-            "executableNow": executable,
-            "dryRunOnly": not executable,
-            "agent": item.get("sourceAgent") or item.get("targetAgent"),
-        })
+        out.append(
+            {
+                "actionId": action_id,
+                "title": item.get("title", ""),
+                "reason": item.get("reason", ""),
+                "commandPreview": item.get("commandPreview", ""),
+                "priority": item.get("priority", "low"),
+                "executableNow": executable,
+                "dryRunOnly": not executable,
+                "agent": item.get("sourceAgent") or item.get("targetAgent"),
+            }
+        )
     return out
 
 
 def _build_handlers() -> dict[str, Callable[..., ActionResult]]:
     """按 action id 返回对应的执行函数。"""
+
     def handle_restart_assemble(dry_run: bool, agent: str | None) -> ActionResult:
         from .cli import assemble_restart  # 延迟导入，避免循环
+
         target = agent or "main"
         preview = f"mark42.py assemble (agent={target})"
         if dry_run:
@@ -173,6 +184,7 @@ def _build_handlers() -> dict[str, Callable[..., ActionResult]]:
 
     def handle_refresh_actions(dry_run: bool, agent: str | None) -> ActionResult:
         from .cli import status_dashboard  # 延迟导入，避免循环
+
         preview = "mark42.py status --all-agents --json"
         if dry_run:
             return ActionResult(
@@ -202,8 +214,7 @@ def _build_handlers() -> dict[str, Callable[..., ActionResult]]:
     }
 
 
-def execute_action(action_id: str, agent: str | None = None,
-                   dry_run: bool = True) -> ActionResult:
+def execute_action(action_id: str, agent: str | None = None, dry_run: bool = True) -> ActionResult:
     """执行/预览单个动作。
 
     参数：
@@ -267,6 +278,7 @@ def self_preview_for(action_id: str, agent: str | None) -> str:
 
 # ─────────────────────── CLI 桥接 ───────────────────────
 
+
 def main(argv: list[str] | None = None) -> int:
     """actions 子命令的入口桥。返回 0 / 1 / 2。"""
     parser = argparse.ArgumentParser(
@@ -276,16 +288,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list", action="store_true", help="列出当前可操作动作")
     parser.add_argument("--run", type=str, default=None, help="执行/预览指定 action id")
     parser.add_argument("--agent", type=str, default=None, help="目标 agent")
-    parser.add_argument("--dry-run", action="store_true", default=True,
-                       help="仅预览，不真执行（默认开启）")
-    parser.add_argument("--yes", action="store_true",
-                       help="明确确认后才会真执行；缺省时 action 不会执行")
+    parser.add_argument("--dry-run", action="store_true", default=True, help="仅预览，不真执行（默认开启）")
+    parser.add_argument("--yes", action="store_true", help="明确确认后才会真执行；缺省时 action 不会执行")
 
     args = parser.parse_args(argv)
 
     if args.list:
         actions = list_actions()
         import json
+
         logger.info(json.dumps({"actions": actions}, ensure_ascii=False, indent=2))
         return 0
 
@@ -304,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     import json
+
     logger.info(json.dumps(asdict(result), ensure_ascii=False, indent=2))
     return 0
 

@@ -3,18 +3,12 @@ name: Mark42 CI
 on:
   push:
     paths:
-      - 'scripts/mark42_modules/**'
-      - 'scripts/tests/**'
       - 'mark42-pkg/**'
-      - 'pyproject.toml'
       - '.github/workflows/mark42-ci.yml'
     branches: [master, main]
   pull_request:
     paths:
-      - 'scripts/mark42_modules/**'
-      - 'scripts/tests/**'
       - 'mark42-pkg/**'
-      - 'pyproject.toml'
       - '.github/workflows/mark42-ci.yml'
 
 jobs:
@@ -40,29 +34,17 @@ jobs:
           pip install -e .
         working-directory: mark42-pkg
       
-      - name: 安装 mark42_modules 依赖
+      - name: 运行测试
         run: |
-          pip install -e mark42-pkg
-        # mark42_modules 从 scripts/ 目录导入，需要 workspace 根
-      
-      - name: 运行测试 (scripts/tests)
-        run: |
-          python -m pytest scripts/tests/ --cov=mark42_modules --cov-report=xml --cov-report=term-missing --tb=short -q --no-header
-        continue-on-error: true
-        id: tests_scripts
-      
-      - name: 运行测试 (mark42-pkg/tests)
-        run: |
-          python -m pytest mark42-pkg/tests/ --no-cov --tb=short -q --no-header
+          python -m pytest tests/ --cov=mark42 --cov-report=xml --cov-report=term-missing --tb=short -q --no-header
+        working-directory: mark42-pkg
       
       - name: 覆盖率门禁 (≥ 50%)
-        if: steps.tests_scripts.outcome == 'success' || steps.tests_scripts.outcome == 'failure'
         run: |
           python -c "
           import xml.etree.ElementTree as ET
           tree = ET.parse('coverage.xml')
           root = tree.getroot()
-          # root.attrib: line-rate is a fraction
           rate = float(root.attrib.get('line-rate', '0'))
           pct = rate * 100
           print(f'覆盖率: {pct:.1f}%')
@@ -72,6 +54,7 @@ jobs:
           else:
               print(f'✅ 覆盖率 {pct:.1f}% 通过门禁 50%')
           "
+        working-directory: mark42-pkg
         continue-on-error: true
 
   lint:
@@ -89,13 +72,12 @@ jobs:
         run: pip install ruff
       
       - name: Ruff 检查
-        run: ruff check scripts/mark42_modules/ mark42-pkg/mark42/
+        run: ruff check mark42-pkg/mark42/
         continue-on-error: true
       
       - name: 检查裸 except
         run: |
-          # 检查裸 except（应全部为 except Exception as e）
-          result=$(grep -rn "except:" scripts/mark42_modules/ mark42-pkg/mark42/ --include="*.py" || true)
+          result=$(grep -rn "except:" mark42-pkg/mark42/ --include="*.py" || true)
           if [ -n "$result" ]; then
             echo "⚠️ 发现裸 except:"
             echo "$result"
@@ -104,12 +86,11 @@ jobs:
             echo "✅ 无裸 except"
           fi
       
-      - name: 检查 print 语句
+      - name: 检查 print 语句（daemon 函数应使用 logging）
         run: |
-          # 检查 print（应使用 logging）
-          result=$(grep -rn "^\s*print(" scripts/mark42_modules/ mark42-pkg/mark42/ --include="*.py" | grep -v "test_" | grep -v "__pycache__" || true)
+          result=$(grep -rn "^\s*print(" mark42-pkg/mark42/ --include="*.py" | grep -v "test_" | grep -v "__pycache__" || true)
           if [ -n "$result" ]; then
-            echo "⚠️ 发现 print 语句（应使用 logging）:"
+            echo "⚠️ 发现 print 语句:"
             echo "$result"
           else
             echo "✅ 无裸 print"
@@ -117,7 +98,7 @@ jobs:
       
       - name: 检查 shell=True
         run: |
-          result=$(grep -rn "shell=True" scripts/mark42_modules/ mark42-pkg/mark42/ --include="*.py" || true)
+          result=$(grep -rn "shell=True" mark42-pkg/mark42/ --include="*.py" || true)
           if [ -n "$result" ]; then
             echo "❌ 发现 shell=True:"
             echo "$result"
@@ -145,8 +126,7 @@ jobs:
       
       - name: 检查硬编码路径
         run: |
-          # 检查 /mnt/data 硬编码（排除注释行）
-          result=$(grep -rn "/mnt/data" scripts/mark42_modules/ mark42-pkg/mark42/ --include="*.py" | grep -v "#" | grep -v """ || true)
+          result=$(grep -rn "/mnt/data" mark42-pkg/mark42/ --include="*.py" | grep -v "#" | grep -v '"""' || true)
           if [ -n "$result" ]; then
             echo "❌ 发现 /mnt/data 硬编码:"
             echo "$result"
@@ -157,8 +137,7 @@ jobs:
       
       - name: 检查硬编码 API key
         run: |
-          # 检查硬编码 API key
-          result=$(grep -rnE "(sk-[a-zA-Z0-9]{20,}|ark-[a-zA-Z0-9-]{20,})" scripts/mark42_modules/ mark42-pkg/mark42/ --include="*.py" | grep -v test | grep -v mock | grep -v "#" || true)
+          result=$(grep -rnE "(sk-[a-zA-Z0-9]{20,}|ark-[a-zA-Z0-9-]{20,})" mark42-pkg/mark42/ --include="*.py" | grep -v test | grep -v mock | grep -v "#" || true)
           if [ -n "$result" ]; then
             echo "❌ 发现硬编码 API key:"
             echo "$result"

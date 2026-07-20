@@ -61,7 +61,9 @@ def _check_process(pattern: str) -> bool:
     try:
         result = subprocess.run(
             ["pgrep", "-f", pattern],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.returncode == 0 and bool(result.stdout.strip())
     except Exception:
@@ -73,7 +75,9 @@ def _restart_service(svc_name: str, logfile: str | Path) -> None:
     _log(f"  重启 {svc_name} ...", logfile)
     result = subprocess.run(
         ["systemctl", "--user", "restart", svc_name],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     if result.returncode != 0:
         _log(f"  {svc_name} 重启失败: {result.stderr.strip()[:200]}", logfile)
@@ -87,10 +91,12 @@ def watchdog_check() -> None:
     log_dir = _get_env("MARK42_LOG_DIR", f"{state_dir}/logs")
     logfile = Path(log_dir) / "watchdog.log"
 
-    heartbeat = Path(_get_env(
-        "HEARTBEAT",
-        f"{state_dir}/engine/daemon-heartbeat.json",
-    ))
+    heartbeat = Path(
+        _get_env(
+            "HEARTBEAT",
+            f"{state_dir}/engine/daemon-heartbeat.json",
+        )
+    )
 
     warn_threshold = 300  # 5 分钟心跳超时
 
@@ -136,8 +142,7 @@ def watchdog_check() -> None:
             _log("✅ 重启成功", logfile)
         else:
             _log(
-                f"❌ 重启后仍有进程缺失: engine={'✅' if new_engine else '❌'}, "
-                f"armor={'✅' if new_armor else '❌'}",
+                f"❌ 重启后仍有进程缺失: engine={'✅' if new_engine else '❌'}, armor={'✅' if new_armor else '❌'}",
                 logfile,
             )
     # 正常情况静默退出（避免日志爆量）

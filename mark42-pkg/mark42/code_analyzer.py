@@ -15,18 +15,17 @@ Mark42 v3 · 核心 5 · 代码理解引擎
 from __future__ import annotations
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import json
-import logging
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # 复用 v3-1 的 LLM Provider
 from .llm_provider import ChatMessage, LLMProvider, build_consciousness, load_config
-
 
 # ── 常量 ─────────────────────────────────────────────
 
@@ -52,25 +51,28 @@ CODE_ANALYSIS_SYSTEM_PROMPT = """\
 
 # ── 数据类 ───────────────────────────────────────────
 
+
 @dataclass
 class CodeBug:
     """单个 bug。"""
+
     line: int = 0
-    severity: str = "info"     # critical | warning | info
+    severity: str = "info"  # critical | warning | info
     desc: str = ""
 
 
 @dataclass
 class AnalysisResult:
     """代码分析结果。"""
-    bugs: List[CodeBug] = field(default_factory=list)
+
+    bugs: list[CodeBug] = field(default_factory=list)
     quality_score: int = 0
     summary: str = ""
-    suggestions: List[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
     elapsed_ms: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bugs": [asdict(b) for b in self.bugs],
             "quality_score": self.quality_score,
@@ -87,6 +89,7 @@ class AnalysisResult:
 
 # ── 代码分析器 ───────────────────────────────────────
 
+
 class CodeAnalyzer:
     """核心 5 · 代码理解引擎。
 
@@ -94,7 +97,7 @@ class CodeAnalyzer:
     支持多种分析模式：bug 检测 / 代码审查 / 语义理解。
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """初始化。
 
         Args:
@@ -102,7 +105,7 @@ class CodeAnalyzer:
                     默认用 consciousness 的 LLM provider（跟核心 2 共享）。
         """
         self.config = config or load_config()
-        self.llm: Optional[LLMProvider] = build_consciousness(self.config)
+        self.llm: LLMProvider | None = build_consciousness(self.config)
 
     def analyze(self, code: str, language: str = "python") -> AnalysisResult:
         """分析代码片段。
@@ -122,24 +125,20 @@ class CodeAnalyzer:
 
         messages = [
             ChatMessage(role="system", content=CODE_ANALYSIS_SYSTEM_PROMPT),
-            ChatMessage(
-                role="user",
-                content=f"语言: {language}\n\n```\n{code}\n```\n\n请分析这段代码。"
-            ),
+            ChatMessage(role="user", content=f"语言: {language}\n\n```\n{code}\n```\n\n请分析这段代码。"),
         ]
 
         t0 = time.monotonic()
         try:
             resp = self.llm.chat(messages, response_format={"type": "json_object"})
         except Exception as e:
-            return AnalysisResult(error=f"LLM 调用失败: {e}",
-                                  elapsed_ms=int((time.monotonic() - t0) * 1000))
+            return AnalysisResult(error=f"LLM 调用失败: {e}", elapsed_ms=int((time.monotonic() - t0) * 1000))
 
         elapsed = int((time.monotonic() - t0) * 1000)
 
         # 解析响应（复用 advisor_client 的解析逻辑）
         content = ""
-        if hasattr(resp, 'content'):
+        if hasattr(resp, "content"):
             content = resp.content or ""
         elif isinstance(resp, dict):
             choices = resp.get("choices", [])
@@ -163,10 +162,10 @@ class CodeAnalyzer:
         except json.JSONDecodeError as e:
             return AnalysisResult(error=f"JSON 解析失败: {e}", elapsed_ms=elapsed)
 
-        bugs = [CodeBug(line=b.get("line", 0),
-                         severity=b.get("severity", "info"),
-                         desc=b.get("desc", ""))
-                for b in parsed.get("bugs", [])]
+        bugs = [
+            CodeBug(line=b.get("line", 0), severity=b.get("severity", "info"), desc=b.get("desc", ""))
+            for b in parsed.get("bugs", [])
+        ]
 
         return AnalysisResult(
             bugs=bugs,
@@ -185,8 +184,16 @@ class CodeAnalyzer:
         code = p.read_text(encoding="utf-8", errors="replace")
         if not language:
             # 根据扩展名推断语言
-            ext_map = {".py": "python", ".js": "javascript", ".ts": "typescript",
-                       ".go": "go", ".rs": "rust", ".java": "java", ".c": "c", ".cpp": "cpp"}
+            ext_map = {
+                ".py": "python",
+                ".js": "javascript",
+                ".ts": "typescript",
+                ".go": "go",
+                ".rs": "rust",
+                ".java": "java",
+                ".c": "c",
+                ".cpp": "cpp",
+            }
             language = ext_map.get(p.suffix, "text")
 
         return self.analyze(code, language)
@@ -196,19 +203,21 @@ class CodeAnalyzer:
         try:
             r = self.analyze("x = 1 + 1\nprint(x)", "python")
             return r.error is None
-        except Exception as e:
+        except Exception:
             return False
 
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_analyze_code(code: str, language: str = "python") -> Dict[str, Any]:
+
+def cli_analyze_code(code: str, language: str = "python") -> dict[str, Any]:
     """CLI: 分析代码片段。"""
     analyzer = CodeAnalyzer()
     result = analyzer.analyze(code, language)
     return result.to_dict()
 
-def cli_analyze_file(file_path: str, language: str = "") -> Dict[str, Any]:
+
+def cli_analyze_file(file_path: str, language: str = "") -> dict[str, Any]:
     """CLI: 分析文件。"""
     analyzer = CodeAnalyzer()
     result = analyzer.analyze_file(file_path, language)

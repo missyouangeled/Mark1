@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import shutil
 import subprocess
-import shutil
-import pathlib
 
 
 def _find_openclaw() -> str:
@@ -22,6 +21,7 @@ def _find_openclaw() -> str:
         if candidate.exists():
             return str(candidate)
     return "openclaw"
+
 
 from datetime import datetime
 from pathlib import Path
@@ -82,7 +82,7 @@ SESSION_MAINTENANCE_BASELINE = {
 def _load_openclaw_config() -> dict[str, Any]:
     if not OPENCLAW_CONFIG.exists():
         raise FileNotFoundError(f"缺少配置文件: {OPENCLAW_CONFIG}")
-    with open(OPENCLAW_CONFIG, "r", encoding="utf-8") as f:
+    with open(OPENCLAW_CONFIG, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -122,7 +122,7 @@ def _get_current_session_override() -> dict[str, Any]:
     if not SESSIONS_STORE.exists():
         return {}
     try:
-        with open(SESSIONS_STORE, "r", encoding="utf-8") as f:
+        with open(SESSIONS_STORE, encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
@@ -165,18 +165,32 @@ def _status_checks(config: dict[str, Any]) -> list[dict[str, Any]]:
     for key, expected in CONTEXT_PRUNING_BASELINE.items():
         add_check(f"contextPruning.{key}", context_pruning.get(key), expected)
 
-    add_check("compaction.truncateAfterCompaction", compaction.get("truncateAfterCompaction"), COMPACTION_BASELINE["truncateAfterCompaction"])
-    add_check("compaction.keepRecentTokens", compaction.get("keepRecentTokens"), COMPACTION_BASELINE["keepRecentTokens"])
+    add_check(
+        "compaction.truncateAfterCompaction",
+        compaction.get("truncateAfterCompaction"),
+        COMPACTION_BASELINE["truncateAfterCompaction"],
+    )
+    add_check(
+        "compaction.keepRecentTokens", compaction.get("keepRecentTokens"), COMPACTION_BASELINE["keepRecentTokens"]
+    )
     add_check("compaction.maxHistoryShare", compaction.get("maxHistoryShare"), COMPACTION_BASELINE["maxHistoryShare"])
     add_check("compaction.model", compaction.get("model"), COMPACTION_BASELINE["model"])
 
     add_check("memoryFlush.enabled", memory_flush.get("enabled"), MEMORY_FLUSH_BASELINE["enabled"])
-    add_check("memoryFlush.softThresholdTokens", memory_flush.get("softThresholdTokens"), MEMORY_FLUSH_BASELINE["softThresholdTokens"])
+    add_check(
+        "memoryFlush.softThresholdTokens",
+        memory_flush.get("softThresholdTokens"),
+        MEMORY_FLUSH_BASELINE["softThresholdTokens"],
+    )
     add_check("memoryFlush.model", memory_flush.get("model"), MEMORY_FLUSH_BASELINE["model"])
 
     add_check("session.maintenance.mode", maintenance.get("mode"), SESSION_MAINTENANCE_BASELINE["mode"])
-    add_check("session.maintenance.pruneAfter", maintenance.get("pruneAfter"), SESSION_MAINTENANCE_BASELINE["pruneAfter"])
-    add_check("session.maintenance.maxEntries", maintenance.get("maxEntries"), SESSION_MAINTENANCE_BASELINE["maxEntries"])
+    add_check(
+        "session.maintenance.pruneAfter", maintenance.get("pruneAfter"), SESSION_MAINTENANCE_BASELINE["pruneAfter"]
+    )
+    add_check(
+        "session.maintenance.maxEntries", maintenance.get("maxEntries"), SESSION_MAINTENANCE_BASELINE["maxEntries"]
+    )
 
     override = _get_current_session_override()
     checks.append(
@@ -204,15 +218,15 @@ def _print_checks(checks: list[dict[str, Any]], verbose: bool = False) -> dict[s
             "info": "[INFO]",
         }.get(severity, "[INFO]")
         if severity == "info":
-            shown = item['actual'] if verbose else trim_json_short(item['actual'], 120)
+            shown = item["actual"] if verbose else trim_json_short(item["actual"], 120)
             logger.info(f"{prefix} {item['name']}: {shown}")
         else:
             if verbose:
-                actual = repr(item['actual'])
-                expected = repr(item['expected'])
+                actual = repr(item["actual"])
+                expected = repr(item["expected"])
             else:
-                actual = trim_detail(repr(trim_json_short(item['actual'], 120)), 160)
-                expected = trim_detail(repr(trim_json_short(item['expected'], 120)), 160)
+                actual = trim_detail(repr(trim_json_short(item["actual"], 120)), 160)
+                expected = trim_detail(repr(trim_json_short(item["expected"], 120)), 160)
             logger.info(f"{prefix} {item['name']}: actual={actual} expected={expected}")
     return counts
 

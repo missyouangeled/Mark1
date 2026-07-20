@@ -3,32 +3,38 @@
 """
 
 from .log_setup import get_logger
+
 logger = get_logger(__name__)
 
 import json
 import os
+import pathlib
 import subprocess
 import time
-import pathlib
-import shutil
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .config import (
-    ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
-    DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
-    THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
-    # 阶段 1: 压缩算法常量 (2026-06-24)
-    ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
+    ALGO_EXPERIMENT_MODE,
+    ALGO_FAIL_SAFE,
+    ALGO_SMARTCRUSH_ENABLED,
     ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
     # 阶段 1 Day 4: 调度器接入控制 (2026-06-24)
-    ALGO_USE_SCHEDULER, ALGO_PII_ENABLED, ALGO_FAIL_SAFE,
+    ALGO_USE_SCHEDULER,
+    ARMOR_STATE,
+    BYTES_PER_KTOKEN,
+    THRESHOLD_ALERT,
+    THRESHOLD_CRIT,
+    THRESHOLD_WARN,
+    XDG_STATE,
+    resolve_model,
 )
 
 # ── openclaw CLI 路径动态查找 ──────────────────────────────
 _openclaw_bin = None
+
 
 def _find_openclaw() -> str:
     """动态查找 openclaw CLI 路径，避免硬编码。"""
@@ -36,6 +42,7 @@ def _find_openclaw() -> str:
     if _openclaw_bin:
         return _openclaw_bin
     import shutil as _sh
+
     # 1. PATH 查找
     path = _sh.which("openclaw")
     if path:
@@ -53,16 +60,22 @@ def _find_openclaw() -> str:
     # 3. 回退到命令名（让 subprocess 自己报错）
     return "openclaw"
 
-from .utils import (
-    _append_broker, _estimate_tokens_smart, _find_active_session,
-    _get_context_window, _load_json, _now_iso, _now_ts, _save_json,
-)
+
 from .output_guard import compact_preview, trim_detail
+from .utils import (
+    _append_broker,
+    _estimate_tokens_smart,
+    _find_active_session,
+    _get_context_window,
+    _now_iso,
+    _save_json,
+)
 
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
 try:
     from .smart_crusher import smartcrush
+
     _COMPRESSION_AVAILABLE = True
 except ImportError as e:
     _COMPRESSION_AVAILABLE = False
@@ -71,7 +84,9 @@ except ImportError as e:
 # 阶段 1 Day 4: 算法调度器 (2026-06-24)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
 try:
-    from .algo_scheduler import process as algo_scheduler_process, decide as algo_scheduler_decide
+    from .algo_scheduler import decide as algo_scheduler_decide
+    from .algo_scheduler import process as algo_scheduler_process
+
     _SCHEDULER_AVAILABLE = True
 except ImportError as e:
     _SCHEDULER_AVAILABLE = False
@@ -95,8 +110,8 @@ def armor_check() -> dict[str, Any]:
         }
     tokens_info = {}
     import subprocess as _sp
-    du_result = _sp.run(["du", "-s", str(XDG_STATE / "openclaw" / "sessions")],
-                        capture_output=True, text=True)
+
+    du_result = _sp.run(["du", "-s", str(XDG_STATE / "openclaw" / "sessions")], capture_output=True, text=True)
     sessions_kb = int(du_result.stdout.split()[0]) if du_result.stdout else 0
     tokens_info = {
         "sessionsDirKB": sessions_kb,
@@ -192,13 +207,41 @@ def _classify_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
     """启发式分类：preserved vs discarded。"""
     preserved = []
     discarded = []
-    PRESERVE_KW = ["偏好", "设定", "规则", "模型", "配置", "记住", "重要",
-                    "Mark42", "方案", "设计", "架构", "密码", "凭据", "API", "Key",
-                    "部署", "系统", "升级", "安装", "补丁", "版本", "决策",
-                    "访问", "账号", "IDENTITY", "SOUL", "MEMORY", "USER",
-                    "语音回复", "图片生成", "视频下载", "快捷键"]
-    DISCARD_KW = ["在吗", "还在", "嗯", "哦", "好的", "收到", "知道了", "明白",
-                   "谢谢", "多谢", "NO_REPLY", "no_reply"]
+    PRESERVE_KW = [
+        "偏好",
+        "设定",
+        "规则",
+        "模型",
+        "配置",
+        "记住",
+        "重要",
+        "Mark42",
+        "方案",
+        "设计",
+        "架构",
+        "密码",
+        "凭据",
+        "API",
+        "Key",
+        "部署",
+        "系统",
+        "升级",
+        "安装",
+        "补丁",
+        "版本",
+        "决策",
+        "访问",
+        "账号",
+        "IDENTITY",
+        "SOUL",
+        "MEMORY",
+        "USER",
+        "语音回复",
+        "图片生成",
+        "视频下载",
+        "快捷键",
+    ]
+    DISCARD_KW = ["在吗", "还在", "嗯", "哦", "好的", "收到", "知道了", "明白", "谢谢", "多谢", "NO_REPLY", "no_reply"]
     for i, msg in enumerate(messages):
         role = msg.get("role", "unknown")
         raw_content = msg.get("content", "")
@@ -275,17 +318,19 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
   "suggestedAction": "/compact 或 monitor"
 }}"""
     try:
-        body = json.dumps({
-            "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"},
-        }).encode()
+        body = json.dumps(
+            {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "response_format": {"type": "json_object"},
+            }
+        ).encode()
         req = urllib.request.Request(
             f"{base_url}{endpoint}",
             data=body,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         )
         resp = urllib.request.urlopen(req, timeout=timeout)
         data = json.loads(resp.read())
@@ -294,7 +339,7 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         if content.startswith("<think>"):
             end = content.find("</think>")
             if end > 0:
-                content = content[end + 8:].strip()
+                content = content[end + 8 :].strip()
         if content.startswith("```"):
             content = content.split("```")[1]
             if content.startswith("json"):
@@ -312,8 +357,7 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         return None
 
 
-def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
-                            dry_run: bool = False) -> dict[str, Any]:
+def armor_pre_compact_hook(session_messages: list[dict[str, Any]], dry_run: bool = False) -> dict[str, Any]:
     """压缩前 hook: 对 session 尾部消息跑压缩算法。
 
     阶段 1 Day 1 (2026-06-24 上午): 只启用 SmartCrusher
@@ -329,13 +373,13 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
         "enabled": False,
         "ran": False,
         "algorithm": None,
-        "mode": None,               # "scheduler" | "direct" (Day 4)
+        "mode": None,  # "scheduler" | "direct" (Day 4)
         "filesProcessed": 0,
         "totalOriginalBytes": 0,
         "totalCrushedBytes": 0,
         "overallRatio": 0.0,
         "piiRedactions": 0,
-        "decisionsByBucket": {},    # {"tiny": 0, "small": 0, ...}
+        "decisionsByBucket": {},  # {"tiny": 0, "small": 0, ...}
         "fallbackCount": 0,
         "error": None,
     }
@@ -352,10 +396,7 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
     # MARK42_ALGO_USE_SCHEDULER=true (默认) 走 algo_scheduler.process()
     # 获得：大小分层 + PII 脱敏 + 压缩护栏 + fail-safe
     # false 走原始 SmartCrusher 直接压缩 (回退路径)
-    use_scheduler = (
-        ALGO_USE_SCHEDULER
-        and _SCHEDULER_AVAILABLE
-    )
+    use_scheduler = ALGO_USE_SCHEDULER and _SCHEDULER_AVAILABLE
 
     if use_scheduler:
         return _hook_via_scheduler(session_messages, stats, dry_run=dry_run)
@@ -363,9 +404,9 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
         return _hook_direct_smartcrush(session_messages, stats, dry_run=dry_run)
 
 
-def _hook_via_scheduler(session_messages: list[dict[str, Any]],
-                         stats: dict[str, Any],
-                         dry_run: bool = False) -> dict[str, Any]:
+def _hook_via_scheduler(
+    session_messages: list[dict[str, Any]], stats: dict[str, Any], dry_run: bool = False
+) -> dict[str, Any]:
     """Day 4 调度器路径: PII 脱敏 + 大小分层 + 压缩护栏 + fail-safe。"""
     stats["enabled"] = True
     stats["mode"] = "scheduler"
@@ -373,8 +414,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
 
     if not _SCHEDULER_AVAILABLE:
         stats["error"] = (
-            f"scheduler not available: {_SCHEDULER_IMPORT_ERROR}. "
-            f"set MARK42_ALGO_USE_SCHEDULER=false to fallback."
+            f"scheduler not available: {_SCHEDULER_IMPORT_ERROR}. set MARK42_ALGO_USE_SCHEDULER=false to fallback."
         )
         if not ALGO_FAIL_SAFE:
             raise RuntimeError(stats["error"])
@@ -392,9 +432,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
             # 调度决策 (记录分布)
             decision = algo_scheduler_decide(content)
             bucket = decision.size_bucket
-            stats["decisionsByBucket"][bucket] = (
-                stats["decisionsByBucket"].get(bucket, 0) + 1
-            )
+            stats["decisionsByBucket"][bucket] = stats["decisionsByBucket"].get(bucket, 0) + 1
 
             # dry_run 跳过实际处理, 只记录决策
             if dry_run:
@@ -403,7 +441,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
             # 调度处理
             result = algo_scheduler_process(content)
             stats["filesProcessed"] += 1
-            stats["totalOriginalBytes"] += len(content.encode('utf-8'))
+            stats["totalOriginalBytes"] += len(content.encode("utf-8"))
 
             # PII 脱敏统计
             pii_stats = result.get("pii_stats")
@@ -418,12 +456,10 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
             else:
                 final_content = result.get("result", content)
 
-            stats["totalCrushedBytes"] += len(final_content.encode('utf-8'))
+            stats["totalCrushedBytes"] += len(final_content.encode("utf-8"))
 
         if stats["totalOriginalBytes"] > 0:
-            stats["overallRatio"] = 1.0 - (
-                stats["totalCrushedBytes"] / stats["totalOriginalBytes"]
-            )
+            stats["overallRatio"] = 1.0 - (stats["totalCrushedBytes"] / stats["totalOriginalBytes"])
         stats["ran"] = True
 
         if stats["filesProcessed"] > 0:
@@ -431,7 +467,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
             fb_info = f" | 回退: {stats['fallbackCount']}" if stats["fallbackCount"] else ""
             logger.info(
                 f"🧪 算法调度器: {stats['filesProcessed']} 条 | "
-                f"压缩率 {stats['overallRatio']*100:.1f}% | "
+                f"压缩率 {stats['overallRatio'] * 100:.1f}% | "
                 f"桶分布 {stats['decisionsByBucket']}"
                 f"{pii_info}{fb_info}"
             )
@@ -448,9 +484,9 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
     return stats
 
 
-def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
-                             stats: dict[str, Any],
-                             dry_run: bool = False) -> dict[str, Any]:
+def _hook_direct_smartcrush(
+    session_messages: list[dict[str, Any]], stats: dict[str, Any], dry_run: bool = False
+) -> dict[str, Any]:
     """Day 1-3 原始路径: 直接调 SmartCrusher, 无 PII / 无护栏。"""
     stats["enabled"] = True
     stats["mode"] = "direct"
@@ -463,7 +499,7 @@ def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
             content = msg.get("message", {}).get("content", "")
             if not isinstance(content, str):
                 continue
-            if len(content.encode('utf-8')) < ALGO_SMARTCRUSH_MIN_CONTENT_SIZE:
+            if len(content.encode("utf-8")) < ALGO_SMARTCRUSH_MIN_CONTENT_SIZE:
                 continue
 
             crushed, cstats = smartcrush(content)
@@ -472,15 +508,13 @@ def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
             stats["totalCrushedBytes"] += cstats.get("crushed_bytes", 0)
 
         if stats["totalOriginalBytes"] > 0:
-            stats["overallRatio"] = 1.0 - (
-                stats["totalCrushedBytes"] / stats["totalOriginalBytes"]
-            )
+            stats["overallRatio"] = 1.0 - (stats["totalCrushedBytes"] / stats["totalOriginalBytes"])
         stats["ran"] = True
 
         if stats["filesProcessed"] > 0:
             logger.info(
                 f"🧪 SmartCrusher 直接路径: {stats['filesProcessed']} 条消息 | "
-                f"压缩率 {stats['overallRatio']*100:.1f}% | "
+                f"压缩率 {stats['overallRatio'] * 100:.1f}% | "
                 f"节省 {stats['totalOriginalBytes'] - stats['totalCrushedBytes']} bytes"
             )
 
@@ -557,23 +591,33 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     actions_log = ARMOR_STATE / "actions.jsonl"
     history_dir = ARMOR_STATE / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
-    _append_broker("health", "armor.compress",
-                   f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
-                   "warn" if usage >= THRESHOLD_WARN else "ok",
-                   f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
-                   {"usagePercent": usage, "dryRun": dry_run})
+    _append_broker(
+        "health",
+        "armor.compress",
+        f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
+        "warn" if usage >= THRESHOLD_WARN else "ok",
+        f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
+        {"usagePercent": usage, "dryRun": dry_run},
+    )
     # ── C 项：标准化事件桥接 ──
-    _append_broker("armor", "mark42.armor.compress.done",
-                   f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
-                   "ok" if index.get('strategyUsed') == 'llm-analyze' else "warn",
-                   trim_detail(
-                       f"策略: {index.get('strategyUsed', '?')} | "
-                       f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) + len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
-                       f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
-                       180,
-                   ),
-                   {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
-                    "modelGenerated": index.get('modelGenerated', False)})
+    _append_broker(
+        "armor",
+        "mark42.armor.compress.done",
+        f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
+        "ok" if index.get("strategyUsed") == "llm-analyze" else "warn",
+        trim_detail(
+            f"策略: {index.get('strategyUsed', '?')} | "
+            f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) + len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
+            f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
+            180,
+        ),
+        {
+            "usagePercent": usage,
+            "strategy": index.get("strategyUsed"),
+            "dryRun": dry_run,
+            "modelGenerated": index.get("modelGenerated", False),
+        },
+    )
     # ── 实际压缩：通过 OpenClaw 合法 CLI 通道触发 /compact ──
     # 修复 (2026-06-24): 不再直接写 active session 文件！
     # 直接写文件会触发 sessionFileFenceKey 检测 (EmbeddedAttemptSessionTakeoverError)，
@@ -601,9 +645,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 # LLM 模式保留语义但慢（60-180s）；截短模式快但丢信息
                 compact_proc = subprocess.run(
                     [
-                        _find_openclaw(), "sessions", "compact",
+                        _find_openclaw(),
+                        "sessions",
+                        "compact",
                         "agent:main:main",
-                        "--timeout", "300000",
+                        "--timeout",
+                        "300000",
                         "--json",
                     ],
                     capture_output=True,
@@ -615,10 +662,14 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     logger.info("    ⚠️ LLM 压缩失败，回退到截短模式")
                     compact_proc = subprocess.run(
                         [
-                            _find_openclaw(), "sessions", "compact",
+                            _find_openclaw(),
+                            "sessions",
+                            "compact",
                             "agent:main:main",
-                            "--max-lines", "200",
-                            "--timeout", "180000",
+                            "--max-lines",
+                            "200",
+                            "--timeout",
+                            "180000",
                             "--json",
                         ],
                         capture_output=True,
@@ -639,16 +690,15 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         index["bytesSaved"] = bytes_saved
                         index["compressionEffective"] = True
                         logger.info(
-                            f"🧹 会话截短成功: {pre_bytes//1024}KB → {post_bytes//1024}KB "
-                            f"(节省 {pct_saved}%)"
+                            f"🧹 会话截短成功: {pre_bytes // 1024}KB → {post_bytes // 1024}KB (节省 {pct_saved}%)"
                         )
                         # 报 broker 成功事件
                         _append_broker(
-                            "armor", "mark42.armor.compact.success",
+                            "armor",
+                            "mark42.armor.compact.success",
                             f"会话截短: {pct_saved}% 节省",
                             "ok",
-                            f"压缩前 {pre_bytes//1024}KB → 压缩后 {post_bytes//1024}KB "
-                            f"({bytes_saved} bytes)",
+                            f"压缩前 {pre_bytes // 1024}KB → 压缩后 {post_bytes // 1024}KB ({bytes_saved} bytes)",
                             {
                                 "preBytes": pre_bytes,
                                 "postBytes": post_bytes,
@@ -666,7 +716,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         index["preCompactBytes"] = pre_bytes  # J 修复: 也记
                         index["postCompactBytes"] = post_bytes
                         index["bytesSaved"] = bytes_saved
-                        logger.warning(f"⚠️ sessions.compact 返回成功但 session 未变小")
+                        logger.warning("⚠️ sessions.compact 返回成功但 session 未变小")
                 else:
                     err = (compact_proc.stderr or compact_proc.stdout)[:300]
                     index["compactTriggered"] = False
@@ -675,7 +725,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     index["preCompactBytes"] = pre_bytes  # J 修复: 也记
                     logger.warning(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
                     _append_broker(
-                        "armor", "mark42.armor.compact.failed",
+                        "armor",
+                        "mark42.armor.compact.failed",
                         f"sessions.compact 失败 rc={compact_proc.returncode}",
                         "error",
                         err,
@@ -757,7 +808,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         # 检查本次压缩是否有效 (粗略依据: 读 memory-index.json)
                         # 精确方式要查 history/*，但简单点：只看本次
                         pass
-                except Exception as e:
+                except Exception:
                     continue
         # 本次判断: index 里是否有 compressionEffective=False 且已生成
         if index.get("compressionEffective") is False:
@@ -772,17 +823,17 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         total_count += 1
                         if h["compressionEffective"] is False:
                             ineffective_count += 1
-                except Exception as e:
+                except Exception:
                     continue
             if total_count >= 3 and ineffective_count == total_count:
                 # 连续 ≥3 次压缩全部无效, 升级 broker
                 _append_broker(
-                    "armor", "mark42.armor.compact.ineffective",
+                    "armor",
+                    "mark42.armor.compact.ineffective",
                     f"连续 {ineffective_count}/{total_count} 次压缩未生效",
                     "warn",
                     trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / session fence 状态", 160),
-                    {"ineffectiveCount": ineffective_count, "totalCount": total_count,
-                     "preUsage": usage},
+                    {"ineffectiveCount": ineffective_count, "totalCount": total_count, "preUsage": usage},
                 )
                 logger.info(trim_detail(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件", 120))
     except Exception as e:
@@ -798,17 +849,27 @@ def _send_context_warn_event(usage: float) -> bool:
     Returns: True=发送成功, False=失败
     """
     import subprocess as _sp
+
     text = (
         f"⚠️ 上下文预警：当前会话上下文使用率已达 {usage}%。"
         f"建议尽快执行 /compact 主动压缩，避免上下文溢出导致 compaction 超时失败。"
     )
     try:
         result = _sp.run(
-            [_find_openclaw(), "system", "event",
-             "--text", text,
-             "--mode", "next-heartbeat",
-             "--session-key", "agent:main:main"],
-            capture_output=True, text=True, timeout=15
+            [
+                _find_openclaw(),
+                "system",
+                "event",
+                "--text",
+                text,
+                "--mode",
+                "next-heartbeat",
+                "--session-key",
+                "agent:main:main",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if result.returncode == 0:
             logger.info(f"    📡 已向主会话发送上下文预警 ({usage}%)")
@@ -837,9 +898,8 @@ def armor_guard(interval_s: int = 300) -> None:
             ts = datetime.now().strftime("%H:%M:%S")
             logger.info(trim_detail(f"[{ts}] 上下文 {usage}% - {check.get('summary', '')}", 120))
             now_ts = time.time()
-            should_warn = (
-                usage >= THRESHOLD_WARN
-                and (_warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown)
+            should_warn = usage >= THRESHOLD_WARN and (
+                _warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown
             )
             if should_warn:
                 logger.info(f"[{ts}] 🟡 上下文达 WARN 阈值，发送预警 + 触发压缩")
@@ -861,8 +921,7 @@ def armor_guard(interval_s: int = 300) -> None:
 # ----------------------------------------------------------------------
 # Day 7: 异步压缩入口 (compress_queue.py 集成)
 # ----------------------------------------------------------------------
-def armor_compress_async(dry_run: bool = False, wait: bool = False,
-                         priority: int = 0) -> dict[str, Any]:
+def armor_compress_async(dry_run: bool = False, wait: bool = False, priority: int = 0) -> dict[str, Any]:
     """异步版 armor_compress — 入队立即返回
 
     Args:
@@ -888,9 +947,10 @@ def armor_compress_async(dry_run: bool = False, wait: bool = False,
     # 提取待压缩的"内容": 实际场景是 session_messages 序列化为 JSON
     # 这里用最简方式: 把 messages 转成字符串作为 compress 输入
     import json as _json
+
     try:
         content = _json.dumps(session_messages, ensure_ascii=False, default=str)
-    except Exception as e:
+    except Exception:
         content = str(session_messages)
 
     req = CompressRequest(
@@ -903,14 +963,15 @@ def armor_compress_async(dry_run: bool = False, wait: bool = False,
     queue = get_compress_queue()
     accepted = queue.enqueue(req)
     if not accepted:
-        return {"status": "dropped", "reason": "queue_full",
-                "queue_size": queue.qsize()}
+        return {"status": "dropped", "reason": "queue_full", "queue_size": queue.qsize()}
 
     if not wait:
-        return {"status": "queued",
-                "request_id": req.request_id,
-                "session_id": req.session_id,
-                "queue_size": queue.qsize()}
+        return {
+            "status": "queued",
+            "request_id": req.request_id,
+            "session_id": req.session_id,
+            "queue_size": queue.qsize(),
+        }
 
     # 同步等结果
     completed = req.wait(timeout=30.0)
@@ -928,6 +989,7 @@ def armor_compress_queue_stats() -> dict[str, Any]:
     try:
         # P1.2 修复: 顶局 import 便于 mock
         from .compress_queue import get_compress_queue
+
         return get_compress_queue().stats
     except ImportError as e:
         return {"error": f"queue module not available: {e}"}

@@ -15,16 +15,16 @@ Mark42 v3-1 · 可插拔 LLM Provider
 from __future__ import annotations
 
 import json
-import logging
 import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 try:
     import yaml  # PyYAML
+
     _HAS_YAML = True
 except ImportError:
     _HAS_YAML = False
@@ -43,19 +43,19 @@ CONFIG_PATHS = [
 ]
 
 # 默认配置（用户不配就用这个）
-DEFAULT_CONFIG: Dict[str, Any] = {
+DEFAULT_CONFIG: dict[str, Any] = {
     "mark42": {
         "consciousness": {
-            "runtime": "stub",          # 可换: ollama | api | stub
-            "model": "stub-model",      # 可换: 任何模型 ID
-            "base_url": "",             # 本地默认
-            "api_key": "",              # 本地不需要
+            "runtime": "stub",  # 可换: ollama | api | stub
+            "model": "stub-model",  # 可换: 任何模型 ID
+            "base_url": "",  # 本地默认
+            "api_key": "",  # 本地不需要
             "timeout_seconds": 60,
             "max_retries": 1,
         },
-        "fallback_chain": ["stub"],    # v3-1 阶段只接 stub fallback
+        "fallback_chain": ["stub"],  # v3-1 阶段只接 stub fallback
         "advisor": {
-            "enabled": False,           # 默认关闭（用户开了才接）
+            "enabled": False,  # 默认关闭（用户开了才接）
             "runtime": "api",
             "model": "",
             "base_url": "",
@@ -67,23 +67,26 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 # ── 数据类 ───────────────────────────────────────────
 
+
 @dataclass
 class ChatMessage:
     """OpenAI 风格单条消息。"""
-    role: str   # system | user | assistant
+
+    role: str  # system | user | assistant
     content: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {"role": self.role, "content": self.content}
 
 
 @dataclass
 class ChatResponse:
     """统一响应结构（不论哪个 runtime 都返回这个）。"""
+
     content: str
     model: str = ""
-    usage: Dict[str, int] = field(default_factory=dict)
-    raw: Optional[Dict[str, Any]] = None
+    usage: dict[str, int] = field(default_factory=dict)
+    raw: dict[str, Any] | None = None
 
     @property
     def ok(self) -> bool:
@@ -91,6 +94,7 @@ class ChatResponse:
 
 
 # ── Provider 接口（R1 钉死 · 锁接口签名）──────────────
+
 
 @runtime_checkable
 class LLMProvider(Protocol):
@@ -102,7 +106,7 @@ class LLMProvider(Protocol):
     runtime: str
     model: str
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse: ...
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse: ...
 
 
 class LLMProviderError(Exception):
@@ -111,7 +115,8 @@ class LLMProviderError(Exception):
 
 # ── 配置加载 ─────────────────────────────────────────
 
-def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
+
+def load_config(path: Path | None = None) -> dict[str, Any]:
     """加载 model.yaml；找不到或解析失败 → 返回默认配置（不崩）。
 
     行为契约：
@@ -142,28 +147,36 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
     return cfg
 
 
-def get_consciousness_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_consciousness_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
     """从配置里取 consciousness 段；缺则补默认。"""
     return cfg.get("mark42", {}).get("consciousness", DEFAULT_CONFIG["mark42"]["consciousness"])
 
 
-def get_advisor_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_advisor_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
     return cfg.get("mark42", {}).get("advisor", DEFAULT_CONFIG["mark42"]["advisor"])
 
 
-def get_fallback_chain(cfg: Dict[str, Any]) -> List[str]:
+def get_fallback_chain(cfg: dict[str, Any]) -> list[str]:
     return cfg.get("mark42", {}).get("fallback_chain", ["stub"])
 
 
 # ── Runtime 实现 ─────────────────────────────────────
+
 
 class OllamaRuntime:
     """本地 Ollama runtime（v3-1 实现，v3-6 真实跑通）。"""
 
     runtime = "ollama"
 
-    def __init__(self, model: str, base_url: str = "", api_key: str = "",
-                 timeout_seconds: int = 60, max_retries: int = 1, **kwargs: Any):
+    def __init__(
+        self,
+        model: str,
+        base_url: str = "",
+        api_key: str = "",
+        timeout_seconds: int = 60,
+        max_retries: int = 1,
+        **kwargs: Any,
+    ):
         self.model = model
         self.base_url = base_url.rstrip("/") or "http://127.0.0.1:11434"
         # Ollama 本地不需要 key，但若提供则透传（兼容远端代理场景）
@@ -171,7 +184,7 @@ class OllamaRuntime:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         url = f"{self.base_url}/v1/chat/completions"
         body = {
             "model": self.model,
@@ -182,8 +195,9 @@ class OllamaRuntime:
             if k in kwargs:
                 body[k] = kwargs[k]
 
-        return _http_post_json(url, body, self.api_key, self.timeout_seconds, self.max_retries,
-                               extra_log=f"[ollama/{self.model}]")
+        return _http_post_json(
+            url, body, self.api_key, self.timeout_seconds, self.max_retries, extra_log=f"[ollama/{self.model}]"
+        )
 
 
 class APIRuntime:
@@ -195,8 +209,15 @@ class APIRuntime:
 
     runtime = "api"
 
-    def __init__(self, model: str, base_url: str = "", api_key: str = "",
-                 timeout_seconds: int = 60, max_retries: int = 1, **kwargs: Any):
+    def __init__(
+        self,
+        model: str,
+        base_url: str = "",
+        api_key: str = "",
+        timeout_seconds: int = 60,
+        max_retries: int = 1,
+        **kwargs: Any,
+    ):
         self.model = model
         self.base_url = base_url.rstrip("/")
         if not self.base_url:
@@ -207,7 +228,7 @@ class APIRuntime:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         url = f"{self.base_url}/chat/completions"
         body = {
             "model": self.model,
@@ -217,8 +238,9 @@ class APIRuntime:
             if k in kwargs:
                 body[k] = kwargs[k]
 
-        return _http_post_json(url, body, self.api_key, self.timeout_seconds, self.max_retries,
-                               extra_log=f"[api/{self.model}]")
+        return _http_post_json(
+            url, body, self.api_key, self.timeout_seconds, self.max_retries, extra_log=f"[api/{self.model}]"
+        )
 
 
 class StubRuntime:
@@ -235,7 +257,7 @@ class StubRuntime:
     def __init__(self, model: str = "stub-model", **kwargs: Any):
         self.model = model
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         # 取最后一条用户消息作为 echo 内容（能让上层验证调用是否真过了）
         # R4 确定性：None / 缺字段 不崩
         last_user = next((m.content for m in reversed(messages) if m.role == "user"), "") or ""
@@ -244,25 +266,28 @@ class StubRuntime:
         return ChatResponse(
             content=content,
             model=self.model,
-            usage={"prompt_tokens": prompt_tokens,
-                   "completion_tokens": len(content) // 2,
-                   "total_tokens": prompt_tokens + len(content) // 2},
+            usage={
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": len(content) // 2,
+                "total_tokens": prompt_tokens + len(content) // 2,
+            },
             raw={"stub": True, "msg_count": len(messages)},
         )
 
 
 # ── HTTP 工具（避免每个 runtime 都重复 try/except） ────
 
-def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
-                    timeout_seconds: int, max_retries: int,
-                    extra_log: str = "") -> ChatResponse:
+
+def _http_post_json(
+    url: str, body: dict[str, Any], api_key: str, timeout_seconds: int, max_retries: int, extra_log: str = ""
+) -> ChatResponse:
     """POST JSON 到 OpenAI 兼容接口，统一错误处理。"""
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for attempt in range(1 + max_retries):
         req = urllib.request.Request(url, data=data, method="POST")
         for k, v in headers.items():
@@ -299,7 +324,7 @@ _RUNTIME_REGISTRY = {
 }
 
 
-def build_provider(cfg_section: Dict[str, Any]) -> LLMProvider:
+def build_provider(cfg_section: dict[str, Any]) -> LLMProvider:
     """根据配置段构造 Provider。未知 runtime → 降级 StubRuntime（不崩）。"""
     runtime_name = (cfg_section.get("runtime") or "stub").lower()
     cls = _RUNTIME_REGISTRY.get(runtime_name)
@@ -321,14 +346,14 @@ def build_provider(cfg_section: Dict[str, Any]) -> LLMProvider:
         return StubRuntime(model=cfg_section.get("model", "stub-model"))
 
 
-def build_consciousness(cfg: Optional[Dict[str, Any]] = None) -> LLMProvider:
+def build_consciousness(cfg: dict[str, Any] | None = None) -> LLMProvider:
     """构造战甲意识层 Provider（主用）。"""
     if cfg is None:
         cfg = load_config()
     return build_provider(get_consciousness_cfg(cfg))
 
 
-def build_advisor(cfg: Optional[Dict[str, Any]] = None) -> Optional[LLMProvider]:
+def build_advisor(cfg: dict[str, Any] | None = None) -> LLMProvider | None:
     """构造外部 advisor Provider；未启用 → 返回 None。"""
     if cfg is None:
         cfg = load_config()
@@ -340,9 +365,8 @@ def build_advisor(cfg: Optional[Dict[str, Any]] = None) -> Optional[LLMProvider]
 
 # ── 顶层 chat 封装（带 fallback 链）────────────────────
 
-def chat_with_fallback(messages: List[ChatMessage],
-                       cfg: Optional[Dict[str, Any]] = None,
-                       **kwargs: Any) -> ChatResponse:
+
+def chat_with_fallback(messages: list[ChatMessage], cfg: dict[str, Any] | None = None, **kwargs: Any) -> ChatResponse:
     """按 fallback_chain 依次尝试，直到一个成功为止。全失败 → 返回 stub 回声。"""
     if cfg is None:
         cfg = load_config()
@@ -359,7 +383,7 @@ def chat_with_fallback(messages: List[ChatMessage],
         except Exception as e:
             logger.warning("构造 fallback %s 失败: %s", runtime_name, e)
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for p in providers_to_try:
         try:
             return p.chat(messages, **kwargs)
@@ -375,8 +399,10 @@ def chat_with_fallback(messages: List[ChatMessage],
 
 # ── CLI（开发期调试用 · 生产时由 consciousness.py 接管） ─
 
+
 def _cli() -> int:
     import argparse
+
     p = argparse.ArgumentParser(description="Mark42 LLM Provider · v3-1 可插拔 demo")
     p.add_argument("--runtime", choices=["ollama", "api", "stub"], help="覆盖配置里的 runtime")
     p.add_argument("--model", help="覆盖模型名")

@@ -26,7 +26,6 @@
 
 import json
 import logging
-import os
 import re
 import time
 import urllib.error
@@ -35,7 +34,6 @@ from typing import Any
 
 # 【2026-07-13】不能用相对路径, perf_bench/algo_scheduler 从外部 import
 from .utils import safe_call
-
 
 log = logging.getLogger("mark42.llm_text_compressor")
 
@@ -95,14 +93,16 @@ def _clean_llm_output(content: str) -> str:
 class LLMTextCompressor:
     """LLM 驱动的语义文本压缩器"""
 
-    def __init__(self,
-                 mode: str = "summarize",
-                 min_text_size: int = 500,
-                 max_input_bytes: int = 12000,
-                 min_useful_ratio: float = 0.05,
-                 max_useful_ratio: float = 0.98,
-                 request_timeout: int = 60,
-                 config_key: str = "llmCompress"):
+    def __init__(
+        self,
+        mode: str = "summarize",
+        min_text_size: int = 500,
+        max_input_bytes: int = 12000,
+        min_useful_ratio: float = 0.05,
+        max_useful_ratio: float = 0.98,
+        request_timeout: int = 60,
+        config_key: str = "llmCompress",
+    ):
         """
         Args:
             mode: "summarize" | "simplify" | "extract"
@@ -133,7 +133,7 @@ class LLMTextCompressor:
             "crushed_bytes": 0,
             "crushed_lines": 0,
             "ratio": 0.0,
-            "status": "none",         # "compressed" | "passthrough_small" | "fallback_rule_based" | "fallback_low_ratio" | "error" | "passthrough_truncated_input"
+            "status": "none",  # "compressed" | "passthrough_small" | "fallback_rule_based" | "fallback_low_ratio" | "error" | "passthrough_truncated_input"
             "llm_called": False,
             "llm_model": None,
             "llm_tokens_in": 0,
@@ -159,7 +159,7 @@ class LLMTextCompressor:
         # 截断超长输入
         truncated = False
         if stats["original_bytes"] > self.max_input_bytes:
-            text = text.encode("utf-8")[:self.max_input_bytes].decode("utf-8", errors="ignore")
+            text = text.encode("utf-8")[: self.max_input_bytes].decode("utf-8", errors="ignore")
             truncated = True
 
         # 解析 LLM 路由
@@ -242,12 +242,14 @@ class LLMTextCompressor:
         if not api_key or not base_url:
             raise RuntimeError(f"missing apiKey/baseUrl in resolved config: {list(resolved)}")
 
-        body = json.dumps({
-            "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }).encode("utf-8")
+        body = json.dumps(
+            {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+        ).encode("utf-8")
 
         req = urllib.request.Request(
             f"{base_url}{endpoint}",
@@ -316,9 +318,9 @@ def llm_text_compress(content: str, mode: str = "summarize") -> tuple[str, dict]
 # ----------------------------------------------------------------------
 # Phase 2 目标 1: LLM 压缩走异步队列 (daemon 永不阻塞)
 # ----------------------------------------------------------------------
-def llm_text_compress_async(content: str, mode: str = "summarize",
-                            wait: bool = True, priority: int = 0,
-                            timeout: float = 60.0) -> dict:
+def llm_text_compress_async(
+    content: str, mode: str = "summarize", wait: bool = True, priority: int = 0, timeout: float = 60.0
+) -> dict:
     """异步版 LLM 压缩 — 走 CompressQueue 后台 worker
 
     工作机制:
@@ -351,40 +353,38 @@ def llm_text_compress_async(content: str, mode: str = "summarize",
         try:
             from .compress_queue import CompressRequest, get_compress_queue
         except ImportError:
-            return {"status": "error", "reason": "compress_queue module not available",
-                    "request_id": None}
+            return {"status": "error", "reason": "compress_queue module not available", "request_id": None}
 
     req = CompressRequest(
         content=content,
         session_id=f"llm-{mode}",
-        content_type=f"llm:{mode}",   # 告诉 worker 走 LLM
+        content_type=f"llm:{mode}",  # 告诉 worker 走 LLM
         priority=priority,
     )
 
     queue = get_compress_queue()
     accepted = queue.enqueue(req)
     if not accepted:
-        return {"status": "dropped", "reason": "queue_full",
-                "request_id": req.request_id, "queue_size": queue.qsize()}
+        return {"status": "dropped", "reason": "queue_full", "request_id": req.request_id, "queue_size": queue.qsize()}
 
     if not wait:
-        return {"status": "queued", "request_id": req.request_id,
-                "queue_size": queue.qsize()}
+        return {"status": "queued", "request_id": req.request_id, "queue_size": queue.qsize()}
 
     # 同步等结果 (LLM 跑在 worker 线程里)
     completed = req.wait(timeout=timeout)
     if not completed:
-        return {"status": "timeout", "request_id": req.request_id,
-                "duration_ms": int(timeout * 1000)}
+        return {"status": "timeout", "request_id": req.request_id, "duration_ms": int(timeout * 1000)}
 
     if req.error:
-        return {"status": "failed", "error": req.error,
-                "request_id": req.request_id,
-                "duration_ms": req._result.get("duration_ms", 0) if req._result else 0}
+        return {
+            "status": "failed",
+            "error": req.error,
+            "request_id": req.request_id,
+            "duration_ms": req._result.get("duration_ms", 0) if req._result else 0,
+        }
 
     if not req.result:
-        return {"status": "error", "reason": "no result",
-                "request_id": req.request_id}
+        return {"status": "error", "reason": "no result", "request_id": req.request_id}
 
     return {
         "status": req.result.get("status", "unknown"),
@@ -421,6 +421,7 @@ def _run_tests() -> bool:
             if isinstance(payload, Exception):
                 raise payload
             return _MockHTTPResponse(payload)
+
         return _mock
 
     def check(name: str, cond: bool):
@@ -459,17 +460,12 @@ def _run_tests() -> bool:
 
     # ---- 测试 4: _clean_llm_output 各种脏数据 ----
     log.info("\n[测试 4] LLM 输出清理")
-    check("4.1 剥离 <think> 块",
-          _clean_llm_output("<think>让我想想</think>这是结果") == "这是结果")
-    check("4.2 剥离 markdown 包裹",
-          _clean_llm_output("```\n真正的内容\n```") == "真正的内容")
-    check("4.3 剥离 ```json 块",
-          _clean_llm_output("```json\n{\"a\": 1}\n```") == '{"a": 1}')
-    check("4.4 头尾空白",
-          _clean_llm_output("  \n  内容  \n  ") == "内容")
+    check("4.1 剥离 <think> 块", _clean_llm_output("<think>让我想想</think>这是结果") == "这是结果")
+    check("4.2 剥离 markdown 包裹", _clean_llm_output("```\n真正的内容\n```") == "真正的内容")
+    check("4.3 剥离 ```json 块", _clean_llm_output('```json\n{"a": 1}\n```') == '{"a": 1}')
+    check("4.4 头尾空白", _clean_llm_output("  \n  内容  \n  ") == "内容")
     check("4.5 空字符串", _clean_llm_output("") == "")
-    check("4.6 混合 <think> + 包裹",
-          _clean_llm_output("<think>...</think>```\n最终\n```") == "最终")
+    check("4.6 混合 <think> + 包裹", _clean_llm_output("<think>...</think>```\n最终\n```") == "最终")
 
     # ---- 测试 5: _resolve_model 找到 llmCompress ----
     log.info("\n[测试 5] 模型配置解析")
@@ -509,9 +505,13 @@ def _run_tests() -> bool:
         "timeout": 7,
     }
     mock_ok_payload = {
-        "choices": [{
-            "message": {"content": "项目采用 Python、PostgreSQL、Redis、Prometheus/Grafana、Loki，提供完整 API 与监控日志能力。"}
-        }]
+        "choices": [
+            {
+                "message": {
+                    "content": "项目采用 Python、PostgreSQL、Redis、Prometheus/Grafana、Loki，提供完整 API 与监控日志能力。"
+                }
+            }
+        ]
     }
 
     c = LLMTextCompressor(mode="summarize")
@@ -572,8 +572,10 @@ def _run_tests() -> bool:
         check("6R.2 status=compressed", stats["status"] == "compressed")
         check("6R.3 压缩率 >= 5%", stats["ratio"] >= 0.05)
         check("6R.4 duration < 60s", stats["llm_duration_ms"] < 60_000)
-        log.info(f"  → 原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B "
-              f"({stats['ratio']:.1%}), 用时 {stats['llm_duration_ms']}ms")
+        log.info(
+            f"  → 原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B "
+            f"({stats['ratio']:.1%}), 用时 {stats['llm_duration_ms']}ms"
+        )
         log.info(f"  → 输出预览: {out[:200]!r}")
 
     # ---- 测试 7: 无 model config → 自动 fallback ----
@@ -635,7 +637,10 @@ def _run_tests() -> bool:
 
     # 12.2 wait=True 同步等结果 (真调 LLM, 5 秒)
     r2 = llm_text_compress_async("总而言之，Mark42 是一个优秀的系统。" * 20, mode="summarize", wait=True, timeout=30)
-    check("12.4 wait=True 拿到 status", r2.get("status") in ("compressed", "fallback_rule_based", "fallback_low_ratio", "passthrough_small"))
+    check(
+        "12.4 wait=True 拿到 status",
+        r2.get("status") in ("compressed", "fallback_rule_based", "fallback_low_ratio", "passthrough_small"),
+    )
     check("12.5 有 result 字段", "result" in r2)
     check("12.6 有 stats 字段", "stats" in r2)
     check("12.7 duration_ms 是 int", isinstance(r2.get("duration_ms", 0), int))
@@ -654,9 +659,19 @@ def _run_tests() -> bool:
         # 等上次请求走完, 避免 2 个 LLM 调用同 worker 冲突
         time.sleep(1)
         r = llm_text_compress_async("总而言之，这是测试文本。\n" * 15, mode=m, wait=True, timeout=30)
-        check(f"12.10.{m} wait=True 拿到状态",
-              r.get("status") in ("compressed", "fallback_rule_based", "fallback_low_ratio",
-                                  "passthrough_small", "passthrough_truncated_input", "error", "none"))
+        check(
+            f"12.10.{m} wait=True 拿到状态",
+            r.get("status")
+            in (
+                "compressed",
+                "fallback_rule_based",
+                "fallback_low_ratio",
+                "passthrough_small",
+                "passthrough_truncated_input",
+                "error",
+                "none",
+            ),
+        )
 
     # 12.6 验证: 调用方不阻塞 (wait=False 应该 < 1 秒)
     t0 = time.time()
@@ -664,7 +679,7 @@ def _run_tests() -> bool:
     elapsed = time.time() - t0
     check("12.11 wait=False 返回时间 < 0.1s", elapsed < 0.1)
 
-    log.info(f"  → 12.11 wait=False 实际用时: {elapsed*1000:.1f}ms")
+    log.info(f"  → 12.11 wait=False 实际用时: {elapsed * 1000:.1f}ms")
 
     log.info()
     log.info("=" * 60)
@@ -676,4 +691,5 @@ def _run_tests() -> bool:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     import sys
+
     sys.exit(0 if _run_tests() else 1)

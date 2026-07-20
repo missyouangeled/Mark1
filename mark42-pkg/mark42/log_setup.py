@@ -14,7 +14,6 @@
 import logging
 import os
 import sys
-from pathlib import Path
 
 # ── 日志格式 ─────────────────────────────────────────────
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
