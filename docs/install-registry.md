@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-07-20
+
+### ✅ 升级：OpenClaw v2026.7.1 -> v2026.7.1-2 + Branding 脚本适配
+- **时间**：2026-07-20 08:20 CST
+- **触发**：点点看到系统提示可升级
+- **操作**：升级 + branding 脚本修复
+- **方式**：`systemd-run --user --collect --wait openclaw update --yes`（通过 systemd-run 绕过 gateway 自身重启冲突）
+- **旧版本**：`2026.7.1 (2d2ddc4)`
+- **新版本**：`2026.7.1-2 (0790d9f)`
+- **安装路径**：`~/.npm-global/lib/node_modules/openclaw/`
+- **是否成功**：✅ 升级成功
+
+**升级后发现问题：**
+
+1. **Brandig 脚本 ExecStartPre 失败**：`apply-openclaw-control-ui-branding.py` 报 "未能定位聊天页补丁入口"
+   - **根因**：v2026.7.1-2 前端改用 Vite 代码分割，聊天逻辑从 `index-*.js` 拆到独立 `chat-page-*.js` chunk；所有函数名全变，6 个历史版本适配都匹配不上
+   - **修复**：在 branding 脚本中新增 v2026.7.1 版本适配分支
+     - 文件扫描：新增 `chat-page-*.js` glob 匹配
+     - 函数映射：`Bl`=isHidden, `ql`=mergeHistory, `O`=roleNormalize, `G`=textExtract, `ps`=stripPrefix, `Lb`=unwrap, `Pi`=shouldSkip, `Rb`=isSending
+     - 注入 Jarvis helper 函数（yielded history replay + pending reading indicator）
+     - "无效重载" bug：新版本已原生修复（`hasActiveRun===!0` 时直接 return，不调 reload），不再需要补丁
+   - **修复后**：ExecStartPre 退出 0 ✅
+
+2. **Gateway 重启卡在 deactivating**：升级时 gateway 停止过程超时
+   - **处理**：`systemctl --user kill --signal=SIGKILL` 强制终止后正常重启
+   - **根因**：gateway 内运行中的会话/任务阻止优雅退出
+
+**修改的文件：**
+- `scripts/apply-openclaw-control-ui-branding.py`：新增 v2026.7.1 适配分支（~60 行）
+
+---
+
 ## 2026-06-23
 
 ### ✅ 配置：trae-agent 接通 OpenRouter + GPT-OSS-120B Free

@@ -93,6 +93,50 @@ JARVIS_FUNCTIONS_V2026_6_5 = (
     + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;return t||!c||Date.now()-c<=3e4}"
 )
 
+
+# ── v2026.7.1 适配 - Vite 代码分割: 聊天逻辑在 chat-page-*.js, 函数映射: Bl->isHidden, O->roleNormalize, G->textExtract, ql->mergeHistory, ps->stripPrefix, Lb->unwrap, Pi->shouldSkip, Rb->isSending ──
+YIELDED_HISTORY_REPLY_V2026_7_1_OLD = "let f=d.filter(e=>!Bl(e)),p=Jl(c,e.chatMessages,f);"
+YIELDED_HISTORY_REPLY_V2026_7_1_NEW = "let f=JarvisProjectYieldedHistoryReply(d.filter(e=>!Bl(e))),p=Jl(c,e.chatMessages,f);"
+STREAM_INDICATOR_V2026_7_1_OLD = "if(e.stream===null&&l.some(e=>e.sendState===`sending`&&Rb(e)))t.push({kind:`reading-indicator`,key:`stream:${e.sessionKey}:pending`});else if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=ps(Lb(e.stream),g),i=Hb(t,e.streamStartedAt??Date.now());r.length>0?Pi(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}return Tb(bb(Fb(Sb(Ub(t,_)))))"
+STREAM_INDICATOR_V2026_7_1_NEW = "let _jarvisPending=JarvisShouldShowPendingReadingIndicator(e);if(_jarvisPending||e.stream===null&&l.some(e=>e.sendState===`sending`&&Rb(e)))t.push({kind:`reading-indicator`,key:`stream:${e.sessionKey}:pending`});else if(e.stream!==null){let n=`stream:${e.sessionKey}:${e.streamStartedAt??`live`}`,r=ps(Lb(e.stream),g),i=Hb(t,e.streamStartedAt??Date.now());r.length>0?Pi(r).shouldSkip||t.push({kind:`stream`,key:n,text:r,startedAt:i,isStreaming:!0}):e.stream.trim().length===0&&t.push({kind:`reading-indicator`,key:n})}return Tb(bb(Fb(Sb(Ub(t,_)))))"
+JARVIS_FUNCTIONS_V2026_7_1 = (
+    "function JarvisReadYieldedToolResultText(e){"
+    + "if(!e||typeof e!='object')return null;"
+    + "let t=O(e?.role??'');"
+    + "if(t!=='toolresult'&&t!=='tool_result'&&t!=='tool'&&t!=='function')return null;"
+    + "let n=typeof e?.content=='string'?e.content:Array.isArray(e?.content)?e.content.map(e=>typeof e?.text=='string'?e.text:'').join('\\n'):typeof e?.text=='string'?e.text:'';"
+    + "if(!n.trim())return null;"
+    + "try{let r=JSON.parse(n),i=typeof r?.message=='string'?r.message.trim():'';"
+    + "return r?.status==='yielded'&&i&&!/^\\s*NO_REPLY\\s*$/.test(i)?i:null}catch{return null}}"
+    + "function JarvisProjectYieldedHistoryReply(e){"
+    + "if(!Array.isArray(e)||e.length===0)return[];"
+    + "let t=e.filter(e=>!Bl(e)),n=-1;"
+    + "for(let r=t.length-1;r>=0;r--){if(O(t[r]?.role??'')==='user'){n=r;break}}"
+    + "if(n<0)return t;"
+    + "for(let r=t.length-1;r>n;r--){let i=t[r];if(!i||typeof i!='object')continue;"
+    + "if(!Bl(i)&&O(i?.role??'')==='assistant'&&G(i)?.trim())return t}"
+    + "for(let r=t.length-1;r>n;r--){let i=JarvisReadYieldedToolResultText(t[r]);if(!i)continue;"
+    + "let a={role:'assistant',content:[{type:'text',text:i}],timestamp:typeof t[r]?.timestamp=='number'?t[r].timestamp:Date.now()};return[...t,a]}return t}"
+    + "function JarvisAssistantHasVisibleContent(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "if(O(e?.role??'')!=='assistant')return!1;"
+    + "let t=G(e)?.trim();return!!t&&!/^\\s*NO_REPLY\\s*$/.test(t)}"
+    + "function JarvisShouldShowPendingReadingIndicator(e){"
+    + "if(!e||typeof e!='object')return!1;"
+    + "let t=e.sessionHasActiveRun===!0||e.sessionStatus==='running',"
+    + "n=typeof e.sessionEndedAt=='number'&&Date.now()-e.sessionEndedAt<=2e4;"
+    + "if(!t&&!n)return!1;"
+    + "let r=Array.isArray(e.messages)?e.messages:[],i=Array.isArray(e.toolMessages)?e.toolMessages:[],a=-1;"
+    + "for(let s=r.length-1;s>=0;s--){if(O(r[s]?.role??'')==='user'){a=s;break}}"
+    + "if(a<0)return!1;let o=!1,s=!1,c=0;"
+    + "for(let l=a+1;l<r.length;l++){let u=r[l];if(!u||typeof u!='object')continue;"
+    + "if(JarvisAssistantHasVisibleContent(u)){o=!0;break}"
+    + "let d=O(u?.role??'');(d==='assistant'||d==='tool'||d==='toolresult')&&(s=!0);"
+    + "let m=typeof u.timestamp=='number'?u.timestamp:0;m>c&&(c=m)}"
+    + "if(o)return!1;if(i.length>0)return!0;if(!s)return!1;"
+    + "return t||!c||Date.now()-c<=3e4}"
+)
+
 # ── v2026.6.8 适配 — 函数映射: bh→isHidden, OA→unwrap, FA→textExtract, ZA→chatRender, xh→markdown, _h→shouldSkip ──
 # ZA 函数是新的 chat items builder，消息对象直接访问无需额外解包
 YIELDED_HISTORY_REPLY_V2026_6_8_OLD = "r=(Array.isArray(e.messages)?e.messages:[]).filter(e=>!bh(e)),i=Array.isArray(e.toolMessages)?e.tool"
@@ -351,10 +395,33 @@ def patch_chat_running_indicator(dist_root: Path) -> list[Path]:
         die(f"Control UI assets 目录不存在：{assets_dir}")
 
     patched_paths: list[Path] = []
-    for asset_path in sorted(assets_dir.glob("index-*.js")):
+    for asset_path in sorted(list(assets_dir.glob("index-*.js")) + list(assets_dir.glob("chat-page-*.js"))):
         content = asset_path.read_text(encoding="utf-8")
         updated = content
         changed = False
+
+        # Detect v2026.7.1+ Vite split - chat-page JS with Bl+ql
+        is_v2026_7_1 = "function Bl(e){return zl(e)||Pl(e)||Il(e)}" in content and "function ql(e,t){" in content
+        if is_v2026_7_1:
+            # Inject Jarvis helper functions before Bl()
+            if "JarvisReadYieldedToolResultText" not in updated:
+                _marker = "function Bl(e){return zl(e)"
+                _pos = updated.index(_marker)
+                if _pos >= 0:
+                    updated = updated[:_pos] + JARVIS_FUNCTIONS_V2026_7_1 + updated[_pos:]
+                    changed = True
+            # Patch yielded history: wrap messages with JarvisProjectYieldedHistoryReply
+            if YIELDED_HISTORY_REPLY_V2026_7_1_NEW not in updated and YIELDED_HISTORY_REPLY_V2026_7_1_OLD in updated:
+                updated = updated.replace(YIELDED_HISTORY_REPLY_V2026_7_1_OLD, YIELDED_HISTORY_REPLY_V2026_7_1_NEW, 1)
+                changed = True
+            # Patch stream indicator: add JarvisShouldShowPendingReadingIndicator
+            if STREAM_INDICATOR_V2026_7_1_NEW not in updated and STREAM_INDICATOR_V2026_7_1_OLD in updated:
+                updated = updated.replace(STREAM_INDICATOR_V2026_7_1_OLD, STREAM_INDICATOR_V2026_7_1_NEW, 1)
+                changed = True
+            if changed:
+                asset_path.write_text(updated, encoding="utf-8")
+            patched_paths.append(asset_path)
+            continue
 
         # Detect v2026.6.8+ — function ZA present (new render), fj+OD present
         is_v2026_6_8 = "function ZA(e){" in content and "function fj(" in content and "function OD(e){" in content
