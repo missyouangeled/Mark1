@@ -468,7 +468,7 @@ class ErrorArchive:
 
 def _print_entry_row(e: ArchiveEntry) -> None:
     last_seen = e.ts_last_seen.split("T")[0] if e.ts_last_seen else "-"
-    logger.info(f"  {e.id:30s} | {e.category:30s} | {e.occurrence_count:3d} | ")
+    logger.info(f"  {e.id:30s} | {e.category:30s} | {e.occurrence_count:3d} | "
           f"{e.resolution_status:15s} | {last_seen}")
 
 
