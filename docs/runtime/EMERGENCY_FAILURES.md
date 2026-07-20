@@ -1505,3 +1505,215 @@
 - [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
 
+## 2026-07-20T08:50:00.104452+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T08:55:00.151691+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:00:00.138574+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:05:00.094386+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:10:00.096551+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:15:01.795439+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:20:00.101249+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:25:00.147312+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T09:57:52.878282+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=32.8811547）
+
+## 2026-07-20T10:00:00.115609+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:05:00.081721+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:10:00.089042+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:15:00.096347+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:20:00.092681+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:25:00.098734+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:30:00.091108+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:40:00.497391+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service, openclaw-health-collector.service
+
+## 2026-07-20T10:45:00.332990+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service, openclaw-health-collector.service
+
+## 2026-07-20T10:50:00.231126+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T10:55:00.314762+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:00:00.385877+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:05:00.639379+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T11:10:00.268480+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:15:00.241431+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:20:00.244677+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:25:00.234409+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:30:00.383253+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:35:00.208517+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:40:00.331809+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:45:00.290815+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:50:00.276296+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T11:55:00.359331+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:00:00.387329+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T12:05:00.244332+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-health-collector.service
+
+## 2026-07-20T12:10:00.114398+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:15:00.114434+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:20:00.121442+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:25:00.119423+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:30:00.113109+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:35:00.128438+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:40:06.037073+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:45:00.150413+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T12:50:00.208245+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T12:55:00.979964+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T13:00:00.538723+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+
+## 2026-07-20T13:05:00.400080+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:10:00.099861+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:15:00.100222+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:20:00.131364+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:25:00.083950+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:30:00.089015+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:35:00.107304+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service
+
+## 2026-07-20T13:40:00.102016+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：mark42-watchdog.service, openclaw-frontstage-guardian.service
+

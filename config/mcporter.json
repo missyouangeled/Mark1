@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "qmd": {
+      "command": "qmd",
+      "args": [
+        "mcp"
+      ],
+      "description": "QMD MCP server for memory search",
+      "env": {
+        "XDG_CACHE_HOME": "/home/missyouangeled/.openclaw/agents/main/qmd/xdg-cache",
+        "XDG_CONFIG_HOME": "/home/missyouangeled/.openclaw/agents/main/qmd/xdg-config"
+      },
+      "lifecycle": "keep-alive"
+    }
+  }
+}
