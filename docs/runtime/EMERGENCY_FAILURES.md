@@ -1880,3 +1880,11 @@
 
 - [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
 
+## 2026-07-21T10:05:00.103966+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-21T10:50:00.084981+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-health-collector.service
+

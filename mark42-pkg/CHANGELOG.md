@@ -5,6 +5,23 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.6.0] - 2026-07-21
+
+### 重构
+- 🏗️ **algo_scheduler 解耦**：用注册表模式替代硬 import 6 个压缩器，新增 `register_compressor()` / `unregister_compressor()` API
+- 🏗️ **cli.py 拆分为 cli/ 包**（1426行 -> 4 个文件）：
+  - `cli/__init__.py`：包入口 + re-export
+  - `cli/assemble.py`（394行）：assemble 进程管理
+  - `cli/status.py`（236行）：状态面板
+  - `cli/parser.py`（798行）：argparse + 命令分发
+
+### 新增
+- 📝 补全 `__main__.py` / `utils.py` / `cli/__init__.py` docstring
+- 🔧 `pyproject.toml` 新增 `[tool.mypy]` 配置段（strict-ish）
+
+### 修复
+- 🐛 ruff format 修复 `algo_scheduler.py` / `armor.py` 格式
+
 ## [2.5.1] - 2026-07-21
 
 ### 新增
