@@ -1,4 +1,7 @@
-"""Mark42 工具函数模块。"""
+"""Mark42 工具函数模块。
+
+提供 JSON 读写、时间戳、会话查找、数据截断等通用工具函数。
+"""
 
 from .log_setup import get_logger
 

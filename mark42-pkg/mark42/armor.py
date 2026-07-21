@@ -73,13 +73,19 @@ from .utils import (
 
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
-try:
-    from .smart_crusher import smartcrush
+# 通过 algo_scheduler 注册表获取压缩器, 不硬 import
 
-    _COMPRESSION_AVAILABLE = True
-except ImportError as e:
-    _COMPRESSION_AVAILABLE = False
-    _COMPRESSION_IMPORT_ERROR = str(e)
+
+def _get_smartcrusher():
+    """从注册表获取 smartcrusher，未注册返回 None。"""
+    try:
+        from .algo_scheduler import get_compressor
+
+        entry = get_compressor("smartcrush")
+        return entry.func if entry else None
+    except ImportError:
+        return None
+
 
 # 阶段 1 Day 4: 算法调度器 (2026-06-24)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
@@ -384,9 +390,7 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]], dry_run: bool
         "error": None,
     }
 
-    # 1. 双重门: module 是否可用 + 配置是否启用 + 实验模式是否开启
-    if not _COMPRESSION_AVAILABLE:
-        return stats
+    # 1. 双重门: 配置是否启用 + 实验模式是否开启
     if not ALGO_SMARTCRUSH_ENABLED:
         return stats
     if not ALGO_EXPERIMENT_MODE:
@@ -491,6 +495,12 @@ def _hook_direct_smartcrush(
     stats["enabled"] = True
     stats["mode"] = "direct"
     stats["algorithm"] = "smartcrush"
+
+    smartcrush = _get_smartcrusher()
+    if smartcrush is None:
+        stats["error"] = "smartcrusher not registered"
+        stats["ran"] = False
+        return stats
 
     try:
         for msg in session_messages:

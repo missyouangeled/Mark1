@@ -26,9 +26,7 @@
 import json
 import os
 import re
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 # Phase 2-2: MARK42_TEXT_USE_LLM 环境变量
@@ -50,20 +48,99 @@ def _should_use_llm(content: str) -> bool:
     return False  # "false" 或未知
 
 
-# 允许独立运行: python3 algo_scheduler.py
-_THIS_DIR = Path(__file__).resolve().parent
-if str(_THIS_DIR) not in sys.path:
-    sys.path.insert(0, str(_THIS_DIR))
+# ------------------------------------------------------------------
+# 压缩器注册表（解耦：压缩器自注册，scheduler 不硬 import）
+# ------------------------------------------------------------------
 
-from .code_compressor import codecrush
-from .diff_compressor import diff_compress
-from .log_deduplicator import logdedup
 from .log_setup import get_logger
 from .pii_redactor import redact_pii
-from .smart_crusher import smartcrush
-from .text_compressor import text_compress
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class CompressorEntry:
+    """注册表中的一个压缩器条目。"""
+
+    name: str  # 算法名: smartcrush | code | diff | log | text
+    func: Any  # callable(content: str) -> tuple[str, dict[str, Any]]
+
+
+_REGISTRY: dict[str, CompressorEntry] = {}
+
+
+def register_compressor(name: str, func: Any) -> None:
+    """注册一个压缩算法到调度器。
+
+    Args:
+        name: 算法名（与 ScheduleDecision.route_algo 对应）
+        func: callable(content: str) -> (compressed: str, stats: dict)
+    """
+    _REGISTRY[name] = CompressorEntry(name=name, func=func)
+    logger.debug(f"压缩器注册: {name} -> {func.__module__}.{func.__name__}")
+
+
+def get_compressor(name: str) -> CompressorEntry | None:
+    """按名称获取已注册的压缩器。未注册返回 None。"""
+    return _REGISTRY.get(name)
+
+
+def list_compressors() -> list[str]:
+    """列出所有已注册的压缩器名称。"""
+    return sorted(_REGISTRY.keys())
+
+
+# ------------------------------------------------------------------
+# 自动注册内置压缩器（延迟加载，失败不影响 scheduler 本身）
+# ------------------------------------------------------------------
+
+
+def _register_builtin_compressors() -> None:
+    """注册 Mark42 内置的 5 个压缩器 + smartcrush。
+
+    每个压缩器独立 try-import，某个缺失不影响其余。
+    """
+    if _REGISTRY:
+        return  # 已注册过
+
+    try:
+        from .smart_crusher import smartcrush
+
+        register_compressor("smartcrush", smartcrush)
+    except ImportError:
+        logger.warning("smart_crusher 不可用，跳过注册")
+
+    try:
+        from .code_compressor import codecrush
+
+        register_compressor("code", codecrush)
+    except ImportError:
+        logger.warning("code_compressor 不可用，跳过注册")
+
+    try:
+        from .diff_compressor import diff_compress
+
+        register_compressor("diff", diff_compress)
+    except ImportError:
+        logger.warning("diff_compressor 不可用，跳过注册")
+
+    try:
+        from .log_deduplicator import logdedup
+
+        register_compressor("log", logdedup)
+    except ImportError:
+        logger.warning("log_deduplicator 不可用，跳过注册")
+
+    try:
+        from .text_compressor import text_compress
+
+        register_compressor("text", text_compress)
+    except ImportError:
+        logger.warning("text_compressor 不可用，跳过注册")
+
+
+# 模块加载时自动注册
+_register_builtin_compressors()
 
 
 # ============================================================================
@@ -319,15 +396,14 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
             current = redacted
             result["changed"] = True
 
-    # 2. 压缩 (如果需要) - 按 route_algo 选择算法
+    # 2. 压缩 (如果需要) - 通过注册表获取算法
     if decision.should_compress:
-        if decision.route_algo == "code":
-            compressed, compress_stats = codecrush(current)
-        elif decision.route_algo == "diff":
-            compressed, compress_stats = diff_compress(current)
-        elif decision.route_algo == "log":
-            compressed, compress_stats = logdedup(current)
-        elif decision.route_algo == "text":
+        entry = get_compressor(decision.route_algo)
+        if entry is None:
+            result["fallback_reason"] = f"compressor '{decision.route_algo}' not registered"
+            return result
+
+        if decision.route_algo == "text":
             # Phase 2-2: env var 决定是否走 LLM
             if _should_use_llm(current):
                 from .llm_text_compressor import llm_text_compress
@@ -335,10 +411,10 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
                 compressed, compress_stats = llm_text_compress(current, mode=_LLM_MODE)
                 result["llm_used"] = True
             else:
-                compressed, compress_stats = text_compress(current)
+                compressed, compress_stats = entry.func(current)
                 result["llm_used"] = False
-        else:  # smartcrush 默认
-            compressed, compress_stats = smartcrush(current)
+        else:
+            compressed, compress_stats = entry.func(current)
         result["compress_stats"] = compress_stats
         result["route_algo"] = decision.route_algo
 
@@ -384,6 +460,6 @@ def _run_tests():
 
 
 if __name__ == "__main__":
-    import sys
+    import sys as _sys
 
-    sys.exit(0 if _run_tests() else 1)
+    _sys.exit(0 if _run_tests() else 1)
