@@ -138,7 +138,8 @@ def load_config(force_reload: bool = False) -> dict[str, Any]:
             user_config = _parse_toml(user_path.read_text(encoding="utf-8"))
             _deep_merge(config, user_config)
         except Exception:
-            pass  # 用户配置坏了就用默认值
+            import logging
+            logging.debug("用户配置解析失败，使用默认值", exc_info=True)
 
     _cache = config
     return config

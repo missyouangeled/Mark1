@@ -1,11 +1,8 @@
 """pytest tests for mark42/heavy.py"""
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import Mock, patch
-
-import pytest
 
 from mark42.heavy import (
     heavy_cleanup,
@@ -16,7 +13,6 @@ from mark42.heavy import (
     heavy_preflight,
     heavy_start,
 )
-
 
 # ── heavy_preflight tests ──
 
@@ -38,18 +34,18 @@ def test_heavy_preflight_with_valid_path(tmp_path, caplog):
     with patch("mark42.heavy.armor_check") as mock_check, \
          patch("mark42.heavy.os.popen") as mock_popen:
         mock_check.return_value = {"usagePercent": 50}
-        
+
         mock_mem = Mock()
         mock_mem.read.return_value.strip.return_value = "16GB"
-        
+
         mock_df = Mock()
         mock_df.read.return_value.strip.return_value = "100G/500G"
-        
+
         mock_popen.return_value = mock_mem
         mock_popen.side_effect = [mock_mem, mock_df]
-        
+
         heavy_preflight(str(tmp_path))
-        
+
         messages = [record.message for record in caplog.records]
         assert any("文件数" in msg for msg in messages) or any("总大小" in msg for msg in messages) or any("上下文余量" in msg for msg in messages)
 
@@ -131,10 +127,10 @@ def test_heavy_start_nonexistent_path(tmp_path, monkeypatch, caplog):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     with patch("mark42.heavy.armor_check") as mock_check:
         mock_check.return_value = {"usagePercent": 50}
         heavy_start("/nonexistent/path", "test-task")
@@ -147,31 +143,31 @@ def test_heavy_start_creates_state_files(tmp_path, monkeypatch):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     test_project = tmp_path / "project"
     test_project.mkdir()
     for i in range(10):
         (test_project / f"file_{i}.py").write_text(f"content {i}")
-    
+
     with patch("mark42.heavy.armor_check") as mock_check, \
-         patch("mark42.heavy._append_broker") as mock_broker:
+         patch("mark42.heavy._append_broker"):
         mock_check.return_value = {"usagePercent": 50}
         heavy_start(str(test_project), "test-task")
-        
+
         # Check task dir created
         task_dir = fake_scratch / "test-task"
         assert task_dir.exists()
-        
+
         # Check status.json
         status_file = task_dir / "status.json"
         assert status_file.exists()
         status = json.loads(status_file.read_text())
         assert status["taskName"] == "test-task"
         assert status["progress"] == "started"
-        
+
         # Check heavy state file
         heavy_state_file = fake_heavy / "test-task.json"
         assert heavy_state_file.exists()
@@ -189,10 +185,10 @@ def test_heavy_finish_nonexistent_task(tmp_path, monkeypatch, caplog):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     heavy_finish("nonexistent-task")
     assert any("不存在" in record.message for record in caplog.records)
 
@@ -203,14 +199,14 @@ def test_heavy_finish_successful(tmp_path, monkeypatch):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     # Setup task state
     task_dir = fake_scratch / "test-task"
     task_dir.mkdir()
-    
+
     # Create status.json with all subtasks done
     status = {
         "taskName": "test-task",
@@ -221,22 +217,22 @@ def test_heavy_finish_successful(tmp_path, monkeypatch):
         }
     }
     (task_dir / "status.json").write_text(json.dumps(status))
-    
+
     # Create heavy state file
     heavy_state = {
         "taskName": "test-task",
         "status": "started",
     }
     (fake_heavy / "test-task.json").write_text(json.dumps(heavy_state))
-    
+
     with patch("mark42.heavy._append_broker"):
         heavy_finish("test-task")
-        
+
         # Verify heavy state updated
         heavy_state = json.loads((fake_heavy / "test-task.json").read_text())
         assert heavy_state["status"] == "finished"
         assert "finishedAt" in heavy_state
-        
+
         # Verify task status updated
         task_status = json.loads((task_dir / "status.json").read_text())
         assert task_status["progress"] == "finished"
@@ -249,9 +245,9 @@ def test_heavy_execute_nonexistent_task(tmp_path, monkeypatch, caplog):
     """Test heavy_execute with non-existent task."""
     fake_scratch = tmp_path / "scratch"
     fake_scratch.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
-    
+
     result = heavy_execute("nonexistent-task")
     assert any("未开工" in record.message for record in caplog.records)
     assert result is None
@@ -261,13 +257,13 @@ def test_heavy_execute_creates_script(tmp_path, monkeypatch):
     """Test heavy_execute creates execution script (dry run mode)."""
     fake_scratch = tmp_path / "scratch"
     fake_scratch.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
-    
+
     # Setup task state
     task_dir = fake_scratch / "test-task"
     task_dir.mkdir()
-    
+
     # Create status.json with pending batch
     status = {
         "taskName": "test-task",
@@ -278,22 +274,22 @@ def test_heavy_execute_creates_script(tmp_path, monkeypatch):
         }
     }
     (task_dir / "status.json").write_text(json.dumps(status))
-    
+
     with patch("mark42.heavy._append_broker"):
         result = heavy_execute("test-task")
-        
+
         # Verify result
         assert result is not None
         assert result["queued"] is True
         assert result["dryRun"] is True
-        
+
         # Verify script created
         script_path = Path(result["script"])
         assert script_path.exists()
         script_content = script_path.read_text()
         assert "#!/bin/bash" in script_content
         assert "processing" in script_content
-        
+
         # Verify queue file created
         queue_file = task_dir / "execute-queue.jsonl"
         assert queue_file.exists()
@@ -303,15 +299,15 @@ def test_heavy_execute_with_command(tmp_path, monkeypatch):
     """Test heavy_execute with custom command."""
     fake_scratch = tmp_path / "scratch"
     fake_scratch.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
-    
+
     task_dir = fake_scratch / "test-task"
     task_dir.mkdir()
-    
+
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    
+
     status = {
         "taskName": "test-task",
         "targetPath": str(project_dir),
@@ -320,10 +316,10 @@ def test_heavy_execute_with_command(tmp_path, monkeypatch):
         }
     }
     (task_dir / "status.json").write_text(json.dumps(status))
-    
+
     with patch("mark42.heavy._append_broker"):
         result = heavy_execute("test-task", command="cat {f}")
-        
+
         script_content = Path(result["script"]).read_text()
         assert "cat " in script_content or "cat" in script_content
 
@@ -337,10 +333,10 @@ def test_heavy_cleanup_nonexistent_task(tmp_path, monkeypatch, caplog):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     heavy_cleanup("nonexistent-task")
     assert any("不存在" in record.message for record in caplog.records)
 
@@ -351,18 +347,18 @@ def test_heavy_cleanup_removes_files(tmp_path, monkeypatch):
     fake_heavy = tmp_path / "heavy"
     fake_scratch.mkdir()
     fake_heavy.mkdir()
-    
+
     monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
     monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
-    
+
     # Create task files
     task_dir = fake_scratch / "test-task"
     task_dir.mkdir()
     (task_dir / "status.json").write_text("{}")
     (fake_heavy / "test-task.json").write_text("{}")
-    
+
     heavy_cleanup("test-task")
-    
+
     # Verify both removed
     assert not task_dir.exists()
     assert not (fake_heavy / "test-task.json").exists()
@@ -380,7 +376,7 @@ def test_heavy_detect_human_nonexistent(tmp_path, caplog):
 def test_heavy_detect_human_small_project(tmp_path, caplog):
     """Test heavy_detect_human with small project (not heavy)."""
     (tmp_path / "test.py").write_text("print('hi')")
-    
+
     with patch("mark42.heavy.armor_check") as mock_check:
         mock_check.return_value = {"usagePercent": 50}
         heavy_detect_human(str(tmp_path))

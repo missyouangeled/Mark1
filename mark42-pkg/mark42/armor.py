@@ -327,12 +327,12 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
                 "response_format": {"type": "json_object"},
             }
         ).encode()
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310
             f"{base_url}{endpoint}",
             data=body,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         )
-        resp = urllib.request.urlopen(req, timeout=timeout)
+        resp = urllib.request.urlopen(req, timeout=timeout)  # noqa: S310
         data = json.loads(resp.read())
         content = data["choices"][0]["message"]["content"]
         content = content.strip()
@@ -633,6 +633,21 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
     # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
     # _save_json 后修改 dict 不会回写到已写入的文件）。
+    # 执行实际压缩
+    _compress_execute(dry_run, usage, index, index_path, history_dir)
+
+    # 审计记录
+    _compress_audit(dry_run, check, usage, index, actions_log, index_path)
+
+    # 连续无效检测
+    _compress_ineffective_check(actions_log, index, history_dir, usage)
+
+    return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
+
+
+
+def _compress_execute(dry_run, usage, index, index_path, history_dir):
+    """执行实际 compact 并更新索引/历史。"""
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
             active_session = _find_active_session()
@@ -766,6 +781,10 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # - "skipped-dry-run": dry_run 模式, 没真压缩, 字段为 null 是预期
     # - "not-attempted": 上下文 < THRESHOLD_WARN, 未尝试 compact
     # - "error": compact 报错 (没产生 postBytes)
+
+
+def _compress_audit(dry_run, check, usage, index, actions_log, index_path):
+    """构建并写入 action_entry 到 actions.jsonl。"""
     if dry_run:
         bytes_status = "skipped-dry-run"
     elif index.get("preCompactBytes") is not None and index.get("postCompactBytes") is not None:
@@ -795,8 +814,11 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 读 actions.jsonl 最近 5 条, 如果全部 compressionEffective=False 且本次也是 False,
     # 说明 sessions.compact 调用一直不能压下 session, 可能是配置文件不一致、LLM 失败、
     # 或上下文估计偏差。则发升级事件到 broker, 提醒人工干预。
+
+
+def _compress_ineffective_check(actions_log, index, history_dir, usage):
+    """P0 补充: 连续压缩无效升级报。"""
     try:
-        recent_ineffective = 0
         if actions_log.exists():
             with open(actions_log) as f:
                 recent_lines = f.readlines()[-10:]  # 最近 10 条
@@ -809,6 +831,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         # 精确方式要查 history/*，但简单点：只看本次
                         pass
                 except Exception:
+                    logger.debug("跳过无法解析的 actions 日志行", exc_info=True)
                     continue
         # 本次判断: index 里是否有 compressionEffective=False 且已生成
         if index.get("compressionEffective") is False:
@@ -824,6 +847,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         if h["compressionEffective"] is False:
                             ineffective_count += 1
                 except Exception:
+                    logger.debug(f"跳过无法解析的 history 文件: {hf}", exc_info=True)
                     continue
             if total_count >= 3 and ineffective_count == total_count:
                 # 连续 ≥3 次压缩全部无效, 升级 broker
@@ -840,7 +864,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         # 升级逻辑本身的错误不能影响主流程
         logger.info(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
 
-    return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
+
 
 
 def _send_context_warn_event(usage: float) -> bool:

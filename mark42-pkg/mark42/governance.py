@@ -192,13 +192,13 @@ class ChaosTester:
                 try:
                     results.append(json.loads(line.strip()))
                 except Exception:
+                    logger.debug("跳过无法解析的 broker 日志行", exc_info=True)
                     continue
         return results[-limit:]
 
 
 # ══════════════════════════════════════════════════════
 # §3.7 模块级协议
-# ══════════════════════════════════════════════════════
 
 
 @dataclass
@@ -293,7 +293,7 @@ class ModuleHealthMonitor:
                 # registered = 活跃（daemon 在周期性执行）
                 # running = 执行中（瞬态）
                 # killed / completed = 不活跃
-                active = sum(1 for l in loops.values() if l.get("status") in ("registered", "running"))
+                active = sum(1 for _l in loops.values() if _l.get("status") in ("registered", "running"))
                 total = len(loops)
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
                 health.traffic_per_min = active
@@ -344,7 +344,7 @@ class ModuleHealthMonitor:
                 from .error_archive import ErrorArchive
 
                 ea = ErrorArchive()
-                entries = ea.list_entries()
+                ea.list_entries()
                 health.status = "green"
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
 

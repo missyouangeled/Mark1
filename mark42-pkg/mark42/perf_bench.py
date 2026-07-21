@@ -126,7 +126,7 @@ def bench_sync_algo(algo_fn: Callable[[str], tuple[Any, dict]], samples: list[st
         t0 = time.perf_counter()
         out, stats = algo_fn(sample)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        peak = _measure_peak_kb(lambda: algo_fn(sample))
+        peak = _measure_peak_kb(lambda s=sample: algo_fn(s))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)
@@ -164,7 +164,7 @@ def bench_scheduler(samples: list[str]) -> BenchResult:
         t0 = time.perf_counter()
         result = scheduler_process(sample)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        peak = _measure_peak_kb(lambda: scheduler_process(sample))
+        peak = _measure_peak_kb(lambda s=sample: scheduler_process(s))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)
@@ -217,7 +217,7 @@ def bench_async_queue(samples: list[str]) -> BenchResult:
                 logger.info(f"  [{idx + 1}/{len(samples)}] done ({elapsed_ms:.0f}ms)")
             else:
                 logger.error(f"  [{idx + 1}/{len(samples)}] TIMEOUT")
-            peak = _measure_peak_kb(lambda: _queue_roundtrip(q, sample, f"bench-mem-{idx}"))
+            peak = _measure_peak_kb(lambda s=sample, i=idx: _queue_roundtrip(q, s, f"bench-mem-{i}"))
 
             if not done:
                 raise TimeoutError("queue wait timed out")
@@ -264,7 +264,7 @@ def bench_async_entry(samples: list[str]) -> BenchResult:
         elapsed_ms = (time.perf_counter() - t0) * 1000
         _flush()
         logger.info(f"  [{idx + 1}/{len(samples)}] async_entry done ({elapsed_ms:.0f}ms)")
-        peak = _measure_peak_kb(lambda: llm_text_compress_async(sample, timeout=30.0))
+        peak = _measure_peak_kb(lambda s=sample: llm_text_compress_async(s, timeout=30.0))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)

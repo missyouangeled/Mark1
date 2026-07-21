@@ -5,6 +5,28 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.5.1] - 2026-07-21
+
+### 新增
+- 🧪 新增 2 个测试模块：test_cli.py（18 条）、test_consciousness.py（62 条）
+- 🔧 补回 `.github/workflows/ci.yml`（多版本 Python 测试 + lint + pip-audit + 密钥扫描）
+- 🔧 补回 `.github/workflows/release.yml`（tag 触发 -> 测试 -> build -> GitHub Release）
+- 📦 新增 `.dockerignore`
+
+### 修复
+- 🔧 ruff lint 清零：318 -> 0（F405/F403 per-file-ignores + B007/E741/S103 手动修复 + unsafe-fixes 清理 F841）
+- 🐛 修复 test_pii_redactor.py 缺失 `import json`（star import 不会带入）
+- 🐛 修复 test_llm_text_compressor.py 的 `_clean_llm_output` 未导入 + 相对导入 + `logger.info()` 空调用
+- 🐛 修复 test_consciousness.py 的 `SelfCheckResult` 字段名错误 + `CertaintyAssessment.is_certain` 不存在
+- 🐛 修复 test_cli.py 的 S110 except-pass noqa 标注位置
+
+### 变更
+- 🔄 测试目录统一：合并 `mark42/tests/` 到 `tests/`（消除两套测试并行的问题）
+- 🔄 `mark42/tests/` 10 个文件迁移至 `tests/`，删除重复的 test_smart_crusher.py（保留更全面的旧版）
+- 🔄 原模块 `_run_tests()` 的 import 路径从 `mark42.tests.` 改为 `tests.`
+- 🔄 清理残留文件：cli.py.bak、scripts/refactor_*.py（8 个）、dist/、egg-info/、.ruff_cache/
+- 🔄 删除过时文档 docs/refactor-cli-plan.md（CLI 重构已完成）
+
 ## [2.5.0] - 2026-07-20
 
 ### 新增

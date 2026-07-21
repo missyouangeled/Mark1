@@ -34,7 +34,8 @@ def _log(msg: str, logfile: str | Path) -> None:
         with open(logfile, "a", encoding="utf-8") as f:
             f.write(line)
     except Exception:
-        pass  # 日志写入失败不影响主流程
+        import logging
+        logging.debug("watchdog 日志写入失败", exc_info=True)  # 日志写入失败不影响主流程
 
 
 def _check_heartbeat(heartbeat_path: Path, warn_threshold: int = 300) -> tuple[bool, str]:

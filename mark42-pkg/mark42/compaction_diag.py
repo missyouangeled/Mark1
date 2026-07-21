@@ -159,7 +159,7 @@ def _get_context_window() -> int:
                         if isinstance(m, dict) and m.get("contextWindow"):
                             return m["contextWindow"]
                 elif isinstance(mods, dict):
-                    for mname, mcfg in mods.items():
+                    for _mname, mcfg in mods.items():
                         if isinstance(mcfg, dict) and mcfg.get("contextWindow"):
                             return mcfg["contextWindow"]
     return DEFAULT_CONTEXT_WINDOW

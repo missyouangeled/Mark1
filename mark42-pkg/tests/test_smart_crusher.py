@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from mark42.smart_crusher import SmartCrusher, get_smartcrusher, smartcrush
 
 
@@ -469,3 +467,11 @@ class TestIntegrationScenarios:
         assert stats["strings_truncated"] >= 1  # description 截断
         assert stats["numeric_arrays_compressed"] >= 1  # timestamps/scores 压缩
         assert stats["ratio"] > 0.0
+
+
+def run_tests():
+    """兼容 mark42.smart_crusher._run_tests() 的薄入口。"""
+    import pytest
+    # 直接调 pytest 跑自身
+    result = pytest.main([__file__, "-q", "--tb=short"])
+    return result == 0

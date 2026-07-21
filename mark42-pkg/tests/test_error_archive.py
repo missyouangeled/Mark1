@@ -1,11 +1,9 @@
 """pytest tests for mark42/error_archive.py"""
 
-import json
 import pytest
-from pathlib import Path
 
 from mark42 import error_archive
-from mark42.error_archive import ErrorArchive, STATUS_NEW, STATUS_RESOLVED, STATUS_AUTO_APPROVED, STATUS_REJECTED
+from mark42.error_archive import STATUS_AUTO_APPROVED, STATUS_NEW, STATUS_REJECTED, STATUS_RESOLVED, ErrorArchive
 
 
 @pytest.fixture

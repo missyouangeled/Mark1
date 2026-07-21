@@ -9,25 +9,20 @@
 - log_rotate("all")
 - log_rotate_status()
 """
-import json
 import os
 import time
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
 from mark42 import logs as logs_mod
 from mark42.logs import (
+    _age_days,
     _load_state,
     _save_state,
-    _age_days,
-    rotate_history_files,
-    rotate_actions_log,
     log_rotate,
-    LOG_ROTATION_STATE,
+    rotate_actions_log,
+    rotate_history_files,
 )
-from mark42.config import ARMOR_STATE
 
 
 @pytest.fixture(autouse=True)
@@ -143,7 +138,7 @@ class TestRotateHistoryFiles:
 
         monkeypatch.setattr(logs_mod, "ARMOR_STATE", tmp_path / "armor")
 
-        result = rotate_history_files()
+        _result = rotate_history_files()
         remaining = list(history_dir.glob("memory-index-*.json"))
         assert len(remaining) == 3
 

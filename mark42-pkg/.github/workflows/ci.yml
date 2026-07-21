@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint
+        run: ruff check mark42/ tests/
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          pytest tests/ -q --tb=short
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --strict
+
+      - name: Check for hardcoded secrets
+        run: |
+          if grep -rnE '(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' mark42/ --include='*.py'; then
+            echo "Hardcoded secret detected!"
+            exit 1
+          fi

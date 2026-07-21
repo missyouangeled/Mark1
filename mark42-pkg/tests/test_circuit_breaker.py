@@ -1,8 +1,7 @@
 """pytest tests for mark42/circuit_breaker.py"""
 
-import pytest
 
-from mark42.circuit_breaker import CircuitBreaker, BreakerState
+from mark42.circuit_breaker import BreakerState, CircuitBreaker
 
 
 class TestBreakerState:

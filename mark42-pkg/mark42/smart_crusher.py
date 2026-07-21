@@ -141,64 +141,10 @@ def smartcrush(content: str) -> tuple[str, dict]:
 
 
 def _run_tests():
-    logger.info("=" * 60)
-    logger.info("SmartCrusher 单元测试")
-    logger.info("=" * 60)
+    """运行测试（已提取到 tests/test_smart_crusher.py）。"""
+    from tests.test_smart_crusher import run_tests
+    return run_tests()
 
-    crusher = SmartCrusher(max_array_len=5, max_string_len=200, max_depth=3)
-
-    test1_input = json.dumps(
-        {"users": [{"id": i, "name": f"user_{i}", "bio": "x" * 500} for i in range(100)]}, ensure_ascii=False
-    )
-    test1_output, test1_stats = crusher.crush(test1_input)
-    logger.info("\n[测试 1] 100 个用户对象数组 (每条 500 字符 bio)")
-    logger.info(f"  原始: {test1_stats['original_bytes']} bytes")
-    logger.info(f"  压缩: {test1_stats['crushed_bytes']} bytes")
-    logger.info(f"  压缩率: {test1_stats['ratio'] * 100:.1f}%")
-    logger.info(f"  数组截断: {test1_stats['arrays_truncated']}")
-    logger.info(f"  字符串截断: {test1_stats['strings_truncated']}")
-    assert test1_stats["arrays_truncated"] >= 1
-    assert test1_stats["strings_truncated"] >= 1
-    assert test1_stats["ratio"] > 0.7
-    logger.info("  ✓ 通过 (数组先被截断, 只前 5 个 bio 被截断)")
-
-    nested = {"a": {"b": {"c": {"d": {"e": {"f": "deep value"}}}}}}
-    test2_output, test2_stats = crusher.crush(json.dumps(nested))
-    logger.info("\n[测试 2] 深度嵌套对象 (depth 6)")
-    logger.info(f"  深度截断: {test2_stats['depth_truncated']}")
-    assert test2_stats["depth_truncated"] >= 1
-    assert "truncated" in test2_output
-    logger.info("  ✓ 通过")
-
-    test3_input = json.dumps({"timestamps": list(range(1000)), "values": [i * 1.5 for i in range(1000)]})
-    test3_output, test3_stats = crusher.crush(test3_input)
-    logger.info("\n[测试 3] 1000 元素数值数组")
-    logger.info(f"  数值数组压缩: {test3_stats['numeric_arrays_compressed']}")
-    assert test3_stats["numeric_arrays_compressed"] == 2
-    assert "numeric array" in test3_output
-    logger.info("  ✓ 通过")
-
-    test4_output, test4_stats = crusher.crush("\n".join(f"line {i}" for i in range(100)))
-    logger.info("\n[测试 4] 100 行纯文本")
-    logger.info(f"  mode: {test4_stats.get('mode')}")
-    assert test4_stats.get("mode") == "mixed_lines"
-    assert "more lines" in test4_output
-    logger.info("  ✓ 通过")
-
-    test5_output, test5_stats = crusher.crush("")
-    logger.info("\n[测试 5] 空内容")
-    assert test5_output == ""
-    assert test5_stats["ratio"] == 0.0
-    logger.info("  ✓ 通过")
-
-    test6_output, test6_stats = crusher.crush('{"a": 1, "b": 2}')
-    logger.info("\n[测试 6] 小 JSON (无压缩需求)")
-    logger.info(f"  压缩率: {test6_stats['ratio'] * 100:.1f}% (可能为 0 或负)")
-    logger.info("  ✓ 通过 (小内容不需压缩)")
-
-    logger.info("\n" + "=" * 60)
-    logger.info("所有测试通过 ✓")
-    logger.info("=" * 60)
 
 
 if __name__ == "__main__":

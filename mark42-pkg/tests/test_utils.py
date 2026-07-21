@@ -1,17 +1,13 @@
 """Test utils.py 工具函数。"""
 
 import json
-import os
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from mark42.utils import (
     _DENSITY,
     _estimate_tokens_smart,
-    _get_context_window,
     _list_project_files,
     _load_json,
-    _lookup_context_window,
     _now_iso,
     _now_ts,
     _safe_mtime,

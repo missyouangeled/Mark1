@@ -441,7 +441,7 @@ def _get_context_window() -> int:
 
     # 策略 2: 遍历 openclaw.json 所有 provider/models，取第一个有 contextWindow 的
     try:
-        for pkey, pcfg in oc.get("models", {}).get("providers", {}).items():
+        for _pkey, pcfg in oc.get("models", {}).get("providers", {}).items():
             for m in pcfg.get("models", []):
                 cw = m.get("contextWindow")
                 if isinstance(cw, int) and cw > 0:

@@ -8,13 +8,10 @@
 """
 import json
 import subprocess
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
 from mark42 import context_safety as cs
-
 
 # ── 工具函数测试 ───────────────────────────────────────────
 

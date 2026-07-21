@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mark42"
-version = "2.5.0"
+version = "2.5.1"
 description = "Mark42 模块化智能铠甲系统 - OpenClaw 上下文守护与循环引擎"
 readme = "README.md"
 license = {text = "MIT"}
@@ -63,7 +63,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "B", "UP"]
+"tests/*" = ["S", "B", "UP", "F403", "F405", "E712"]
 
 [tool.ruff.format]
 quote-style = "double"

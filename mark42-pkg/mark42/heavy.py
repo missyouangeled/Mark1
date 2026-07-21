@@ -5,6 +5,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,11 +39,24 @@ def heavy_preflight(path_str: str) -> None:
         logger.info("   💡 偏紧 — 建议后台执行")
     else:
         logger.info("   ✅ 充足 — 可前台启动")
-    mem = os.popen("free -h | grep Mem | awk '{print $2}'").read().strip()
+    mem = subprocess.run(["free", "-h"], capture_output=True, text=True).stdout
+    for line in mem.splitlines():
+        if line.startswith("Mem"):
+            parts = line.split()
+            mem = parts[1] if len(parts) > 1 else "?"
+            break
     logger.info(f"🖥️ 内存: {mem}")
     for mp in ["/"]:
         # 如有数据盘可在此添加
-        out = os.popen(f"df -h {mp} | tail -1 | awk '{{print $4\"/\"$2}}'").read().strip()
+        df = subprocess.run(["df", "-h", mp], capture_output=True, text=True).stdout.splitlines()
+        if len(df) >= 2:
+            parts = df[-1].split()
+            if len(parts) >= 3:
+                out = f"{parts[2]}/{parts[1]}"
+            else:
+                out = ""
+        else:
+            out = ""
         logger.info(f"💽 {mp}: 剩余 {out}" if out else "")
 
 
@@ -393,59 +407,10 @@ def heavy_execute(
     st["lastUpdate"] = _now_iso()
     _save_json(status_file, st)
     # 生成执行脚本
-    import shlex as _shlex
-
-    script_path = task_dir / f"{target_id}-exec.sh"
-    target_full = target_path if target_path.is_absolute() else SCRATCH.parent / target_path
-    script_lines = [
-        "#!/bin/bash",
-        "set -e",
-        f"echo '🚀 {target_id}: {len(files)} files'",
-        f"cd {_shlex.quote(str(target_full))}",
-    ]
-    for f in files:
-        safe_path = _shlex.quote(str(target_full / f))
-        script_lines.append(f"echo '  processing: {f}'")
-        if command:
-            # 用户提供的命令，{f} 会被替换为实际文件路径
-            script_lines.append(command.replace("{f}", safe_path))
-        else:
-            # 默认仅 echo 列出文件，不真做任何修改
-            script_lines.append(f"echo '  [no-op] would process: {f}'")
-    script_lines.append(f"echo '✅ {target_id} done'")
-    with open(script_path, "w") as sf:
-        sf.write("\n".join(script_lines) + "\n")
-    os.chmod(script_path, 0o755)
-    # 写入执行队列文件（供 daemon/subagent 消费）
-    queue_file = task_dir / "execute-queue.jsonl"
-    exec_cmd = {
-        "batchId": target_id,
-        "taskName": task_name,
-        "script": str(script_path),
-        "files": files,
-        "targetPath": str(target_full),
-        "command": command,
-        "timestamp": _now_iso(),
-        "dryRun": not execute_now,
-    }
-    with open(queue_file, "a") as qf:
-        qf.write(json.dumps(exec_cmd, ensure_ascii=False) + "\n")
-    _append_broker(
-        "tasks",
-        "heavy.batch.queued",
-        f"批次入队: {target_id}",
-        "ok",
-        f"{task_name}: {target_id} 已加入执行队列 (dry_run={not execute_now})",
-        {"taskName": task_name, "batchId": target_id, "fileCount": len(files), "dryRun": not execute_now},
+    script_path, queue_file, exec_cmd, result = _heavy_build_script(
+        task_dir, target_id, batch, target_path, task_name, files, command, execute_now
     )
-    result: dict[str, Any] = {
-        "action": "queued",
-        "batchId": target_id,
-        "script": str(script_path),
-        "queued": True,
-        "dryRun": not execute_now,
-        "startedPid": None,
-    }
+
     if execute_now:
         # 【真执行】仅在显式传 execute_now=True 才启动后台进程
         import subprocess
@@ -523,3 +488,62 @@ def heavy_cleanup(task_name: str) -> None:
     if heavy_status.exists():
         heavy_status.unlink()
     logger.info(f"🧹 已清理: {task_name}")
+
+
+def _heavy_build_script(task_dir, target_id, batch, target_path, task_name, files, command, execute_now):
+    """构建执行脚本和队列文件，返回 (script_path, queue_file, exec_cmd, result)。"""
+    import shlex as _shlex
+
+    script_path = task_dir / f"{target_id}-exec.sh"
+    target_full = target_path if target_path.is_absolute() else SCRATCH.parent / target_path
+    script_lines = [
+        "#!/bin/bash",
+        "set -e",
+        f"echo '🚀 {target_id}: {len(files)} files'",
+        f"cd {_shlex.quote(str(target_full))}",
+    ]
+    for f in files:
+        safe_path = _shlex.quote(str(target_full / f))
+        script_lines.append(f"echo '  processing: {f}'")
+        if command:
+            # 用户提供的命令，{f} 会被替换为实际文件路径
+            script_lines.append(command.replace("{f}", safe_path))
+        else:
+            # 默认仅 echo 列出文件，不真做任何修改
+            script_lines.append(f"echo '  [no-op] would process: {f}'")
+    script_lines.append(f"echo '✅ {target_id} done'")
+    with open(script_path, "w") as sf:
+        sf.write("\n".join(script_lines) + "\n")
+    os.chmod(script_path, 0o755)  # noqa: S103
+    # 写入执行队列文件（供 daemon/subagent 消费）
+    queue_file = task_dir / "execute-queue.jsonl"
+    exec_cmd = {
+        "batchId": target_id,
+        "taskName": task_name,
+        "script": str(script_path),
+        "files": files,
+        "targetPath": str(target_full),
+        "command": command,
+        "timestamp": _now_iso(),
+        "dryRun": not execute_now,
+    }
+    with open(queue_file, "a") as qf:
+        qf.write(json.dumps(exec_cmd, ensure_ascii=False) + "\n")
+    _append_broker(
+        "tasks",
+        "heavy.batch.queued",
+        f"批次入队: {target_id}",
+        "ok",
+        f"{task_name}: {target_id} 已加入执行队列 (dry_run={not execute_now})",
+        {"taskName": task_name, "batchId": target_id, "fileCount": len(files), "dryRun": not execute_now},
+    )
+    result: dict[str, Any] = {
+        "action": "queued",
+        "batchId": target_id,
+        "script": str(script_path),
+        "queued": True,
+        "dryRun": not execute_now,
+        "startedPid": None,
+    }
+    return script_path, queue_file, exec_cmd, result
+

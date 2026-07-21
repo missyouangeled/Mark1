@@ -7,10 +7,6 @@
 - engine_list() 列表
 - Loop 状态转换
 """
-import json
-import os
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -18,10 +14,9 @@ from mark42 import engine
 from mark42.engine import (
     _load_loops,
     _save_loops,
-    engine_start,
     engine_kill,
+    engine_start,
 )
-from mark42.config import ENGINE_STATE
 
 
 @pytest.fixture(autouse=True)

@@ -9,21 +9,17 @@
 - _send_context_warn_event() 预警发送
 """
 import json
-import os
-import tempfile
-from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from mark42.armor import (
-    _find_openclaw,
     _classify_messages,
+    _find_openclaw,
     _read_session_tail,
     armor_check,
     armor_compress,
 )
-
 
 # ── _find_openclaw ────────────────────────────────────────
 

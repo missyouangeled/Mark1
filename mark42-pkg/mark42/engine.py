@@ -253,19 +253,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     task = loop["task"]
     logger.info(f"▶️ 执行 Loop '{name}': {task}")
     if template_name == "context-guard":
-        check = armor_check()
-        usage = check.get("usagePercent", 0)
-        logger.info(f"   🔍 Observe: 上下文 {usage}%")
-        if usage >= THRESHOLD_ALERT:
-            logger.info(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，触发压缩")
-            result = armor_compress()
-            verify = armor_check()
-            new_usage = verify.get("usagePercent", 0)
-            logger.info(f"   ✅ Verify: {usage}% → {new_usage}%")
-            loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
-        else:
-            logger.info("   ✅ Decide: 未达阈值，继续监控")
-            loop["lastResult"] = {"action": "monitor", "usage": usage}
+        _run_context_guard_loop(loop, loops)
     elif template_name == "task-watch":
         heavy_tasks = list(HEAVY_STATE.glob("*.json"))
         active_tasks = []
@@ -576,7 +564,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                             },
                         )
                 except Exception:
-                    pass  # 守护模式下静默失败
+                    logger.debug("守护模式状态检查失败", exc_info=True)  # 守护模式下静默失败
             # ── 写入心跳文件 ──
             heartbeat_file = ENGINE_STATE / "daemon-heartbeat.json"
             _save_json(heartbeat_file, {"lastTick": _now_iso(), "cycle": rotation_check_count, "loops": len(loops)})
@@ -589,3 +577,21 @@ def engine_daemon(interval_s: int = 30) -> None:
     except KeyboardInterrupt:
         _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
         logger.info("\n🔄 守护模式已退出")
+
+
+def _run_context_guard_loop(loop, loops):
+    """执行 context-guard 模板的 Loop。"""
+    check = armor_check()
+    usage = check.get("usagePercent", 0)
+    logger.info(f"   🔍 Observe: 上下文 {usage}%")
+    if usage >= THRESHOLD_ALERT:
+        logger.info(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，触发压缩")
+        armor_compress()
+        verify = armor_check()
+        new_usage = verify.get("usagePercent", 0)
+        logger.info(f"   ✅ Verify: {usage}% → {new_usage}%")
+        loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
+    else:
+        logger.info("   ✅ Decide: 未达阈值，继续监控")
+        loop["lastResult"] = {"action": "monitor", "usage": usage}
+

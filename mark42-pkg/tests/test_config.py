@@ -8,28 +8,22 @@
 - _conf_load_json / _conf_save_json
 - mark42_init() 初始化
 """
-import json
 import os
-import tempfile
 from pathlib import Path
-from unittest import mock
-
-import pytest
 
 from mark42 import config as cfg
 from mark42.config import (
+    MARK42_STATE,
+    THRESHOLD_ALERT,
+    THRESHOLD_CRIT,
+    THRESHOLD_WARN,
+    WORKSPACE,
+    XDG_STATE,
     _conf_load_json,
     _conf_save_json,
     get_model_config,
     resolve_model,
-    THRESHOLD_WARN,
-    THRESHOLD_ALERT,
-    THRESHOLD_CRIT,
-    WORKSPACE,
-    XDG_STATE,
-    MARK42_STATE,
 )
-
 
 # ── 路径常量 ──────────────────────────────────────────────
 

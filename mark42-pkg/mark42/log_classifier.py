@@ -242,6 +242,7 @@ def cli_classify_recent(limit: int = 20) -> list[dict[str, Any]]:
         try:
             events.append(json.loads(line.strip()))
         except Exception:
+            logger.debug("跳过无法解析的日志事件行", exc_info=True)
             continue
 
     clf = LogClassifier()

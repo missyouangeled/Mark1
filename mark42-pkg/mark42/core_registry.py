@@ -137,7 +137,7 @@ class CoreEntry:
 def _probe_http(url: str, timeout: int = 3) -> bool:
     """HTTP 探活。"""
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
+        with urllib.request.urlopen(url, timeout=timeout) as r:  # noqa: S310
             return r.status == 200
     except Exception:
         return False
@@ -162,7 +162,6 @@ def probe_core(core_id: str) -> dict[str, Any]:
 
     rt = core["runtime"]
     url = core["base_url"]
-    crit = core["criticality"]
 
     # 未加载的核心
     if rt == "none" or core["model_name"] == "not_loaded":

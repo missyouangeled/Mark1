@@ -554,7 +554,7 @@ class Consciousness:
             }
 
         # 跑 auto_remediate（dry-run 默认）
-        assessment = self.assess_certainty(issue)
+        self.assess_certainty(issue)
         return {
             "archive_id": entry.id,
             "auto_approved": True,
@@ -719,7 +719,7 @@ class Consciousness:
                         "verified_at": record["verified_at"],
                     }
             except Exception:
-                pass  # 记录坏了就重考
+                logger.debug("验证记录解析失败，重考", exc_info=True)  # 记录坏了就重考
 
         # 加载题池
         questions_file = state_dir / "questions.yaml"

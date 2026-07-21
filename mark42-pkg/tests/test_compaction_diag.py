@@ -8,12 +8,8 @@
 """
 import json
 from pathlib import Path
-from unittest import mock
-
-import pytest
 
 from mark42 import compaction_diag as cd
-
 
 # ── 工具函数测试 ───────────────────────────────────────────
 
@@ -127,7 +123,7 @@ class TestCompactionDiagnose:
 
         monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
         # mock Path.home() 来避免检查真实的 session 目录
-        original_home = Path.home
+        _original_home = Path.home
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         # 确保 sessions 目录不存在
         sessions_dir = tmp_path / ".openclaw" / "agents" / "main" / "sessions"
@@ -371,7 +367,7 @@ class TestCompactionApply:
 
         monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
 
-        result = cd.compaction_apply(auto_confirm=True)
+        cd.compaction_apply(auto_confirm=True)
 
         # 检查 memoryFlush 已添加
         with open(config_path) as f:

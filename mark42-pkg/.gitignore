@@ -35,3 +35,7 @@ Thumbs.db
 # Mark42 runtime state
 *.lock
 *.tmp
+
+# 运行时产物（不应进入仓库）
+~/.local/
+.mark42-runtime/

@@ -498,7 +498,7 @@ def _cli() -> int:
     p_reject.add_argument("entry_id", help="条目 ID")
     p_reject.add_argument("--notes", default="", help="拒绝原因")
 
-    p_stats = sub.add_parser("stats", help="统计概览")
+    _p_stats = sub.add_parser("stats", help="统计概览")
 
     args = p.parse_args()
     arc = ErrorArchive()
