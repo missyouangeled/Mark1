@@ -38,6 +38,7 @@ def isolated_engine_state(tmp_path, monkeypatch):
 
 # ── _load_loops / _save_loops ─────────────────────────────
 
+
 class TestLoadSaveLoops:
     def test_load_empty_returns_empty_dict(self):
         """无 loops.json 时应返回空字典。"""
@@ -74,6 +75,7 @@ class TestLoadSaveLoops:
 
 
 # ── engine_start ─────────────────────────────────────────
+
 
 class TestEngineStart:
     def test_registers_new_loop(self):
@@ -117,6 +119,7 @@ class TestEngineStart:
 
 # ── engine_kill ──────────────────────────────────────────
 
+
 class TestEngineKill:
     def test_kills_registered_loop(self):
         """应能终止已注册的 Loop。"""
@@ -143,13 +146,24 @@ class TestEngineKill:
 
 # ── Loop 状态完整性 ───────────────────────────────────────
 
+
 class TestLoopIntegrity:
     def test_loop_has_all_required_fields(self):
         """注册的 Loop 应包含所有必需字段。"""
         engine_start("echo test", interval_s=60, template="fields")
         loops = _load_loops()
         loop = loops["fields"]
-        required = {"task", "interval", "maxCycles", "template", "status", "cycle", "lastRun", "lastResult", "createdAt"}
+        required = {
+            "task",
+            "interval",
+            "maxCycles",
+            "template",
+            "status",
+            "cycle",
+            "lastRun",
+            "lastResult",
+            "createdAt",
+        }
         assert required.issubset(loop.keys())
 
     def test_createdat_is_iso_format(self):

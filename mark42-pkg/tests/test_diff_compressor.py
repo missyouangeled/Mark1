@@ -1,4 +1,5 @@
 """从 diff_compressor.py 提取的单元测试。"""
+
 import os
 import sys
 
@@ -135,4 +136,3 @@ index 1234..5678 100644
     logger.info(f"结果: {passed} 通过 / {failed} 失败")
     logger.info("=" * 60)
     return failed == 0
-

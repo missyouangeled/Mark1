@@ -66,8 +66,13 @@ def test_certainty_assessment():
     check("2.2 action", a.action == "auto_remediate")
     check("2.3 to_dict works", isinstance(a.to_dict(), dict))
     a_low = CertaintyAssessment(
-        certainty="low", matched_rule=None, archive_entry_id=None,
-        archive_auto_approved=False, action="ask_user", reason="", next_step="",
+        certainty="low",
+        matched_rule=None,
+        archive_entry_id=None,
+        archive_auto_approved=False,
+        action="ask_user",
+        reason="",
+        next_step="",
     )
     check("2.4 low certainty", a_low.certainty == "low")
 
@@ -150,12 +155,19 @@ def test_auto_remediate_dry_run():
     c = make_mock_consciousness()
     issue = {"source": "test", "category": "test", "severity": "warning"}
     assessment = CertaintyAssessment(
-        certainty="high", matched_rule="test", archive_entry_id=None,
-        archive_auto_approved=False, action="auto_remediate", reason="test", next_step="test",
+        certainty="high",
+        matched_rule="test",
+        archive_entry_id=None,
+        archive_auto_approved=False,
+        action="auto_remediate",
+        reason="test",
+        next_step="test",
     )
     result = c.auto_remediate(issue, assessment, dry_run=True)
     check("8.1 返回 dict", isinstance(result, dict))
-    check("8.2 dry_run", result.get("dry_run") == True or result.get("executed") == False or result.get("ok") is not None)
+    check(
+        "8.2 dry_run", result.get("dry_run") == True or result.get("executed") == False or result.get("ok") is not None
+    )
 
 
 # ── 测试 9: 修复函数 _remediate_dummy ──
@@ -201,10 +213,10 @@ def test_remediate_loop_not_registered():
 def test_rules_structure():
     check("14.1 规则非空", len(DETERMINISTIC_RULES) > 0)
     for i, rule in enumerate(DETERMINISTIC_RULES):
-        check(f"14.{i+2}.1 规则{i} 有id", "id" in rule, f"rule={rule}")
-        check(f"14.{i+2}.2 规则{i} 有match", "match" in rule)
-        check(f"14.{i+2}.3 规则{i} 有certainty", "certainty" in rule)
-        check(f"14.{i+2}.4 规则{i} 有action", "action" in rule)
+        check(f"14.{i + 2}.1 规则{i} 有id", "id" in rule, f"rule={rule}")
+        check(f"14.{i + 2}.2 规则{i} 有match", "match" in rule)
+        check(f"14.{i + 2}.3 规则{i} 有certainty", "certainty" in rule)
+        check(f"14.{i + 2}.4 规则{i} 有action", "action" in rule)
 
 
 def run_tests():
@@ -236,5 +248,6 @@ def run_tests():
 
 if __name__ == "__main__":
     import logging
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     sys.exit(0 if run_tests() else 1)

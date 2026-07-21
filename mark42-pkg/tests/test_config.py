@@ -8,6 +8,7 @@
 - _conf_load_json / _conf_save_json
 - mark42_init() 初始化
 """
+
 import os
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from mark42.config import (
 )
 
 # ── 路径常量 ──────────────────────────────────────────────
+
 
 class TestPathConstants:
     def test_workspace_is_path(self):
@@ -48,6 +50,7 @@ class TestPathConstants:
 
 # ── 阈值 ────────────────────────────────────────────────
 
+
 class TestThresholds:
     def test_default_values(self):
         """无环境变量时应为默认值。"""
@@ -62,6 +65,7 @@ class TestThresholds:
 
 
 # ── _conf_load_json / _conf_save_json ─────────────────────
+
 
 class TestConfJson:
     def test_save_and_load(self, tmp_path):
@@ -95,6 +99,7 @@ class TestConfJson:
 
 # ── get_model_config ──────────────────────────────────────
 
+
 class TestGetModelConfig:
     def test_returns_known_config(self):
         """已知配置键应返回配置字典。"""
@@ -112,6 +117,7 @@ class TestGetModelConfig:
         """llmAnalyze 应配置为 doubao-seed-2.0-pro。"""
         # 临时指向不存在的 config.json，强制走 config.toml
         import mark42.config as cfg_mod
+
         monkeypatch.setattr(cfg_mod, "CONFIG_PATH", tmp_path / "nonexistent.json")
         result = get_model_config("llmAnalyze")
         assert result is not None
@@ -120,6 +126,7 @@ class TestGetModelConfig:
 
 
 # ── resolve_model ────────────────────────────────────────
+
 
 class TestResolveModel:
     def test_returns_none_for_unknown(self):
@@ -141,6 +148,7 @@ class TestResolveModel:
         monkeypatch.setenv("OPENCLAW_CONFIG", str(tmp_path / "nonexistent.json"))
         # 需要重新 import
         import importlib
+
         importlib.reload(cfg)
         result = cfg.resolve_model("llmAnalyze")
         # 如果 openclaw.json 不存在，api_key 为空，应返回 None

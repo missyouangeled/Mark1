@@ -6,6 +6,7 @@
 - context_safety_verify: 验证逻辑
 - 工具函数: _load_openclaw_config, _save_openclaw_config, _ensure_dict, _compare_value
 """
+
 import json
 import subprocess
 
@@ -14,6 +15,7 @@ import pytest
 from mark42 import context_safety as cs
 
 # ── 工具函数测试 ───────────────────────────────────────────
+
 
 class TestUtilityFunctions:
     def test_ensure_dict_creates_when_missing(self):
@@ -52,6 +54,7 @@ class TestUtilityFunctions:
 
 # ── _load_openclaw_config / _save_openclaw_config ──────────
 
+
 class TestConfigLoadSave:
     def test_load_nonexistent_raises(self, tmp_path, monkeypatch):
         """配置文件不存在应抛出 FileNotFoundError。"""
@@ -83,6 +86,7 @@ class TestConfigLoadSave:
 
 
 # ── context_safety_status ──────────────────────────────────
+
 
 class TestContextSafetyStatus:
     def test_returns_correct_structure(self, tmp_path, monkeypatch):
@@ -205,6 +209,7 @@ class TestContextSafetyStatus:
 
 
 # ── context_safety_apply ───────────────────────────────────
+
 
 class TestContextSafetyApply:
     def test_returns_correct_structure(self, tmp_path, monkeypatch):
@@ -331,6 +336,7 @@ class TestContextSafetyApply:
 
 # ── context_safety_verify ──────────────────────────────────
 
+
 class TestContextSafetyVerify:
     def test_verify_returns_zero_on_perfect_config(self, tmp_path, monkeypatch):
         """完美配置 + validate 通过 + smoke 通过 应返回 0。"""
@@ -371,6 +377,7 @@ class TestContextSafetyVerify:
             class MockResult:
                 returncode = 0
                 stdout = b"OpenClaw"
+
             return MockResult()
 
         monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
@@ -428,6 +435,7 @@ class TestContextSafetyVerify:
 
 # ── _run_light_smoke_checks ────────────────────────────────
 
+
 class TestSmokeChecks:
     def test_all_checks_pass(self, tmp_path, monkeypatch):
         """所有 smoke 检查通过的情况。"""
@@ -441,6 +449,7 @@ class TestSmokeChecks:
             class MockResult:
                 returncode = 0
                 stdout = b"OpenClaw"
+
             return MockResult()
 
         monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
@@ -460,6 +469,7 @@ class TestSmokeChecks:
             class MockResult:
                 returncode = 0
                 stdout = b"OpenClaw"
+
             return MockResult()
 
         monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
@@ -479,6 +489,7 @@ class TestSmokeChecks:
             class MockResult:
                 returncode = 1
                 stdout = b""
+
             return MockResult()
 
         monkeypatch.setattr(subprocess, "run", mock_subprocess_run)

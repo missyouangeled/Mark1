@@ -204,8 +204,8 @@ def diff_compress(content: str) -> tuple[str, dict]:
 def _run_tests() -> bool:
     """运行测试（已提取到 tests/test_diff_compressor.py）。"""
     from tests.test_diff_compressor import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

@@ -143,8 +143,8 @@ def smartcrush(content: str) -> tuple[str, dict]:
 def _run_tests():
     """运行测试（已提取到 tests/test_smart_crusher.py）。"""
     from tests.test_smart_crusher import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

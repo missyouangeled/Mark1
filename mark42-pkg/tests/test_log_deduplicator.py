@@ -1,4 +1,5 @@
 """从 log_deduplicator.py 提取的单元测试。"""
+
 import os
 import sys
 
@@ -125,4 +126,3 @@ def run_tests():
     logger.info(f"结果: {passed} 通过 / {failed} 失败")
     logger.info("=" * 60)
     return failed == 0
-

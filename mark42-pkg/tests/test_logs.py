@@ -9,6 +9,7 @@
 - log_rotate("all")
 - log_rotate_status()
 """
+
 import os
 import time
 
@@ -36,12 +37,14 @@ def isolated_log_state(tmp_path, monkeypatch):
     monkeypatch.setattr(logs_mod, "ARMOR_STATE", test_armor)
     # config 模块中的引用
     from mark42 import config as cfg
+
     monkeypatch.setattr(cfg, "ARMOR_STATE", test_armor)
 
     yield
 
 
 # ── _load_state / _save_state ────────────────────────────
+
 
 class TestLoadSaveState:
     def test_default_state(self):
@@ -71,6 +74,7 @@ class TestLoadSaveState:
 
 # ── _age_days ────────────────────────────────────────────
 
+
 class TestAgeDays:
     def test_recent_file_near_zero(self, tmp_path):
         """新文件的 age 应接近 0。"""
@@ -98,6 +102,7 @@ class TestAgeDays:
 
 # ── rotate_history_files ─────────────────────────────────
 
+
 class TestRotateHistoryFiles:
     def test_no_history_dir(self):
         """无历史目录应返回 cleaned=0。"""
@@ -111,6 +116,7 @@ class TestRotateHistoryFiles:
 
         # 创建 60 个文件（超过 MAX_HISTORY_FILES=50）
         from mark42.config import MAX_HISTORY_FILES
+
         assert MAX_HISTORY_FILES == 50
         for i in range(60):
             f = history_dir / f"memory-index-2026070{i:02d}-000000.json"
@@ -145,6 +151,7 @@ class TestRotateHistoryFiles:
 
 # ── rotate_actions_log ───────────────────────────────────
 
+
 class TestRotateActionsLog:
     def test_no_actions_file(self, tmp_path, monkeypatch):
         """无 actions.jsonl 应安全返回。"""
@@ -154,6 +161,7 @@ class TestRotateActionsLog:
 
 
 # ── log_rotate ───────────────────────────────────────────
+
 
 class TestLogRotate:
     def test_all_returns_dict(self):

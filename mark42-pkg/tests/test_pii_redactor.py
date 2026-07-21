@@ -1,4 +1,5 @@
 """从 pii_redactor.py 提取的单元测试。"""
+
 import json
 import os
 import sys
@@ -127,4 +128,3 @@ def run_tests():
     logger.info("")
     logger.info(f"结果: {passed} 通过 / {failed} 失败 / 共 {len(test_cases)} 个")
     return failed == 0
-

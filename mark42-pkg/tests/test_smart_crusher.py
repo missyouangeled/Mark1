@@ -472,6 +472,7 @@ class TestIntegrationScenarios:
 def run_tests():
     """兼容 mark42.smart_crusher._run_tests() 的薄入口。"""
     import pytest
+
     # 直接调 pytest 跑自身
     result = pytest.main([__file__, "-q", "--tb=short"])
     return result == 0

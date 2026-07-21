@@ -1,4 +1,5 @@
 """从 algo_scheduler.py 提取的单元测试。"""
+
 import os
 import sys
 
@@ -218,4 +219,3 @@ def run_tests():
     logger.info("")
     logger.info(f"结果: {passed + 3} 通过 / {failed} 失败 / 共 {passed + failed + 3} 个")
     return failed == 0
-

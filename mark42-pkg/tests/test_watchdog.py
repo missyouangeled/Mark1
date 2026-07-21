@@ -75,6 +75,7 @@ def test_check_heartbeat_valid(tmp_path):
 
     # Use real recent time
     from datetime import datetime, timezone
+
     recent_time = datetime.now(timezone.utc).isoformat()
     heartbeat.write_text(json.dumps({"lastTick": recent_time}))
 
@@ -202,6 +203,7 @@ def test_watchdog_check_all_normal(tmp_path):
     heartbeat_file.parent.mkdir(parents=True)
 
     from datetime import datetime, timezone
+
     recent_time = datetime.now(timezone.utc).isoformat()
     heartbeat_file.write_text(json.dumps({"lastTick": recent_time}))
 
@@ -212,11 +214,12 @@ def test_watchdog_check_all_normal(tmp_path):
         "HEARTBEAT": str(heartbeat_file),
     }
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process") as mock_check_proc, \
-         patch("mark42.watchdog._restart_service") as mock_restart, \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process") as mock_check_proc,
+        patch("mark42.watchdog._restart_service") as mock_restart,
+        patch("mark42.watchdog.time.sleep"),
+    ):
         mock_check_proc.return_value = True  # Both processes alive
 
         watchdog_check()
@@ -244,11 +247,12 @@ def test_watchdog_check_heartbeat_timeout(tmp_path):
         "HEARTBEAT": str(heartbeat_file),
     }
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process") as mock_check_proc, \
-         patch("mark42.watchdog._restart_service") as mock_restart, \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process") as mock_check_proc,
+        patch("mark42.watchdog._restart_service") as mock_restart,
+        patch("mark42.watchdog.time.sleep"),
+    ):
         mock_check_proc.return_value = False  # Processes dead
 
         watchdog_check()
@@ -264,6 +268,7 @@ def test_watchdog_check_engine_dead(tmp_path):
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
+
     recent_time = datetime.now(timezone.utc).isoformat()
     heartbeat_file.write_text(json.dumps({"lastTick": recent_time}))
 
@@ -284,11 +289,12 @@ def test_watchdog_check_engine_dead(tmp_path):
             return True  # Armor alive
         return False
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process", side_effect=mock_check_process), \
-         patch("mark42.watchdog._restart_service") as mock_restart, \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process", side_effect=mock_check_process),
+        patch("mark42.watchdog._restart_service") as mock_restart,
+        patch("mark42.watchdog.time.sleep"),
+    ):
         watchdog_check()
 
         # Should restart engine
@@ -303,6 +309,7 @@ def test_watchdog_check_armor_dead(tmp_path):
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
+
     recent_time = datetime.now(timezone.utc).isoformat()
     heartbeat_file.write_text(json.dumps({"lastTick": recent_time}))
 
@@ -323,11 +330,12 @@ def test_watchdog_check_armor_dead(tmp_path):
             return False  # Armor dead
         return False
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process", side_effect=mock_check_process), \
-         patch("mark42.watchdog._restart_service") as mock_restart, \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process", side_effect=mock_check_process),
+        patch("mark42.watchdog._restart_service") as mock_restart,
+        patch("mark42.watchdog.time.sleep"),
+    ):
         watchdog_check()
 
         # Should restart armor
@@ -342,6 +350,7 @@ def test_watchdog_check_both_dead(tmp_path):
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
+
     recent_time = datetime.now(timezone.utc).isoformat()
     heartbeat_file.write_text(json.dumps({"lastTick": recent_time}))
 
@@ -355,11 +364,12 @@ def test_watchdog_check_both_dead(tmp_path):
         "HEARTBEAT": str(heartbeat_file),
     }
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process") as mock_check_proc, \
-         patch("mark42.watchdog._restart_service") as mock_restart, \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process") as mock_check_proc,
+        patch("mark42.watchdog._restart_service") as mock_restart,
+        patch("mark42.watchdog.time.sleep"),
+    ):
         mock_check_proc.return_value = False  # Both dead
 
         watchdog_check()
@@ -390,11 +400,12 @@ def test_watchdog_check_logs_restart(tmp_path):
         "HEARTBEAT": str(heartbeat_file),
     }
 
-    with patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)), \
-         patch("mark42.watchdog._check_process") as mock_check_proc, \
-         patch("mark42.watchdog._restart_service"), \
-         patch("mark42.watchdog.time.sleep"):
-
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env_vars.get(k, d)),
+        patch("mark42.watchdog._check_process") as mock_check_proc,
+        patch("mark42.watchdog._restart_service"),
+        patch("mark42.watchdog.time.sleep"),
+    ):
         mock_check_proc.return_value = False
 
         watchdog_check()

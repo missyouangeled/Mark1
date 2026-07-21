@@ -200,7 +200,14 @@ class PIIRedactor:
             validator = pattern_def.get("validator")
             stats_ref = stats
 
-            def _do_replace(match, exclude=exclude, validator=validator, pii_type=pii_type, replacement=replacement, stats_ref=stats_ref):
+            def _do_replace(
+                match,
+                exclude=exclude,
+                validator=validator,
+                pii_type=pii_type,
+                replacement=replacement,
+                stats_ref=stats_ref,
+            ):
                 # 排除规则
                 if exclude and exclude(match):
                     return match.group(0)
@@ -303,8 +310,8 @@ def redact_pii_in_dict(obj: Any) -> tuple[Any, dict]:
 def _run_tests():
     """运行测试（已提取到 tests/test_pii_redactor.py）。"""
     from tests.test_pii_redactor import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

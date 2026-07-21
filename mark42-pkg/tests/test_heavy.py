@@ -31,8 +31,7 @@ def test_heavy_preflight_with_valid_path(tmp_path, caplog):
     test_file = tmp_path / "test.py"
     test_file.write_text("print('hello')")
 
-    with patch("mark42.heavy.armor_check") as mock_check, \
-         patch("mark42.heavy.os.popen") as mock_popen:
+    with patch("mark42.heavy.armor_check") as mock_check, patch("mark42.heavy.os.popen") as mock_popen:
         mock_check.return_value = {"usagePercent": 50}
 
         mock_mem = Mock()
@@ -47,7 +46,11 @@ def test_heavy_preflight_with_valid_path(tmp_path, caplog):
         heavy_preflight(str(tmp_path))
 
         messages = [record.message for record in caplog.records]
-        assert any("文件数" in msg for msg in messages) or any("总大小" in msg for msg in messages) or any("上下文余量" in msg for msg in messages)
+        assert (
+            any("文件数" in msg for msg in messages)
+            or any("总大小" in msg for msg in messages)
+            or any("上下文余量" in msg for msg in messages)
+        )
 
 
 # ── heavy_detect tests ──
@@ -152,8 +155,7 @@ def test_heavy_start_creates_state_files(tmp_path, monkeypatch):
     for i in range(10):
         (test_project / f"file_{i}.py").write_text(f"content {i}")
 
-    with patch("mark42.heavy.armor_check") as mock_check, \
-         patch("mark42.heavy._append_broker"):
+    with patch("mark42.heavy.armor_check") as mock_check, patch("mark42.heavy._append_broker"):
         mock_check.return_value = {"usagePercent": 50}
         heavy_start(str(test_project), "test-task")
 
@@ -214,7 +216,7 @@ def test_heavy_finish_successful(tmp_path, monkeypatch):
         "subtasks": {
             "batch-001": {"status": "done"},
             "batch-002": {"status": "done"},
-        }
+        },
     }
     (task_dir / "status.json").write_text(json.dumps(status))
 
@@ -271,7 +273,7 @@ def test_heavy_execute_creates_script(tmp_path, monkeypatch):
         "subtasks": {
             "batch-001": {"status": "pending", "files": ["file1.py", "file2.py"], "count": 2, "sizeMB": 0.01},
             "batch-002": {"status": "pending", "files": ["file3.py"], "count": 1, "sizeMB": 0.005},
-        }
+        },
     }
     (task_dir / "status.json").write_text(json.dumps(status))
 
@@ -313,7 +315,7 @@ def test_heavy_execute_with_command(tmp_path, monkeypatch):
         "targetPath": str(project_dir),
         "subtasks": {
             "batch-001": {"status": "pending", "files": ["file1.py"], "count": 1, "sizeMB": 0.01},
-        }
+        },
     }
     (task_dir / "status.json").write_text(json.dumps(status))
 

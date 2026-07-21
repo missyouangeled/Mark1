@@ -299,13 +299,14 @@ def shutdown_compress_queue() -> None:
 def _run_tests() -> bool:
     """运行测试（已提取到 tests/test_compress_queue.py）。"""
     from tests.test_compress_queue import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":
     # 配置 logging 让错误可见
     import logging
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     sys.exit(0 if _run_tests() else 1)

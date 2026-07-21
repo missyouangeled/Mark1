@@ -295,8 +295,8 @@ def codecrush(content: str) -> tuple[str, dict]:
 def _run_tests():
     """运行测试（已提取到 tests/test_code_compressor.py）。"""
     from tests.test_code_compressor import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

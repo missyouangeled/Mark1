@@ -645,7 +645,6 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 
-
 def _compress_execute(dry_run, usage, index, index_path, history_dir):
     """执行实际 compact 并更新索引/历史。"""
     if not dry_run and usage >= THRESHOLD_WARN:
@@ -863,8 +862,6 @@ def _compress_ineffective_check(actions_log, index, history_dir, usage):
     except Exception as e:
         # 升级逻辑本身的错误不能影响主流程
         logger.info(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
-
-
 
 
 def _send_context_warn_event(usage: float) -> bool:

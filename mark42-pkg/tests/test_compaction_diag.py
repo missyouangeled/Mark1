@@ -6,12 +6,14 @@
 - print_diagnose / print_apply_result: 不报错、正确输出
 - 工具函数: _check_value, _format_bytes, _get_context_window
 """
+
 import json
 from pathlib import Path
 
 from mark42 import compaction_diag as cd
 
 # ── 工具函数测试 ───────────────────────────────────────────
+
 
 class TestUtilityFunctions:
     def test_format_bytes_bytes(self):
@@ -62,6 +64,7 @@ class TestUtilityFunctions:
 
 
 # ── compaction_diagnose ────────────────────────────────────
+
 
 class TestCompactionDiagnose:
     def test_no_config_returns_no_config_status(self, tmp_path, monkeypatch):
@@ -168,9 +171,17 @@ class TestCompactionDiagnose:
         result = cd.compaction_diagnose()
 
         required_keys = {
-            "diagnosedAt", "status", "summary", "openclawJsonPath",
-            "contextWindow", "todaySessionCount", "largestTranscriptMB",
-            "currentConfig", "issues", "advice", "actionable"
+            "diagnosedAt",
+            "status",
+            "summary",
+            "openclawJsonPath",
+            "contextWindow",
+            "todaySessionCount",
+            "largestTranscriptMB",
+            "currentConfig",
+            "issues",
+            "advice",
+            "actionable",
         }
         assert required_keys.issubset(result.keys())
         assert isinstance(result["issues"], list)
@@ -227,6 +238,7 @@ class TestCompactionDiagnose:
 
 
 # ── compaction_apply ───────────────────────────────────────
+
 
 class TestCompactionApply:
     def test_dry_run_mode_default(self, tmp_path, monkeypatch):
@@ -381,6 +393,7 @@ class TestCompactionApply:
 
 # ── print_diagnose ─────────────────────────────────────────
 
+
 class TestPrintDiagnose:
     def test_print_ok_status_does_not_crash(self, tmp_path, monkeypatch, caplog):
         """打印 ok 状态不应崩溃。"""
@@ -481,6 +494,7 @@ class TestPrintDiagnose:
 
 # ── print_apply_result ─────────────────────────────────────
 
+
 class TestPrintApplyResult:
     def test_print_nothing_to_do_does_not_crash(self, caplog):
         """打印 nothing_to_do 状态不应崩溃。"""
@@ -544,6 +558,7 @@ class TestPrintApplyResult:
 
 
 # ── v2.0 新增功能测试 ──────────────────────────────────────
+
 
 class TestV2Features:
     def test_token_aware_check_no_data(self, tmp_path, monkeypatch):

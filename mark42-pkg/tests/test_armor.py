@@ -8,6 +8,7 @@
 - armor_compress() dry-run 模式
 - _send_context_warn_event() 预警发送
 """
+
 import json
 from unittest import mock
 
@@ -22,6 +23,7 @@ from mark42.armor import (
 )
 
 # ── _find_openclaw ────────────────────────────────────────
+
 
 class TestFindOpenclaw:
     def test_returns_string(self):
@@ -39,6 +41,7 @@ class TestFindOpenclaw:
     def test_fallback_to_command_name(self):
         """找不到 openclaw 时应回退到 'openclaw'。"""
         import mark42.armor as armor_mod
+
         old = armor_mod._openclaw_bin
         try:
             armor_mod._openclaw_bin = None
@@ -51,6 +54,7 @@ class TestFindOpenclaw:
 
 
 # ── armor_check ──────────────────────────────────────────
+
 
 class TestArmorCheck:
     def test_returns_dict_with_required_keys(self):
@@ -92,6 +96,7 @@ class TestArmorCheck:
 
 # ── _classify_messages ───────────────────────────────────
 
+
 class TestClassifyMessages:
     def test_empty_messages(self):
         """空消息列表应返回空分类。"""
@@ -127,6 +132,7 @@ class TestClassifyMessages:
 
 
 # ── _read_session_tail ───────────────────────────────────
+
 
 class TestReadSessionTail:
     def test_reads_jsonl_file(self, tmp_path):
@@ -167,9 +173,11 @@ class TestReadSessionTail:
         """损坏的行不应导致崩溃。"""
         session_file = tmp_path / "malformed.jsonl"
         content = (
-            json.dumps({"role": "user", "content": "good"}) + "\n"
+            json.dumps({"role": "user", "content": "good"})
+            + "\n"
             + "NOT JSON\n"
-            + json.dumps({"role": "assistant", "content": "also good"}) + "\n"
+            + json.dumps({"role": "assistant", "content": "also good"})
+            + "\n"
         )
         session_file.write_text(content, encoding="utf-8")
         result = _read_session_tail(session_file, lines=10)
@@ -178,6 +186,7 @@ class TestReadSessionTail:
 
 
 # ── armor_compress (dry-run) ─────────────────────────────
+
 
 class TestArmorCompress:
     @pytest.mark.skip(reason="armor_compress 内部会访问会话文件和 LLM，需要 mock 整个链路")

@@ -362,6 +362,7 @@ def _assemble_monitor(children: list, pid_file) -> None:
                         if hb:
                             from datetime import datetime as _dt
                             from datetime import timezone as _tz
+
                             try:
                                 last_tick = _dt.fromisoformat(hb.get("lastTick", ""))
                                 gap = (_dt.now(_tz.utc) - last_tick).total_seconds()
@@ -457,6 +458,7 @@ def _collect_status_data() -> dict:
     heavy_tasks = list(HEAVY_STATE.glob("*.json"))
 
     from .logs import _load_state as _logs_state
+
     ls = _logs_state()
     last_rot = ls.get("lastRotation", "从未")
     count = ls.get("rotationCount", 0)
@@ -538,6 +540,7 @@ def _format_status_text(d: dict, verbose: bool = False) -> str:
     lines.append("\n  🧹 日志轮替")
     lines.append(f"     上次: {d['last_rot']} (累计 {d['count']} 次)")
     from .config import MARK42_BROKER_EVENTS, SCRATCH
+
     if MARK42_BROKER_EVENTS.exists():
         lines.append(f"     Mark42 Broker: {d['broker_size'] / 1024:.1f}KB ({d['broker_lines']} 行)")
     if SCRATCH.exists():
@@ -620,6 +623,7 @@ def _build_status_json(d: dict) -> dict:
         "actions": [],
     }
     from .config import THRESHOLD_WARN
+
     if d["usage"] >= THRESHOLD_WARN:
         status_data["actions"].append("建议 /compact")
     if d["active"] == 0:
@@ -637,12 +641,13 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     print(_format_status_text(d, verbose=verbose))
     return None
 
+
 def _build_parser() -> argparse.ArgumentParser:
     """构建 argparse 解析器。"""
     parser = argparse.ArgumentParser(
-    description="Mark42 模块化智能铠甲系统",
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog="""
+        description="Mark42 模块化智能铠甲系统",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
     示例:
       mark42.py --init
       mark42.py --config
@@ -710,11 +715,11 @@ def _build_parser() -> argparse.ArgumentParser:
     heavy_p = sub.add_parser("heavy", help="⚙️ 重型战甲")
     heavy_p.add_argument("--detect", type=str, help="自动检测工程是否为大工程")
     heavy_p.add_argument(
-    "--auto",
-    type=str,
-    choices=["ask", "semi", "full"],
-    default="ask",
-    help="大工程检测后的行为：ask(默认,询问) / semi(半自动,30s倒计时) / full(全自动)",
+        "--auto",
+        type=str,
+        choices=["ask", "semi", "full"],
+        default="ask",
+        help="大工程检测后的行为：ask(默认,询问) / semi(半自动,30s倒计时) / full(全自动)",
     )
     heavy_p.add_argument("--preflight", type=str, help="大工程预检")
     heavy_p.add_argument("--start", type=str, help="大工程开工")
@@ -726,14 +731,14 @@ def _build_parser() -> argparse.ArgumentParser:
     heavy_p.add_argument("--batch", type=str, default="", help="指定批次ID (配合 --execute)")
     heavy_p.add_argument("--command", type=str, default="", help="每个文件执行的自定义命令，{f} 替换为文件路径")
     heavy_p.add_argument(
-    "--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动"
+        "--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动"
     )
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
     compaction_p = sub.add_parser("compaction", help="📊 OpenClaw 压缩配置诊断 & 调优 (v2.0)")
     compaction_p.add_argument(
-    "--token-aware", action="store_true", help="启用令牌感知检测（从 session jsonl 读取实际 token 消耗）"
+        "--token-aware", action="store_true", help="启用令牌感知检测（从 session jsonl 读取实际 token 消耗）"
     )
     compaction_p.add_argument("--probe", action="store_true", help="启用摘要质量探针（检测压缩后关键信息留存率）")
     compaction_p.add_argument("--drift-check", action="store_true", help="启用上下文降解检测（分析连续压缩趋势）")
@@ -753,12 +758,12 @@ def _build_parser() -> argparse.ArgumentParser:
     archive_p.add_argument("action", choices=["list", "show", "approve", "reject", "stats"], help="子动作")
     archive_p.add_argument("entry_id", nargs="?", default="", help="条目 ID（show/approve/reject 用）")
     archive_p.add_argument(
-    "--status", choices=["NEW", "RESOLVED", "AUTO_APPROVED", "REJECTED"], help="按状态过滤（list）"
+        "--status", choices=["NEW", "RESOLVED", "AUTO_APPROVED", "REJECTED"], help="按状态过滤（list）"
     )
     archive_p.add_argument("--category", help="按 category 过滤（list）")
     archive_p.add_argument("--limit", type=int, default=20, help="最多显示多少条（list）")
     archive_p.add_argument(
-    "--scope", choices=["exact_match", "similar_match"], default="exact_match", help="匹配范围（approve）"
+        "--scope", choices=["exact_match", "similar_match"], default="exact_match", help="匹配范围（approve）"
     )
     archive_p.add_argument("--notes", default="", help="备注（reject）")
 
@@ -861,6 +866,7 @@ def _cmd_default(args) -> None:
     _build_parser().print_help()
     return
 
+
 def _cmd_install(args) -> None:
     """处理 install 子命令。"""
     from .installer import install_systemd, uninstall_systemd
@@ -872,12 +878,14 @@ def _cmd_install(args) -> None:
         install_systemd(workspace=ws)
     return
 
+
 def _cmd_watchdog(args) -> None:
     """处理 watchdog 子命令。"""
     from .watchdog import watchdog_check
 
     watchdog_check()
     return
+
 
 def _cmd_logs(args) -> None:
     """处理 logs 子命令。"""
@@ -890,6 +898,7 @@ def _cmd_logs(args) -> None:
     else:
         log_rotate_status()
     return
+
 
 def _cmd_armor(args) -> None:
     """处理 armor 子命令。"""
@@ -949,6 +958,7 @@ def _cmd_armor(args) -> None:
         print(f"   {trim_summary(result.get('summary', ''), 100)}")
     return
 
+
 def _cmd_engine(args) -> None:
     """处理 engine 子命令。"""
     from .engine import (
@@ -983,6 +993,7 @@ def _cmd_engine(args) -> None:
     else:
         engine_list()
     return
+
 
 def _cmd_heavy(args) -> None:
     """处理 heavy 子命令。"""
@@ -1026,6 +1037,7 @@ def _cmd_heavy(args) -> None:
         print("❌ 请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup")
     return
 
+
 def _cmd_compaction(args) -> None:
     """处理 compaction 子命令。"""
     from .compaction_diag import compaction_diagnose, print_diagnose
@@ -1047,6 +1059,7 @@ def _cmd_compaction(args) -> None:
         print("     直接应用: python3 scripts/mark42.py --tune-compaction --apply")
     return
 
+
 def _cmd_assemble(args) -> None:
     """处理 assemble 子命令。"""
     if args.status:
@@ -1058,6 +1071,7 @@ def _cmd_assemble(args) -> None:
     else:
         assemble()
     return
+
 
 def _cmd_context_safety(args) -> None:
     """处理 context-safety 子命令。"""
@@ -1077,6 +1091,7 @@ def _cmd_context_safety(args) -> None:
         context_safety_status(verbose=getattr(args, "verbose", False))
     return
 
+
 def _cmd_status(args) -> None:
     """处理 status 子命令。"""
     if getattr(args, "json", False):
@@ -1087,6 +1102,7 @@ def _cmd_status(args) -> None:
     else:
         status_dashboard(verbose=getattr(args, "verbose", False))
     return
+
 
 def _cmd_archive(args) -> None:
     """处理 archive 子命令。"""
@@ -1130,6 +1146,7 @@ def _cmd_archive(args) -> None:
             print(f"  {k:18s} {v}")
         print(f"已授权自动执行: {s['auto_approved_count']}\n")
     return
+
 
 def _cmd_consciousness(args) -> None:
     """处理 consciousness 子命令。"""
@@ -1211,6 +1228,7 @@ def _cmd_consciousness(args) -> None:
         print(_j5.dumps(result, indent=2, ensure_ascii=False, default=str)[:500])
     return
 
+
 def _cmd_cores(args) -> None:
     """处理 cores 子命令。"""
     from .core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
@@ -1249,6 +1267,7 @@ def _cmd_cores(args) -> None:
         print(f"{'✅' if r['ok'] else '❌'} 恢复 {args.core_id}: {r['ok']}")
     return
 
+
 def _cmd_chaos(args) -> None:
     """处理 chaos 子命令。"""
     from .governance import ChaosTester
@@ -1278,6 +1297,7 @@ def _cmd_chaos(args) -> None:
             )
     return
 
+
 def _cmd_module(args) -> None:
     """处理 module 子命令。"""
     from .governance import ModuleHealthMonitor
@@ -1296,6 +1316,7 @@ def _cmd_module(args) -> None:
         print("🔌 模块级协议摘要\n")
         print(f"  总计: {s['total']} | 🟢 {s['green']} | 🟡 {s['yellow']} | 🔴 {s['red']}")
     return
+
 
 def _cmd_cluster(args) -> None:
     """处理 cluster 子命令。"""
@@ -1324,6 +1345,7 @@ def _cmd_cluster(args) -> None:
         r = cm.replace(args.name, source=args.source)
         print(f"{'✅' if r['ok'] else '❌'} {r.get('note', '')} (action recorded)")
     return
+
 
 def _cmd_breaker(args) -> None:
     """处理 breaker 子命令。"""
@@ -1363,31 +1385,30 @@ def _cmd_breaker(args) -> None:
     return
 
 
-
 def main() -> None:
     """Mark42 CLI 入口 - 解析参数并分发到对应子命令处理函数。"""
     parser = _build_parser()
     args = parser.parse_args()
 
     dispatch = {
-    "default": _cmd_default,
-    "install": _cmd_install,
-    "watchdog": _cmd_watchdog,
-    "logs": _cmd_logs,
-    "armor": _cmd_armor,
-    "engine": _cmd_engine,
-    "heavy": _cmd_heavy,
-    "compaction": _cmd_compaction,
-    "assemble": _cmd_assemble,
-    "context-safety": _cmd_context_safety,
-    "status": _cmd_status,
-    "archive": _cmd_archive,
-    "consciousness": _cmd_consciousness,
-    "cores": _cmd_cores,
-    "chaos": _cmd_chaos,
-    "module": _cmd_module,
-    "cluster": _cmd_cluster,
-    "breaker": _cmd_breaker,
+        "default": _cmd_default,
+        "install": _cmd_install,
+        "watchdog": _cmd_watchdog,
+        "logs": _cmd_logs,
+        "armor": _cmd_armor,
+        "engine": _cmd_engine,
+        "heavy": _cmd_heavy,
+        "compaction": _cmd_compaction,
+        "assemble": _cmd_assemble,
+        "context-safety": _cmd_context_safety,
+        "status": _cmd_status,
+        "archive": _cmd_archive,
+        "consciousness": _cmd_consciousness,
+        "cores": _cmd_cores,
+        "chaos": _cmd_chaos,
+        "module": _cmd_module,
+        "cluster": _cmd_cluster,
+        "breaker": _cmd_breaker,
     }
 
     if not args.module:

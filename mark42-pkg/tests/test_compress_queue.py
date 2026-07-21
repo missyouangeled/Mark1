@@ -1,4 +1,5 @@
 """从 compress_queue.py 提取的单元测试。"""
+
 import os
 import sys
 
@@ -189,4 +190,3 @@ def run_tests():
     log.info(f"结果: {passed} 通过 / {failed} 失败")
     log.info("=" * 60)
     return failed == 0
-

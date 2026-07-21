@@ -594,4 +594,3 @@ def _run_context_guard_loop(loop, loops):
     else:
         logger.info("   ✅ Decide: 未达阈值，继续监控")
         loop["lastResult"] = {"action": "monitor", "usage": usage}
-

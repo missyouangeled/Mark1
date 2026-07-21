@@ -379,8 +379,8 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
 def _run_tests():
     """运行测试（已提取到 tests/test_algo_scheduler.py）。"""
     from tests.test_algo_scheduler import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

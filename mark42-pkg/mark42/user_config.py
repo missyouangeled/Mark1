@@ -139,6 +139,7 @@ def load_config(force_reload: bool = False) -> dict[str, Any]:
             _deep_merge(config, user_config)
         except Exception:
             import logging
+
             logging.debug("用户配置解析失败，使用默认值", exc_info=True)
 
     _cache = config

@@ -551,8 +551,8 @@ def text_compress(content: str) -> tuple[str, dict]:
 def _run_tests() -> bool:
     """运行测试（已提取到 tests/test_text_compressor.py）。"""
     from tests.test_text_compressor import run_tests
-    return run_tests()
 
+    return run_tests()
 
 
 if __name__ == "__main__":

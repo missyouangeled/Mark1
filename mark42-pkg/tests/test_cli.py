@@ -35,9 +35,23 @@ def test_parser_build():
         subcommands.update(a.choices.keys())
 
     expected = {
-        "logs", "armor", "engine", "heavy", "compaction", "assemble",
-        "context-safety", "status", "archive", "consciousness", "cores",
-        "chaos", "module", "cluster", "breaker", "install", "watchdog",
+        "logs",
+        "armor",
+        "engine",
+        "heavy",
+        "compaction",
+        "assemble",
+        "context-safety",
+        "status",
+        "archive",
+        "consciousness",
+        "cores",
+        "chaos",
+        "module",
+        "cluster",
+        "breaker",
+        "install",
+        "watchdog",
     }
     check("1.2 包含所有子命令", expected.issubset(subcommands), f"缺少: {expected - subcommands}")
     check("1.3 无多余子命令", len(subcommands - expected) == 0, f"多余: {subcommands - expected}")
@@ -105,6 +119,7 @@ def test_context_safety_cmd():
     """context-safety 命令应正常执行。"""
     try:
         from mark42.cli import _cmd_context_safety
+
         _cmd_context_safety(type("Args", (), {"module": "context-safety", "action": "status", "verbose": False})())
         check("6.1 context-safety 执行无异常", True)
     except Exception as e:
@@ -116,7 +131,9 @@ def test_subprocess_version():
     """通过 python -m mark42 --version 验证端到端。"""
     result = subprocess.run(
         [sys.executable, "-m", "mark42", "--version"],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     check("7.1 exit code 0", result.returncode == 0, f"code={result.returncode}")
     check("7.2 含版本号", "v" in result.stdout, f"stdout={result.stdout[:50]}")
@@ -127,7 +144,9 @@ def test_subprocess_status():
     """通过 python -m mark42 status 验证端到端。"""
     result = subprocess.run(
         [sys.executable, "-m", "mark42", "status"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     check("8.1 exit code 0", result.returncode == 0, f"code={result.returncode}")
     check("8.2 含 Mark42", "Mark42" in result.stdout, f"stdout={result.stdout[:80]}")
@@ -138,7 +157,9 @@ def test_subprocess_armor_check():
     """通过 python -m mark42 armor --check 验证。"""
     result = subprocess.run(
         [sys.executable, "-m", "mark42", "armor", "--check"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     check("9.1 exit code 0", result.returncode == 0, f"code={result.returncode}")
     check("9.2 含 铠甲", "铠甲" in result.stdout, f"stdout={result.stdout[:80]}")
@@ -148,7 +169,9 @@ def test_subprocess_armor_check():
 def test_subprocess_engine_list():
     result = subprocess.run(
         [sys.executable, "-m", "mark42", "engine", "--list"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     check("10.1 exit code 0", result.returncode == 0, f"code={result.returncode}")
 
@@ -198,5 +221,6 @@ def run_tests():
 
 if __name__ == "__main__":
     import logging
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     sys.exit(0 if run_tests() else 1)

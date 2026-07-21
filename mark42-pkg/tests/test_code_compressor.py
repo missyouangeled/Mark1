@@ -1,4 +1,5 @@
 """从 code_compressor.py 提取的单元测试。"""
+
 import os
 import sys
 
@@ -130,4 +131,3 @@ const bar = 42;
     logger.info(f"结果: {passed} 通过 / {failed} 失败")
     logger.info("=" * 60)
     return failed == 0
-

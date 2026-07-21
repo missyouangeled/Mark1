@@ -35,6 +35,7 @@ def _log(msg: str, logfile: str | Path) -> None:
             f.write(line)
     except Exception:
         import logging
+
         logging.debug("watchdog 日志写入失败", exc_info=True)  # 日志写入失败不影响主流程
 
 

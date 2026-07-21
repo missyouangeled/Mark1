@@ -546,4 +546,3 @@ def _heavy_build_script(task_dir, target_id, batch, target_path, task_name, file
         "startedPid": None,
     }
     return script_path, queue_file, exec_cmd, result
-
