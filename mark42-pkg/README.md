@@ -1,6 +1,6 @@
 # Mark42
 
-模块化智能铠甲系统 — 为 [OpenClaw](https://github.com/nicepkg/openclaw) 提供上下文守护与循环引擎。
+模块化智能铠甲系统 - 为 [OpenClaw](https://github.com/openclaw/openclaw) 提供上下文守护与循环引擎。
 
 ## 功能
 
@@ -59,10 +59,11 @@ mark42 armor --check
 | `mark42 status` | 一屏聚合系统状态 |
 | `mark42 armor --check` | 手动检查上下文使用率 |
 | `mark42 armor --guard` | 启动铠甲守护模式 |
-| `mark42 engine start` | 启动循环引擎 |
+| `mark42 engine --start` | 启动循环引擎 |
 | `mark42 assemble` | 一键启动完整战甲 |
 | `mark42 --init` | 初始化配置文件 |
 | `mark42 --config` | 查看/修改配置 |
+| `mark42 --version` | 查看版本 |
 | `mark42 --help` | 查看所有命令 |
 
 ## 依赖

@@ -37,7 +37,7 @@ mark42 = "mark42.cli:main"
 include = ["mark42*"]
 
 [tool.setuptools.package-data]
-mark42 = ["systemd/*.tmpl", "templates/*.json", "templates/*.toml"]
+mark42 = ["systemd/*.tmpl", "systemd/*.timer", "templates/*.json", "templates/*.toml"]
 
 [tool.ruff]
 target-version = "py310"

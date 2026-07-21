@@ -185,4 +185,4 @@ echo "  mark42 armor --check"
 echo
 info "配置文件:"
 echo "  OpenClaw: $HOME/.openclaw/openclaw.json"
-echo "  Mark42:   $HOME/.local/state/openclaw/mark42/config.json"
+echo "  Mark42:   $HOME/.config/mark42/config.toml"

@@ -53,8 +53,8 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 ## [2.4.0] - 2026-07-20
 
 ### 新增
-- 🔧 GitHub Actions CI（`mark42-ci.yml`）：多 Python 版本测试 + coverage 门禁 50% + lint 检查
-- 🔧 GitHub Actions 自动发版（`mark42-release.yml`）：tag 触发 -> 测试 -> CHANGELOG -> Release
+- 🔧 GitHub Actions CI（`ci.yml`）：多 Python 版本测试 + lint 检查
+- 🔧 GitHub Actions 自动发版（`release.yml`）：tag 触发 -> 测试 -> build -> GitHub Release
 - 🐳 Docker 镜像支持（`Dockerfile` + `docker-build.sh`）：python3.12-slim 非root
 - 🔒 pip-audit 依赖漏洞扫描集成到 CI
 - 🔒 硬编码 API key / 路径安全检查集成到 CI
