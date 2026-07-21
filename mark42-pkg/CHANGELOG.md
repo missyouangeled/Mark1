@@ -7,6 +7,9 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 
 ## [2.6.0] - 2026-07-21
 
+### 新增
+- 📄 新增 `ARCHITECTURE.md` 五层架构设计文档
+
 ### 重构
 - 🏗️ **algo_scheduler 解耦**：用注册表模式替代硬 import 6 个压缩器，新增 `register_compressor()` / `unregister_compressor()` API
 - 🏗️ **cli.py 拆分为 cli/ 包**（1426行 -> 4 个文件）：
