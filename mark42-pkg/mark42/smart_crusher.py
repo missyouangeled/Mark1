@@ -12,19 +12,18 @@
 import json
 from typing import Any
 
-# 【2026-07-13】不能用相对路径, 因为 algo_scheduler 从外部 `from .smart_crusher import smartcrush`
-from .log_setup import get_logger
-from .utils import safe_call
-
-logger = get_logger(__name__)
+# 【2026-07-13】不能用相对路径, 因为 algo_scheduler 从外部 `from smart_crusher import smartcrush`
+from mark42.utils import safe_call
 
 
 class SmartCrusher:
     """借鉴 Headroom JSON compressor：JSON 工具输出压缩"""
 
-    def __init__(
-        self, max_array_len: int = 5, max_string_len: int = 200, max_depth: int = 3, max_numeric_array_len: int = 50
-    ):
+    def __init__(self,
+                 max_array_len: int = 5,
+                 max_string_len: int = 200,
+                 max_depth: int = 3,
+                 max_numeric_array_len: int = 50):
         self.max_array_len = max_array_len
         self.max_string_len = max_string_len
         self.max_depth = max_depth
@@ -33,7 +32,7 @@ class SmartCrusher:
     def crush(self, content: str) -> tuple[str, dict]:
         stats = {
             "algorithm": "smartcrush",
-            "original_bytes": len(content.encode("utf-8")),
+            "original_bytes": len(content.encode('utf-8')),
             "crushed_bytes": 0,
             "arrays_truncated": 0,
             "strings_truncated": 0,
@@ -62,7 +61,7 @@ class SmartCrusher:
             stats["error"] = f"serialization failed: {e}"
             return content, stats
 
-        stats["crushed_bytes"] = len(result.encode("utf-8"))
+        stats["crushed_bytes"] = len(result.encode('utf-8'))
         stats["ratio"] = 1.0 - (stats["crushed_bytes"] / max(1, stats["original_bytes"]))
         return result, stats
 
@@ -81,7 +80,7 @@ class SmartCrusher:
 
             if len(value) > self.max_array_len:
                 stats["arrays_truncated"] += 1
-                head = [self._crush_value(v, depth + 1, stats) for v in value[: self.max_array_len]]
+                head = [self._crush_value(v, depth + 1, stats) for v in value[:self.max_array_len]]
                 summary = f"... (total {len(value)} items, head {self.max_array_len} shown)"
                 return head + [summary]
 
@@ -90,7 +89,8 @@ class SmartCrusher:
         if isinstance(value, str):
             if len(value) > self.max_string_len:
                 stats["strings_truncated"] += 1
-                return value[: self.max_string_len] + f"... ({len(value) - self.max_string_len} chars truncated)"
+                return (value[:self.max_string_len] +
+                        f"... ({len(value) - self.max_string_len} chars truncated)")
             return value
 
         return value
@@ -101,12 +101,10 @@ class SmartCrusher:
     def _compress_numeric_array(self, arr: list) -> str:
         if not arr:
             return "[]"
-        return (
-            f"[numeric array: length={len(arr)}, "
-            f"min={min(arr)}, max={max(arr)}, "
-            f"mean={sum(arr) / len(arr):.2f}, "
-            f"sum={sum(arr)}]"
-        )
+        return (f"[numeric array: length={len(arr)}, "
+                f"min={min(arr)}, max={max(arr)}, "
+                f"mean={sum(arr)/len(arr):.2f}, "
+                f"sum={sum(arr)}]")
 
     def _crush_mixed(self, content: str, stats: dict) -> tuple[str, dict]:
         lines = content.splitlines()
@@ -119,7 +117,7 @@ class SmartCrusher:
         else:
             result = content
 
-        stats["crushed_bytes"] = len(result.encode("utf-8"))
+        stats["crushed_bytes"] = len(result.encode('utf-8'))
         stats["ratio"] = 1.0 - (stats["crushed_bytes"] / max(1, stats["original_bytes"]))
         stats["mode"] = "mixed_lines"
         return result, stats
@@ -141,10 +139,67 @@ def smartcrush(content: str) -> tuple[str, dict]:
 
 
 def _run_tests():
-    """运行测试（已提取到 tests/test_smart_crusher.py）。"""
-    from tests.test_smart_crusher import run_tests
+    print("=" * 60)
+    print("SmartCrusher 单元测试")
+    print("=" * 60)
 
-    return run_tests()
+    crusher = SmartCrusher(max_array_len=5, max_string_len=200, max_depth=3)
+
+    test1_input = json.dumps({
+        "users": [
+            {"id": i, "name": f"user_{i}", "bio": "x" * 500}
+            for i in range(100)
+        ]
+    }, ensure_ascii=False)
+    test1_output, test1_stats = crusher.crush(test1_input)
+    print(f"\n[测试 1] 100 个用户对象数组 (每条 500 字符 bio)")
+    print(f"  原始: {test1_stats['original_bytes']} bytes")
+    print(f"  压缩: {test1_stats['crushed_bytes']} bytes")
+    print(f"  压缩率: {test1_stats['ratio'] * 100:.1f}%")
+    print(f"  数组截断: {test1_stats['arrays_truncated']}")
+    print(f"  字符串截断: {test1_stats['strings_truncated']}")
+    assert test1_stats['arrays_truncated'] >= 1
+    assert test1_stats['strings_truncated'] >= 1
+    assert test1_stats['ratio'] > 0.7
+    print("  ✓ 通过 (数组先被截断, 只前 5 个 bio 被截断)")
+
+    nested = {"a": {"b": {"c": {"d": {"e": {"f": "deep value"}}}}}}
+    test2_output, test2_stats = crusher.crush(json.dumps(nested))
+    print(f"\n[测试 2] 深度嵌套对象 (depth 6)")
+    print(f"  深度截断: {test2_stats['depth_truncated']}")
+    assert test2_stats['depth_truncated'] >= 1
+    assert "truncated" in test2_output
+    print("  ✓ 通过")
+
+    test3_input = json.dumps({"timestamps": list(range(1000)), "values": [i * 1.5 for i in range(1000)]})
+    test3_output, test3_stats = crusher.crush(test3_input)
+    print(f"\n[测试 3] 1000 元素数值数组")
+    print(f"  数值数组压缩: {test3_stats['numeric_arrays_compressed']}")
+    assert test3_stats['numeric_arrays_compressed'] == 2
+    assert "numeric array" in test3_output
+    print("  ✓ 通过")
+
+    test4_output, test4_stats = crusher.crush("\n".join(f"line {i}" for i in range(100)))
+    print(f"\n[测试 4] 100 行纯文本")
+    print(f"  mode: {test4_stats.get('mode')}")
+    assert test4_stats.get('mode') == 'mixed_lines'
+    assert "more lines" in test4_output
+    print("  ✓ 通过")
+
+    test5_output, test5_stats = crusher.crush("")
+    print(f"\n[测试 5] 空内容")
+    assert test5_output == ""
+    assert test5_stats['ratio'] == 0.0
+    print("  ✓ 通过")
+
+    test6_output, test6_stats = crusher.crush('{"a": 1, "b": 2}')
+    print(f"\n[测试 6] 小 JSON (无压缩需求)")
+    print(f"  压缩率: {test6_stats['ratio'] * 100:.1f}% (可能为 0 或负)")
+    print("  ✓ 通过 (小内容不需压缩)")
+
+    print("\n" + "=" * 60)
+    print("所有测试通过 ✓")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

@@ -1462,3 +1462,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260722-001] correction
+
+**Logged**: 2026-07-22T05:18:49.791Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Image] User text: 应该是支持的。试试看 Description: This screenshot displays a Chinese technical guide for configuring an AI model service. The first section, "Configure Model," lists `doubao-seedance-1.5-pro` (noting it is being discontinued) and `doubao-seedream-5.0-lite`, with warning…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

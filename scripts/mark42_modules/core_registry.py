@@ -51,9 +51,9 @@ CORE_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "core_id": "core_3_memory_vector_engine",
         "core_role": "memory_vector",
-        "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
-        "runtime": "local_http",
-        "base_url": "http://127.0.0.1:18792",
+        "model_name": "qmd (embeddinggemma-300M + Qwen3-Reranker)",
+        "runtime": "local_cli",
+        "base_url": "",
         "criticality": "degradable",
         "fallback_chain": ["L1_keyword_only"],
     },
@@ -172,9 +172,14 @@ def probe_core(core_id: str) -> Dict[str, Any]:
             return {"status": "healthy" if ok else "down",
                     "reason": "" if ok else "gateway 不可达"}
         elif core_id == "core_3_memory_vector_engine":
-            ok = _probe_http("http://127.0.0.1:18792/healthz")
-            return {"status": "healthy" if ok else "down",
-                    "reason": "" if ok else "embed-sidecar /healthz 不可达"}
+            # QMD 通过 MCP/CLI 工作，不是 HTTP。检查 qmd 命令可用 + 索引存在
+            import shutil
+            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
+            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
+            if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
+                return {"status": "healthy", "reason": "qmd index ready"}
+            else:
+                return {"status": "down", "reason": "qmd 命令或索引不可用"}
         elif core_id == "core_2_armor_consciousness":
             # 意识层走 API，不直接探活（太慢），默认 healthy
             return {"status": "healthy", "reason": "api provider (skip probe)"}
@@ -185,6 +190,16 @@ def probe_core(core_id: str) -> Dict[str, Any]:
             ok = _probe_http(url)
             return {"status": "healthy" if ok else "down",
                     "reason": "" if ok else f"{url} 不可达"}
+
+    # CLI 命令探活（核心 3 QMD）
+    if rt == "local_cli":
+        import shutil
+        qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
+        index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
+        if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
+            return {"status": "healthy", "reason": "qmd index ready"}
+        else:
+            return {"status": "down", "reason": "qmd 命令或索引不可用"}
 
     # Python 模块探活（核心 4 和 7）
     if rt == "local_python":
@@ -252,39 +267,80 @@ class CoreRegistry:
         return self.cores.get(core_id)
 
     def probe_all(self) -> Dict[str, Any]:
-        """探活所有核心，更新状态。"""
+        """探活所有核心，更新状态。
+        
+        R13-D: 核心状态变为 down/degraded 时自动生成 FAILURE.md；
+        恢复为 healthy 时自动清理 FAILURE.md。
+        """
+        # 延迟导入避免循环依赖
+        from mark42_modules.failure_contract import create_contract_for_core, write_failure_md, remove_failure_md
+        
         results = {}
         for core_id in self.cores:
+            old_status = self.cores[core_id].status
             r = probe_core(core_id)
-            self.cores[core_id].status = r["status"]
-            if r["status"] == "healthy":
+            new_status = r["status"]
+            self.cores[core_id].status = new_status
+            
+            # R13-D: 状态变化时处理 FAILURE.md
+            if new_status in ("down", "degraded") and old_status == "healthy":
+                # 核心降级/故障 → 生成 FAILURE.md
+                criticality = self.cores[core_id].criticality
+                reason = r.get("reason", "")
+                contract = create_contract_for_core(core_id, new_status, criticality, reason)
+                write_failure_md(core_id, contract)
+            elif new_status == "healthy" and old_status in ("down", "degraded", "quarantined"):
+                # 核心恢复 → 删除 FAILURE.md
+                remove_failure_md(core_id)
+            
+            if new_status == "healthy":
                 # 更新 model_name（探活时可能从 not_loaded 变为已加载）
                 core_def = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
                 if core_def:
                     self.cores[core_id].model_name = core_def["model_name"]
-            if r["status"] != "healthy" and r.get("reason"):
+            if new_status != "healthy" and r.get("reason"):
                 self.cores[core_id].last_failure_reason = r["reason"]
             results[core_id] = r
         self._save()
         return results
 
     def quarantine(self, core_id: str, reason: str = "") -> bool:
-        """隔离核心。"""
+        """隔离核心。
+        
+        R13-D: 隔离时自动生成 FAILURE.md。
+        """
         if core_id not in self.cores:
             return False
         self.cores[core_id].status = "quarantined"
         self.cores[core_id].last_failure_reason = reason
         self._save()
+        
+        # R13-D: 隔离 → 生成 FAILURE.md
+        from mark42_modules.failure_contract import create_contract_for_core, write_failure_md
+        criticality = self.cores[core_id].criticality
+        contract = create_contract_for_core(core_id, "degraded", criticality, reason)
+        write_failure_md(core_id, contract)
+        
         return True
 
     def restore(self, core_id: str) -> bool:
-        """恢复隔离的核心。"""
+        """恢复隔离的核心。
+        
+        R13-D: 恢复时自动清理 FAILURE.md。
+        """
         if core_id not in self.cores:
             return False
         r = probe_core(core_id)
-        self.cores[core_id].status = r["status"]
+        new_status = r["status"]
+        self.cores[core_id].status = new_status
         self.cores[core_id].last_failure_reason = None
         self._save()
+        
+        # R13-D: 恢复为 healthy → 删除 FAILURE.md
+        if new_status == "healthy":
+            from mark42_modules.failure_contract import remove_failure_md
+            remove_failure_md(core_id)
+        
         return True
 
     def record_invocation(self, core_id: str, success: bool, reason: str = ""):

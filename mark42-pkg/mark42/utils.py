@@ -1,18 +1,11 @@
-"""Mark42 工具函数模块。
-
-提供 JSON 读写、时间戳、会话查找、数据截断等通用工具函数。
-"""
-
-from .log_setup import get_logger
-
-logger = get_logger(__name__)
+"""Mark42 工具函数模块。"""
 
 import functools
 import json
 import os
 import time
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -24,16 +17,14 @@ LOCK_MAX_AGE = 120
 # - BROKER_DIRTY: 仅 config.py 定义, utils import 后无人调 (所有 broker 事件都走 BROKER_DIR/events.jsonl)
 # - MAX_BROKER_EVENTS_MB: 仅 logs.py 调, utils import 后无人调
 from .config import (
-    BROKER_DIR,
-    BROKER_SOURCE,
-    BYTES_PER_KTOKEN,
-    CONFIG_PATH,
-    DEFAULT_CONTEXT_WINDOW,
-    ERRORS_FILE,
-    MARK42_BROKER_EVENTS,
-    MAX_ERRORS_LINES,
+    ARMOR_STATE, BROKER_DIR, BROKER_SOURCE, BYTES_PER_KTOKEN,
+    CONFIG_PATH, DEFAULT_CONTEXT_WINDOW, ERRORS_FILE, HEAVY_STATE, MARK42_STATE,
+    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_ERRORS_LINES, MAX_HISTORY_FILES,
+    MAX_LOG_AGE_DAYS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_CRIT,
+    THRESHOLD_WARN, WORKSPACE, XDG_STATE,
 )
 from .output_guard import trim_detail, trim_summary
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 【2026-07-13 新增】safe_call 统一错误处理装饰器
@@ -67,7 +58,7 @@ def _append_error_log(label: str, exc: BaseException) -> None:
     except Exception:
         # 留痕失败时绝不能再炸（避免 safe_call 反而引入新崩溃点）
         # 用 print 兜底，至少能在终端/日志看到
-        logger.error(f"[safe_call] 无法写 errors.jsonl: {exc!r}", flush=True)
+        print(f"[safe_call] 无法写 errors.jsonl: {exc!r}", flush=True)
 
 
 def _rotate_errors_file() -> None:
@@ -79,11 +70,11 @@ def _rotate_errors_file() -> None:
         with open(ERRORS_FILE, encoding="utf-8") as f:
             lines = f.readlines()
         if len(lines) > MAX_ERRORS_LINES:
-            keep = lines[-MAX_ERRORS_LINES // 2 :]  # 保留后一半
+            keep = lines[-MAX_ERRORS_LINES // 2:]  # 保留后一半
             with open(ERRORS_FILE, "w", encoding="utf-8") as f:
                 f.writelines(keep)
     except Exception as e:
-        logger.error(f"[safe_call] 截尾 errors.jsonl 失败: {e!r}", flush=True)
+        print(f"[safe_call] 截尾 errors.jsonl 失败: {e!r}", flush=True)
 
 
 def safe_call(default=None, label: str | None = None, reraise: bool = False):
@@ -101,7 +92,6 @@ def safe_call(default=None, label: str | None = None, reraise: bool = False):
         @safe_call()  # 默认返回 None，label=函数名
         def _call_llm(...): ...
     """
-
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -117,19 +107,15 @@ def safe_call(default=None, label: str | None = None, reraise: bool = False):
                 if reraise:
                     raise
                 return default
-
         return wrapper
-
     return decorator
 
 
 def _now_iso() -> str:
     return datetime.now(timezone(timedelta(hours=8))).isoformat()
 
-
 def _now_ts() -> float:
     return datetime.now(timezone.utc).timestamp()
-
 
 def _load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -140,18 +126,15 @@ def _load_json(path: Path) -> dict[str, Any]:
     except (json.JSONDecodeError, OSError):
         return {}
 
-
 @safe_call(default=None, label="save_json")
 def _save_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-
 @safe_call(default=None, label="append_broker")
-def _append_broker(
-    source_view: str, event_type: str, label: str, level: str, summary: str, metadata: dict[str, Any] | None = None
-) -> None:
+def _append_broker(source_view: str, event_type: str, label: str, level: str,
+                   summary: str, metadata: dict[str, Any] | None = None) -> None:
     BROKER_DIR.mkdir(parents=True, exist_ok=True)
     safe_metadata = dict(metadata) if isinstance(metadata, dict) else {}
     event = {
@@ -171,17 +154,15 @@ def _append_broker(
     with open(str(MARK42_BROKER_EVENTS), "a") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
-
 def _safe_mtime(path: Path) -> float:
     try:
         return path.stat().st_mtime
     except FileNotFoundError:
         return -1.0
 
-
 def _find_active_session() -> Path | None:
     """找当前活跃 session：优先用 .lock 文件，按 mtime 取最新。
-
+    
     选择策略：
     1. 找所有 .jsonl.lock 文件，按修改时间排序
     2. 过滤掉 LOCK_MAX_AGE 秒内未更新的死 session
@@ -209,13 +190,11 @@ def _find_active_session() -> Path | None:
     # 策略 B：回退——按 mtime 取最新 JSONL
     # 优先看 .reset / .deleted / .bak 后缀，排除; 再按 mtime 倒序
     candidates = [
-        c
-        for c in sessions_dir.glob("*.jsonl")
+        c for c in sessions_dir.glob("*.jsonl")
         if all(bad not in str(c) for bad in [".reset.", ".deleted.", ".bak-", ".trajectory."])
     ]
     candidates.sort(key=_safe_mtime, reverse=True)
     return candidates[0] if candidates else None
-
 
 def _estimate_tokens(session_path: Path) -> dict[str, Any]:
     try:
@@ -246,16 +225,15 @@ def _estimate_tokens(session_path: Path) -> dict[str, Any]:
 
 import re as _re
 
-_ZH_RE = _re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
-_EN_RE = _re.compile(r"[a-zA-Z]")
+_ZH_RE = _re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf]')
+_EN_RE = _re.compile(r'[a-zA-Z]')
 
 # 不同语言的 token 密度 (经验值, 适用于 Claude/Qwen/DeepSeek/GPT-4)
 _DENSITY = {
-    "zh": 1.5,  # 中文字符: 1.5 token/char
-    "en": 0.25,  # 英文字符: 0.25 token/char (BPE 压缩)
-    "other": 0.1,  # 数字/标点/JSON: 0.1 token/char
+    'zh': 1.5,    # 中文字符: 1.5 token/char
+    'en': 0.25,   # 英文字符: 0.25 token/char (BPE 压缩)
+    'other': 0.1, # 数字/标点/JSON: 0.1 token/char
 }
-
 
 def _estimate_tokens_smart(session_path: Path, scan_lines: int = 200) -> dict[str, Any]:
     """自适应 token 估算: 扫描真实字符密度, 避免中文场景下 6× 高估。
@@ -371,17 +349,19 @@ def _estimate_tokens_smart(session_path: Path, scan_lines: int = 200) -> dict[st
             zh_total, en_total, other_total = zh_chars, en_chars, other_chars
 
         # token 估算 = zh × 1.5 + en × 0.25 + other × 0.1
-        est_tokens = int(zh_total * _DENSITY["zh"] + en_total * _DENSITY["en"] + other_total * _DENSITY["other"])
+        est_tokens = int(
+            zh_total * _DENSITY['zh']
+            + en_total * _DENSITY['en']
+            + other_total * _DENSITY['other']
+        )
         result["estimatedTokens"] = est_tokens
         return result
     except OSError:
         return result
 
-
 # ── 公共文件扫描（统一跳过规则，供 heavy.preflight/detect/start 复用） ──
 
 _SKIP_PATTERNS = ["__pycache__", ".pyc", ".git/", "node_modules/", ".meta/"]
-
 
 def _list_project_files(path: Path) -> list[Path]:
     """扫描目录下所有非隐藏文件，跳过 __pycache__/.pyc/.git/node_modules/.meta。
@@ -418,7 +398,6 @@ def _get_context_window() -> int:
         try:
             oc = json.loads(oc_path.read_text())
         except Exception:
-            logger.exception("Unhandled exception")
             pass
 
     # 策略 1: 从 session jsonl 找当前 session 的 model（不再依赖 resolved）
@@ -427,14 +406,13 @@ def _get_context_window() -> int:
     primary_model = None
     primary_provider = None
     try:
-        agents = oc.get("agents", {})
-        defaults = agents.get("defaults", {})
-        primary = defaults.get("model", {}).get("primary", "")
+        agents = oc.get('agents', {})
+        defaults = agents.get('defaults', {})
+        primary = defaults.get('model', {}).get('primary', '')
         # primary 格式: "minimax/MiniMax-M3" 或 "deepseek/deepseek-v4-pro"
-        if "/" in primary:
-            primary_provider, primary_model = primary.split("/", 1)
+        if '/' in primary:
+            primary_provider, primary_model = primary.split('/', 1)
     except Exception:
-        logger.exception("Unhandled exception")
         pass
 
     if primary_model and primary_provider:
@@ -444,13 +422,12 @@ def _get_context_window() -> int:
 
     # 策略 2: 遍历 openclaw.json 所有 provider/models，取第一个有 contextWindow 的
     try:
-        for _pkey, pcfg in oc.get("models", {}).get("providers", {}).items():
-            for m in pcfg.get("models", []):
-                cw = m.get("contextWindow")
+        for pkey, pcfg in oc.get('models', {}).get('providers', {}).items():
+            for m in pcfg.get('models', []):
+                cw = m.get('contextWindow')
                 if isinstance(cw, int) and cw > 0:
                     return cw
     except Exception:
-        logger.exception("Unhandled exception")
         pass
 
     # 策略 3: config.json
@@ -460,17 +437,16 @@ def _get_context_window() -> int:
         if isinstance(cw, int) and cw > 0:
             return cw
     except Exception:
-        logger.exception("Unhandled exception")
         pass
     return DEFAULT_CONTEXT_WINDOW
 
 
 def _lookup_context_window(oc: dict, provider: str, model_id: str) -> int | None:
     """在 openclaw.json 中查找指定 provider.model 的 contextWindow。"""
-    pcfg = oc.get("models", {}).get("providers", {}).get(provider, {})
-    for m in pcfg.get("models", []):
-        if m.get("id") == model_id or m.get("name") == model_id:
-            cw = m.get("contextWindow")
+    pcfg = oc.get('models', {}).get('providers', {}).get(provider, {})
+    for m in pcfg.get('models', []):
+        if m.get('id') == model_id or m.get('name') == model_id:
+            cw = m.get('contextWindow')
             if isinstance(cw, int) and cw > 0:
                 return cw
     return None

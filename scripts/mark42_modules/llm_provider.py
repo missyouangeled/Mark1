@@ -239,12 +239,27 @@ class StubRuntime:
         last_user = next((m.content for m in reversed(messages) if m.role == "user"), "") or ""
         content = f"[stub/{self.model}] 收到 {len(messages)} 条消息。最后一条: {str(last_user)[:120]}"
         prompt_tokens = sum(len(str(m.content or "")) for m in messages) // 2
+        completion_tokens = len(content) // 2
+        total_tokens = prompt_tokens + completion_tokens
+        
+        # R15: 旁路记录成本（失败不阻塞主流程）
+        try:
+            from .cost_tracker import record_cost
+            record_cost(
+                model=self.model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                caller_module="llm_provider_stub",
+            )
+        except Exception:
+            pass  # 成本记录失败不影响主流程
+        
         return ChatResponse(
             content=content,
             model=self.model,
             usage={"prompt_tokens": prompt_tokens,
-                   "completion_tokens": len(content) // 2,
-                   "total_tokens": prompt_tokens + len(content) // 2},
+                   "completion_tokens": completion_tokens,
+                   "total_tokens": total_tokens},
             raw={"stub": True, "msg_count": len(messages)},
         )
 
@@ -272,10 +287,28 @@ def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
             if not choices:
                 raise LLMProviderError(f"{extra_log} 响应无 choices: {resp_body}")
             content = choices[0].get("message", {}).get("content", "")
+            model = resp_body.get("model", "")
+            usage = resp_body.get("usage", {}) or {}
+            
+            # R15: 旁路记录成本（失败不阻塞主流程）
+            try:
+                from .cost_tracker import record_cost
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                if prompt_tokens or completion_tokens:
+                    record_cost(
+                        model=model or "unknown",
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        caller_module="llm_provider_api",
+                    )
+            except Exception:
+                pass  # 成本记录失败不影响主流程
+            
             return ChatResponse(
                 content=content,
-                model=resp_body.get("model", ""),
-                usage=resp_body.get("usage", {}) or {},
+                model=model,
+                usage=usage,
                 raw=resp_body,
             )
         except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:

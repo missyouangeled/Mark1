@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -257,21 +258,22 @@ class Consciousness:
         except Exception as e:
             logger.warning("C1 loops 检查失败: %s", e)
 
-        # 4) embed sidecar 健康（端口 18792）
+        # 4) QMD 向量引擎健康（检查 qmd 命令 + 索引）
         try:
-            import urllib.request
-            with urllib.request.urlopen("http://127.0.0.1:18792/healthz", timeout=2) as r:
-                if r.status != 200:
-                    issues.append({
-                        "source": "sidecar", "category": "embed_unhealthy",
-                        "severity": "warning", "code": r.status,
-                        "msg": "embed-sidecar /healthz 非 200",
-                    })
+            import shutil
+            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
+            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
+            if not (os.path.isfile(qmd_bin) and os.path.isfile(index_path)):
+                issues.append({
+                    "source": "sidecar", "category": "process_down",
+                    "severity": "warning",
+                    "msg": "qmd 命令或索引不可用",
+                })
         except Exception as e:
             issues.append({
                 "source": "sidecar", "category": "process_down",
                 "severity": "warning",
-                "msg": f"embed-sidecar 不通: {type(e).__name__}",
+                "msg": f"qmd 检查失败: {type(e).__name__}",
             })
 
         return SelfCheckResult(

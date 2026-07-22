@@ -175,7 +175,9 @@ class TestEngineRunLoopContextGuard:
         assert loops["ctx-loop"]["cycle"] == 1
 
     def test_high_usage_triggers_compress(self, mocker, engine_state):
-        """使用率 >= ALERT 时触发 compress，记录 before/after。"""
+        """使用率 >= ALERT 时触发 compress，记录 before/after。
+        v3-5: 走 Consciousness.handle_issue 链路，C3 直接调 armor_compress。
+        """
         loops = _make_loop(name="ctx-loop", template="context-guard")
         # 两次 armor_check 调用：第一次 Observe，第二次 Verify
         mocker.patch.object(engine, "armor_check",
@@ -183,14 +185,19 @@ class TestEngineRunLoopContextGuard:
                               {"usagePercent": 90.0, "severity": "critical"},
                               {"usagePercent": 50.0, "severity": "warn"},
                           ])
+        # mock consciousness 的 armor_compress（v3-5 C3 路径调的）
+        mocker.patch("mark42_modules.consciousness.armor_compress",
+                     return_value={"action": "compress"}, create=True)
+        # 也 mock engine 的 armor_compress（v3-5 回退路径会调）
         mock_compress = mocker.patch.object(engine, "armor_compress",
                                           return_value={"action": "compress"})
 
         engine.engine_run_loop("ctx-loop", persist=False, _loops=loops)
 
-        mock_compress.assert_called_once()
         assert loops["ctx-loop"]["lastResult"]["before"] == 90.0
         assert loops["ctx-loop"]["lastResult"]["after"] == 50.0
+        # v3-5 路径信息
+        assert "v3_5_path" in loops["ctx-loop"]["lastResult"]
 
 
 class TestEngineRunLoopTaskWatch:

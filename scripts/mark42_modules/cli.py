@@ -632,6 +632,13 @@ def main() -> None:
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
+    # ── Cost ──
+    cost_p = sub.add_parser("cost", help="💰 LLM 成本追踪")
+    cost_p.add_argument("action", nargs="?", choices=["today", "month", "top"], default="today",
+                       help="today(默认): 今日汇总 | month: 本月汇总 | top: 模块排名")
+    cost_p.add_argument("--top-n", type=int, default=10, help="Top N 排名（仅用于 action=top）")
+    cost_p.add_argument("--days", type=int, default=None, help="最近几天（仅用于 action=top，None=全部历史）")
+
     compaction_p = sub.add_parser("compaction", help="📊 OpenClaw 压缩配置诊断 & 调优 (v2.0)")
     compaction_p.add_argument("--token-aware", action="store_true",
                              help="启用令牌感知检测（从 session jsonl 读取实际 token 消耗）")
@@ -855,6 +862,16 @@ def main() -> None:
             print("❌ 请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup")
         return
 
+    if args.module == "cost":
+        from .cost_tracker import cli_cost_today, cli_cost_month, cli_cost_top
+        if args.action == "month":
+            cli_cost_month()
+        elif args.action == "top":
+            cli_cost_top(n=args.top_n, days=args.days)
+        else:
+            cli_cost_today()
+        return
+
     if args.module == "compaction":
         from .compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
         diag = compaction_diagnose(
@@ -1061,33 +1078,37 @@ def main() -> None:
         return
 
     if args.module == "chaos":
-        from .governance import ChaosTester
+        from .chaos_engine import ChaosEngine
         import json as _j7
-        ct = ChaosTester()
+        ce = ChaosEngine()
         if args.action == "list":
-            scenarios = ct.list_scenarios()
-            print(f"🔥 混沌工程场景 ({len(scenarios)} 个)\n")
-            for s in scenarios:
-                print(f"  {s['id']:<20} {s['name']:<20} -> {s['target']}")
+            exps = ce.list_experiments()
+            print(f"🔥 混沌工程实验 ({len(exps)} 个)\n")
+            for e in exps:
+                desc = e['description'][:40] + '...' if len(e['description']) > 40 else e['description']
+                print(f"  {e['name']:<30} {desc}")
         elif args.action == "run":
             if not args.scenario:
-                print("❌ --scenario 必填。可用场景:")
-                for s in ct.list_scenarios():
-                    print(f"  {s['id']}")
+                print("❌ --scenario 必填。可用实验:")
+                for e in ce.list_experiments():
+                    print(f"  {e['name']}")
                 return 1
-            r = ct.run(args.scenario, dry_run=not args.execute_now)
-            print(f"{'✅' if r.passed else '❌'} {r.test_name}")
-            print(f"  检测: {r.detection_time_ms}ms | 恢复: {r.recovery_time_ms or 'N/A'}ms")
-            print(f"  备注: {r.notes}")
+            r = ce.run_experiment(args.scenario, dry_run=not args.execute_now)
+            icon = "✅" if r.status == "passed" else "❌"
+            print(f"{icon} {r.experiment} [{r.status}]")
+            print(f"  耗时: {r.duration_ms}ms")
+            print(f"  setup: {'✅' if r.setup_ok else '❌'} | execute: {'✅' if r.execute_ok else '❌'} | verify: {'✅' if r.verify_ok else '❌'} | cleanup: {'✅' if r.cleanup_ok else '❌'}")
+            print(f"  详情: {r.details}")
         elif args.action == "history":
-            h = ct.history()
+            h = ce.get_results(limit=50)
             print(f"📜 Chaos Test 历史 ({len(h)} 条)\n")
             for r in h:
-                print(f"  {r.get('test_id','')} | {r.get('test_name','')} | {'✅' if r.get('passed') else '❌'} | {r.get('started_at','')}")
+                icon = "✅" if r.get('status') == "passed" else "❌"
+                print(f"  {icon} {r.get('experiment',''):<30} {r.get('started_at','')[:19]}  {r.get('duration_ms',0)}ms")
         return
 
     if args.module == "module":
-        from .governance import ModuleHealthMonitor
+        from .module_health import ModuleHealthMonitor
         import json as _j8
         mhm = ModuleHealthMonitor()
         if args.action == "check":
@@ -1105,7 +1126,7 @@ def main() -> None:
         return
 
     if args.module == "cluster":
-        from .governance import ClusterManager
+        from .cluster_manager import ClusterManager
         import json as _j9
         cm = ClusterManager()
         if args.action == "list":
@@ -1114,11 +1135,17 @@ def main() -> None:
             for c in clusters:
                 print(f"  {c['name']:<30} {c['core_id']:<35} {c['criticality']}")
         elif args.action == "status":
-            statuses = cm.status()
-            print(f"🏗️ 集群状态 ({len(statuses)} 个)\n")
-            for s in statuses:
-                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(s["status"], "?")
-                print(f"  {icon} {s['cluster']:<30} {s['model']:<25} {s['status']}")
+            # 用 list_clusters + core_registry 获取状态
+            from .core_registry import CoreRegistry
+            reg = CoreRegistry()
+            clusters = cm.list_clusters()
+            print(f"🏗️ 集群状态 ({len(clusters)} 个)\n")
+            for c in clusters:
+                core = reg.get_core(c["core_id"])
+                status = core.status if core else "unknown"
+                model = core.model_name if core else ""
+                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(status, "?")
+                print(f"  {icon} {c['name']:<30} {model:<25} {status}")
         elif args.action == "replace":
             if not args.name:
                 print("❌ --name 必填。可用集群:")
@@ -1126,7 +1153,7 @@ def main() -> None:
                     print(f"  {c['name']}")
                 return 1
             r = cm.replace(args.name, source=args.source)
-            print(f"{'✅' if r['ok'] else '❌'} {r.get('note','')} (action recorded)")
+            print(f"{'✅' if r.get('ok') else '❌'} {r.get('note','')} (action recorded)")
         return
 
     if args.module == "breaker":

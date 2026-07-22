@@ -18,7 +18,7 @@
 | 今日动态 | `memory/daily/YYYY-MM-DD.md` |
 | CPU 过载 | `docs/通用-CPU负载过高临时处理方案.md` |
 | 视频下载 | `docs/通用-视频平台下载工作流.md` |
-| 语音/TTS | `TOOLS.md` → Voice replies |
+| 语音/TTS | `memory/rules/chat-prefs.md` → 语音回复引擎与音色 |
 | Mark2 中枢 | `projects/mark2/README.md` |
 | 关键文件职责 | 见 `AGENTS.md` 速查表 |
 

@@ -220,11 +220,37 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         print(f"   🔍 Observe: 上下文 {usage}%")
         if usage >= THRESHOLD_ALERT:
             print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，触发压缩")
-            result = armor_compress()
-            verify = armor_check()
-            new_usage = verify.get("usagePercent", 0)
-            print(f"   ✅ Verify: {usage}% → {new_usage}%")
-            loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
+            # v3-5: 先走 Consciousness.handle_issue 链路（L4->advisor, L5->档案）
+            try:
+                from .consciousness import Consciousness
+                cs = Consciousness()
+                issue = {"source": "armor", "category": "context_alert",
+                         "severity": "critical", "value": usage,
+                         "msg": f"上下文使用率 {usage}% 达到告警线"}
+                handle_result = cs.handle_issue(issue, dry_run=False)
+                path = handle_result.get("path", "")
+                print(f"   🔗 v3-5 路由: {path}")
+                rem = handle_result.get("remediation", {})
+                if rem.get("ok") and not rem.get("dry_run"):
+                    verify = armor_check()
+                    new_usage = verify.get("usagePercent", 0)
+                    print(f"   ✅ Verify: {usage}% -> {new_usage}%")
+                    loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
+                                          "v3_5_path": path}
+                else:
+                    result = armor_compress()
+                    verify = armor_check()
+                    new_usage = verify.get("usagePercent", 0)
+                    print(f"   ✅ Verify: {usage}% -> {new_usage}%")
+                    loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
+                                          "v3_5_path": path, "v3_5_result": handle_result}
+            except Exception as e:
+                print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
+                result = armor_compress()
+                verify = armor_check()
+                new_usage = verify.get("usagePercent", 0)
+                print(f"   ✅ Verify: {usage}% -> {new_usage}%")
+                loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
         else:
             print(f"   ✅ Decide: 未达阈值，继续监控")
             loop["lastResult"] = {"action": "monitor", "usage": usage}
@@ -284,6 +310,18 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         if not gw_ok:
             _append_broker("health", "engine.model.fallback", "Gateway 不可达", "error",
                            "Gateway health check 失败", {})
+            # v3-5: 写错误档案（L5）+ 走 Consciousness 链路
+            try:
+                from .consciousness import Consciousness
+                cs = Consciousness()
+                issue = {"source": "engine", "category": "gateway_down",
+                         "severity": "critical",
+                         "msg": "Gateway 不可达"}
+                handle_result = cs.handle_issue(issue, dry_run=True)
+                print(f"   🔗 v3-5 路由: {handle_result.get('path', 'unknown')}")
+                loop["lastResult"]["v3_5_path"] = handle_result.get("path", "")
+            except Exception as e:
+                print(f"   ⚠️ v3-5 链路异常: {e}")
     elif template_name == "memory-index":
         # 扫描最近 7 天 memory/daily/ 文件，更新 INDEX.md 主题锚点
         memory_dir = WORKSPACE / "memory" / "daily"

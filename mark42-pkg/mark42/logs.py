@@ -2,25 +2,17 @@
 
 import fcntl
 import json
+import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .config import (
-    ARMOR_STATE,
-    LOG_DIR,
-    MARK42_BROKER_EVENTS,
-    MAX_ACTIONS_LINES,
-    MAX_BROKER_EVENTS_MB,
-    MAX_DAEMON_LOG_LINES,
-    MAX_DAEMON_LOG_MB,
-    MAX_HISTORY_FILES,
-    MAX_LOG_AGE_DAYS,
+    ARMOR_STATE, BROKER_DIR, LOG_DIR, MARK42_BROKER_EVENTS,
+    MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_DAEMON_LOG_MB,
+    MAX_DAEMON_LOG_LINES, MAX_HISTORY_FILES, MAX_LOG_AGE_DAYS,
 )
-from .log_setup import get_logger
 from .utils import safe_call
-
-logger = get_logger(__name__)
 
 LOG_ROTATION_STATE = ARMOR_STATE.parent / "log-rotation.json"
 
@@ -77,7 +69,7 @@ def rotate_actions_log() -> dict:
     if not log_path.exists():
         return {"trimmed": 0, "note": "无 actions 日志"}
     try:
-        with open(log_path) as f:
+        with open(log_path, "r") as f:
             lines = f.readlines()
         if len(lines) <= MAX_ACTIONS_LINES:
             return {"trimmed": 0, "lines": len(lines)}
@@ -91,14 +83,14 @@ def rotate_actions_log() -> dict:
 
 def rotate_broker_events() -> dict:
     """若 broker events.jsonl >= MAX_BROKER_EVENTS_MB 则裁剪尾部。
-
+    
     【2026-06-30 全面审查 I 修复 v2】原本是 size_mb <= MAX_BROKER_EVENTS_MB 才裁，
     改为 <,留安全余量（10MB 临界不裁的问题）。
-
+    
     【2026-06-30 10:11 优化】keep_count 乘 0.9 SAFETY_FACTOR, 裁完 < 9MB。
     原逻辑: size_mb=10, MAX/size=1.0, keep_count=100% 行, 裁完仍 10MB。
     改后: keep_count=90% 行, 裁后 ~9MB, 留 10% 余量 (1MB) 足够兼容即将产生的新事件。
-
+    
     【2026-06-30 10:13 🟡2 修复】加 fcntl.flock 独占锁保证裁剪原子性。
     原问题: armor-guard / engine-daemon 多个进程并发 append broker, 裁的瞬间可能丢中间事件。
     修后: 读+写 全程占独占锁, 阻止其他进程同时改 broker 事件。
@@ -122,7 +114,7 @@ def rotate_broker_events() -> dict:
                 return {"sizeMB": round(size_mb, 2), "trimmed": 0}
             # 保留尾部的量 = 总行数 * (SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb)
             # SAFETY_FACTOR=0.9 是保证裁后 < 9MB (留 1MB 余量) 而不是 10MB 临界
-            with open(MARK42_BROKER_EVENTS) as f:
+            with open(MARK42_BROKER_EVENTS, "r") as f:
                 lines = f.readlines()
             keep_count = max(100, int(len(lines) * SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb))
             kept = lines[-keep_count:]
@@ -130,13 +122,9 @@ def rotate_broker_events() -> dict:
                 f.writelines(kept)
             # 实际裁后大小 (读回再算)
             post_size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
-            return {
-                "sizeMB": round(size_mb, 2),
-                "postSizeMB": round(post_size_mb, 2),
-                "trimmed": len(lines) - len(kept),
-                "kept": len(kept),
-                "safetyFactor": SAFETY_FACTOR,
-            }
+            return {"sizeMB": round(size_mb, 2), "postSizeMB": round(post_size_mb, 2),
+                    "trimmed": len(lines) - len(kept), "kept": len(kept),
+                    "safetyFactor": SAFETY_FACTOR}
         finally:
             fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
             lock_fh.close()
@@ -172,7 +160,6 @@ def rotate_daemon_logs() -> dict:
 def rotate_scratch_old() -> dict:
     """清理超过 MAX_LOG_AGE_DAYS 天且无 .keep 标记的 scratch 目录。"""
     from .config import SCRATCH
-
     if not SCRATCH.exists():
         return {"cleaned": 0, "note": "无 scratch 目录"}
     cleaned = 0
@@ -183,7 +170,6 @@ def rotate_scratch_old() -> dict:
             continue
         if _age_days(d) > MAX_LOG_AGE_DAYS:
             import shutil
-
             shutil.rmtree(d)
             cleaned += 1
     return {"cleaned": cleaned}
@@ -205,58 +191,54 @@ def log_rotate(target: str = "all") -> dict:
         results["broker"] = rotate_broker_events()
     if "scratch" in targets:
         results["scratch"] = rotate_scratch_old()
-    total = sum(
-        r.get("cleaned", 0) + r.get("trimmed", 0) + r.get("trimmed_files", 0) + r.get("trimmed_lines", 0)
-        for r in results.values()
-    )
+    total = sum(r.get("cleaned", 0) + r.get("trimmed", 0) + r.get("trimmed_files", 0) + r.get("trimmed_lines", 0) for r in results.values())
     state = _load_state()
     state["lastRotation"] = now_str
     state["rotationCount"] = state.get("rotationCount", 0) + 1
     _save_state(state)
-    logger.info(f"🧹 日志轮替完成 ({now_str})")
+    print(f"🧹 日志轮替完成 ({now_str})")
     for k, v in results.items():
         if v.get("cleaned", 0) > 0:
-            logger.info(f"   {k}: 删除 {v['cleaned']} 个文件")
+            print(f"   {k}: 删除 {v['cleaned']} 个文件")
         if v.get("trimmed", 0) > 0:
-            logger.info(f"   {k}: 裁剪 {v['trimmed']} 行")
+            print(f"   {k}: 裁剪 {v['trimmed']} 行")
         if v.get("trimmed_files", 0) > 0:
-            logger.info(f"   {k}: 截尾 {v['trimmed_files']} 个日志 ({v.get('trimmed_lines', 0)} 行)")
+            print(f"   {k}: 截尾 {v['trimmed_files']} 个日志 ({v.get('trimmed_lines', 0)} 行)")
     if total == 0:
-        logger.info("   ℹ️ 无需清理")
+        print(f"   ℹ️ 无需清理")
     return {"status": "ok", "results": results, "totalItems": total}
 
 
 def log_rotate_status() -> None:
     """查看日志轮替状态。"""
     state = _load_state()
-    logger.info("🧹 日志轮替状态:\n")
-    logger.info(f"   上次轮替: {state.get('lastRotation', '从未')}")
-    logger.info(f"   累计次数: {state.get('rotationCount', 0)}")
-    logger.info("\n   阈值:")
-    logger.info(f"     历史文件: ≤{MAX_HISTORY_FILES} 个")
-    logger.info(f"     actions.jsonl: ≤{MAX_ACTIONS_LINES} 行")
-    logger.info(f"     broker events: ≤{MAX_BROKER_EVENTS_MB}MB")
-    logger.info(f"     老化天数: {MAX_LOG_AGE_DAYS} 天")
-    logger.info("\n   当前状态:")
+    print("🧹 日志轮替状态:\n")
+    print(f"   上次轮替: {state.get('lastRotation', '从未')}")
+    print(f"   累计次数: {state.get('rotationCount', 0)}")
+    print(f"\n   阈值:")
+    print(f"     历史文件: ≤{MAX_HISTORY_FILES} 个")
+    print(f"     actions.jsonl: ≤{MAX_ACTIONS_LINES} 行")
+    print(f"     broker events: ≤{MAX_BROKER_EVENTS_MB}MB")
+    print(f"     老化天数: {MAX_LOG_AGE_DAYS} 天")
+    print(f"\n   当前状态:")
     # armor history
     history_dir = ARMOR_STATE / "history"
     if history_dir.exists():
         count = len(list(history_dir.glob("memory-index-*.json")))
-        logger.info(f"     历史索引: {count} 个文件")
+        print(f"     历史索引: {count} 个文件")
     # actions.jsonl
     actions_log = ARMOR_STATE / "actions.jsonl"
     if actions_log.exists():
         lines = sum(1 for _ in open(actions_log))
-        logger.info(f"     actions.jsonl: {lines} 行")
+        print(f"     actions.jsonl: {lines} 行")
     # broker
     if MARK42_BROKER_EVENTS.exists():
         size_mb = MARK42_BROKER_EVENTS.stat().st_size / (1024 * 1024)
         lines = sum(1 for _ in open(MARK42_BROKER_EVENTS))
-        logger.info(f"     broker events: {size_mb:.1f}MB ({lines} 行)")
+        print(f"     broker events: {size_mb:.1f}MB ({lines} 行)")
     # scratch
     from .config import SCRATCH
-
     if SCRATCH.exists():
         dirs = [d for d in SCRATCH.iterdir() if d.is_dir()]
         kept = sum(1 for d in dirs if (d / ".keep").exists())
-        logger.info(f"     scratch: {len(dirs)} 个目录 ({kept} 受保护)")
+        print(f"     scratch: {len(dirs)} 个目录 ({kept} 受保护)")

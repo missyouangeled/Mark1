@@ -11,17 +11,15 @@ Mark42 v3 §4.8 · 核心位注册表 (Core Registry)
 
 from __future__ import annotations
 
-from .log_setup import get_logger
-
-logger = get_logger(__name__)
-
 import json
 import logging
+import os
+import time
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ REGISTRY_DIR = Path.home() / ".local" / "state" / "openclaw" / "mark42" / "core-
 REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
 # 8 个核心位定义（§3.6 + §3.6.2 R13-D）
-CORE_DEFINITIONS: list[dict[str, Any]] = [
+CORE_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "core_id": "core_1_main_consciousness",
         "core_role": "main_consciousness",
@@ -53,9 +51,9 @@ CORE_DEFINITIONS: list[dict[str, Any]] = [
     {
         "core_id": "core_3_memory_vector_engine",
         "core_role": "memory_vector",
-        "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
-        "runtime": "local_http",
-        "base_url": "http://127.0.0.1:18792",
+        "model_name": "qmd (embeddinggemma-300M + Qwen3-Reranker)",
+        "runtime": "local_cli",
+        "base_url": "",
         "criticality": "degradable",
         "fallback_chain": ["L1_keyword_only"],
     },
@@ -109,35 +107,32 @@ CORE_DEFINITIONS: list[dict[str, Any]] = [
 
 # ── 数据类 ───────────────────────────────────────────
 
-
 @dataclass
 class CoreEntry:
     """单个核心位的注册信息。"""
-
     core_id: str
     core_role: str
     model_name: str
     runtime: str
     base_url: str
     criticality: str  # critical | degradable | optional
-    fallback_chain: list[str] = field(default_factory=list)
+    fallback_chain: List[str] = field(default_factory=list)
     status: str = "unknown"  # unknown | healthy | degraded | down | quarantined
-    last_used_at: str | None = None
+    last_used_at: Optional[str] = None
     total_invocations: int = 0
     total_failures: int = 0
-    last_failure_reason: str | None = None
+    last_failure_reason: Optional[str] = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
 # ── 探活函数 ─────────────────────────────────────────
 
-
 def _probe_http(url: str, timeout: int = 3) -> bool:
     """HTTP 探活。"""
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:  # noqa: S310
+        with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.status == 200
     except Exception:
         return False
@@ -146,15 +141,16 @@ def _probe_http(url: str, timeout: int = 3) -> bool:
 def _probe_systemd(service: str) -> str:
     """systemd service 探活。返回 active/inactive/unknown。"""
     import subprocess
-
     try:
-        r = subprocess.run(["systemctl", "--user", "is-active", service], capture_output=True, text=True, timeout=3)
+        r = subprocess.run(
+            ["systemctl", "--user", "is-active", service],
+            capture_output=True, text=True, timeout=3)
         return r.stdout.strip()
     except Exception:
         return "unknown"
 
 
-def probe_core(core_id: str) -> dict[str, Any]:
+def probe_core(core_id: str) -> Dict[str, Any]:
     """探活单个核心。返回 {status, reason}。"""
     core = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
     if not core:
@@ -162,6 +158,7 @@ def probe_core(core_id: str) -> dict[str, Any]:
 
     rt = core["runtime"]
     url = core["base_url"]
+    crit = core["criticality"]
 
     # 未加载的核心
     if rt == "none" or core["model_name"] == "not_loaded":
@@ -172,10 +169,17 @@ def probe_core(core_id: str) -> dict[str, Any]:
         if core_id == "core_1_main_consciousness":
             # 主意识走 OpenClaw gateway
             ok = _probe_http("http://127.0.0.1:18788/healthz")
-            return {"status": "healthy" if ok else "down", "reason": "" if ok else "gateway 不可达"}
+            return {"status": "healthy" if ok else "down",
+                    "reason": "" if ok else "gateway 不可达"}
         elif core_id == "core_3_memory_vector_engine":
-            ok = _probe_http("http://127.0.0.1:18792/healthz")
-            return {"status": "healthy" if ok else "down", "reason": "" if ok else "embed-sidecar /healthz 不可达"}
+            # QMD 通过 MCP/CLI 工作，不是 HTTP。检查 qmd 命令可用 + 索引存在
+            import shutil
+            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
+            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
+            if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
+                return {"status": "healthy", "reason": "qmd index ready"}
+            else:
+                return {"status": "down", "reason": "qmd 命令或索引不可用"}
         elif core_id == "core_2_armor_consciousness":
             # 意识层走 API，不直接探活（太慢），默认 healthy
             return {"status": "healthy", "reason": "api provider (skip probe)"}
@@ -184,39 +188,42 @@ def probe_core(core_id: str) -> dict[str, Any]:
             return {"status": "healthy", "reason": "code_analyzer (api provider, skip probe)"}
         else:
             ok = _probe_http(url)
-            return {"status": "healthy" if ok else "down", "reason": "" if ok else f"{url} 不可达"}
+            return {"status": "healthy" if ok else "down",
+                    "reason": "" if ok else f"{url} 不可达"}
+
+    # CLI 命令探活（核心 3 QMD）
+    if rt == "local_cli":
+        import shutil
+        qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
+        index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
+        if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
+            return {"status": "healthy", "reason": "qmd index ready"}
+        else:
+            return {"status": "down", "reason": "qmd 命令或索引不可用"}
 
     # Python 模块探活（核心 4 和 7）
     if rt == "local_python":
         try:
             if core_id == "core_4_text_compressor":
-                from .text_compressor import TextCompressor
-
+                from mark42.text_compressor import TextCompressor
                 TextCompressor()
                 return {"status": "healthy", "reason": "text_compressor loaded"}
             elif core_id == "core_7_pii_redact":
-                from .pii_redactor import PIIRedactor
-
+                from mark42.pii_redactor import PIIRedactor
                 PIIRedactor()
                 return {"status": "healthy", "reason": "pii_redactor loaded"}
             elif core_id == "core_6_log_classify":
-                from .log_classifier import LogClassifier
-
+                from mark42.log_classifier import LogClassifier
                 clf = LogClassifier()
                 ok = clf.health_check()
-                return {
-                    "status": "healthy" if ok else "down",
-                    "reason": "log_classifier loaded" if ok else "health_check failed",
-                }
+                return {"status": "healthy" if ok else "down",
+                        "reason": "log_classifier loaded" if ok else "health_check failed"}
             elif core_id == "core_8_anomaly_detect":
-                from .anomaly_detector import AnomalyDetector
-
+                from mark42.anomaly_detector import AnomalyDetector
                 ad = AnomalyDetector()
                 ok = ad.health_check()
-                return {
-                    "status": "healthy" if ok else "down",
-                    "reason": "anomaly_detector loaded" if ok else "health_check failed",
-                }
+                return {"status": "healthy" if ok else "down",
+                        "reason": "anomaly_detector loaded" if ok else "health_check failed"}
         except Exception as e:
             return {"status": "down", "reason": f"import failed: {e}"}
 
@@ -224,7 +231,6 @@ def probe_core(core_id: str) -> dict[str, Any]:
 
 
 # ── CoreRegistry 主类 ───────────────────────────────
-
 
 class CoreRegistry:
     """核心位注册表。"""
@@ -243,7 +249,7 @@ class CoreRegistry:
         else:
             self.cores = self._init_defaults()
 
-    def _init_defaults(self) -> dict[str, CoreEntry]:
+    def _init_defaults(self) -> Dict[str, CoreEntry]:
         return {c["core_id"]: CoreEntry(**c) for c in CORE_DEFINITIONS}
 
     def _save(self):
@@ -253,47 +259,88 @@ class CoreRegistry:
         }
         REGISTRY_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def list_cores(self) -> list[dict[str, Any]]:
+    def list_cores(self) -> List[Dict[str, Any]]:
         """列出所有核心。"""
         return [c.to_dict() for c in self.cores.values()]
 
-    def get_core(self, core_id: str) -> CoreEntry | None:
+    def get_core(self, core_id: str) -> Optional[CoreEntry]:
         return self.cores.get(core_id)
 
-    def probe_all(self) -> dict[str, Any]:
-        """探活所有核心，更新状态。"""
+    def probe_all(self) -> Dict[str, Any]:
+        """探活所有核心，更新状态。
+        
+        R13-D: 核心状态变为 down/degraded 时自动生成 FAILURE.md；
+        恢复为 healthy 时自动清理 FAILURE.md。
+        """
+        # 延迟导入避免循环依赖
+        from mark42.failure_contract import create_contract_for_core, write_failure_md, remove_failure_md
+        
         results = {}
         for core_id in self.cores:
+            old_status = self.cores[core_id].status
             r = probe_core(core_id)
-            self.cores[core_id].status = r["status"]
-            if r["status"] == "healthy":
+            new_status = r["status"]
+            self.cores[core_id].status = new_status
+            
+            # R13-D: 状态变化时处理 FAILURE.md
+            if new_status in ("down", "degraded") and old_status == "healthy":
+                # 核心降级/故障 → 生成 FAILURE.md
+                criticality = self.cores[core_id].criticality
+                reason = r.get("reason", "")
+                contract = create_contract_for_core(core_id, new_status, criticality, reason)
+                write_failure_md(core_id, contract)
+            elif new_status == "healthy" and old_status in ("down", "degraded", "quarantined"):
+                # 核心恢复 → 删除 FAILURE.md
+                remove_failure_md(core_id)
+            
+            if new_status == "healthy":
                 # 更新 model_name（探活时可能从 not_loaded 变为已加载）
                 core_def = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
                 if core_def:
                     self.cores[core_id].model_name = core_def["model_name"]
-            if r["status"] != "healthy" and r.get("reason"):
+            if new_status != "healthy" and r.get("reason"):
                 self.cores[core_id].last_failure_reason = r["reason"]
             results[core_id] = r
         self._save()
         return results
 
     def quarantine(self, core_id: str, reason: str = "") -> bool:
-        """隔离核心。"""
+        """隔离核心。
+        
+        R13-D: 隔离时自动生成 FAILURE.md。
+        """
         if core_id not in self.cores:
             return False
         self.cores[core_id].status = "quarantined"
         self.cores[core_id].last_failure_reason = reason
         self._save()
+        
+        # R13-D: 隔离 → 生成 FAILURE.md
+        from mark42.failure_contract import create_contract_for_core, write_failure_md
+        criticality = self.cores[core_id].criticality
+        contract = create_contract_for_core(core_id, "degraded", criticality, reason)
+        write_failure_md(core_id, contract)
+        
         return True
 
     def restore(self, core_id: str) -> bool:
-        """恢复隔离的核心。"""
+        """恢复隔离的核心。
+        
+        R13-D: 恢复时自动清理 FAILURE.md。
+        """
         if core_id not in self.cores:
             return False
         r = probe_core(core_id)
-        self.cores[core_id].status = r["status"]
+        new_status = r["status"]
+        self.cores[core_id].status = new_status
         self.cores[core_id].last_failure_reason = None
         self._save()
+        
+        # R13-D: 恢复为 healthy → 删除 FAILURE.md
+        if new_status == "healthy":
+            from mark42.failure_contract import remove_failure_md
+            remove_failure_md(core_id)
+        
         return True
 
     def record_invocation(self, core_id: str, success: bool, reason: str = ""):
@@ -308,7 +355,7 @@ class CoreRegistry:
             c.last_failure_reason = reason
         self._save()
 
-    def summary(self) -> dict[str, Any]:
+    def summary(self) -> Dict[str, Any]:
         """摘要统计。"""
         statuses = {}
         for c in self.cores.values():
@@ -316,32 +363,27 @@ class CoreRegistry:
         return {
             "total": len(self.cores),
             "statuses": statuses,
-            "critical_down": [
-                c.core_id for c in self.cores.values() if c.criticality == "critical" and c.status == "down"
-            ],
+            "critical_down": [c.core_id for c in self.cores.values()
+                              if c.criticality == "critical" and c.status == "down"],
         }
 
 
 # ── CLI 接口 ────────────────────────────────────────
 
-
-def cli_cores_list() -> dict[str, Any]:
+def cli_cores_list() -> Dict[str, Any]:
     reg = CoreRegistry()
     return {"cores": reg.list_cores(), "summary": reg.summary()}
 
-
-def cli_cores_probe() -> dict[str, Any]:
+def cli_cores_probe() -> Dict[str, Any]:
     reg = CoreRegistry()
     return reg.probe_all()
 
-
-def cli_cores_quarantine(core_id: str, reason: str = "") -> dict[str, Any]:
+def cli_cores_quarantine(core_id: str, reason: str = "") -> Dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.quarantine(core_id, reason)
     return {"ok": ok, "core_id": core_id}
 
-
-def cli_cores_restore(core_id: str) -> dict[str, Any]:
+def cli_cores_restore(core_id: str) -> Dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.restore(core_id)
     return {"ok": ok, "core_id": core_id}

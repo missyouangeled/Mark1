@@ -3,35 +3,14 @@
 from __future__ import annotations
 
 import json
-import pathlib
 import shutil
 import subprocess
-
-
-def _find_openclaw() -> str:
-    """动态查找 openclaw CLI 路径。"""
-    path = shutil.which("openclaw")
-    if path:
-        return path
-    for candidate in [
-        pathlib.Path.home() / ".npm-global" / "bin" / "openclaw",
-        pathlib.Path("/usr/local/bin/openclaw"),
-        pathlib.Path("/usr/bin/openclaw"),
-    ]:
-        if candidate.exists():
-            return str(candidate)
-    return "openclaw"
-
-
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .log_setup import get_logger
 from .output_guard import trim_detail, trim_json_short
 from .utils import _now_iso
-
-logger = get_logger(__name__)
 
 
 OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
@@ -82,7 +61,7 @@ SESSION_MAINTENANCE_BASELINE = {
 def _load_openclaw_config() -> dict[str, Any]:
     if not OPENCLAW_CONFIG.exists():
         raise FileNotFoundError(f"缺少配置文件: {OPENCLAW_CONFIG}")
-    with open(OPENCLAW_CONFIG, encoding="utf-8") as f:
+    with open(OPENCLAW_CONFIG, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -101,7 +80,7 @@ def _backup_openclaw_config() -> Path:
 
 def _run_openclaw_validate() -> tuple[bool, str]:
     proc = subprocess.run(
-        [_find_openclaw(), "config", "validate"],
+        ["/home/missyouangeled/.npm-global/bin/openclaw", "config", "validate"],
         capture_output=True,
         text=True,
         check=False,
@@ -122,7 +101,7 @@ def _get_current_session_override() -> dict[str, Any]:
     if not SESSIONS_STORE.exists():
         return {}
     try:
-        with open(SESSIONS_STORE, encoding="utf-8") as f:
+        with open(SESSIONS_STORE, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
@@ -165,32 +144,18 @@ def _status_checks(config: dict[str, Any]) -> list[dict[str, Any]]:
     for key, expected in CONTEXT_PRUNING_BASELINE.items():
         add_check(f"contextPruning.{key}", context_pruning.get(key), expected)
 
-    add_check(
-        "compaction.truncateAfterCompaction",
-        compaction.get("truncateAfterCompaction"),
-        COMPACTION_BASELINE["truncateAfterCompaction"],
-    )
-    add_check(
-        "compaction.keepRecentTokens", compaction.get("keepRecentTokens"), COMPACTION_BASELINE["keepRecentTokens"]
-    )
+    add_check("compaction.truncateAfterCompaction", compaction.get("truncateAfterCompaction"), COMPACTION_BASELINE["truncateAfterCompaction"])
+    add_check("compaction.keepRecentTokens", compaction.get("keepRecentTokens"), COMPACTION_BASELINE["keepRecentTokens"])
     add_check("compaction.maxHistoryShare", compaction.get("maxHistoryShare"), COMPACTION_BASELINE["maxHistoryShare"])
     add_check("compaction.model", compaction.get("model"), COMPACTION_BASELINE["model"])
 
     add_check("memoryFlush.enabled", memory_flush.get("enabled"), MEMORY_FLUSH_BASELINE["enabled"])
-    add_check(
-        "memoryFlush.softThresholdTokens",
-        memory_flush.get("softThresholdTokens"),
-        MEMORY_FLUSH_BASELINE["softThresholdTokens"],
-    )
+    add_check("memoryFlush.softThresholdTokens", memory_flush.get("softThresholdTokens"), MEMORY_FLUSH_BASELINE["softThresholdTokens"])
     add_check("memoryFlush.model", memory_flush.get("model"), MEMORY_FLUSH_BASELINE["model"])
 
     add_check("session.maintenance.mode", maintenance.get("mode"), SESSION_MAINTENANCE_BASELINE["mode"])
-    add_check(
-        "session.maintenance.pruneAfter", maintenance.get("pruneAfter"), SESSION_MAINTENANCE_BASELINE["pruneAfter"]
-    )
-    add_check(
-        "session.maintenance.maxEntries", maintenance.get("maxEntries"), SESSION_MAINTENANCE_BASELINE["maxEntries"]
-    )
+    add_check("session.maintenance.pruneAfter", maintenance.get("pruneAfter"), SESSION_MAINTENANCE_BASELINE["pruneAfter"])
+    add_check("session.maintenance.maxEntries", maintenance.get("maxEntries"), SESSION_MAINTENANCE_BASELINE["maxEntries"])
 
     override = _get_current_session_override()
     checks.append(
@@ -218,26 +183,26 @@ def _print_checks(checks: list[dict[str, Any]], verbose: bool = False) -> dict[s
             "info": "[INFO]",
         }.get(severity, "[INFO]")
         if severity == "info":
-            shown = item["actual"] if verbose else trim_json_short(item["actual"], 120)
-            logger.info(f"{prefix} {item['name']}: {shown}")
+            shown = item['actual'] if verbose else trim_json_short(item['actual'], 120)
+            print(f"{prefix} {item['name']}: {shown}")
         else:
             if verbose:
-                actual = repr(item["actual"])
-                expected = repr(item["expected"])
+                actual = repr(item['actual'])
+                expected = repr(item['expected'])
             else:
-                actual = trim_detail(repr(trim_json_short(item["actual"], 120)), 160)
-                expected = trim_detail(repr(trim_json_short(item["expected"], 120)), 160)
-            logger.info(f"{prefix} {item['name']}: actual={actual} expected={expected}")
+                actual = trim_detail(repr(trim_json_short(item['actual'], 120)), 160)
+                expected = trim_detail(repr(trim_json_short(item['expected'], 120)), 160)
+            print(f"{prefix} {item['name']}: actual={actual} expected={expected}")
     return counts
 
 
 def context_safety_status(verbose: bool = False) -> dict[str, Any]:
     config = _load_openclaw_config()
     checks = _status_checks(config)
-    logger.info("== Mark42 Context Safety Status ==")
-    logger.info(f"config: {OPENCLAW_CONFIG}")
+    print("== Mark42 Context Safety Status ==")
+    print(f"config: {OPENCLAW_CONFIG}")
     counts = _print_checks(checks, verbose=verbose)
-    logger.info(f"summary: pass={counts['pass']} warn={counts['warn']} fail={counts['fail']} info={counts['info']}")
+    print(f"summary: pass={counts['pass']} warn={counts['warn']} fail={counts['fail']} info={counts['info']}")
     return {"checks": checks, "summary": counts, "checkedAt": _now_iso()}
 
 
@@ -294,20 +259,20 @@ def context_safety_apply(verbose: bool = False) -> dict[str, Any]:
         backup = _backup_openclaw_config()
         _save_openclaw_config(new_config)
     valid, output = _run_openclaw_validate()
-    logger.info("== Mark42 Context Safety Apply ==")
-    logger.info(f"backup: {backup if backup else 'none'}")
+    print("== Mark42 Context Safety Apply ==")
+    print(f"backup: {backup if backup else 'none'}")
     if changed:
-        logger.info("changed:")
+        print("changed:")
         if verbose:
             for item in changed:
-                logger.info(f"  - {item}")
+                print(f"  - {item}")
         else:
-            logger.info(f"  - {len(changed)} 项变更")
+            print(f"  - {len(changed)} 项变更")
     else:
-        logger.info("changed: none")
-    logger.info(f"validate: {'PASS' if valid else 'FAIL'}")
+        print("changed: none")
+    print(f"validate: {'PASS' if valid else 'FAIL'}")
     if output:
-        logger.info(output)
+        print(output)
     return {
         "backup": str(backup) if backup else None,
         "changed": changed,
@@ -320,19 +285,19 @@ def context_safety_apply(verbose: bool = False) -> dict[str, Any]:
 def context_safety_verify(verbose: bool = False) -> int:
     result = context_safety_status(verbose=verbose)
     valid, output = _run_openclaw_validate()
-    logger.info("== Validate ==")
-    logger.info(f"status: {'PASS' if valid else 'FAIL'}")
+    print("== Validate ==")
+    print(f"status: {'PASS' if valid else 'FAIL'}")
     if output and verbose:
-        logger.info(output)
+        print(output)
     smoke_ok, smoke_lines = _run_light_smoke_checks()
-    logger.info("== Smoke ==")
+    print("== Smoke ==")
     if verbose:
         for line in smoke_lines:
-            logger.info(line)
+            print(line)
     else:
         pass_count = sum(1 for line in smoke_lines if line.startswith("[PASS]"))
         fail_count = sum(1 for line in smoke_lines if line.startswith("[FAIL]"))
-        logger.info(f"summary: pass={pass_count} fail={fail_count}")
+        print(f"summary: pass={pass_count} fail={fail_count}")
     summary = result["summary"]
     if not valid:
         return 1

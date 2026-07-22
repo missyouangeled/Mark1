@@ -2,22 +2,14 @@
 
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from .log_setup import get_logger
-from .user_config import get as cfg_get
-from .user_config import load_config
-
-logger = get_logger(__name__)
-
 # ── 本地基础工具（不依赖 utils，避免循环导入） ──
-
 
 def _conf_now_iso() -> str:
     return datetime.now(timezone(timedelta(hours=8))).isoformat()
-
 
 def _conf_load_json(path: Path) -> dict:
     if not path.exists():
@@ -28,39 +20,30 @@ def _conf_load_json(path: Path) -> dict:
     except (json.JSONDecodeError, OSError):
         return {}
 
-
 def _conf_save_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-
-# ── 用户配置 ──
-_USER_CONFIG = load_config()
-
-# ── 用户配置（从 ~/.config/mark42/config.toml 加载）──
-_USER_CONFIG = load_config()
-
 # ── 常量 ──────────────────────────────────────────────
 
-# 工作区路径：env > config.toml > 默认值
-WORKSPACE = Path(
-    os.environ.get("MARK42_WORKSPACE", cfg_get("paths", "workspace", str(Path.home() / ".openclaw" / "workspace")))
-).expanduser()
+WORKSPACE = Path(__file__).resolve().parent.parent.parent
 SCRIPTS = WORKSPACE / "scripts"
 
-XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", cfg_get("paths", "xdg_state", str(Path.home() / ".local" / "state"))))
+XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
 
-# SCRATCH 路径（7/01 修： env 路由 + XDG_STATE fallback）
-# 优先级：MARK42_SCRATCH env > XDG_STATE fallback
+# SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
+# 优先级：MARK42_SCRATCH env > /mnt/data/openclaw/scratch > XDG_STATE fallback
 # 避免非点点机器 /mnt/data 不存在时 hard-fail
-SCRATCH = Path(os.environ.get("MARK42_SCRATCH", cfg_get("paths", "scratch", str(XDG_STATE / "openclaw" / "scratch"))))
-if not SCRATCH.parent.exists():
+SCRATCH = Path(os.environ.get("MARK42_SCRATCH", "/mnt/data/openclaw/scratch"))
+if not SCRATCH.parent.parent.exists():
     SCRATCH = XDG_STATE / "openclaw" / "scratch"
 
-# 数据盘路径（优先 SCRATCH 同级，回退 XDG_STATE）
-DATA_ROOT = SCRATCH.parent / "mark42" if SCRATCH.parent.exists() else XDG_STATE / "openclaw" / "mark42"
+# 数据盘路径（优先 /mnt/data，回退 ~/.local/state）
+DATA_ROOT = Path("/mnt/data/openclaw/mark42")
+if not DATA_ROOT.parent.parent.exists():
+    DATA_ROOT = XDG_STATE / "openclaw" / "mark42"
 
 ARMOR_STATE = MARK42_STATE / "armor"
 ENGINE_STATE = MARK42_STATE / "engine"
@@ -74,13 +57,11 @@ BROKER_EVENTS = BROKER_DIR / "events.jsonl"
 BROKER_DIRTY = BROKER_DIR / ".dirty"
 MARK42_BROKER_EVENTS = BROKER_DIR / "mark42-events.jsonl"
 
-THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", str(cfg_get("thresholds", "warn", 70))))
-THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", str(cfg_get("thresholds", "alert", 85))))
-THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", str(cfg_get("thresholds", "crit", 95))))
+THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))
+THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", "85"))
+THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", "95"))
 
-BYTES_PER_KTOKEN = int(
-    os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(cfg_get("thresholds", "bytes_per_ktoken", 2048)))
-)
+BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(2 * 1024)))
 DEFAULT_CONTEXT_WINDOW = 131072
 
 BROKER_SOURCE = "mark42"
@@ -139,7 +120,7 @@ MARK42_MODEL_TABLE: dict[str, dict[str, Any]] = {
     # 用途：上下文压缩时的 LLM 智能分析（armor._llm_analyze）
     "llmAnalyze": {
         "model": "doubao-seed-2.0-pro",
-        "provider": "volcengine-agent",  # openclaw.json 中对应的 provider key
+        "provider": "volcengine-agent",         # openclaw.json 中对应的 provider key
         "maxTokens": 2000,
         "temperature": 0.1,
         "timeout": 120,
@@ -164,46 +145,25 @@ MARK42_MODEL_TABLE: dict[str, dict[str, Any]] = {
     # "taskClassify": { "model": "MiniMax-M3", ... },
 }
 
-
 def get_model_config(config_key: str) -> dict[str, Any] | None:
-    """读取模型配置。
-    优先级：运行时 config.json > config.toml > MARK42_MODEL_TABLE 默认值。
+    """从 Mark42 统一模型配置表读取指定用途的配置。
+    优先读运行时 config.json，不存在时回退到代码中的 MARK42_MODEL_TABLE 默认值。
     """
-    # 1. 先从运行时 config.json 读
+    # 先尝试从运行时配置读取
     if CONFIG_PATH.exists():
         try:
             cfg = json.loads(CONFIG_PATH.read_text())
             models = cfg.get("models", {})
             entry = models.get(config_key)
             if entry:
+                # 兼容旧格式：如果是纯字符串则包装
                 if isinstance(entry, str):
                     return dict(MARK42_MODEL_TABLE.get(config_key, {}), model=entry)
                 return dict(MARK42_MODEL_TABLE.get(config_key, {}), **entry)
         except Exception:
-            logger.exception("Unhandled exception")
             pass
-
-    # 2. 从 config.toml 读
-    from .user_config import load_config as load_toml
-
-    toml_cfg = load_toml()
-    toml_models = toml_cfg.get("models", {})
-    toml_entry = toml_models.get(config_key)
-    if toml_entry and isinstance(toml_entry, dict):
-        # 转换 snake_case -> camelCase（兼容旧格式）
-        result = {}
-        for k, v in toml_entry.items():
-            result[k] = v
-        # 确保有默认值
-        defaults = MARK42_MODEL_TABLE.get(config_key, {})
-        for dk, dv in defaults.items():
-            if dk not in result:
-                result[dk] = dv
-        return result
-
-    # 3. 回退到代码默认值
+    # 回退到代码默认值
     return MARK42_MODEL_TABLE.get(config_key)
-
 
 def resolve_model(config_key: str) -> dict[str, Any] | None:
     """解析最终模型调用参数。
@@ -213,17 +173,13 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
     model_entry = get_model_config(config_key)
     if not model_entry:
         return None
-
+    
     provider_key = model_entry.get("provider", "")
     api_key = ""
     base_url = model_entry.get("baseUrlFallback", "")
-
+    
     # 从 openclaw.json 取 API key 和 baseUrl
-    openclaw_path = Path(
-        os.environ.get(
-            "OPENCLAW_CONFIG", cfg_get("paths", "openclaw_config", str(Path.home() / ".openclaw" / "openclaw.json"))
-        )
-    )
+    openclaw_path = Path.home() / ".openclaw" / "openclaw.json"
     if openclaw_path.exists():
         try:
             oc = json.loads(openclaw_path.read_text())
@@ -232,12 +188,11 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
             if provider.get("baseUrl"):
                 base_url = provider["baseUrl"]
         except Exception:
-            logger.exception("Unhandled exception")
             pass
-
+    
     if not api_key:
         return None
-
+    
     return {
         "model": model_entry.get("model", ""),
         "apiKey": api_key,
@@ -248,25 +203,21 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
         "timeout": model_entry.get("timeout", 45),
     }
 
-
 # ── 配置系统 ────────────────────────────────────────────
-
 
 def _load_config() -> dict[str, any]:  # noqa
     if CONFIG_PATH.exists():
         return _conf_load_json(CONFIG_PATH)
     return {}
 
-
 def _save_config(cfg: dict[str, any]) -> None:  # noqa
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     _conf_save_json(CONFIG_PATH, cfg)
 
-
 def mark42_init() -> None:
     if CONFIG_PATH.exists():
         cfg = _load_config()
-        logger.info(f"⚙️ Mark42 已初始化（版本: {cfg.get('version', '?')})，使用 --config 修改")
+        print(f"⚙️ Mark42 已初始化（版本: {cfg.get('version', '?')})，使用 --config 修改")
         return
     cfg = {
         "version": "2.3.0",
@@ -290,36 +241,38 @@ def mark42_init() -> None:
     for d in [ARMOR_STATE, ENGINE_STATE, HEAVY_STATE]:
         d.mkdir(parents=True, exist_ok=True)
     (ARMOR_STATE / "history").mkdir(parents=True, exist_ok=True)
-    logger.info("✅ Mark42 已初始化")
-    logger.info(f"   配置: {CONFIG_PATH}")
-    logger.info(f"   状态: {MARK42_STATE}")
-    logger.info(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
-    logger.info("   使用 'python3 scripts/mark42.py --config' 查看/修改")
-
+    print("✅ Mark42 已初始化")
+    print(f"   配置: {CONFIG_PATH}")
+    print(f"   状态: {MARK42_STATE}")
+    print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
+    print(f"   使用 'python3 scripts/mark42.py --config' 查看/修改")
 
 def mark42_config() -> None:
     if not CONFIG_PATH.exists():
-        logger.info("⚠️ 运行时配置未创建，使用用户配置文件 (~/.config/mark42/config.toml)")
-    else:
-        cfg = _load_config()
-        logger.info("⚙️ 运行时配置:")
-        logger.info(f"   版本: {cfg.get('version', '?')}")
-        logger.info(f"   上下文窗口: {cfg.get('contextWindow', 0) / 1000:.0f}K")
-    # 显示用户配置文件内容摘要
-    from .user_config import load_config as load_toml
-
-    toml_cfg = load_toml()
-    logger.info("\n📋 用户配置 (config.toml):")
-    t = toml_cfg.get("thresholds", {})
-    logger.info(f"   阈值: WARN={t.get('warn', 70)}% ALERT={t.get('alert', 85)}% CRIT={t.get('crit', 95)}%")
-    p = toml_cfg.get("paths", {})
-    logger.info(f"   工作区: {p.get('workspace', '~/.openclaw/workspace')}")
-    logger.info(f"   OpenClaw: {p.get('openclaw_config', '~/.openclaw/openclaw.json')}")
-    m = toml_cfg.get("models", {})
+        print("❌ 尚未初始化，请先运行: mark42.py --init")
+        return
+    cfg = _load_config()
+    print("⚙️ Mark42 配置:\n")
+    print(f"   版本: {cfg.get('version', '?')}")
+    print(f"   初始化于: {cfg.get('initializedAt', '?')}")
+    print(f"   上下文窗口: {cfg.get('contextWindow', 0)/1000:.0f}K")
+    print(f"   字节/KToken: {cfg.get('bytesPerKtoken', '?')}")
+    print(f"\n   阈值:")
+    t = cfg.get("thresholds", {})
+    print(f"     WARN: {t.get('warn', '?')}%  |  ALERT: {t.get('alert', '?')}%  |  CRIT: {t.get('crit', '?')}%")
+    print(f"\n   模型配置表:")
+    m = cfg.get("models", {})
     for key, entry in m.items():
         if isinstance(entry, dict):
-            logger.info(f"   模型 {key}: {entry.get('model', '?')} (provider: {entry.get('provider', '?')})")
-    d = toml_cfg.get("daemon", {})
-    logger.info("\n   守护进程:")
-    logger.info(f"     扫描间隔: {d.get('scan_interval', 30)}s")
-    logger.info(f"     自动压缩: {d.get('auto_armor_compress', True)}")
+            print(f"     {key}: {entry.get('model', '?')}  (provider: {entry.get('provider', '?')})")
+        elif isinstance(entry, str):
+            print(f"     {key}: {entry}  (旧格式)")
+    print(f"\n   守护模式:")
+    d = cfg.get("daemon", {})
+    print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
+    print(f"     自动压缩: {d.get('autoArmorCompress', '?')}")
+    print(f"     自动监控: {d.get('autoTaskWatch', '?')}")
+    h = cfg.get("heavy", {})
+    print(f"\n   重型战甲:")
+    print(f"     大工程检测: {'启用' if h.get('autoDetectEnabled') else '关闭'}")
+    print(f"     检测模式: {h.get('autoDetect', 'ask')} (ask=询问/semi=半自动30s/full=全自动)")

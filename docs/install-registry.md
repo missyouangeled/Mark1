@@ -6,6 +6,44 @@
 
 ---
 
+## 2026-07-21
+
+### ✅ 安装：byted-ark-tts-skill（豆包 Seed TTS 2.0 语音合成）
+- **时间**：2026-07-21 15:30 CST
+- **触发**：点点要求配置语音回复能力
+- **来源**：自定义构建（官方无预构建 TTS Skill）
+- **安装路径**：`~/.openclaw/skills/byted-ark-tts-skill/`
+- **主脚本**：`scripts/tts.js`
+- **API 端点**：`https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional`
+- **鉴权方式**：`X-Api-Key` 头（复用 Agent Plan 的 ark- key）
+- **资源 ID**：`seed-tts-2.0`
+- **默认音色**：`zh_female_sophie_uranus_bigtts`（魅力苏菲 2.0）
+- **是否成功**：✅ 已验证可正常合成
+- **计费**：5 元/万字符，走 Agent Plan 额度
+- **排查记录**：
+  - `Authorization: Bearer` -> `app key not found`，改用 `X-Api-Key` 解决
+  - `voice_type` 字段 -> `resource ID mismatched`，改用 `speaker` 字段解决
+  - `seed-tts-1.0` + TTS 2.0 音色 -> `resource not granted`，必须用 `seed-tts-2.0`
+  - TTS 1.0 音色（BV001_streaming 等）在 plan 套餐下不可用
+- **特色功能**：支持情绪指令 `#指令#` 控制语气（温柔/吵架/哭腔/ASMR 等）
+- **输出目录**：`~/.openclaw/workspace/media/tts/`
+
+### ✅ 安装：byted-ark-seedream-skill（豆包 Seedream 5.0 lite 图片生成）
+- **时间**：2026-07-21 14:00 CST
+- **触发**：点点要求配置生图能力
+- **来源**：官方 Skill 仓库 `https://skills.volces.com/skills/volcengine/agentplan`
+- **安装路径**：`~/.openclaw/skills/byted-ark-seedream-skill/`
+- **版本**：3.0.0，作者 volcengine/agentplan
+- **生图模型**：doubao-seedream-5.0-lite
+- **API 端点**：`https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
+- **默认保存路径**：`~/.openclaw/workspace/media/Seedream-Images/`
+- **是否成功**：✅ 已验证可正常生图
+- **排查记录**：
+  - 直接调用 API -> `AuthenticationError (API key format is incorrect)`，需通过 Skill 处理认证
+  - 默认保存到桌面 -> OpenClaw webchat 无法显示（`Outside allowed folders`），已修改脚本保存到 workspace/media/
+
+---
+
 ## 2026-07-20
 
 ### ✅ 升级：OpenClaw v2026.7.1 -> v2026.7.1-2 + Branding 脚本适配
@@ -454,3 +492,15 @@
 - **改动**：consciousness.runtime: stub -> api, model: agnes-2.0-flash
 - **原因**：本机 7.7G 内存跑不了 Qwen3-4B，先用 Agnes 2.0 flash 云端 API 替代
 - **可插拔**：以后换回本地模型改 1 行配置（runtime: ollama），代码不用动
+
+---
+
+## AIRI (moeru-ai/airi) - 2026-07-21 收藏
+
+- **仓库**: https://github.com/moeru-ai/airi
+- **Stars**: 42,899
+- **描述**: 自托管 AI 虚拟伴侣，实时语音 + Minecraft/Factorio 游戏 + Live2D/VRM 形象
+- **技术栈**: TypeScript / Vue.js / ONNX Runtime / WebGPU
+- **仓库大小**: ~507 MB
+- **状态**: 收藏待装。本机内存 7.7G 偏紧，clone 时 OOM。等硬件升级或换机后再装
+- **日期**: 2026-07-21

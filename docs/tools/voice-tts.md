@@ -1,5 +1,18 @@
 # Voice replies / TTS
 
+> ⚠️ **当前语音回复标准（2026-07-22 起生效）**
+>
+> - **引擎**：豆包 Seed TTS 2.0（`byted-ark-tts-skill`）
+> - **默认音色**：`zh_female_sophie_uranus_bigtts`（魅力苏菲 2.0）
+> - **输出格式**：wav，存到 `media/tts/`
+> - **禁止**：`--text` 参数中加 `#...#` 情绪指令前缀
+> - **详细规则**：`memory/rules/chat-prefs.md` -> 语音回复引擎与音色
+> - **调用脚本**：`node ~/.openclaw/skills/byted-ark-tts-skill/scripts/tts.js`
+>
+> 以下内容为历史记录（ChatTTS / Kokoro / XTTS / Noiz），**已废弃**，仅供排查参考。
+
+---
+
 > 语音回复 / TTS / Kokoro / ChatTTS / XTTS
 
 

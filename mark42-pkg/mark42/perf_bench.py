@@ -12,39 +12,34 @@ P2-6 目标：
 
 from __future__ import annotations
 
-from .log_setup import get_logger
-
-logger = get_logger(__name__)
-
 import json
+import os
 import sys
 import time
 import tracemalloc
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from statistics import median, quantiles
-from typing import Any
+from typing import Callable, Any
 
 
 def _flush():
     """确保 stdout 立即刷出（尤其在被 pipe/tail 时）。"""
     sys.stdout.flush()
 
-
 _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from .algo_scheduler import process as scheduler_process
-from .code_compressor import codecrush
-from .compress_queue import CompressQueue, CompressRequest
-from .diff_compressor import diff_compress
-from .llm_text_compressor import llm_text_compress_async
-from .log_deduplicator import logdedup
-from .smart_crusher import smartcrush
-from .text_compressor import text_compress
+from smart_crusher import smartcrush
+from text_compressor import text_compress
+from code_compressor import codecrush
+from log_deduplicator import logdedup
+from diff_compressor import diff_compress
+from algo_scheduler import process as scheduler_process
+from compress_queue import CompressRequest, CompressQueue
+from llm_text_compressor import llm_text_compress_async
 
 
 @dataclass
@@ -126,7 +121,7 @@ def bench_sync_algo(algo_fn: Callable[[str], tuple[Any, dict]], samples: list[st
         t0 = time.perf_counter()
         out, stats = algo_fn(sample)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        peak = _measure_peak_kb(lambda s=sample: algo_fn(s))
+        peak = _measure_peak_kb(lambda: algo_fn(sample))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)
@@ -164,7 +159,7 @@ def bench_scheduler(samples: list[str]) -> BenchResult:
         t0 = time.perf_counter()
         result = scheduler_process(sample)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        peak = _measure_peak_kb(lambda s=sample: scheduler_process(s))
+        peak = _measure_peak_kb(lambda: scheduler_process(sample))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)
@@ -209,15 +204,15 @@ def bench_async_queue(samples: list[str]) -> BenchResult:
             if not accepted:
                 raise RuntimeError("queue enqueue failed during benchmark")
             _flush()
-            logger.info(f"  [{idx + 1}/{len(samples)}] queued")
+            print(f"  [{idx+1}/{len(samples)}] queued", file=sys.stderr)
             done = req.wait(timeout=30.0)
             elapsed_ms = (time.perf_counter() - t0) * 1000
             _flush()
             if done:
-                logger.info(f"  [{idx + 1}/{len(samples)}] done ({elapsed_ms:.0f}ms)")
+                print(f"  [{idx+1}/{len(samples)}] done ({elapsed_ms:.0f}ms)", file=sys.stderr)
             else:
-                logger.error(f"  [{idx + 1}/{len(samples)}] TIMEOUT")
-            peak = _measure_peak_kb(lambda s=sample, i=idx: _queue_roundtrip(q, s, f"bench-mem-{i}"))
+                print(f"  [{idx+1}/{len(samples)}] TIMEOUT", file=sys.stderr)
+            peak = _measure_peak_kb(lambda: _queue_roundtrip(q, sample, f"bench-mem-{idx}"))
 
             if not done:
                 raise TimeoutError("queue wait timed out")
@@ -263,8 +258,8 @@ def bench_async_entry(samples: list[str]) -> BenchResult:
         result = llm_text_compress_async(sample, timeout=30.0)
         elapsed_ms = (time.perf_counter() - t0) * 1000
         _flush()
-        logger.info(f"  [{idx + 1}/{len(samples)}] async_entry done ({elapsed_ms:.0f}ms)")
-        peak = _measure_peak_kb(lambda s=sample: llm_text_compress_async(s, timeout=30.0))
+        print(f"  [{idx+1}/{len(samples)}] async_entry done ({elapsed_ms:.0f}ms)", file=sys.stderr)
+        peak = _measure_peak_kb(lambda: llm_text_compress_async(sample, timeout=30.0))
 
         latencies.append(elapsed_ms)
         peak_mems.append(peak)
@@ -347,15 +342,13 @@ def gen_json_sample(size_kb: int) -> str:
     items = []
     i = 0
     while True:
-        items.append(
-            {
-                "id": i,
-                "name": f"user_{i}",
-                "bio": "x" * 180,
-                "tags": ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
-                "values": list(range(60)),
-            }
-        )
+        items.append({
+            "id": i,
+            "name": f"user_{i}",
+            "bio": "x" * 180,
+            "tags": ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
+            "values": list(range(60)),
+        })
         text = json.dumps({"items": items}, ensure_ascii=False)
         if len(text.encode("utf-8")) >= target:
             return _truncate_utf8(text, target)
@@ -404,11 +397,9 @@ def report_line(label: str, result: BenchResult) -> str:
     )
 
 
-def format_report(
-    sync_results: dict[str, dict[int, BenchResult]],
-    scheduler_results: dict[int, BenchResult],
-    async_results: dict[str, dict[int, BenchResult]],
-) -> str:
+def format_report(sync_results: dict[str, dict[int, BenchResult]],
+                  scheduler_results: dict[int, BenchResult],
+                  async_results: dict[str, dict[int, BenchResult]]) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = [
         f"# Mark42 压缩子系统性能基准 ({datetime.now().strftime('%Y-%m-%d')})",
@@ -465,8 +456,8 @@ def format_report(
 
 
 def _progress(label: str, done: int, total: int):
-    """进度提示。"""
-    logger.info(f"[{label}] {done}/{total}")
+    """进度提示，打到 stderr 避免混入 stdout 管道。"""
+    print(f"[{label}] {done}/{total}", file=sys.stderr)
     _flush()
 
 
@@ -484,7 +475,7 @@ def main() -> None:
     }
 
     sync_results: dict[str, dict[int, BenchResult]] = {}
-    logger.info("=== 本地算法层基准 ===")
+    print("=== 本地算法层基准 ===")
     _flush()
     for algo_name, (fn, kind) in sync_algos.items():
         sync_results[algo_name] = {}
@@ -492,43 +483,35 @@ def main() -> None:
             samples = make_samples(kind, size_kb, sync_runs[size_kb])
             result = bench_sync_algo(fn, samples)
             sync_results[algo_name][size_kb] = result
-            logger.info(
-                f"{algo_name:12s} {size_kb:4d}KB  P50={result.p50_ms:8.2f}ms  P95={result.p95_ms:8.2f}ms  Mem={result.peak_mem_kb_p50:8.0f}KB"
-            )
+            print(f"{algo_name:12s} {size_kb:4d}KB  P50={result.p50_ms:8.2f}ms  P95={result.p95_ms:8.2f}ms  Mem={result.peak_mem_kb_p50:8.0f}KB")
 
     scheduler_results: dict[int, BenchResult] = {}
-    logger.info("\n=== 调度层基准 ===")
+    print("\n=== 调度层基准 ===")
     _flush()
     for size_kb in sizes:
         samples = make_samples("mixed", size_kb, async_runs[size_kb])
         result = bench_scheduler(samples)
         scheduler_results[size_kb] = result
-        logger.info(
-            f"scheduler     {size_kb:4d}KB  P50={result.p50_ms:8.2f}ms  P95={result.p95_ms:8.2f}ms  Mem={result.peak_mem_kb_p50:8.0f}KB"
-        )
+        print(f"scheduler     {size_kb:4d}KB  P50={result.p50_ms:8.2f}ms  P95={result.p95_ms:8.2f}ms  Mem={result.peak_mem_kb_p50:8.0f}KB")
 
     async_results: dict[str, dict[int, BenchResult]] = {"queue": {}, "async_entry": {}}
-    logger.info("\n=== 异步层基准 ===")
+    print("\n=== 异步层基准 ===")
     _flush()
     for size_kb in sizes:
         samples = make_samples("text", size_kb, async_runs[size_kb])
         queue_result = bench_async_queue(samples)
         async_results["queue"][size_kb] = queue_result
-        logger.info(
-            f"queue         {size_kb:4d}KB  P50={queue_result.p50_ms:8.2f}ms  P95={queue_result.p95_ms:8.2f}ms  Mem={queue_result.peak_mem_kb_p50:8.0f}KB"
-        )
+        print(f"queue         {size_kb:4d}KB  P50={queue_result.p50_ms:8.2f}ms  P95={queue_result.p95_ms:8.2f}ms  Mem={queue_result.peak_mem_kb_p50:8.0f}KB")
 
         entry_result = bench_async_entry(samples)
         async_results["async_entry"][size_kb] = entry_result
-        logger.info(
-            f"async_entry   {size_kb:4d}KB  P50={entry_result.p50_ms:8.2f}ms  P95={entry_result.p95_ms:8.2f}ms  Mem={entry_result.peak_mem_kb_p50:8.0f}KB"
-        )
+        print(f"async_entry   {size_kb:4d}KB  P50={entry_result.p50_ms:8.2f}ms  P95={entry_result.p95_ms:8.2f}ms  Mem={entry_result.peak_mem_kb_p50:8.0f}KB")
         _flush()
 
     report = format_report(sync_results, scheduler_results, async_results)
     out_path = Path("docs/design/mark42-压缩方案-性能基准-20260626.md")
     out_path.write_text(report)
-    logger.info(f"\n报告已写入: {out_path}")
+    print(f"\n报告已写入: {out_path}")
 
 
 if __name__ == "__main__":
@@ -536,7 +519,7 @@ if __name__ == "__main__":
         main()
     finally:
         try:
-            from .compress_queue import shutdown_compress_queue
+            from compress_queue import shutdown_compress_queue
         except ImportError:
             from .compress_queue import shutdown_compress_queue
         shutdown_compress_queue()

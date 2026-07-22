@@ -52,11 +52,25 @@
 
 | 需求 | 路径 | 备注 |
 |---|---|---|
-| 语音回复总览 | [docs/tools/voice-tts.md](docs/tools/voice-tts.md) | |
-| 本地 ChatTTS | `skills/chattts-stable/SKILL.md` | 稳定中文 TTS |
-| Noizai TTS | `skills/noizai-tts/SKILL.md` | 备用 |
-| XTTS 声音克隆 | [docs/tools/voice-tts.md#xtts](docs/tools/voice-tts.md) | 需 GPU |
-| ChatTTS 配置 | `local_free_voice_cloning_stack` 见 voice-tts.md | |
+| **语音回复标准（必读）** | `memory/rules/chat-prefs.md` -> 「语音回复引擎与音色」段 | 当前标准 |
+| **豆包 TTS Skill** | `~/.openclaw/skills/byted-ark-tts-skill/SKILL.md` | 当前引擎 |
+| 历史文档（旧） | [docs/tools/voice-tts.md](docs/tools/voice-tts.md) | ChatTTS/Kokoro/XTTS 已废弃 |
+
+### 语音回复快速参考
+
+- **引擎**：豆包 Seed TTS 2.0（`byted-ark-tts-skill`）
+- **默认音色**：`zh_female_sophie_uranus_bigtts`（魅力苏菲 2.0）
+- **输出格式**：wav，存到 `media/tts/`
+- **禁止**：`--text` 参数中加 `#...#` 情绪指令前缀
+- **调用**：
+  ```bash
+  node ~/.openclaw/skills/byted-ark-tts-skill/scripts/tts.js \
+    --text "纯文本内容" \
+    --voice zh_female_sophie_uranus_bigtts \
+    --format wav --speed 1.0 \
+    --output media/tts/filename.wav
+  ```
+- **发送**：`[[audio_as_voice]]` + `MEDIA:media/tts/filename.wav`
 
 ## 6. 资源/常驻服务
 

@@ -17,6 +17,7 @@
 | 历史方案 / 技术决策 | `PLANS.md` / `PLANS_INDEX.md` |
 | 项目入口 | `PROJECT_INDEX.md` |
 | 本地工具 / 凭据路径 / 服务入口 | `TOOLS.md` |
+| 语音回复标准 | `memory/rules/chat-prefs.md` -> 语音回复引擎与音色 |
 | 总导航 | `WORKSPACE_INDEX.md` |
 | 非主模型使用手册 | `docs/非主模型使用手册.md` |
 | 🔧 模型路由问题排查 | `docs/通用-AI模型路由问题排查与修复手册.md` |
@@ -103,12 +104,16 @@
 
 ## 图片生成
 
-- **默认图生模型**：`litellm/agnes-image-2.1-flash`（通过 LiteLLM 通道调用）
-- **Agnes API 网关**：`https://apihub.agnes-ai.com/v1`
-- **API key 存储**：已写入 litellm provider 配置（`openclaw.json` → `models.providers.litellm`）
-- **可用模型**：`agnes-image-2.0-flash`、`agnes-image-2.1-flash`、`agnes-video-v2.0`、`agnes-1.5-flash`、`agnes-2.0-flash`
-- **接入日期**：2026-06-10
-- **注意事项**：通过 Control UI 聊天框发送 `sk-` 前缀 key 会被前端安全机制截断→应使用上传页绕过
+- **默认图生模型**：`doubao-seedream-5.0-lite`（通过火山方舟 Agent Plan 调用，无需额外付费）
+- **API 端点**：`https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
+- **鉴权**：`Authorization: Bearer <volcengine-agent apiKey>`
+- **API Key 存储**：`openclaw.json` -> `models.providers.volcengine-agent.apiKey`
+- **最小尺寸**：1920x1920（API 要求至少 3686400 像素）
+- **可用模型**：`doubao-seedream-5.0-lite`、`doubao-seedream-4.5`、`doubao-seedream-4.0`
+- **接入日期**：2026-07-22
+- **备注**：生成图右下角有「AI生成」水印，无法去除；效果优于 Agnes 免费模型
+- **~~Agnes Image（已降级为备用）~~**：`litellm/agnes-image-2.1-flash`，API 网关 `https://apihub.agnes-ai.com/v1`，仅在豆包不可用时作为 fallback
+- **注意事项**：通过 Control UI 聊天框发送 `sk-` 前缀 key 会被前端安全机制截断->应使用上传页绕过
 
 ## 项目
 
