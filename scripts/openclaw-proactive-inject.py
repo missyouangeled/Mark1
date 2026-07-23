@@ -58,6 +58,14 @@ def find_current_dashboard() -> str | None:
             if status == "done":
                 candidates.append((updated, key))
 
+    # Final fallback: use the main session if no dashboard sessions exist
+    if not candidates:
+        main_key = "agent:main:main"
+        main_session = data.get(main_key)
+        if main_session and isinstance(main_session, dict):
+            if main_session.get("status") in ("running", "idle", "done"):
+                candidates.append((main_session.get("updatedAt", 0), main_key))
+
     if not candidates:
         return None
 

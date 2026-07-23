@@ -1962,3 +1962,79 @@
 - [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.03595528333334）
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
 
+## 2026-07-22T15:41:24.125353+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.02902255）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-22T16:41:25.691002+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.0274167）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-22T17:41:27.529955+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.03204925）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T07:15:43.554976+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=799.5092496）
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=814.2713996）
+
+## 2026-07-23T08:15:48.353983+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.08373305）
+
+## 2026-07-23T08:56:05.481609+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=40.28694348333333）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T08:56:17.110697+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=40.48076161666667）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T08:56:26.625215+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=40.63933691666667）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T08:57:42.217740+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=41.89921233333334）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T09:05:46.775746+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=49.9751791）
+
+## 2026-07-23T09:15:50.532038+08:00
+
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=60.037783966666666）
+
+## 2026-07-23T09:20:00.107196+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T09:25:00.113549+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T09:30:00.079868+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T09:50:00.086754+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T09:55:00.093021+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-23T10:00:00.113521+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+

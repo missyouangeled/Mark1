@@ -1486,3 +1486,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260723-001] correction
+
+**Logged**: 2026-07-23T00:27:18.269Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 就是因为没想好。我最初想弄的不是论坛而是一个社区，结合我的小说。打造一个 仿佛在其他星球生活的社区，灵感来源于 有个辩论节目叫 奇葩说，如果不知道可以联网搜索一下。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
