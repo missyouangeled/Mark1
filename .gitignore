@@ -55,3 +55,4 @@ openclaw-workspace-state.json
 
 # Backup directories (pre-upgrade systemd unit backups, etc.)
 docs/backup/
+media/Seedream-Images/

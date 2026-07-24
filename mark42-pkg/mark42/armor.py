@@ -626,15 +626,65 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                             },
                         )
                     else:
-                        # 返回 0 但 session 没变 (极少见, 可能已压缩)
-                        index["compactTriggered"] = True
-                        index["compactMethod"] = "openclaw-sessions-compact"
-                        index["compressionEffective"] = False
-                        index["compactError"] = "no-bytes-saved"
-                        index["preCompactBytes"] = pre_bytes  # J 修复: 也记
-                        index["postCompactBytes"] = post_bytes
-                        index["bytesSaved"] = bytes_saved
-                        print(f"⚠️ sessions.compact 返回成功但 session 未变小")
+                        # LLM compact 返回 rc=0 但文件没缩小。
+                        # 根因：压缩期间用户仍在聊天，新消息追加抵消了截短；
+                        # 或会话已经足够小，LLM 摘要后反而更大。
+                        # 修复 (2026-07-23)：不再只标记失败就完事，
+                        # 而是回退到 --max-lines 截短模式，确保真正缩小文件。
+                        compact_stdout = (compact_proc.stdout or "")[:500]
+                        print(f"⚠️ LLM compact 返回成功但文件未缩小 "
+                              f"(pre={pre_bytes}, post={post_bytes}, diff={bytes_saved})")
+                        print(f"   stdout: {compact_stdout[:200]}")
+                        print(f"   回退到 --max-lines 200 截短模式")
+                        fallback_proc = subprocess.run(
+                            [
+                                "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
+                                "agent:main:main",
+                                "--max-lines", "200",
+                                "--timeout", "180000",
+                                "--json",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=200,
+                        )
+                        if fallback_proc.returncode == 0:
+                            post_bytes2 = active_session.stat().st_size
+                            bytes_saved2 = pre_bytes - post_bytes2
+                            pct_saved2 = round(bytes_saved2 / pre_bytes * 100, 1) if pre_bytes > 0 else 0
+                            index["compactTriggered"] = True
+                            index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback"
+                            index["preCompactBytes"] = pre_bytes
+                            index["postCompactBytes"] = post_bytes2
+                            index["bytesSaved"] = bytes_saved2
+                            index["llmCompactStdout"] = compact_stdout[:300]
+                            if bytes_saved2 > 0:
+                                index["compressionEffective"] = True
+                                index["compactError"] = None
+                                print(f"🧹 截短回退成功: {pre_bytes//1024}KB -> {post_bytes2//1024}KB "
+                                      f"(节省 {pct_saved2}%)")
+                                _append_broker(
+                                    "armor", "mark42.armor.compact.success",
+                                    f"截短回退成功: {pct_saved2}% 节省",
+                                    "ok",
+                                    f"LLM compact 未缩小，截短回退: {pre_bytes//1024}KB -> {post_bytes2//1024}KB",
+                                    {"preBytes": pre_bytes, "postBytes": post_bytes2,
+                                     "bytesSaved": bytes_saved2, "method": "maxlines-fallback"},
+                                )
+                            else:
+                                index["compressionEffective"] = False
+                                index["compactError"] = "no-bytes-saved-after-fallback"
+                                print(f"⚠️ 截短回退后仍未缩小 (pre={pre_bytes}, post={post_bytes2})")
+                        else:
+                            fb_err = (fallback_proc.stderr or fallback_proc.stdout)[:300]
+                            index["compactTriggered"] = True
+                            index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback"
+                            index["compressionEffective"] = False
+                            index["compactError"] = f"fallback-failed: {fb_err}"
+                            index["preCompactBytes"] = pre_bytes
+                            index["postCompactBytes"] = active_session.stat().st_size
+                            index["bytesSaved"] = pre_bytes - active_session.stat().st_size
+                            print(f"⚠️ 截短回退也失败: {fb_err}")
                 else:
                     err = (compact_proc.stderr or compact_proc.stdout)[:300]
                     index["compactTriggered"] = False

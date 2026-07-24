@@ -495,6 +495,40 @@ def engine_daemon(interval_s: int = 30) -> None:
                                        {"taskName": task_name})
             # ── 2. 重新加载 loops（处理 broker 事件中可能新增的） ──
             loops = _load_loops()
+            # ── 2.5 卡死恢复：重置超时 "running" 的 Loop ──
+            # 如果一个 Loop 停留在 "running" 状态超过其 interval 的 2 倍，
+            # 说明上次执行被中断（daemon 重启/被杀/子进程超时），重置为 "registered"。
+            # 根因：2026-07-20 daemon 被 SIGKILL 杀死时 context-guard 正在执行，
+            # status="running" 已写入磁盘，重启后调度器只挑 "registered"，
+            # 导致该 Loop 永久卡死。
+            stale_reset_count = 0
+            for name, loop in loops.items():
+                if loop.get("status") != "running":
+                    continue
+                last_run = loop.get("lastRun", "")
+                if not last_run:
+                    loop["status"] = "registered"
+                    stale_reset_count += 1
+                    continue
+                try:
+                    last_ts = datetime.fromisoformat(last_run).timestamp()
+                    interval = loop.get("interval", 300)
+                    if _now_ts() - last_ts > interval * 2:
+                        print(f"⚠️ Loop '{name}' 卡在 running 已 {int(_now_ts() - last_ts)}s "
+                              f"(>2×{interval}s)，重置为 registered")
+                        loop["status"] = "registered"
+                        stale_reset_count += 1
+                except Exception:
+                    loop["status"] = "registered"
+                    stale_reset_count += 1
+            if stale_reset_count:
+                _save_loops(loops)
+                _append_broker("engine", "mark42.engine.loop.stale_reset",
+                               f"{stale_reset_count} 个 Loop 从卡死状态恢复",
+                               "warn",
+                               f"重置的 Loop 已恢复为 registered，将在本 tick 执行",
+                               {"count": stale_reset_count})
+                loops = _load_loops()  # 重新加载，确保下面的执行用最新状态
             # ── 3. 执行到期 Loop ──
             executed_any = False
             for name, loop in list(loops.items()):
