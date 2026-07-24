@@ -29,3 +29,29 @@ Evaluate whether this capability belongs in agent workflow, hook automation, or 
 - Session Key: agent:main:dashboard:9d7566a0-122a-42c0-b8a6-9082de455fa7
 
 ---
+
+## [FEAT-20260724-001] missing-capability-request
+
+**Logged**: 2026-07-24T05:35:21.714Z
+**Priority**: medium
+**Status**: pending
+**Area**: docs
+
+### Requested Capability
+你能不能加上一个功能，在每次自动压缩以后 读取一下 对话保存日志。
+
+### User Context
+User explicitly asked for a concrete capability or workflow the assistant does not reliably have yet.
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+Evaluate whether this capability belongs in agent workflow, hook automation, or a dedicated skill update.
+
+### Metadata
+- Frequency: first_time
+- Related Features: self-improvement
+- Session Key: agent:main:main
+
+---
