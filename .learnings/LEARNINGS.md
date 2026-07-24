@@ -1510,3 +1510,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260724-001] correction
+
+**Logged**: 2026-07-24T02:09:25.797Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 完整项目： 要能清晰说明架构选型的决策逻辑​：比如为什么选Milvus作为向量库、为什么用混合检索而不是纯向量检索，不能只说“教程里这么写的”。 重点展示线上问题排查能力​：能讲清楚项目中遇到的bad case，比如召回准确率低、模型幻觉等问题，你是怎么定位根因、一步步优化解决的反手就一个豪油根 。 突出生产级特性​：体现出你做的不是能跑通的Demo，而是支持多租户隔离、权限控制、高并发访问的可规模化系统，这才是企业愿意付费的核心能力。 按照Mark42项目来 帮我整理一下这几个方面 。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

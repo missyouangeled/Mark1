@@ -26286,3 +26286,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260724-001] user-reported-error
+
+**Logged**: 2026-07-24T02:29:10.187Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+异常与成本治理​：掌握大模型API的指数退避重试策略，能区分哪些错误不能重试、如何避免重复写请求；熟悉Token统计、多模型路由、熔断降级等生产级必备能力。安全合规意识​：提前掌握Prompt注入防范方案、敏感输出拦截策略，以及API Key和数据的隔离机制， 这些是不是 Mark42 也涉及到了。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
