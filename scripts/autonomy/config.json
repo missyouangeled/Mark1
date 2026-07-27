@@ -1,11 +1,8 @@
 {
   "threshold": 0.6,
   "cooldown_minutes": 30,
-  "daily_max_triggers": 3,
-  "quiet_hours": [
-    22,
-    7
-  ],
+  "daily_max_triggers": 999,
+  "quiet_hours": [99, 99],
   "weights": {
     "time_score": 0.25,
     "gap_score": 0.25,
