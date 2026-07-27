@@ -5,6 +5,18 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.7.0] - 2026-07-27
+
+### 新增
+- 🔧 **ArcLock 电磁锁扣系统**：9 大 Protocol 接口 + 内置实现 + 注册器 + arclock.yaml 配置
+- 🔧 **install.sh 配置向导**：安装后自动初始化 arclock.yaml + 打印配置向导引导
+- 🔧 **arclock.yaml.tmpl**：包内模板，安装时自动复制到状态目录
+- 📄 **CONFIG-GUIDE.md**：完整配置向导文档（openclaw.json / config.toml / arclock.yaml / systemd / 环境变量）
+- 📄 **README.md 重写**：QuickStart 更新为最新功能（含 ArcLock / Consciousness / Breaker / Chaos 等新模块）
+
+### 变更
+- 🔄 pyproject.toml package-data 补 templates/*.yaml + templates/*.tmpl
+
 ## [2.6.0] - 2026-07-21
 
 ### 新增

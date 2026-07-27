@@ -1,0 +1,102 @@
+# ArcLock 电磁锁扣配置文件
+#
+# 位置: ~/.local/state/openclaw/mark42/arclock.yaml
+#
+# 不配 = 用 Mark42 默认实现（零配置开箱即用）
+# 只配你想替换的锁扣，其余自动走默认
+#
+# 配置优先级: arclock.yaml > 代码内 register() > 默认实现
+#
+# 自定义实现需要满足对应 Protocol 接口（PEP 544）。
+# 详见: docs/CONFIG-GUIDE.md -> ArcLock 配置
+
+arclock: {}
+
+  # ── 压缩锁扣 (CompressLock) ──
+  # 替换 Mark42 armor 为 Headroom 或其他第三方压缩方案
+  #
+  # compress:
+  #   module: "headroom_adapter"
+  #   class: "HeadroomCompress"
+  #   config:
+  #     api_key: "your-api-key"
+  #     model: "gpt-4o"
+
+  # ── 记忆搜索锁扣 (MemoryLock) ──
+  # 替换 QMD 向量引擎为 Pinecone / Weaviate / ChromaDB
+  #
+  # memory:
+  #   module: "pinecone_client"
+  #   class: "PineconeMemory"
+  #   config:
+  #     api_key: "your-api-key"
+  #     environment: "us-west-2"
+
+  # ── 意识/自愈锁扣 (ConsciousnessLock) ──
+  # 替换 Consciousness 为自定义运维系统
+  #
+  # consciousness:
+  #   module: "my_ops_system"
+  #   class: "OpsConsciousness"
+  #   config:
+  #     webhook_url: "https://hooks.slack.com/..."
+
+  # ── 错误档案锁扣 (ArchiveLock) ──
+  # 替换 ErrorArchive 为 PagerDuty / Incident.io
+  #
+  # archive:
+  #   module: "pagerduty_adapter"
+  #   class: "PagerDutyArchive"
+  #   config:
+  #     api_key: "your-pagerduty-key"
+  #     service_id: "S123456"
+
+  # ── 熔断器锁扣 (BreakerLock) ──
+  # 替换 CircuitBreaker 为 Hystrix / Resilience4j
+  #
+  # breaker:
+  #   module: "resilience4j_py"
+  #   class: "Resilience4jBreaker"
+  #   config:
+  #     failure_rate_threshold: 0.5
+  #     wait_duration_in_open_state: 60
+
+  # ── 健康监控锁扣 (HealthLock) ──
+  # 替换内置 health-watch 为 Prometheus exporter
+  #
+  # health:
+  #   module: "prometheus_exporter"
+  #   class: "PrometheusHealth"
+  #   config:
+  #     endpoint: "http://prometheus:9090"
+  #     query: 'up{job="mark42"}'
+
+  # ── 循环引擎锁扣 (EngineLock) ──
+  # 替换 engine 为 Celery Beat / APScheduler
+  #
+  # engine:
+  #   module: "celery_adapter"
+  #   class: "CeleryEngine"
+  #   config:
+  #     broker_url: "redis://localhost:6379"
+  #     result_backend: "redis://localhost:6379"
+
+  # ── 混沌工程锁扣 (ChaosLock) ──
+  # 替换 ChaosEngine 为 Chaos Mesh / LitmusChaos
+  #
+  # chaos:
+  #   module: "chaos_mesh_adapter"
+  #   class: "ChaosMeshLock"
+  #   config:
+  #     namespace: "mark42"
+  #     kubeconfig: "/path/to/kubeconfig"
+
+  # ── 重型战甲锁扣 (HeavyLock) ──
+  # 替换 heavy 为 Temporal / Airflow / Prefect
+  #
+  # heavy:
+  #   module: "temporal_adapter"
+  #   class: "TemporalHeavy"
+  #   config:
+  #     host: "localhost:7233"
+  #     namespace: "mark42"

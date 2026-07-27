@@ -179,10 +179,94 @@ fi
 echo
 ok "Mark42 安装完成！"
 echo
-info "快速验证:"
-echo "  mark42 status"
-echo "  mark42 armor --check"
+
+# ── ArcLock 配置初始化 ──
+info "初始化 ArcLock 配置..."
+ARCLOCK_FILE="$STATE_DIR/arclock.yaml"
+if [[ ! -f "$ARCLOCK_FILE" ]]; then
+    # 从包内模板复制
+    TMPL_DIR="$(python3 -c "import mark42; import pathlib; print(pathlib.Path(mark42.__file__).parent / 'templates')" 2>/dev/null)"
+    if [[ -z "$TMPL_DIR" || ! -d "$TMPL_DIR" ]]; then
+        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+        TMPL_DIR="$SCRIPT_DIR/mark42/templates"
+    fi
+    if [[ -f "$TMPL_DIR/arclock.yaml.tmpl" ]]; then
+        cp "$TMPL_DIR/arclock.yaml.tmpl" "$ARCLOCK_FILE"
+        ok "ArcLock 配置已初始化: $ARCLOCK_FILE"
+    else
+        # 创建空配置
+        echo "# ArcLock 配置 - 不配则使用默认实现" > "$ARCLOCK_FILE"
+        echo "arclock: {}" >> "$ARCLOCK_FILE"
+        ok "ArcLock 配置已创建（默认）: $ARCLOCK_FILE"
+    fi
+else
+    ok "ArcLock 配置已存在: $ARCLOCK_FILE"
+fi
+
+# ── 调用 mark42 --init ──
+info "初始化 Mark42 配置..."
+$MARK42_BIN --init 2>/dev/null || true
+ok "配置初始化完成"
+
+# ── 配置向导 ──
 echo
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  Mark42 安装完成！接下来：${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo
+echo -e "${YELLOW}1. 配置模型路由${NC}"
+echo "   编辑 OpenClaw 配置:"
+echo "   $HOME/.openclaw/openclaw.json"
+echo "   在 models.providers 中配置你的 AI 模型供应商："
+echo "   - volcengine-agent (火山方舟, 推荐)"
+echo "   - litellm (Agnes AI)"
+echo "   - ollama (本地模型)"
+echo "   - nvidia (NVIDIA API)"
+echo
+echo -e "${YELLOW}2. 配置 Mark42 阈值${NC}"
+echo "   运行初始化命令:"
+echo "   $MARK42_BIN --init"
+echo "   然后编辑配置文件:"
+echo "   $HOME/.config/mark42/config.toml"
+echo "   关键配置项:"
+echo "   - armor.warn_threshold  (默认 70%)"
+echo "   - armor.alert_threshold (默认 85%)"
+echo "   - armor.crit_threshold  (默认 95%)"
+echo
+echo -e "${YELLOW}3. ArcLock 电磁锁扣（可选）${NC}"
+echo "   默认零配置即可使用，如需自定义实现:"
+echo "   编辑: $ARCLOCK_FILE"
+echo "   可替换的锁扣:"
+echo "   - compress / memory / consciousness / archive"
+echo "   - breaker / health / engine / chaos / heavy"
+echo "   详见: docs/CONFIG-GUIDE.md"
+echo
+echo -e "${YELLOW}4. 启动服务${NC}"
+echo "   一键启动完整战甲:"
+echo "   $MARK42_BIN assemble"
+echo
+echo -e "${YELLOW}5. 验证安装${NC}"
+echo "   查看系统状态:"
+echo "   $MARK42_BIN status"
+echo "   检查上下文健康:"
+echo "   $MARK42_BIN armor --check"
+echo "   查看 Prometheus 指标:"
+echo "   $MARK42_BIN status --metrics"
+echo
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo
+
+# ── 自动验证 ──
+info "运行安装验证..."
+if $MARK42_BIN status >/dev/null 2>&1; then
+    ok "✅ Mark42 安装验证通过"
+else
+    warn "⚠️ Mark42 status 未通过，可能是 OpenClaw 未启动"
+    warn "   请先启动 OpenClaw: openclaw gateway restart"
+    warn "   然后重新验证: $MARK42_BIN status"
+fi
+
 info "配置文件:"
 echo "  OpenClaw: $HOME/.openclaw/openclaw.json"
 echo "  Mark42:   $HOME/.config/mark42/config.toml"
+echo "  ArcLock:  $ARCLOCK_FILE"
