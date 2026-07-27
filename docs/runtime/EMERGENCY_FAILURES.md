@@ -2485,15 +2485,26 @@
 
 - [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
 
-## 2026-07-27T09:20:00.100555+08:00
+## 2026-07-27T11:18:42.016107+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=121.40026845000001）
+- [DEADMAN] CRON_STALE: 救命 1 最近成功运行距离现在超过 15 分钟（age=123.70016845）
+
+## 2026-07-27T11:20:00.089062+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=122.70148436666666）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T11:25:00.118318+08:00
+
+- [DEADMAN] BACKUP_STALE: backup 最近快照超过 25 分钟或无法读取（age=127.70197196666666）
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T11:30:00.092087+08:00
 
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
 
-## 2026-07-27T09:25:00.099441+08:00
+## 2026-07-27T11:35:00.082344+08:00
 
-- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
-
-## 2026-07-27T09:30:00.135404+08:00
-
-- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
 

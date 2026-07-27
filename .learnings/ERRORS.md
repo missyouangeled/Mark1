@@ -4,6 +4,40 @@ Command failures, exceptions, and unexpected behaviors.
 
 ---
 
+## [ERR-20260727-001] chaos-test-unknown-scenario-random-kill
+
+**Logged**: 2026-07-27T11:18:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+每周定时 Chaos Test 执行失败，原因是 `random-kill` 场景不存在。
+
+### Error
+```text
+❌ random-kill [error]
+  耗时: 0ms
+  setup: ❌ | execute: ❌ | verify: ❌ | cleanup: ❌
+  详情: 未知实验: random-kill
+```
+
+### Context
+- Cron Job: mark42-chaos-weekly (每周一 11:18 触发)
+- Command: `cd /home/missyouangeled/.openclaw/workspace/scripts && python3 -m mark42_modules.cli chaos run --scenario random-kill --execute-now`
+- 可用场景列表：kill_engine, kill_armor, fill_disk, network_latency, high_context, circuit_breaker_trip, consciousness_degraded
+
+### Suggested Fix
+1. 更新 Cron Job 中的场景名称，从 `random-kill` 改为一个真实存在的场景（如 `kill_engine` 或 `kill_armor`）
+2. 或者在 chaos CLI 中添加 `random-kill` 作为一个组合场景，随机选择可用场景之一执行
+
+### Metadata
+- Reproducible: yes
+- Related Files: scripts/mark42_modules/cli/chaos.py
+- Tags: chaos-test, cron, configuration
+
+---
+
 ## [ERR-20260529-001] edit-tool-missing-path-key
 
 **Logged**: 2026-05-29T14:05:00+08:00
@@ -26330,6 +26364,36 @@ User message strongly indicated a real failure or error state.
 ### Error
 ```text
 MiniMax 429 导致 cron 任务报错 这个换成 豆包。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
+
+## [ERR-20260727-002] user-reported-error
+
+**Logged**: 2026-07-27T03:19:41.788Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+[Image] User text: OpenClaw doctor │ ◇ Update ──────────────────────────────────────────────────────────────────────────────────╮ │ │ │ This install is not a git checkout. │ │ Run `openclaw update` to update via your package manager (npm/pnpm), then rerun doctor. │ │ │ ├────────…
 ```
 
 ### Context
