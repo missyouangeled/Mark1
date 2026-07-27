@@ -33,6 +33,8 @@ WORKSPACE = Path(os.environ.get(
     os.path.expanduser("~/.openclaw/workspace")
 ))
 DAILY_DIR = WORKSPACE / "memory" / "daily"
+SESSIONS_DIR = Path(os.path.expanduser("~/.openclaw/agents/main/sessions"))
+CHAT_DENSITY_WINDOW_MIN = 4  # 最近N分钟内有聊天则跳过
 
 
 # ============================================================
@@ -89,6 +91,37 @@ def log_decision(features, score, decision, reason=""):
     }
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+# ============================================================
+# 聊天密度检测
+# ============================================================
+
+def get_last_chat_time():
+    """检查最近一次对话活动的时间（session jsonl文件最后修改时间）"""
+    if not SESSIONS_DIR.exists():
+        return None
+    # 找最近修改的 session jsonl 文件（排除 .bak/.lock/.trajectory 等）
+    candidates = []
+    for f in SESSIONS_DIR.glob("*.jsonl"):
+        if ".lock" in f.name or ".bak" in f.name or ".trajectory" in f.name:
+            continue
+        candidates.append(f)
+    if not candidates:
+        return None
+    # 取最近修改的文件
+    latest = max(candidates, key=lambda f: f.stat().st_mtime)
+    return datetime.fromtimestamp(latest.stat().st_mtime)
+
+
+def check_chat_density():
+    """检查最近N分钟内是否有对话活动。
+    返回 (is_chatting, minutes_since_last)"""
+    last = get_last_chat_time()
+    if not last:
+        return False, 999
+    gap = (datetime.now() - last).total_seconds() / 60.0
+    return gap < CHAT_DENSITY_WINDOW_MIN, gap
 
 
 # ============================================================
@@ -248,6 +281,14 @@ def check_daily_limit(state, daily_max):
 def run_decision(config, state, verbose=False):
     """跑一次完整决策流程"""
     now = datetime.now()
+
+    # 先检查聊天密度：正在聊就不插嘴
+    is_chatting, gap_min = check_chat_density()
+    if is_chatting:
+        if verbose:
+            print(f"[聊天中] 距上次对话 {gap_min:.1f}分钟, 跳过决策")
+        return 0, 0.0, "chatting"
+
     features = extract_features(state, now)
 
     # 硬性拦截
