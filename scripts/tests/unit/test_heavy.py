@@ -25,6 +25,16 @@ from mark42_modules import heavy
 # SCRATCH 从 conftest scratch_dir fixture 获取
 
 
+@pytest.fixture(autouse=True)
+def mock_get_compress(mocker):
+    """自动 mock heavy.get_compress，避免真调用 armor。"""
+    mock_lock = MagicMock()
+    mock_lock.check.return_value = {"usagePercent": 30.0, "severity": "ok"}
+    mock_lock.compress.return_value = {"action": "compress"}
+    mocker.patch.object(heavy, "get_compress", return_value=mock_lock)
+    return mock_lock
+
+
 # ─────────────────────── heavy_detect ───────────────────────
 
 class TestHeavyDetect:
@@ -39,12 +49,11 @@ class TestHeavyDetect:
         assert result["advice"] == "路径不存在"
         assert str(nonexistent) == result["path"]
 
-    def test_small_project_not_heavy(self, tmp_path, mocker):
+    def test_small_project_not_heavy(self, tmp_path, mocker, mock_get_compress):
         """10 文件 5MB 不算大工程。"""
         for i in range(10):
             (tmp_path / f"f{i}.txt").write_text("x" * 500_000)  # 500KB each → ~5MB
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         result = heavy.heavy_detect(str(tmp_path))
         assert result["exists"] is True
         assert result["isHeavy"] is False
@@ -52,42 +61,38 @@ class TestHeavyDetect:
         assert result["metrics"]["files"] == 10
         assert result["metrics"]["sizeMB"] < 50  # 实际 5MB
 
-    def test_many_files_triggers_heavy(self, tmp_path, mocker):
+    def test_many_files_triggers_heavy(self, tmp_path, mocker, mock_get_compress):
         """60 个文件触发大工程（>= 50）。"""
         for i in range(60):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         result = heavy.heavy_detect(str(tmp_path))
         assert result["isHeavy"] is True
         assert any("文件数" in r for r in result["reasons"])
 
-    def test_large_size_triggers_heavy(self, tmp_path, mocker):
+    def test_large_size_triggers_heavy(self, tmp_path, mocker, mock_get_compress):
         """总大小 >= 50MB 触发。"""
         # 1 个 60MB 文件
         (tmp_path / "big.bin").write_text("x" * (60 * 1024 * 1024))
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         result = heavy.heavy_detect(str(tmp_path))
         assert result["isHeavy"] is True
         assert any("总大小" in r for r in result["reasons"])
 
-    def test_deep_nesting_triggers_heavy(self, tmp_path, mocker):
+    def test_deep_nesting_triggers_heavy(self, tmp_path, mocker, mock_get_compress):
         """目录深度 >= 5 触发。"""
         deep = tmp_path / "a" / "b" / "c" / "d" / "e" / "f"
         deep.mkdir(parents=True)
         deep.joinpath("file.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         result = heavy.heavy_detect(str(tmp_path))
         assert result["metrics"]["maxDepth"] >= 5
         assert result["isHeavy"] is True
 
-    def test_high_context_triggers_heavy(self, tmp_path, mocker):
+    def test_high_context_triggers_heavy(self, tmp_path, mocker, mock_get_compress):
         """上下文 > 70% 触发。"""
         (tmp_path / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 85.0})
+        mock_get_compress.check.return_value = {"usagePercent": 85.0}
         result = heavy.heavy_detect(str(tmp_path))
         assert result["isHeavy"] is True
         assert any("上下文" in r for r in result["reasons"])
@@ -104,23 +109,21 @@ class TestHeavyDetectHuman:
         out = capsys.readouterr().out
         assert "❌ 路径不存在" in out
 
-    def test_small_project_shows_ok(self, tmp_path, mocker, capsys):
+    def test_small_project_shows_ok(self, tmp_path, mocker, capsys, mock_get_compress):
         """小工程输出 ✅。"""
         (tmp_path / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         heavy.heavy_detect_human(str(tmp_path), auto_mode="ask")
         out = capsys.readouterr().out
         assert "✅" in out
         assert "未達大工程标准" in out or "未达大工程标准" in out
 
-    def test_full_mode_auto_starts(self, tmp_path, mocker):
+    def test_full_mode_auto_starts(self, tmp_path, mocker, mock_get_compress):
         """auto_mode=full 直接调 heavy_start。"""
         # 准备大工程目录
         for i in range(60):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         # mock heavy_start 看是否被调
         mock_start = mocker.patch.object(heavy, "heavy_start")
 
@@ -132,7 +135,7 @@ class TestHeavyDetectHuman:
         # task_name 由 _auto_task_name 生成
         assert "task_name" in args.kwargs or len(args[0]) >= 2
 
-    def test_semi_mode_timeout_auto_starts(self, tmp_path, mocker):
+    def test_semi_mode_timeout_auto_starts(self, tmp_path, mocker, mock_get_compress):
         """semi 模式：mock select 让 rlist 一直空 → 30s 倒计时后自动开工。
 
         设计：为了避免测试跑 30s，mock time.sleep 立即返回，
@@ -140,8 +143,7 @@ class TestHeavyDetectHuman:
         """
         for i in range(60):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         # mock time.sleep 立即返回
         mocker.patch("time.sleep")
         # mock select 让 rlist 总是空（无人输入）
@@ -154,12 +156,11 @@ class TestHeavyDetectHuman:
         # 倒计时结束后应自动调 heavy_start
         mock_start.assert_called_once()
 
-    def test_ask_mode_shows_manual_command(self, tmp_path, mocker, capsys):
+    def test_ask_mode_shows_manual_command(self, tmp_path, mocker, capsys, mock_get_compress):
         """ask 模式：检测到大型项目时只提示手动命令，不开工。"""
         for i in range(60):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
         mock_start = mocker.patch.object(heavy, "heavy_start")
 
         heavy.heavy_detect_human(str(tmp_path), auto_mode="ask")
@@ -175,14 +176,12 @@ class TestHeavyDetectHuman:
 class TestHeavyStart:
     """heavy_start() 测试群。"""
 
-    def test_creates_scratch_dir(self, tmp_path, mocker, scratch_dir):
+    def test_creates_scratch_dir(self, tmp_path, mocker, scratch_dir, mock_get_compress):
         """应在 SCRATCH/task_name 创建目录。"""
         project = tmp_path / "project"
         project.mkdir()
         (project / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
-        mocker.patch.object(heavy, "armor_compress")
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
 
         task_name = "my-test-task"
         heavy.heavy_start(str(project), task_name, context_aware=True)
@@ -191,16 +190,14 @@ class TestHeavyStart:
         assert scratch_task_dir.exists()
         assert (scratch_task_dir / ".keep").exists()
 
-    def test_writes_status_json_with_batches(self, tmp_path, mocker, scratch_dir):
+    def test_writes_status_json_with_batches(self, tmp_path, mocker, scratch_dir, mock_get_compress):
         """应写 status.json 包含 subtasks/batches。"""
         project = tmp_path / "project"
         project.mkdir()
         # 创建 10 个文件
         for i in range(10):
             (project / f"f{i}.txt").write_text("x" * 1000)
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
-        mocker.patch.object(heavy, "armor_compress")
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
 
         heavy.heavy_start(str(project), "test-task")
 
@@ -213,14 +210,12 @@ class TestHeavyStart:
         assert len(status["subtasks"]) >= 1  # 至少一个 batch
         assert status["totalBatches"] == len(status["subtasks"])
 
-    def test_writes_heavy_state_json(self, tmp_path, mocker, heavy_state):
+    def test_writes_heavy_state_json(self, tmp_path, mocker, heavy_state, mock_get_compress):
         """应在 HEAVY_STATE/ 写 task 状态。"""
         project = tmp_path / "project"
         project.mkdir()
         (project / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})
-        mocker.patch.object(heavy, "armor_compress")
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}
 
         heavy.heavy_start(str(project), "task-state")
 
@@ -232,31 +227,25 @@ class TestHeavyStart:
         assert hs["contextAware"] is True
         assert "startedAt" in hs
 
-    def test_context_aware_triggers_compress_on_alert(self, tmp_path, mocker):
+    def test_context_aware_triggers_compress_on_alert(self, tmp_path, mocker, mock_get_compress):
         """context_aware=True 且 usage >= ALERT 时自动触发 compress。"""
         project = tmp_path / "project"
         project.mkdir()
         (project / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 90.0})  # ALERT 区间
-        mock_compress = mocker.patch.object(heavy, "armor_compress")
-
+        mock_get_compress.check.return_value = {"usagePercent": 90.0}  # ALERT 区间
         heavy.heavy_start(str(project), "ctx-aware", context_aware=True)
 
-        mock_compress.assert_called_once()
+        mock_get_compress.compress.assert_called_once()
 
-    def test_context_aware_no_compress_on_normal(self, tmp_path, mocker):
+    def test_context_aware_no_compress_on_normal(self, tmp_path, mocker, mock_get_compress):
         """context_aware=True 但 usage < ALERT 时不触发 compress。"""
         project = tmp_path / "project"
         project.mkdir()
         (project / "f1.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 30.0})  # < ALERT
-        mock_compress = mocker.patch.object(heavy, "armor_compress")
-
+        mock_get_compress.check.return_value = {"usagePercent": 30.0}  # < ALERT
         heavy.heavy_start(str(project), "ctx-normal", context_aware=True)
 
-        mock_compress.assert_not_called()
+        mock_get_compress.compress.assert_not_called()
 
     def test_nonexistent_path_no_op(self, tmp_path, capsys):
         """路径不存在时输出错误并 return（不抛异常）。"""
@@ -270,14 +259,13 @@ class TestHeavyStart:
 class TestHeavyBatchSize:
     """P 修复: batch_size 下限 3 改 1 (单文件友好)。"""
 
-    def test_single_file_yields_single_batch(self, tmp_path, scratch_dir, mocker):
+    def test_single_file_yields_single_batch(self, tmp_path, scratch_dir, mocker, mock_get_compress):
         """【P】1 个文件 + 100% 余量 → batch_size=1, num_batches=1 (原 3, 1 切 1 批但 batch_size 3 不准确)。"""
         # 1 个文件
         for i in range(1):
             (tmp_path / f"f{i}.txt").write_text("x")
         # mock armor_check 返 0% 使用率 (剩 100% 余量)
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 0.0})
+        mock_get_compress.check.return_value = {"usagePercent": 0.0}
         class FakeFile:
             def read(self):
                 return "10G"
@@ -298,13 +286,12 @@ class TestHeavyBatchSize:
             f"P 修复: 1 文件 batch_size 应=1 (下限改了), 实际 {status['batchSize']}"
         )
 
-    def test_batch_size_lower_bound_is_one(self, tmp_path, scratch_dir, mocker):
+    def test_batch_size_lower_bound_is_one(self, tmp_path, scratch_dir, mocker, mock_get_compress):
         """【P】batch_size 公式计算 < 1 时, 应保 1 不保 3。"""
         # 0 个文件是边界, 制造 1 个测试
         for i in range(1):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 99.0})  # 几乎 0% 余量
+        mock_get_compress.check.return_value = {"usagePercent": 99.0}  # 几乎 0% 余量
         class FakeFile:
             def read(self):
                 return "1G"
@@ -732,15 +719,14 @@ class TestHeavyPreflight:
         out = capsys.readouterr().out
         assert "❌ 路径不存在" in out
 
-    def test_existing_path_with_mocked_popen(self, tmp_path, mocker, capsys):
+    def test_existing_path_with_mocked_popen(self, tmp_path, mocker, capsys, mock_get_compress):
         """存在路径 + mock os.popen，应输出文件数和上下文余量。"""
         # 用独立 project 子目录，避免 tmp_path 根目录混入 autouse fixture 生成的 state/data 文件
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         for i in range(5):
             (project_dir / f"f{i}.txt").write_text("x" * 1000)
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 40.0})
+        mock_get_compress.check.return_value = {"usagePercent": 40.0}
 
         # mock os.popen 返回一个 fake file 对象
         class FakeFile:
@@ -764,12 +750,11 @@ class TestHeavyPreflight:
         assert "📂 文件数: 5" in out
         assert "🧠 上下文余量" in out
 
-    def test_low_remaining_warns(self, tmp_path, mocker, capsys):
+    def test_low_remaining_warns(self, tmp_path, mocker, capsys, mock_get_compress):
         """上下文余量 < 20% 时输出 ⚠️。"""
         for i in range(3):
             (tmp_path / f"f{i}.txt").write_text("x")
-        mocker.patch.object(heavy, "armor_check",
-                          return_value={"usagePercent": 85.0})  # 剩余 15%
+        mock_get_compress.check.return_value = {"usagePercent": 85.0}  # 剩余 15%
         class FakeFile:
             def read(self):
                 return "1G"

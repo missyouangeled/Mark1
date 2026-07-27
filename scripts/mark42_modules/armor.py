@@ -899,3 +899,89 @@ def armor_compress_queue_stats() -> dict[str, Any]:
         return get_compress_queue().stats
     except ImportError as e:
         return {"error": f"queue module not available: {e}"}
+
+
+# ── G10: LLM 压缩成功率统计 + fallback SLO 告警 ──
+
+# SLO 阈值：fallback 率超过此值触发告警
+FALLBACK_SLO_THRESHOLD = 0.20  # 20%
+
+
+def armor_llm_stats(window: int = 50) -> dict[str, Any]:
+    """统计最近 N 次压缩的 LLM 成功率 / fallback 率。
+
+    从 actions.jsonl 读取历史记录，按 compactMethod 分类统计。
+    - LLM 路径：compactMethod 含 'llm' 或 'smartcrush'
+    - Fallback 路径：compactMethod 含 'fallback' 或 'maxlines' 或 'heuristic'
+    - 其他（如 openclaw-sessions-compact）：单列
+    """
+    actions_log = ARMOR_STATE / "actions.jsonl"
+    if not actions_log.exists():
+        return {"total": 0, "llmSuccess": 0, "fallback": 0, "other": 0,
+                "llmRate": 0.0, "fallbackRate": 0.0, "sloBreached": False}
+
+    try:
+        with open(actions_log) as f:
+            lines = f.readlines()[-window:]
+    except Exception:
+        return {"error": "读取 actions.jsonl 失败"}
+
+    total = 0
+    llm_success = 0
+    fallback = 0
+    other = 0
+    errors = 0
+
+    for line in lines:
+        try:
+            d = json.loads(line.strip())
+            if d.get("action") not in ("compress", "compress-dryrun"):
+                continue
+            total += 1
+            method = d.get("compactMethod") or ""
+            is_error = bool(d.get("compactError"))
+
+            if "llm" in method.lower() or "smartcrush" in method.lower():
+                llm_success += 1
+            elif "fallback" in method.lower() or "maxlines" in method.lower() or "heuristic" in method.lower():
+                fallback += 1
+            elif is_error:
+                errors += 1
+            else:
+                other += 1
+        except Exception:
+            continue
+
+    effective_total = llm_success + fallback
+    llm_rate = (llm_success / effective_total) if effective_total > 0 else 0.0
+    fallback_rate = (fallback / effective_total) if effective_total > 0 else 0.0
+
+    result = {
+        "total": total,
+        "llmSuccess": llm_success,
+        "fallback": fallback,
+        "other": other,
+        "errors": errors,
+        "llmRate": round(llm_rate * 100, 1),
+        "fallbackRate": round(fallback_rate * 100, 1),
+        "sloThreshold": FALLBACK_SLO_THRESHOLD * 100,
+        "sloBreached": fallback_rate > FALLBACK_SLO_THRESHOLD,
+        "window": min(window, len(lines)),
+    }
+
+    # SLO 告警：fallback 率超阈值时发 broker 事件
+    if result["sloBreached"] and effective_total >= 5:
+        try:
+            from .utils import _append_broker
+            _append_broker(
+                "armor", "mark42.armor.llm.slo_breach",
+                f"LLM fallback 率 {fallback_rate*100:.1f}% 超过 SLO 阈值 {FALLBACK_SLO_THRESHOLD*100:.0f}%",
+                "warn",
+                f"最近 {effective_total} 次压缩中 fallback {fallback} 次",
+                {"fallbackRate": fallback_rate, "threshold": FALLBACK_SLO_THRESHOLD,
+                 "window": effective_total},
+            )
+        except Exception:
+            pass
+
+    return result

@@ -1,8 +1,9 @@
 # Mark42 v4-ArcLock：通用适配层（电磁吸锁扣）设计方案
 
 > 设计日期：2026-07-22
+> 实施日期：2026-07-27
 > 代号：ArcLock（Arc = 战甲，Lock = 锁扣）
-> 状态：**方案设计中（待点点审核）**
+> 状态：**✅ 已实施（P1-P7 全部完成）**
 > 目标：让 Mark42 的每个功能模块都能独立拔插，第三方实现可以"咔嗒"吸上、随时换掉
 
 ---
@@ -752,16 +753,58 @@ mark42 arclock test compress
 
 ## 十、实施计划
 
-| 阶段 | 内容 | 估时 | 依赖 |
-|------|------|------|------|
-| **P1** | 新建 `interfaces/` 目录 + 9 个 Protocol 文件 | 2h | 无 |
-| **P2** | 新建 `plugins/` 目录 + 9 个内置包装器 | 3h | P1 |
-| **P3** | 注册器 `interfaces/__init__.py` | 2h | P1 |
-| **P4** | 修改 5 个现有文件（~65 行改动） | 1h | P2, P3 |
-| **P5** | CLI 新增 `arclock` 子命令 | 1h | P3 |
-| **P6** | 单元测试（~15 个测试用例） | 2h | P4 |
-| **P7** | arclock.yaml 示例文件 + 文档 | 1h | P6 |
-| **总计** | | **~12h** | |
+| 阶段 | 内容 | 估时 | 实际 | 状态 |
+|------|------|------|------|------|
+| **P1** | 新建 `interfaces/` 目录 + 9 个 Protocol 文件 | 2h | 10 min | ✅ 完成 |
+| **P2** | 新建 `plugins/` 目录 + 9 个内置包装器 | 3h | 10 min | ✅ 完成 |
+| **P3** | 注册器 `interfaces/__init__.py` | 2h | 5 min | ✅ 完成 |
+| **P4** | 修改 5 个现有文件（~65 行改动） | 1h | 10 min | ✅ 完成 |
+| **P5** | CLI 新增 `arclock` 子命令 | 1h | 5 min | ✅ 完成 |
+| **P6** | 单元测试（31 个测试用例） | 2h | 10 min | ✅ 完成 |
+| **P7** | arclock.yaml 示例文件 + 文档 | 1h | 5 min | ✅ 完成 |
+| **总计** | | **~12h** | **~55 min** | **全部完成** |
+
+### 实施记录（2026-07-27）
+
+**新增文件（21 个）：**
+- `interfaces/__init__.py` - 注册器 + get/list/configure 函数
+- `interfaces/compress.py` - CompressLock Protocol
+- `interfaces/memory.py` - MemoryLock Protocol
+- `interfaces/consciousness.py` - ConsciousnessLock Protocol
+- `interfaces/error_archive.py` - ArchiveLock Protocol
+- `interfaces/circuit_breaker.py` - BreakerLock Protocol
+- `interfaces/health.py` - HealthLock Protocol
+- `interfaces/engine.py` - EngineLock Protocol
+- `interfaces/chaos.py` - ChaosLock Protocol
+- `interfaces/heavy.py` - HeavyLock Protocol
+- `interfaces/arclock.example.yaml` - 配置文件示例
+- `plugins/__init__.py`
+- `plugins/builtin_compress.py` - 包装 armor.py
+- `plugins/builtin_memory.py` - 包装 QMD
+- `plugins/builtin_consciousness.py` - 包装 Consciousness
+- `plugins/builtin_archive.py` - 包装 ErrorArchive
+- `plugins/builtin_breaker.py` - 包装 CircuitBreaker
+- `plugins/builtin_health.py` - 包装 health-watch
+- `plugins/builtin_engine.py` - 包装 engine
+- `plugins/builtin_chaos.py` - 包装 ChaosEngine
+- `plugins/builtin_heavy.py` - 包装 heavy
+
+**修改文件（7 个）：**
+- `engine.py` - `from .armor import armor_check` → `from .interfaces import get_compress`
+- `heavy.py` - 同上
+- `consciousness.py` - 同上 + `get_engine()` 用于 loop 重新注册
+- `core_registry.py` - core_3 探测改走 `get_memory().health()`
+- `config.py` - 新增 `ARCLOCK_CONFIG_PATH` 常量
+- `cli.py` - 新增 `arclock list/reload/test` 三个子命令
+
+**测试适配（2 个）：**
+- `tests/unit/test_arclock.py` - 31 个新测试（Protocol + 注册器 + 包装器 + 集成 + 配置）
+- `tests/unit/test_engine.py` - mock 从 `armor_check` 改为 `get_compress().check()`
+- `tests/unit/test_heavy.py` - autouse fixture mock `get_compress`
+
+**全量测试结果：**
+- 1091 passed, 2 skipped, 1 failed（失败项为改动前已有的 memory-index 问题）
+- 新增 31 个 ArcLock 测试全部通过
 
 ---
 

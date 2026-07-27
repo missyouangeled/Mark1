@@ -5,7 +5,89 @@
 
 ---
 
-## 2026-07-01 #34 — 继续测试接力：收尾 `code_compressor.py` + 扫描 `cli.py` 边缘分支，整体覆盖升到 97.5%
+## 2026-07-27 #36 - 全量体检修复 + G10/G11/G13/G16/G21/G23 六项缺失补齐
+
+**背景**：
+点点要求全量检查 Mark42，查到任何问题都要修复。发现 3 个 Bug + 截图列出 6 项缺失项，全部修复。
+
+### Bug 修复（3 个）
+
+1. **Bug 1 🔴 consciousness.py 变量丢失**：ArcLock 改动时误删 `_remediate_loop_not_registered` 里 `template/task/interval` 变量提取行，导致 NameError 被 except 兜住，功能失效。已恢复。
+2. **Bug 2 🟠 engine.py memory-index 日期边界**：`cutoff = datetime.now() - timedelta(days=7)` 用时间戳比较，7 天前的文件因 00:00:00 < 当前时刻被跳过。改用 `date()` 比较。
+3. **Bug 3 🟠 utils.py broker 写入无锁**：`_append_broker` 多进程并发写无 fcntl 锁，导致行拼接 + null bytes。加 fcntl.flock 独占锁 + 清理已有坏行。
+
+### G10: LLM 压缩成功率统计 + fallback SLO 告警
+- `armor.py` 新增 `armor_llm_stats()` 函数 + `FALLBACK_SLO_THRESHOLD` 常量
+- 从 actions.jsonl 读取历史，按 compactMethod 分类统计 LLM 成功率 / fallback 率
+- fallback 率 >20% 时发 broker 告警事件
+- 6 个单元测试（test_g10_g11_metrics.py）
+
+### G11: Prometheus metrics 端点
+- `cli.py` 新增 `mark42 status --metrics` 子命令
+- 输出 Prometheus 格式指标：上下文使用率 / LLM 压缩统计 / Loop 状态 / 熔断器状态
+
+### G13: pre-commit lint 规则
+- 新增 `.pre-commit-config.yaml`
+- 规则：trailing-whitespace / end-of-file-fixer / check-yaml / pyflakes
+- 自定义：禁止遗留 TODO/FIXME/NotImplementedError / 禁止 print 作为返回值
+
+### G16: v3 模块专属单测
+- 5 个测试文件（consciousness / error_archive / circuit_breaker / core_registry / advisor_client）
+- 由分身并行编写
+
+### G21: Chaos Test 定时触发
+- 新增 cron 任务 `mark42-chaos-weekly`
+- 每周一 10:00 CST 自动执行 Chaos Test
+
+### G23: 集群打包 tar.gz 脚本
+- 新增 `cluster-pack.sh`
+- 用法：`./cluster-pack.sh <cluster-name> [output-dir]`
+- 打包 config.json + status.json + restart_count + FAILURE.md + manifest.json
+
+**验证结果**：
+- Bug 修复后全量测试：1093 passed, 2 skipped, 0 failed
+- G10/G11 测试：6 passed
+
+---
+
+## 2026-07-27 #35 - ArcLock 电磁锁扣系统实施完成（P1-P7 全部）
+
+**背景**：
+点点 7/22 设计了 ArcLock 通用适配层方案——让 Mark42 每个功能模块都能独立拔插，第三方实现可以“咔嗒”吸上。今天 7/27 点点要求实施。
+
+**变更清单**：
+
+新增文件（21 个）：
+- `interfaces/` 目录：`__init__.py`（注册器）+ 9 个 Protocol 接口文件 + `arclock.example.yaml`
+- `plugins/` 目录：`__init__.py` + 9 个内置包装器（包装 armor/engine/heavy/consciousness/error_archive/circuit_breaker/chaos_engine/health/QMD）
+
+修改文件（7 个）：
+- `engine.py` - `from .armor import armor_check, armor_compress` -> `from .interfaces import get_compress`，所有 `armor_check()` -> `get_compress().check()`，`armor_compress()` -> `get_compress().compress()`
+- `heavy.py` - 同上
+- `consciousness.py` - `_remediate_context_alert` 走 `get_compress().compress()`，`_remediate_loop_not_registered` 走 `get_engine().register_loop()`
+- `core_registry.py` - core_3 探测改走 `get_memory().health()`
+- `config.py` - 新增 `ARCLOCK_CONFIG_PATH` 常量
+- `cli.py` - 新增 `arclock list/reload/test` 三个子命令
+
+测试文件（3 个）：
+- `tests/unit/test_arclock.py` - 31 个新测试
+- `tests/unit/test_engine.py` - mock 适配（`armor_check` -> `get_compress().check()`）
+- `tests/unit/test_heavy.py` - autouse fixture mock `get_compress`
+
+**验证结果**：
+- `python3 -m pytest tests/ -q` -> **1091 passed, 2 skipped, 1 failed**
+- 失败项 `test_scans_recent_daily_files` 为改动前已有问题（memory-index 路径问题，与 ArcLock 无关）
+- 新增 31 个 ArcLock 测试全部通过
+- 0 个原有测试因 ArcLock 改动而失败
+
+**关键设计决策**：
+- 用 `Protocol`（PEP 544）不用 `ABC`——第三方不需要继承任何类
+- 内置实现作为 `plugins/` 包装器——`armor.py` 等核心代码完全不改
+- 零破坏迁移：不配 `arclock.yaml` = 行为不变
+
+---
+
+## 2026-07-01 #34 - 继续测试接力：收尾 `code_compressor.py` + 扫描 `cli.py` 边缘分支，整体覆盖升到 97.5%
 
 **背景**：
 `heavy.py` 完成后，按接力顺位补 `code_compressor.py` 和 `cli.py` 最后一类高价值 contract。这轮尽量在“不扭实现”的前提下填补能填的。

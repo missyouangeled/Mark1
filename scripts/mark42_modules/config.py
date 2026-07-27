@@ -49,6 +49,9 @@ ARMOR_STATE = MARK42_STATE / "armor"
 ENGINE_STATE = MARK42_STATE / "engine"
 HEAVY_STATE = MARK42_STATE / "heavy"
 
+# ArcLock 配置文件路径
+ARCLOCK_CONFIG_PATH = MARK42_STATE / "arclock.yaml"
+
 # 日志统一放到数据盘
 LOG_DIR = DATA_ROOT / "logs"
 

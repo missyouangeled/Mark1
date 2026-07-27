@@ -18,8 +18,9 @@ from .config import (
 from .utils import (
     _append_broker, _load_json, _now_iso, _now_ts, _save_json,
 )
+from .interfaces import get_compress
+
 from .output_guard import trim_detail, trim_summary
-from .armor import armor_check, armor_compress
 from .logs import log_rotate
 
 ENGINE_LOOPS = ENGINE_STATE / "loops.json"
@@ -215,7 +216,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     task = loop["task"]
     print(f"▶️ 执行 Loop '{name}': {task}")
     if template_name == "context-guard":
-        check = armor_check()
+        check = get_compress().check()
         usage = check.get("usagePercent", 0)
         print(f"   🔍 Observe: 上下文 {usage}%")
         if usage >= THRESHOLD_ALERT:
@@ -232,22 +233,22 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 print(f"   🔗 v3-5 路由: {path}")
                 rem = handle_result.get("remediation", {})
                 if rem.get("ok") and not rem.get("dry_run"):
-                    verify = armor_check()
+                    verify = get_compress().check()
                     new_usage = verify.get("usagePercent", 0)
                     print(f"   ✅ Verify: {usage}% -> {new_usage}%")
                     loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
                                           "v3_5_path": path}
                 else:
-                    result = armor_compress()
-                    verify = armor_check()
+                    result = get_compress().compress()
+                    verify = get_compress().check()
                     new_usage = verify.get("usagePercent", 0)
                     print(f"   ✅ Verify: {usage}% -> {new_usage}%")
                     loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
                                           "v3_5_path": path, "v3_5_result": handle_result}
             except Exception as e:
                 print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
-                result = armor_compress()
-                verify = armor_check()
+                result = get_compress().compress()
+                verify = get_compress().check()
                 new_usage = verify.get("usagePercent", 0)
                 print(f"   ✅ Verify: {usage}% -> {new_usage}%")
                 loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
@@ -330,12 +331,14 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         new_anchors = []
         if memory_dir.exists():
             from datetime import datetime as _dt, timedelta as _td
-            cutoff = _dt.now() - _td(days=7)
+            # 用日期比较而非时间戳比较，避免 00:00:00 < 当前时刻导致跳过当天
+            today = _dt.now().date()
+            cutoff_date = today - _td(days=7)
             for df in sorted(memory_dir.glob("*.md"), reverse=True):
                 try:
                     date_str = df.stem
-                    dt = _dt.strptime(date_str, "%Y-%m-%d")
-                    if dt < cutoff:
+                    dt = _dt.strptime(date_str, "%Y-%m-%d").date()
+                    if dt < cutoff_date:
                         continue
                     scanned += 1
                     content = df.read_text()[:2000]
@@ -365,7 +368,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         # 通用/自定义 Loop 回退
         task_lower = task.lower()
         if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
-            result = armor_compress()
+            result = get_compress().compress()
             loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
         else:
             loop["lastResult"] = {"action": "executed", "note": "通用任务"}

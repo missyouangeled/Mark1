@@ -172,14 +172,16 @@ def probe_core(core_id: str) -> Dict[str, Any]:
             return {"status": "healthy" if ok else "down",
                     "reason": "" if ok else "gateway 不可达"}
         elif core_id == "core_3_memory_vector_engine":
-            # QMD 通过 MCP/CLI 工作，不是 HTTP。检查 qmd 命令可用 + 索引存在
-            import shutil
-            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
-            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
-            if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
-                return {"status": "healthy", "reason": "qmd index ready"}
-            else:
-                return {"status": "down", "reason": "qmd 命令或索引不可用"}
+            # 通过 ArcLock 注册器检查记忆搜索后端
+            try:
+                from .interfaces import get_memory
+                mem = get_memory()
+                if mem and mem.health():
+                    return {"status": "healthy", "reason": "memory backend ready"}
+                else:
+                    return {"status": "down", "reason": "memory backend unavailable"}
+            except Exception as e:
+                return {"status": "down", "reason": f"memory probe error: {e}"}
         elif core_id == "core_2_armor_consciousness":
             # 意识层走 API，不直接探活（太慢），默认 healthy
             return {"status": "healthy", "reason": "api provider (skip probe)"}

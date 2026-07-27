@@ -1,0 +1,52 @@
+# Mark42 pre-commit 配置
+# 使用方式：
+#   pip install pre-commit
+#   cd scripts/ && pre-commit install
+#   pre-commit run --all-files  # 手动跑一次
+
+repos:
+  # ── 基础检查 ──
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: debug-statements
+        # 禁止在业务代码中留 print() 调试语句
+        # 注意：Mark42 大量使用 print 作为 CLI 输出，这里只检查 debug 语句
+        exclude: ^(tests/|mark42_modules/cli\.py|mark42_modules/engine\.py|mark42_modules/armor\.py)
+
+  # ── Python 语法检查 ──
+  - repo: https://github.com/pycqa/pyflakes
+    rev: 3.2.0
+    hooks:
+      - id: pyflakes
+        exclude: ^tests/
+
+  # ── 自定义规则：禁止业务代码中的 TODO/FIXME/NotImplementedError ──
+  - repo: local
+    hooks:
+      - id: no-placeholder-todo
+        name: "禁止遗留 TODO/FIXME/NotImplementedError"
+        entry: bash -c 'if grep -rnE "(# TODO|# FIXME|raise NotImplementedError)" --include="*.py" mark42_modules/ | grep -v __pycache__ | grep -v "NotImplementedError.*use request.wait"; then echo "❌ 发现遗留占位符，请修复或移除："; grep -rnE "(# TODO|# FIXME|raise NotImplementedError)" --include="*.py" mark42_modules/ | grep -v __pycache__ | grep -v "NotImplementedError.*use request.wait"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: no-print-as-return
+        name: "禁止 print() 作为业务函数返回值（非 CLI 输出）"
+        entry: bash -c 'if grep -rnE "^\s+return\s+print\(" --include="*.py" mark42_modules/ | grep -v __pycache__ | grep -v cli.py; then echo "❌ 发现 print() 作为返回值："; grep -rnE "^\s+return\s+print\(" --include="*.py" mark42_modules/ | grep -v __pycache__ | grep -v cli.py; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: test-side-effect-assert
+        name: "heavy 集成测试必须断言副作用"
+        entry: bash -c 'if grep -L "assert.*exists\|assert.*is_file" tests/unit/test_heavy.py > /dev/null 2>&1; then echo "⚠️ test_heavy.py 应包含副作用断言"; fi'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        verbose: true

@@ -163,14 +163,13 @@ class TestEngineRunLoopContextGuard:
     def test_low_usage_monitor_only(self, mocker, engine_state):
         """低使用率只 monitor，不触发 compress。"""
         loops = _make_loop(name="ctx-loop", template="context-guard")
-        # mock armor_check 返回低使用率
-        mocker.patch.object(engine, "armor_check",
-                          return_value={"usagePercent": 30.0, "severity": "ok"})
-        mock_compress = mocker.patch.object(engine, "armor_compress")
+        # mock get_compress() 返回的锁扣对象
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.check.return_value = {"usagePercent": 30.0, "severity": "ok"}
 
         engine.engine_run_loop("ctx-loop", persist=False, _loops=loops)
 
-        mock_compress.assert_not_called()
+        mock_lock.return_value.compress.assert_not_called()
         assert loops["ctx-loop"]["lastResult"]["action"] == "monitor"
         assert loops["ctx-loop"]["cycle"] == 1
 
@@ -179,18 +178,16 @@ class TestEngineRunLoopContextGuard:
         v3-5: 走 Consciousness.handle_issue 链路，C3 直接调 armor_compress。
         """
         loops = _make_loop(name="ctx-loop", template="context-guard")
-        # 两次 armor_check 调用：第一次 Observe，第二次 Verify
-        mocker.patch.object(engine, "armor_check",
-                          side_effect=[
-                              {"usagePercent": 90.0, "severity": "critical"},
-                              {"usagePercent": 50.0, "severity": "warn"},
-                          ])
-        # mock consciousness 的 armor_compress（v3-5 C3 路径调的）
-        mocker.patch("mark42_modules.consciousness.armor_compress",
-                     return_value={"action": "compress"}, create=True)
-        # 也 mock engine 的 armor_compress（v3-5 回退路径会调）
-        mock_compress = mocker.patch.object(engine, "armor_compress",
-                                          return_value={"action": "compress"})
+        # mock get_compress() 返回的锁扣对象
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.check.side_effect = [
+            {"usagePercent": 90.0, "severity": "critical"},
+            {"usagePercent": 50.0, "severity": "warn"},
+        ]
+        mock_lock.return_value.compress.return_value = {"action": "compress"}
+        # mock consciousness 的 get_compress（v3-5 C3 路径调的）
+        mocker.patch("mark42_modules.consciousness.get_compress",
+                     return_value=mock_lock.return_value, create=True)
 
         engine.engine_run_loop("ctx-loop", persist=False, _loops=loops)
 
@@ -306,6 +303,23 @@ class TestEngineRunLoopMemoryIndex:
         assert "2026-07-20] Test Topic B" in content
         assert loops["mi"]["lastResult"]["scannedDays"] >= 1
 
+    def test_old_daily_files_skipped(self, mocker, engine_state, tmp_path):
+        """超过 7 天的 daily 文件不会被扫描。"""
+        from datetime import datetime as _dt, timedelta as _td
+        memory_dir = tmp_path / "memory"
+        daily_dir = memory_dir / "daily"
+        daily_dir.mkdir(parents=True)
+        # 8 天前的文件应该被跳过
+        old_date = (_dt.now() - _td(days=8)).strftime("%Y-%m-%d")
+        (daily_dir / f"{old_date}.md").write_text("## Old Topic\n")
+        mocker.patch.object(engine, "WORKSPACE", tmp_path)
+        loops = _make_loop(name="mi-old", template="memory-index")
+        mocker.patch.object(engine, "_load_loops", return_value=loops)
+
+        engine.engine_run_loop("mi-old", persist=False, _loops=loops)
+
+        assert loops["mi-old"]["lastResult"]["scannedDays"] == 0
+
 
 class TestEngineRunLoopGeneric:
     """通用 task（无 template）测试群。"""
@@ -313,12 +327,12 @@ class TestEngineRunLoopGeneric:
     def test_context_keyword_triggers_armor_compress(self, mocker, engine_state):
         """task 含"context"或"armor"关键词时调 armor_compress。"""
         loops = _make_loop(name="generic", template="", task="监控 context 健康")
-        mock_compress = mocker.patch.object(engine, "armor_compress",
-                                          return_value={"action": "compress", "preCompressUsage": 80.0})
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.compress.return_value = {"action": "compress", "preCompressUsage": 80.0}
 
         engine.engine_run_loop("generic", persist=False, _loops=loops)
 
-        mock_compress.assert_called_once()
+        mock_lock.return_value.compress.assert_called_once()
         assert loops["generic"]["lastResult"]["action"] == "compress"
 
     def test_unknown_task_marks_executed(self, mocker, engine_state):
@@ -334,24 +348,24 @@ class TestEngineRunLoopCycle:
     def test_cycle_increments(self, mocker, engine_state):
         """每次执行 cycle 增 1。"""
         loops = _make_loop(name="l1", template="", task="foo", cycle=5)
-        mocker.patch.object(engine, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.check.return_value = {"usagePercent": 30.0}
         engine.engine_run_loop("l1", persist=False, _loops=loops)
         assert loops["l1"]["cycle"] == 6
 
     def test_status_resets_to_registered_after_run(self, mocker, engine_state):
         """执行后状态回到 registered（除非达到 maxCycles）。"""
         loops = _make_loop(name="l1", template="", task="foo", status="running", cycle=0)
-        mocker.patch.object(engine, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.check.return_value = {"usagePercent": 30.0}
         engine.engine_run_loop("l1", persist=False, _loops=loops)
         assert loops["l1"]["status"] == "registered"
 
     def test_completes_after_max_cycles(self, mocker, engine_state):
         """达到 maxCycles 后状态变为 completed。"""
         loops = _make_loop(name="l1", template="", task="foo", cycle=9, max_cycles=10)
-        mocker.patch.object(engine, "armor_check",
-                          return_value={"usagePercent": 30.0})
+        mock_lock = mocker.patch.object(engine, "get_compress")
+        mock_lock.return_value.check.return_value = {"usagePercent": 30.0}
         engine.engine_run_loop("l1", persist=False, _loops=loops)
         assert loops["l1"]["status"] == "completed"
         assert loops["l1"]["cycle"] == 10

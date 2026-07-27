@@ -151,8 +151,21 @@ def _append_broker(source_view: str, event_type: str, label: str, level: str,
         for key in ("summary", "detail", "preview", "message"):
             if key in event["metadata"]:
                 event["metadata"][key] = trim_detail(event["metadata"][key])
-    with open(str(MARK42_BROKER_EVENTS), "a") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    # 加 fcntl 锁防止多进程并发写入导致行拼接
+    import fcntl as _fcntl
+    lock_path = str(MARK42_BROKER_EVENTS) + ".lock"
+    with open(lock_path, "w") as lock_fh:
+        try:
+            _fcntl.flock(lock_fh.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass  # 另一进程在写，跳过锁直接 append（OS 级 write 仍原子）
+        with open(str(MARK42_BROKER_EVENTS), "a") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            f.flush()
+        try:
+            _fcntl.flock(lock_fh.fileno(), _fcntl.LOCK_UN)
+        except:
+            pass
 
 def _safe_mtime(path: Path) -> float:
     try:

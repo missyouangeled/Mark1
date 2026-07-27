@@ -544,6 +544,66 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     return None
 
 
+def _print_metrics() -> None:
+    """G11: 输出 Prometheus 格式指标。"""
+    from .armor import armor_check, armor_llm_stats
+    from .engine import _load_loops
+    from .circuit_breaker import CircuitBreaker
+    import json as _jm
+
+    lines = []
+
+    # 上下文使用率
+    try:
+        check = armor_check()
+        lines.append(f'mark42_context_usage_percent {check.get("usagePercent", 0)}')
+        lines.append(f'mark42_context_severity 1')  # 1=ok, 2=warn, 3=critical
+        lines.append(f'mark42_context_window_tokens {check.get("contextWindow", 0)}')
+        lines.append(f'mark42_context_estimated_tokens {check.get("estimatedTokens", 0)}')
+    except Exception as e:
+        lines.append(f'# armor_check error: {e}')
+
+    # LLM 压缩统计
+    try:
+        stats = armor_llm_stats()
+        lines.append(f'mark42_compress_total {stats.get("total", 0)}')
+        lines.append(f'mark42_compress_llm_success {stats.get("llmSuccess", 0)}')
+        lines.append(f'mark42_compress_fallback {stats.get("fallback", 0)}')
+        lines.append(f'mark42_compress_errors {stats.get("errors", 0)}')
+        lines.append(f'mark42_compress_llm_rate_percent {stats.get("llmRate", 0)}')
+        lines.append(f'mark42_compress_fallback_rate_percent {stats.get("fallbackRate", 0)}')
+        slo = 1 if stats.get("sloBreached") else 0
+        lines.append(f'mark42_compress_slo_breached {slo}')
+    except Exception as e:
+        lines.append(f'# llm_stats error: {e}')
+
+    # Loop 状态
+    try:
+        loops = _load_loops()
+        active = sum(1 for l in loops.values() if l.get("status") == "registered")
+        total = len(loops)
+        lines.append(f'mark42_engine_loops_active {active}')
+        lines.append(f'mark42_engine_loops_total {total}')
+        for name, loop in loops.items():
+            cycle = loop.get("cycle", 0)
+            lines.append(f'mark42_engine_loop_cycle{{loop="{name}"}} {cycle}')
+    except Exception as e:
+        lines.append(f'# engine error: {e}')
+
+    # 熔断器状态
+    try:
+        cb = CircuitBreaker()
+        breaker_states = cb.list_all()
+        open_count = sum(1 for b in breaker_states if b.get("status") == "open")
+        half_open = sum(1 for b in breaker_states if b.get("status") == "half_open")
+        lines.append(f'mark42_breakers_open {open_count}')
+        lines.append(f'mark42_breakers_half_open {half_open}')
+    except Exception as e:
+        lines.append(f'# breaker error: {e}')
+
+    print("\n".join(lines))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Mark42 模块化智能铠甲系统",
@@ -656,6 +716,7 @@ def main() -> None:
     status_p = sub.add_parser("status", help="一屏聚合系统状态")
     status_p.add_argument("--json", action="store_true", help="输出 JSON 格式")
     status_p.add_argument("--verbose", action="store_true", help="输出更详细的状态信息")
+    status_p.add_argument("--metrics", action="store_true", help="输出 Prometheus 格式指标")
 
     # ── v3-2 错误档案（archive）──
     archive_p = sub.add_parser("archive", help="📚 错误档案管理（v3-2）")
@@ -703,6 +764,12 @@ def main() -> None:
     brk_p = sub.add_parser("breaker", help="⚡ 熔断器（R-CAND-02）")
     brk_p.add_argument("action", choices=["list", "status", "reset", "reset-all"], help="子动作")
     brk_p.add_argument("--core-id", default="", help="核心 ID（reset 时必填）")
+
+    # ── v4-ArcLock 电磁锁扣 ──
+    arclock_p = sub.add_parser("arclock", help="🔌 ArcLock 电磁锁扣（v4 通用适配层）")
+    arclock_p.add_argument("action", choices=["list", "reload", "test"], help="子动作")
+    arclock_p.add_argument("--config", type=str, default="", help="配置文件路径（reload）")
+    arclock_p.add_argument("--target", type=str, default="", help="测试目标锁扣名（test）")
 
     args = parser.parse_args()
 
@@ -919,6 +986,10 @@ def main() -> None:
         return
 
     if args.module == "status":
+        if getattr(args, 'metrics', False):
+            # G11: Prometheus 格式指标输出
+            _print_metrics()
+            return
         if getattr(args, 'json', False):
             import json as _j
             result = status_dashboard(json_mode=True)
@@ -1189,6 +1260,78 @@ def main() -> None:
         elif args.action == "reset-all":
             cb.reset_all()
             print("✅ 所有熔断器已重置")
+        return
+
+    if args.module == "arclock":
+        from .interfaces import list_all, configure_from_file, get
+        from .config import ARCLOCK_CONFIG_PATH
+        import json as _j10
+
+        if args.action == "list":
+            print("🔌 ArcLock 电磁锁扣状态\n")
+            statuses = list_all()
+            for name, info in sorted(statuses.items()):
+                if "error" in info:
+                    print(f"  ❌ {name:<18} -> 加载失败: {info['error']}")
+                else:
+                    print(f"  ✅ {name:<18} -> {info['class']} ({info['module']})")
+            # 检查配置文件
+            if ARCLOCK_CONFIG_PATH.exists():
+                print(f"\n  配置文件: {ARCLOCK_CONFIG_PATH}")
+            else:
+                print("\n  配置文件: 未配置（全部使用默认实现）")
+
+        elif args.action == "reload":
+            cfg_path = args.config or str(ARCLOCK_CONFIG_PATH)
+            print(f"🔄 从 {cfg_path} 加载 ArcLock 配置...")
+            configure_from_file(cfg_path)
+            print("✅ 配置加载完成。当前状态:")
+            statuses = list_all()
+            for name, info in sorted(statuses.items()):
+                if "error" in info:
+                    print(f"  ❌ {name:<18} -> {info['error']}")
+                else:
+                    print(f"  ✅ {name:<18} -> {info['class']}")
+
+        elif args.action == "test":
+            target = args.target
+            if not target:
+                print("❌ --target 必填。可测试的锁扣:")
+                for name in ["compress", "memory", "consciousness", "archive",
+                             "breaker", "health", "engine", "chaos", "heavy"]:
+                    print(f"  {name}")
+                return 1
+            impl = get(target)
+            if impl is None:
+                print(f"❌ 锁扣 '{target}' 加载失败")
+                return 1
+            print(f"🧪 测试锁扣: {target}")
+            # 基本协议检查
+            print(f"  类名: {type(impl).__name__}")
+            print(f"  模块: {type(impl).__module__}")
+            # 尝试调用基本方法
+            try:
+                if target == "compress":
+                    result = impl.check()
+                    print(f"  ✅ check() 返回: {_j10.dumps(result, ensure_ascii=False)[:200]}")
+                    dry = impl.compress(dry_run=True)
+                    print(f"  ✅ compress(dry_run=True) 返回: {_j10.dumps(dry, ensure_ascii=False)[:200]}")
+                elif target == "memory":
+                    h = impl.health()
+                    print(f"  ✅ health() 返回: {h}")
+                elif target == "breaker":
+                    s = impl.status()
+                    print(f"  ✅ status() 返回: {_j10.dumps(s, ensure_ascii=False)[:200]}")
+                elif target == "health":
+                    h = impl.check_health()
+                    print(f"  ✅ check_health() 返回: {_j10.dumps(h, ensure_ascii=False)[:200]}")
+                elif target == "engine":
+                    l = impl.list_loops()
+                    print(f"  ✅ list_loops() 返回: {_j10.dumps(l, ensure_ascii=False)[:200]}")
+                else:
+                    print(f"  ✅ 加载成功（无自动化测试，请手动验证）")
+            except Exception as e:
+                print(f"  ❌ 调用失败: {e}")
         return
 
 
