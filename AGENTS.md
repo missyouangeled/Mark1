@@ -12,6 +12,7 @@
 0.2 读 `RULES_INDEX.md`（域规则网关）
 1. 读 `SOUL.md`
 2. 读 `USER.md`
+2.5 读 `COGNITION.md`（认知沉淀层）
 3. 读 `HOST_CONTEXT.md`（如存在）
 4. 读 `HANDOFF.md`（如存在）
 5. 读今日+昨日 `memory/daily/` + session-backup 快照
@@ -52,6 +53,7 @@ BOOT_INDEX.md  ─── 启动入口，指向下面各层
 |---|---|
 | 人格 | `SOUL.md` |
 | 用户 | `USER.md` |
+| 认知沉淀 | `COGNITION.md` |
 | 长期记忆 | `MEMORY.md` |
 | 工具/环境 | `TOOLS.md` |
 | 技能目录 | `SKILL_CATALOG.md` |
