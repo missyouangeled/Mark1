@@ -16,15 +16,6 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def _reset_circuit_breaker_shared():
-    """每个测试前清理 CircuitBreaker 单例共享状态。"""
-    from mark42_modules.circuit_breaker import CircuitBreaker
-    CircuitBreaker._reset_shared()
-    yield
-    CircuitBreaker._reset_shared()
-
-
 # ── P1: BreakerState 数据结构 ───────────────────────
 
 class TestBreakerState:

@@ -1,8 +1,11 @@
 """pytest tests for mark42/heavy.py"""
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 from mark42.heavy import (
     heavy_cleanup,
@@ -13,6 +16,12 @@ from mark42.heavy import (
     heavy_preflight,
     heavy_start,
 )
+
+
+@pytest.fixture(autouse=True)
+def _set_caplog_level(caplog):
+    """caplog 默认只捕获 WARNING+，设为 INFO 以匹配 heavy.py 的 logger.info 输出。"""
+    caplog.set_level(logging.INFO, logger="mark42.heavy")
 
 # ── heavy_preflight tests ──
 
@@ -40,8 +49,8 @@ def test_heavy_preflight_with_valid_path(tmp_path, caplog):
         mock_df = Mock()
         mock_df.read.return_value.strip.return_value = "100G/500G"
 
-        mock_popen.return_value = mock_mem
-        mock_popen.side_effect = [mock_mem, mock_df]
+        # os.popen 被调用 3 次: free, df /, df /mnt/data
+        mock_popen.side_effect = [mock_mem, mock_df, mock_df]
 
         heavy_preflight(str(tmp_path))
 

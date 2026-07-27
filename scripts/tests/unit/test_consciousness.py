@@ -142,7 +142,8 @@ class TestConsciousnessInit:
     def test_init_with_defaults(self):
         from mark42_modules.consciousness import Consciousness, DETERMINISTIC_RULES
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             with patch("mark42_modules.consciousness.ErrorArchive", return_value=MagicMock()):
                 cs = Consciousness()
                 assert cs.rules is DETERMINISTIC_RULES
@@ -154,7 +155,8 @@ class TestConsciousnessInit:
             {"id": "test-001", "match": {"source": "test", "category": "test"},
              "certainty": "100%", "action": "ask_user", "reason": "test"}
         ]
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             with patch("mark42_modules.consciousness.ErrorArchive", return_value=MagicMock()):
                 cs = Consciousness(rules=custom_rules)
                 assert cs.rules == custom_rules
@@ -163,7 +165,8 @@ class TestConsciousnessInit:
         from mark42_modules.consciousness import Consciousness
 
         mock_archive = MagicMock()
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             cs = Consciousness(archive=mock_archive)
             assert cs.archive is mock_archive
 
@@ -180,7 +183,8 @@ class TestAssessCertainty:
             mock_archive = MagicMock()
             mock_archive.lookup.return_value = None
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             return Consciousness(archive=mock_archive, rules=DETERMINISTIC_RULES)
 
     def test_match_rule_100_percent_context_alert(self):
@@ -295,7 +299,8 @@ class TestAutoRemediate:
     def _make_cs(self):
         from mark42_modules.consciousness import Consciousness, DETERMINISTIC_RULES
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             with patch("mark42_modules.consciousness.ErrorArchive", return_value=MagicMock()):
                 return Consciousness(rules=DETERMINISTIC_RULES)
 
@@ -339,7 +344,8 @@ class TestHandleIssue:
             mock_archive = MagicMock()
             mock_archive.lookup.return_value = None
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             return Consciousness(archive=mock_archive, rules=DETERMINISTIC_RULES)
 
     def test_handle_issue_100_percent_dry_run(self):
@@ -403,7 +409,8 @@ class TestDialog:
     def _make_cs(self):
         from mark42_modules.consciousness import Consciousness, DETERMINISTIC_RULES
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             with patch("mark42_modules.consciousness.ErrorArchive", return_value=MagicMock()):
                 return Consciousness(rules=DETERMINISTIC_RULES)
 
@@ -463,7 +470,8 @@ class TestCheckArchive:
             mock_archive = MagicMock()
             mock_archive.lookup.return_value = None
 
-        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()):
+        with patch("mark42_modules.consciousness.build_consciousness", return_value=MagicMock()), \
+             patch("mark42_modules.consciousness._USE_REAL_ADVISOR", False):
             return Consciousness(archive=mock_archive)
 
     def test_no_archive_hit_returns_none(self):

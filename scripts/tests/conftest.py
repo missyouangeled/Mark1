@@ -134,6 +134,21 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
     # pytest 自动清理 tmp_path
 
 
+# ── 1.5 CircuitBreaker 单例清理（autouse）──
+
+@pytest.fixture(autouse=True)
+def _reset_circuit_breaker():
+    """每个测试前清理 CircuitBreaker 单例共享状态，防止测试间状态污染。
+
+    CircuitBreaker 使用类变量 _shared_breakers 共享状态（设计用于 chaos_engine
+    的 execute -> verify 阶段共享），但测试间需要清理。
+    """
+    from mark42_modules.circuit_breaker import CircuitBreaker
+    CircuitBreaker._reset_shared()
+    yield
+    CircuitBreaker._reset_shared()
+
+
 # ── 2. 路径 fixtures（让测试代码少写几行）──
 
 @pytest.fixture
