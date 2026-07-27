@@ -2476,3 +2476,24 @@
 
 - [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 7.26MB，已明显超过 5.0MB watcher 阈值
 
+## 2026-07-27T09:10:00.089551+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 9.40MB，已明显超过 5.0MB watcher 阈值
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-frontstage-guardian.service
+
+## 2026-07-27T09:15:00.092572+08:00
+
+- [CRITICAL] TRAJECTORY_TOO_LARGE: 当前主 trajectory 10.00MB，已明显超过 5.0MB watcher 阈值
+
+## 2026-07-27T09:20:00.100555+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T09:25:00.099441+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T09:30:00.135404+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
