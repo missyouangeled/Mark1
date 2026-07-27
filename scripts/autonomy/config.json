@@ -1,0 +1,22 @@
+{
+  "threshold": 0.6,
+  "cooldown_minutes": 30,
+  "daily_max_triggers": 3,
+  "quiet_hours": [
+    22,
+    7
+  ],
+  "weights": {
+    "time_score": 0.25,
+    "gap_score": 0.25,
+    "frequency_score": 0.15,
+    "mood_score": 0.1,
+    "weekday_score": 0.15,
+    "pending_score": 0.1,
+    "trend_score": 0.1
+  },
+  "feature_defaults": {
+    "mood": "neutral",
+    "pending_topic": false
+  }
+}

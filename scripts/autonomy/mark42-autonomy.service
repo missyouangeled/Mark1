@@ -1,0 +1,10 @@
+[Unit]
+Description=Mark42 Autonomy Decision Engine
+After=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/autonomy/autonomy.py --check
+Environment=OPENCLAW_WORKSPACE=/home/missyouangeled/.openclaw/workspace
+StandardOutput=journal
+StandardError=journal
