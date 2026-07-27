@@ -44,6 +44,21 @@ def load_config():
         return json.load(f)
 
 
+MAX_LOG_ENTRIES = 2000  # 日志最多保留2000条（约5天的每5分钟决策）
+
+
+def rotate_log():
+    """日志轮替：超过MAX_LOG_ENTRIES时只保留最近的一半"""
+    if not LOG_PATH.exists():
+        return
+    with open(LOG_PATH, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    if len(lines) > MAX_LOG_ENTRIES:
+        keep = lines[-(MAX_LOG_ENTRIES // 2):]
+        with open(LOG_PATH, "w", encoding="utf-8") as f:
+            f.writelines(keep)
+
+
 def load_state():
     if not STATE_PATH.exists():
         return {
@@ -494,6 +509,7 @@ def main():
         return
 
     if args.check:
+        rotate_log()
         decision, score, reason = run_decision(config, state, verbose=args.verbose)
         if decision == 1:
             send_trigger_event(score, extract_features(state, datetime.now()))
