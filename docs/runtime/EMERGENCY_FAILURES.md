@@ -2603,3 +2603,61 @@
 - [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
 - [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
 
+## 2026-07-27T14:15:00.097356+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+
+## 2026-07-27T14:25:00.084525+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T14:30:00.105279+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T14:35:00.091548+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T14:45:00.090829+08:00
+
+- [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error
+
+## 2026-07-27T14:55:00.080937+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:00:00.086174+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:05:00.083754+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:25:00.087065+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:30:00.086604+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:35:00.088469+08:00
+
+- [CRITICAL] HEALTH_STUCK_SESSION_DETECT: health-collector 子检查异常：stuck-session-detect / 发现 1 个卡住会话，⚠ 主会话被阻塞！
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T15:45:00.095585+08:00
+
+- [CRITICAL] CRON_NOT_OK: 救命 1 最近状态不是 ok：error
+
+## 2026-07-27T15:55:00.081016+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+
+## 2026-07-27T16:00:00.118250+08:00
+
+- [CRITICAL] SYSTEMD_INACTIVE: 存在 inactive/failed 的 openclaw/mark42 单元：openclaw-lifecycle-maintainer.service
+

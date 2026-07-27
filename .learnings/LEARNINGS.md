@@ -1558,3 +1558,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260727-001] correction
+
+**Logged**: 2026-07-27T07:42:23.158Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 我觉得yuri说的就很对，开始塑造一个ai的时候，其实是双向的，并不是我站在外部来构造什么，而是咱俩站在一起，互相理解，互相塑造。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
