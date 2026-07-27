@@ -275,7 +275,9 @@ class AdvisorClient:
 
         t0 = time.monotonic()
         try:
-            raw = self.provider.chat(messages, response_format={"type": "json_object"})
+            # 不传 response_format（部分 API 如 Agnes 不支持）
+            # prompt 已要求 JSON 输出，靠 _parse_response 兼容
+            raw = self.provider.chat(messages)
         except Exception as e:
             elapsed = int((time.monotonic() - t0) * 1000)
             logger.warning("advisor 调用失败 (%dms): %s", elapsed, e)
@@ -444,7 +446,7 @@ class AdvisorClient:
 
         t0 = time.monotonic()
         try:
-            raw = self.provider.chat(messages, response_format={"type": "json_object"})
+            raw = self.provider.chat(messages)
         except Exception as e:
             elapsed = int((time.monotonic() - t0) * 1000)
             return AdvisorResult(

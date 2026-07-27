@@ -771,6 +771,10 @@ def main() -> None:
     arclock_p.add_argument("--config", type=str, default="", help="配置文件路径（reload）")
     arclock_p.add_argument("--target", type=str, default="", help="测试目标锁扣名（test）")
 
+    ms_p = sub.add_parser("metrics-server", help="📊 Prometheus HTTP 端点（/metrics + /health）")
+    ms_p.add_argument("--port", type=int, default=9100, help="监听端口（默认 9100）")
+    ms_p.add_argument("--host", type=str, default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
+
     args = parser.parse_args()
 
     if not args.module:
@@ -1332,6 +1336,17 @@ def main() -> None:
                     print(f"  ✅ 加载成功（无自动化测试，请手动验证）")
             except Exception as e:
                 print(f"  ❌ 调用失败: {e}")
+        return
+
+    if args.module == "metrics-server":
+        from .metrics_server import run_server
+        print(f"📊 Mark42 Prometheus 端点")
+        print(f"   监听: {args.host}:{args.port}")
+        print(f"   /metrics - Prometheus 格式指标")
+        print(f"   /health  - 健康检查")
+        print(f"   Ctrl+C 停止")
+        print()
+        run_server(port=args.port, host=args.host)
         return
 
 

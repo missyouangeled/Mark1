@@ -514,28 +514,62 @@ class ChaosEngine:
 
     def _setup_consciousness_degraded(self, dry_run: bool = True) -> dict:
         """记录当前意识层状态。"""
-        return {"consciousness_before": "stub"}
+        try:
+            from .llm_provider import build_consciousness, load_config
+            before = type(build_consciousness(load_config())).__name__
+        except Exception:
+            before = "unknown"
+        return {"consciousness_before": before}
 
     def _execute_consciousness_degraded(self, dry_run: bool = True) -> dict:
-        """模拟本地小模型不可用。"""
+        """模拟本地小模型不可用，触发 stub 降级。"""
         if dry_run:
             logger.info("[DRY-RUN] 将模拟 consciousness runtime 不可用")
             return {"action": "degrade (dry_run)"}
-        # 实际实现可以临时修改配置使 runtime 指向不存在的地址
+        # 临时 monkeypatch load_config，注入不可达端点
+        from . import llm_provider as lp
+        original_load = lp.load_config
+        def _mock_load():
+            cfg = original_load()
+            mc = cfg.get("mark42", {}).get("consciousness", {})
+            mc["runtime"] = "api"
+            mc["base_url"] = "http://127.0.0.1:1"
+            mc["api_key"] = "invalid"
+            mc["timeout_seconds"] = 1
+            mc["max_retries"] = 0
+            return cfg
+        lp.load_config = _mock_load
+        self._original_load_config = original_load
         return {"action": "degrade"}
 
     def _verify_consciousness_degraded(self, dry_run: bool = True) -> dict:
-        """验证 stub 降级生效。"""
+        """验证 stub 降级生效：用被破坏的配置实际调用，检查是否回退到 stub。"""
         if dry_run:
             return True
-        from .llm_provider import build_consciousness, load_config
+        from .llm_provider import chat_with_fallback, load_config, ChatMessage
 
         cfg = load_config()
-        p = build_consciousness(cfg)
-        return type(p).__name__ == "StubRuntime"
+        # 用被 monkeypatch 的配置实际调用
+        try:
+            resp = chat_with_fallback(
+                [ChatMessage(role="user", content="ping")],
+                cfg=cfg,
+                caller="chaos_verify",
+            )
+            # stub 回声的特征：content 包含 "stub" 或 echo
+            is_stub = "stub" in (resp.content or "").lower() or "echo" in (resp.content or "").lower()
+            return is_stub
+        except Exception:
+            # 如果调用本身就抛异常也不算通过
+            return False
 
     def _cleanup_consciousness_degraded(self, dry_run: bool = True) -> None:
-        pass
+        if dry_run:
+            return
+        if hasattr(self, "_original_load_config"):
+            from . import llm_provider as lp
+            lp.load_config = self._original_load_config
+            del self._original_load_config
 
     # ── 工具方法 ──
 

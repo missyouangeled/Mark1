@@ -72,7 +72,16 @@ class CircuitBreaker:
     """
 
     def __init__(self):
-        self._breakers: Dict[str, BreakerState] = {}
+        # 单例共享状态：同一进程内所有 CircuitBreaker() 实例共享 _breakers
+        if not hasattr(self, '_shared_breakers'):
+            type(self)._shared_breakers: Dict[str, BreakerState] = {}
+        self._breakers = type(self)._shared_breakers
+
+    @classmethod
+    def _reset_shared(cls):
+        """重置共享状态（测试/混沌实验 cleanup 用）。"""
+        if hasattr(cls, '_shared_breakers'):
+            cls._shared_breakers.clear()
 
     def _get(self, core_id: str) -> BreakerState:
         if core_id not in self._breakers:
