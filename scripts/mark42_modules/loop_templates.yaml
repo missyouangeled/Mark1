@@ -1,0 +1,40 @@
+# Mark42 Loop 模板配置文件
+# 包含所有内置 Loop 模板的元数据
+# 用户可在工作区根目录创建 loop_templates.yaml 覆盖或扩展模板
+
+templates:
+  context-guard:
+    period: 300
+    description: "持续监控上下文健康 + 自动出手
+      Observe: armor --check
+      Decide:  if usage > 85% → trigger compress; if > 70% → warn
+      Act:     armor --compress"
+
+  task-watch:
+    period: 30
+    description: "大工程执行 + 全程护航
+      Observe: heavy task status via scratch/{name}/status.json
+      Decide:  if stalled → alert; if done → verify; if failed → retry
+      Act:     notify frontstage via broker"
+
+  health-watch:
+    period: 600
+    description: "系统健康监控（CPU/内存/磁盘）
+      Observe: free -h && df -h / /mnt/data
+      Decide:  if disk < 5GB or mem < 500MB → alert
+      Act:     write broker warning event"
+
+  model-fallback:
+    period: 60
+    description: "监测模型可用性状态
+      Observe: 扫描 broker 事件中 model.fallback 信号
+      Decide:  检测到故障 → 写 Mark42 broker 警告
+      Act:     在 status dashboard 展示 failover 历史
+      ⚠️ 模型切换由 OpenClaw 内置 failover 自动完成，铠甲不接管"
+
+  memory-index:
+    period: 21600
+    description: "记忆自动归类——扫描最近 daily 文件 + 更新 INDEX.md 锚点
+      Observe: 扫描最近 7 天 memory/daily/ 文件
+      Decide:  识别新主题/事件/改进要求 → 追加到 memory/INDEX.md
+      Act:     写入 memory/INDEX.md 主题锚点条目（去重）"

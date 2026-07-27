@@ -320,7 +320,7 @@ def heavy_finish(task_name: str) -> None:
 
 
 def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None,
-                   execute_now: bool = False) -> dict[str, Any]:
+                   execute_now: bool = False, retry: bool = False) -> dict[str, Any]:
     """准备并（可选）执行大工程子任务 — 将 batch 分配给后台分身。
     不传 batch_id 则按序处理第一个 pending batch。
 
@@ -349,16 +349,21 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
         if target_id not in subtasks:
             logger.info(f"❌ 批次 '{target_id}' 不存在")
             return
-        if subtasks[target_id]["status"] not in ("pending",):
+        allowed = ("pending",) if not retry else ("pending", "failed")
+        if subtasks[target_id]["status"] not in allowed:
             logger.info(f"⚠️ 批次 '{target_id}' 状态为 '{subtasks[target_id]['status']}'，跳过")
             return
     else:
+        search_statuses = ("pending", "failed") if retry else ("pending",)
         for bid, bt in sorted(subtasks.items()):
-            if bt.get("status") == "pending":
+            if bt.get("status") in search_statuses:
                 target_id = bid
                 break
         if not target_id:
-            logger.info(f"✅ 所有批次已完成，无 pending 子任务")
+            if retry:
+                logger.info(f"✅ 无 pending/failed 子任务需要处理")
+            else:
+                logger.info(f"✅ 所有批次已完成，无 pending 子任务")
             return
     batch = subtasks[target_id]
     files = batch.get("files", [])
@@ -369,9 +374,15 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
         logger.info(f"      {f}")
     if len(files) > 5:
         logger.info(f"      ... 共 {len(files)} 个")
-    # 标记为 running
+    # 标记为 running（记录重试信息）
+    retry_count = batch.get("retryCount", 0)
+    if retry:
+        retry_count += 1
     batch["status"] = "running"
     batch["startedAt"] = _now_iso()
+    batch["retryCount"] = retry_count
+    if retry:
+        batch["lastRetryAt"] = _now_iso()
     st["lastUpdate"] = _now_iso()
     _save_json(status_file, st)
     # 生成执行脚本
@@ -459,7 +470,7 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
 
 
 def heavy_execute_all(task_name: str, command: str | None = None,
-                       execute_now: bool = False) -> list[dict[str, Any]]:
+                       execute_now: bool = False, retry: bool = False) -> list[dict[str, Any]]:
     """自动准备所有 pending 子任务。默认仅入队，不传 execute_now 不真跑。"""
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
@@ -479,6 +490,62 @@ def heavy_execute_all(task_name: str, command: str | None = None,
         r = heavy_execute(task_name, bid, command=command, execute_now=execute_now)
         results.append(r)
     return results
+
+
+
+def heavy_resume(task_name: str, command: str | None = None,
+                 execute_now: bool = False) -> dict[str, Any]:
+    """断点续传：自动找到所有 failed/pending 批次并重新执行。
+
+    1. 扫描 status.json 中所有 subtasks
+    2. 筛选 status=failed 或 status=pending 的批次
+    3. 逐个重新执行（调用 heavy_execute with retry=True）
+    4. 返回汇总结果
+    """
+    task_dir = SCRATCH / task_name
+    status_file = task_dir / "status.json"
+    if not status_file.exists():
+        logger.warning(f"❌ 任务 '{task_name}' 未开工，请先 heavy --start")
+        return {"error": "task not found"}
+    st = _load_json(status_file)
+    subtasks = st.get("subtasks", {})
+    retryable = []
+    for bid, bt in sorted(subtasks.items()):
+        if bt.get("status") in ("failed", "pending"):
+            retryable.append(bid)
+    if not retryable:
+        logger.info(f"✅ 任务 '{task_name}' 无需续传，所有批次已完成")
+        return {"resumed": 0, "total": len(subtasks), "remaining": 0}
+    logger.info(f"🔄 断点续传: {task_name}")
+    logger.info(f"   需要重试: {len(retryable)} 个批次 ({', '.join(retryable)})")
+    logger.info(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
+    results = []
+    for bid in retryable:
+        logger.info(f"   ⚙️ 重试 {bid}...")
+        r = heavy_execute(task_name, bid, command=command,
+                          execute_now=execute_now, retry=True)
+        if isinstance(r, dict):
+            results.append({"batchId": bid, **r})
+    done = sum(1 for r in results if r.get("action") in ("queued", "started"))
+    failed = sum(1 for r in results if r.get("action") == "start_failed")
+    st = _load_json(status_file)
+    remaining = sum(1 for bt in st.get("subtasks", {}).values()
+                    if bt.get("status") in ("pending", "failed", "running"))
+    summary = {
+        "resumed": len(retryable),
+        "succeeded": done,
+        "failed": failed,
+        "total": len(subtasks),
+        "remaining": remaining,
+        "details": results,
+    }
+    _append_broker("tasks", "heavy.task.resumed",
+                   f"断点续传: {task_name}", "ok" if failed == 0 else "warn",
+                   f"重试 {len(retryable)} 批 | 成功 {done} | 失败 {failed} | 剩余 {remaining}",
+                   {"taskName": task_name, **{k: v for k, v in summary.items() if k != "details"}})
+    logger.info(f"📊 续传统计:")
+    logger.info(f"   重试: {len(retryable)} | 成功: {done} | 失败: {failed} | 剩余: {remaining}")
+    return summary
 
 
 def heavy_cleanup(task_name: str) -> None:

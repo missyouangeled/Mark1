@@ -541,7 +541,8 @@ class TestMainDispatchExtra:
         cli.main()
 
         mock_execute.assert_called_once_with(
-            "big-task", "b1", command="python {f}", execute_now=True
+            "big-task", "b1", command="python {f}", execute_now=True,
+            retry=False
         )
 
     def test_heavy_execute_all_dispatches(self, mocker):
@@ -558,7 +559,8 @@ class TestMainDispatchExtra:
         cli.main()
 
         mock_execute_all.assert_called_once_with(
-            "big-task", command="python {f}", execute_now=True
+            "big-task", command="python {f}", execute_now=True,
+            retry=False
         )
 
     def test_heavy_missing_task_name_prints_error(self, mocker, capsys):

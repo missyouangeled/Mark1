@@ -690,6 +690,8 @@ def main() -> None:
     heavy_p.add_argument("--command", type=str, default="", help="每个文件执行的自定义命令，{f} 替换为文件路径")
     heavy_p.add_argument("--execute-now", action="store_true", help="【安全】--execute-now 才真跑后台进程；不加此 flag 仅入队不启动")
     heavy_p.add_argument("--cleanup", action="store_true", help="清理 scratch 目录")
+    heavy_p.add_argument("--resume", action="store_true", help="断点续传：重试所有 failed/pending 批次")
+    heavy_p.add_argument("--retry", action="store_true", help="重试单个 failed 批次（配合 --batch 使用）")
     heavy_p.add_argument("--path", type=str, help="工作路径")
 
     # ── Cost ──
@@ -902,6 +904,7 @@ def main() -> None:
         from .heavy import (
             heavy_cleanup, heavy_execute, heavy_execute_all,
             heavy_finish, heavy_preflight, heavy_start, heavy_detect_human,
+            heavy_resume,
         )
         path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
@@ -916,11 +919,17 @@ def main() -> None:
         elif args.execute and task_name:
             heavy_execute(task_name, args.batch or None,
                           command=args.command or None,
-                          execute_now=getattr(args, 'execute_now', False))
+                          execute_now=getattr(args, 'execute_now', False),
+                          retry=getattr(args, 'retry', False))
         elif args.execute_all and task_name:
             heavy_execute_all(task_name,
                               command=args.command or None,
-                              execute_now=getattr(args, 'execute_now', False))
+                              execute_now=getattr(args, 'execute_now', False),
+                              retry=getattr(args, 'retry', False))
+        elif args.resume and task_name:
+            heavy_resume(task_name,
+                         command=args.command or None,
+                         execute_now=getattr(args, 'execute_now', False))
         elif args.finish and task_name:
             heavy_finish(task_name)
         elif args.cleanup and task_name:

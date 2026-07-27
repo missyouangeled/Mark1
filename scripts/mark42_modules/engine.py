@@ -12,8 +12,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 from .config import (
     ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, BROKER_EVENTS, BROKER_DIR, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN, WORKSPACE,
+    LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH,
 )
 from .utils import (
     _append_broker, _load_json, _now_iso, _now_ts, _save_json,
@@ -24,6 +30,64 @@ from .output_guard import trim_detail, trim_summary
 from .logs import log_rotate
 
 ENGINE_LOOPS = ENGINE_STATE / "loops.json"
+
+
+# ── 内置默认模板（代码兜底） ──
+_BUILTIN_TEMPLATES = {
+    "context-guard": {"period": 300, "description": "持续监控上下文健康 + 自动出手"},
+    "task-watch": {"period": 30, "description": "大工程执行 + 全程护航"},
+    "health-watch": {"period": 600, "description": "系统健康监控（CPU/内存/磁盘）"},
+    "model-fallback": {"period": 60, "description": "监测模型可用性状态"},
+    "memory-index": {"period": 21600, "description": "记忆自动归类——扫描最近 daily 文件 + 更新 INDEX.md 锚点"},
+}
+
+
+def _load_templates() -> dict[str, Any]:
+    """加载 Loop 模板配置。
+    
+    优先级：
+    1. 用户自定义模板（WORKSPACE/loop_templates.yaml）- 覆盖同名内置模板
+    2. 内置模板配置文件（SCRIPTS/mark42_modules/loop_templates.yaml）
+    3. 代码硬编码兜底模板
+    """
+    templates = dict(_BUILTIN_TEMPLATES)
+    
+    # 加载内置配置文件
+    if yaml and LOOP_TEMPLATES_PATH.exists():
+        try:
+            with open(LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if data and isinstance(data, dict) and "templates" in data:
+                    for name, cfg in data["templates"].items():
+                        if isinstance(cfg, dict):
+                            templates[name] = {
+                                "period": cfg.get("period", 300),
+                                "description": cfg.get("description", ""),
+                            }
+        except Exception:
+            pass
+    
+    # 加载用户自定义配置（覆盖同名）
+    if yaml and USER_LOOP_TEMPLATES_PATH.exists():
+        try:
+            with open(USER_LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if data and isinstance(data, dict) and "templates" in data:
+                    for name, cfg in data["templates"].items():
+                        if isinstance(cfg, dict):
+                            templates[name] = {
+                                "period": cfg.get("period", 300),
+                                "description": cfg.get("description", ""),
+                            }
+        except Exception:
+            pass
+    
+    return templates
+
+
+def _template_exists(name: str) -> bool:
+    """检查模板名是否存在。"""
+    return name in _load_templates()
 
 
 def _load_loops() -> dict[str, Any]:
@@ -47,38 +111,17 @@ def _save_loops(loops: dict[str, Any]) -> None:
 def engine_templates() -> None:
     """列出所有可用 Loop 模板。"""
     print("🔄 可用 Loop 模板:\n")
-    templates = [
-        ("context-guard", "300s",
-         "持续监控上下文健康 + 自动出手\n"
-         "     Observe: armor --check\n"
-         "     Decide:  if usage > 85% → trigger compress; if > 70% → warn\n"
-         "     Act:     armor --compress"),
-        ("health-watch", "600s",
-         "系统健康监控（CPU/内存/磁盘）\n"
-         "     Observe: free -h && df -h / /mnt/data\n"
-         "     Decide:  if disk < 5GB or mem < 500MB → alert\n"
-         "     Act:     write broker warning event"),
-        ("model-fallback", "60s",
-         "监测模型可用性状态\n"
-         "     Observe: 扫描 broker 事件中 model.fallback 信号\n"
-         "     Decide:  检测到故障 → 写 Mark42 broker 警告\n"
-         "     Act:     在 status dashboard 展示 failover 历史\n"
-         "     ⚠️ 模型切换由 OpenClaw 内置 failover 自动完成，铠甲不接管"),
-        ("task-watch", "30s",
-         "大工程执行 + 全程护航\n"
-         "     Observe: heavy task status via scratch/{name}/status.json\n"
-         "     Decide:  if stalled → alert; if done → verify; if failed → retry\n"
-         "     Act:     notify frontstage via broker"),
-        ("memory-index", "21600s",
-         "记忆自动归类——扫描最近 daily 文件 + 更新 INDEX.md 锚点\n"
-         "     Observe: 扫描最近 7 天 memory/daily/ 文件\n"
-         "     Decide:  识别新主题/事件/改进要求 → 追加到 memory/INDEX.md\n"
-         "     Act:     写入 memory/INDEX.md 主题锚点条目（去重）"),
-    ]
-    for name, period, desc in templates:
-        print(f"  📋 {name}")
-        print(f"     {desc}")
-        print(f"     周期: {period}\n")
+    templates = _load_templates()
+    for name, cfg in sorted(templates.items()):
+        period = cfg.get("period", 300)
+        desc = cfg.get("description", "")
+        is_builtin = name in _BUILTIN_TEMPLATES
+        builtin_tag = "" if is_builtin else " [自定义]"
+        print(f"  📋 {name}{builtin_tag}")
+        if desc:
+            for line in desc.split("\n"):
+                print(f"     {line}")
+        print(f"     周期: {period}s\n")
 
 
 def engine_list() -> None:
@@ -129,6 +172,9 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
     print(f"   任务: {task}")
     print(f"   周期: {interval_s}s  |  最大循环: {max_cycles or '无限'}")
     if template:
+        # 模板名验证
+        if not _template_exists(template):
+            print(f"   ⚠️ 模板 '{template}' 未在配置中定义，将使用通用执行路径")
         # 【L 修复 2026-06-30】只查模板的 docstring, 不用 f-string 空拼接
         # 原 template_desc = f" — {engine_templates.__doc__}" 是死代码, if False 进一步取消显示
         template_help = ""
@@ -366,12 +412,23 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         loop["lastResult"] = {"scannedDays": scanned, "newAnchors": len(new_anchors)}
     else:
         # 通用/自定义 Loop 回退
-        task_lower = task.lower()
-        if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
-            result = get_compress().compress()
-            loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+        if template_name:
+            # 用户自定义模板（不含执行逻辑）- 使用 generic 路径
+            print(f"   ℹ️ 自定义模板 '{template_name}' 使用通用执行路径")
+            # 仅记录 broker 事件，不执行特定逻辑
+            loop["lastResult"] = {
+                "action": "executed",
+                "template": template_name,
+                "note": "自定义模板通用路径",
+            }
         else:
-            loop["lastResult"] = {"action": "executed", "note": "通用任务"}
+            # 无模板的通用 Loop
+            task_lower = task.lower()
+            if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
+                result = get_compress().compress()
+                loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+            else:
+                loop["lastResult"] = {"action": "executed", "note": "通用任务"}
     
     # ── C 项：Loop 执行完成 → emit 标准化事件 ──
     _append_broker("engine", "mark42.engine.loop.completed",

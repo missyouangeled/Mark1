@@ -1,0 +1,99 @@
+# ============================================================================
+# ArcLock 配置文件示例 - 使用 Headroom 第三方实现
+# ============================================================================
+# 将此文件复制到 Mark42 工作目录，命名为 arclock.yaml
+# 启动时自动加载，替换默认实现
+#
+# 优先级: 配置文件 > 代码内 register() > 默认实现
+# 不配的项 = 用 Mark42 内置实现，零配置开箱即用
+# ============================================================================
+
+arclock:
+  # ── 压缩锁扣：使用 Headroom 替代内置 armor 压缩 ──
+  compress:
+    # 第三方模块路径（Python import 路径，相对于 PYTHONPATH）
+    module: "examples.arclock_headroom.headroom_compress"
+    # 实现类名
+    class: "HeadroomCompress"
+    # 构造函数参数（透传给 __init__）
+    config:
+      api_key: "sk-headroom-xxxxxxxxxxxx"
+      model: "gpt-4o"
+      base_url: "https://api.headroom.ai"
+
+  # ── 记忆搜索锁扣：使用 Headroom 向量搜索替代 QMD ──
+  memory:
+    module: "examples.arclock_headroom.headroom_memory"
+    class: "HeadroomMemory"
+    config:
+      api_key: "sk-headroom-xxxxxxxxxxxx"
+      index_name: "mark42-memory"
+      base_url: "https://api.headroom.ai"
+      embedding_model: "all-MiniLM-L6-v2"
+
+  # ── 以下未配置，全部使用 Mark42 默认实现 ──
+  #
+  # consciousness:  # 自愈意识
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # archive:        # 错误档案
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # breaker:        # 熔断器
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # health:         # 健康监控
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # engine:         # 循环引擎
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # chaos:          # 混沌工程
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+  #
+  # heavy:          # 重型战甲
+  #   module: "xxx"
+  #   class: "XXX"
+  #   config: {}
+
+# ============================================================================
+# 说明
+# ============================================================================
+#
+# 1. 如何启用这个配置?
+#    复制此文件到 Mark42 工作目录 (scripts/):
+#      cp examples/arclock-headroom/arclock.yaml ./arclock.yaml
+#
+# 2. 如何切换回默认实现?
+#    方法 A: 删除或重命名 arclock.yaml
+#    方法 B: 注释掉某个锁扣的配置
+#    方法 C: 用 CLI 命令: mark42 arclock reload --reset
+#
+# 3. 如何验证生效?
+#    mark42 arclock list
+#    应该看到:
+#      compress -> HeadroomCompress (examples.arclock_headroom.headroom_compress)
+#      memory   -> HeadroomMemory (examples.arclock_headroom.headroom_memory)
+#
+# 4. 如何测试功能?
+#    mark42 arclock test compress
+#    mark42 arclock test memory
+#
+# 5. 真实环境注意事项
+#    - 示例用 mock 数据，真实实现需替换 _mock_api_call 为真实 HTTP 调用
+#    - api_key 建议用环境变量注入，不要硬编码
+#    - 生产环境建议加 retry/timeout/circuit_breaker 保护
+#
+# ============================================================================

@@ -668,7 +668,7 @@ class TestHeavyExecute:
 
         assert results == []
         out = capsys.readouterr().out
-        assert "无 pending" in out
+        assert "无" in out and ("pending" in out or "待处理" in out)
 
 
 # ─────────────────────── heavy_cleanup ───────────────────────
