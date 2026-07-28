@@ -6,6 +6,7 @@
   "weights": {
     "time_score": 0.25,
     "gap_score": 0.25,
+    "urgency_score": 0,
     "frequency_score": 0.15,
     "mood_score": 0.1,
     "weekday_score": 0.15,
