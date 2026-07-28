@@ -27,6 +27,7 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 CONFIG_PATH = SCRIPT_DIR / "config.json"
 STATE_PATH = SCRIPT_DIR / "state.json"
 LOG_PATH = SCRIPT_DIR / "decisions.jsonl"
+ERROR_LOG_PATH = SCRIPT_DIR / "errors.jsonl"
 
 WORKSPACE = Path(os.environ.get(
     "OPENCLAW_WORKSPACE",
@@ -175,10 +176,14 @@ URGENCY_KEYWORDS_MED = [
 
 
 def get_urgency_score(context_text):
-    """从最近对话内容判断紧急程度 (0.0=普通闲聊, 0.3=一般工作, 0.8=技术尝试/调试)"""
+    """从最近对话内容判断紧急程度 (0.0=普通闲聊, 0.3=一般工作, 0.8=技术尝试/调试)
+    只看最后3条消息，避免被较早的话题干扰。"""
     if not context_text:
         return 0.0
-    text = context_text.lower()
+    # 只取最后3条消息判断当前话题方向
+    lines = context_text.strip().split("\n")
+    recent = "\n".join(lines[-3:])
+    text = recent.lower()
     for kw in URGENCY_KEYWORDS_HIGH:
         if kw in text:
             return 0.8
@@ -309,7 +314,9 @@ def sigmoid(x):
 
 def decide(features, weights, threshold):
     """加权求和 + sigmoid"""
-    raw = sum(features[k] * weights.get(k, 0) for k in features)
+    # urgency_score 是 gap_score 的调节因子，不参与独立加权
+    scored_keys = [k for k in features if k != "urgency_score"]
+    raw = sum(features[k] * weights.get(k, 0) for k in scored_keys)
     # 把 raw 从 [0, 1] 区间映射到 sigmoid 的敏感区间
     # raw 大约在 0-1 之间，映射到 -3 到 3
     mapped = (raw - 0.5) * 6
@@ -347,7 +354,7 @@ def check_daily_limit(state, daily_max):
 
 
 def run_decision(config, state, verbose=False):
-    """跑一次完整决策流程"""
+    """跑一次完整决策流程。返回 (decision, score, reason, features)"""
     now = datetime.now()
 
     # 同步 last_interaction 到实际 session 文件修改时间
@@ -376,7 +383,7 @@ def run_decision(config, state, verbose=False):
     if is_chatting:
         if verbose:
             print(f"[聊天中] 距上次对话 {gap_min:.1f}分钟, 跳过决策")
-        return 0, 0.0, "chatting"
+        return 0, 0.0, "chatting", {}
 
     features = extract_features(state, now, chat_context=get_recent_chat_context(8))
 
@@ -385,19 +392,19 @@ def run_decision(config, state, verbose=False):
         log_decision(features, 0.0, 0, "quiet_hours")
         if verbose:
             print(f"[勿扰时段] score=0, decision=0")
-        return 0, 0.0, "quiet_hours"
+        return 0, 0.0, "quiet_hours", features
 
     if not check_cooldown(state, config["cooldown_minutes"]):
         log_decision(features, 0.0, 0, "cooldown")
         if verbose:
             print(f"[冷却中] score=0, decision=0")
-        return 0, 0.0, "cooldown"
+        return 0, 0.0, "cooldown", features
 
     if not check_daily_limit(state, config["daily_max_triggers"]):
         log_decision(features, 0.0, 0, "daily_limit")
         if verbose:
             print(f"[今日上限] score=0, decision=0")
-        return 0, 0.0, "daily_limit"
+        return 0, 0.0, "daily_limit", features
 
     # 加权决策
     score, triggered = decide(features, config["weights"], config["threshold"])
@@ -417,7 +424,7 @@ def run_decision(config, state, verbose=False):
             for k, v in features.items():
                 print(f"  {k}: {v:.3f} (weight={config['weights'].get(k, 0)})")
 
-    return (1 if triggered else 0), score, ("triggered" if triggered else "below_threshold")
+    return (1 if triggered else 0), score, ("triggered" if triggered else "below_threshold"), features
 
 
 # ============================================================
@@ -518,7 +525,7 @@ def send_trigger_event(score, features):
             capture_output=True, timeout=90
         )
     except Exception as e:
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
+        with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "timestamp": datetime.now().isoformat(),
                 "error": f"event_send_failed: {e}"
@@ -719,9 +726,9 @@ def main():
 
     if args.check:
         rotate_log()
-        decision, score, reason = run_decision(config, state, verbose=args.verbose)
+        decision, score, reason, features = run_decision(config, state, verbose=args.verbose)
         if decision == 1:
-            send_trigger_event(score, extract_features(state, datetime.now()))
+            send_trigger_event(score, features)
         save_state(state)
         return
 
