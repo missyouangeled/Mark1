@@ -282,6 +282,27 @@ def run_decision(config, state, verbose=False):
     """跑一次完整决策流程"""
     now = datetime.now()
 
+    # 同步 last_interaction 到实际 session 文件修改时间
+    # （--record-interaction 没有外部调用方，改为自动同步）
+    last_chat = get_last_chat_time()
+    if last_chat:
+        stored = state.get("last_interaction")
+        if not stored or datetime.fromisoformat(stored) < last_chat:
+            state["last_interaction"] = last_chat.isoformat()
+            # 检测到新的交互，加入 recent_interactions 用于 trend_score
+            if "recent_interactions" not in state:
+                state["recent_interactions"] = []
+            state["recent_interactions"].append(last_chat.isoformat())
+            # 只保留最近30天的
+            cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+            state["recent_interactions"] = [
+                ts for ts in state["recent_interactions"]
+                if ts > cutoff
+            ]
+            save_state(state)
+            if verbose:
+                print(f"[同步] last_interaction -> {last_chat.isoformat()}")
+
     # 先检查聊天密度：正在聊就不插嘴
     is_chatting, gap_min = check_chat_density()
     if is_chatting:
@@ -336,7 +357,7 @@ def run_decision(config, state, verbose=False):
 # ============================================================
 
 def send_trigger_event(score, features):
-    """触发时向主会话注入系统事件"""
+    """触发时通过 cron wake 唤醒主会话，触发 agent turn"""
     feature_str = ", ".join(f"{k}={v:.2f}" for k, v in features.items())
     message = (
         f"[自主决策器触发] score={score:.4f}\n"
@@ -345,8 +366,8 @@ def send_trigger_event(score, features):
     )
     try:
         subprocess.run(
-            ["openclaw", "system", "event", "--text", message],
-            capture_output=True, timeout=10
+            ["openclaw", "system", "event", "--mode", "now", "--expect-final", "--timeout", "60000", "--text", message],
+            capture_output=True, timeout=90
         )
     except Exception as e:
         # 系统事件发送失败不影响决策器本身

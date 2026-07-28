@@ -6,5 +6,7 @@ After=openclaw-gateway.service
 Type=oneshot
 ExecStart=/usr/bin/python3 /home/missyouangeled/.openclaw/workspace/scripts/autonomy/autonomy.py --check
 Environment=OPENCLAW_WORKSPACE=/home/missyouangeled/.openclaw/workspace
+Environment=PATH=/home/missyouangeled/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 StandardOutput=journal
 StandardError=journal
+TimeoutStartSec=120
