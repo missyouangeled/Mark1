@@ -163,7 +163,8 @@ def check_chat_density():
 # 特征提取
 # ============================================================
 
-# 紧急程度关键词：从最近对话内容判断是否需要更快回访
+# 紧急程度多维度判断
+# 维度1: 工作/调试关键词
 URGENCY_KEYWORDS_HIGH = [
     "试试", "测试", "尝试", "报错", "错误", "失败", "bug", "fix", "修复",
     "超时", "崩溃", "不行", "不对", "怎么办", "为什么", "排查", "根因",
@@ -173,24 +174,68 @@ URGENCY_KEYWORDS_MED = [
     "方案", "配置", "安装", "更新", "升级", "迁移", "重构",
     "工作", "开会", "文档", "整理", "计划", "调研",
 ]
+# 维度2: 情绪低落关键词
+URGENCY_KEYWORDS_MOOD = [
+    "唉", "累", "烦", "难过", "不开心", "孤独", "寂寞",
+    "想她", "怀念", "回忆", "不行了", "崩溃", "压力", "焦虑",
+    "心累", "没意思", "没劲", "不想",
+]
+# 维度3: 约定但未跟进
+URGENCY_KEYWORDS_FOLLOWUP = [
+    "一会", "回头", "等下", "待会", "稍后", "马上", "先去", "去忙",
+    "看完", "弄完", "试完", "等我",
+]
 
 
-def get_urgency_score(context_text):
-    """从最近对话内容判断紧急程度 (0.0=普通闲聊, 0.3=一般工作, 0.8=技术尝试/调试)
-    只看最后3条消息，避免被较早的话题干扰。"""
+def get_urgency_score(context_text, state=None):
+    """多维度紧急度计算
+    维度1: 工作/调试 (0.3-0.8)
+    维度2: 情绪低落 (0.6) - 需要关心
+    维度3: 未完成话题 (0.5) - pending_topic
+    维度4: 约定未跟进 (0.4) - 说了但没回来
+    取最高分。"""
     if not context_text:
+        # 没有对话上下文，只检查 pending_topic
+        if state and state.get("pending_topic"):
+            return 0.5
         return 0.0
-    # 只取最后3条消息判断当前话题方向
+    
     lines = context_text.strip().split("\n")
-    recent = "\n".join(lines[-3:])
-    text = recent.lower()
+    # 只看最后3条消息判断当前话题方向
+    recent = "\n".join(lines[-3:]).lower()
+    
+    scores = []
+    
+    # 维度1: 工作关键词
     for kw in URGENCY_KEYWORDS_HIGH:
-        if kw in text:
-            return 0.8
-    for kw in URGENCY_KEYWORDS_MED:
-        if kw in text:
-            return 0.3
-    return 0.0
+        if kw in recent:
+            scores.append(0.8)
+            break
+    else:
+        for kw in URGENCY_KEYWORDS_MED:
+            if kw in recent:
+                scores.append(0.3)
+                break
+    
+    # 维度2: 情绪低落
+    for kw in URGENCY_KEYWORDS_MOOD:
+        if kw in recent:
+            scores.append(0.6)
+            break
+    
+    # 维度3: 未完成话题 (state)
+    if state and state.get("pending_topic"):
+        scores.append(0.5)
+    
+    # 维度4: 约定但未跟进
+    for kw in URGENCY_KEYWORDS_FOLLOWUP:
+        if kw in recent:
+            scores.append(0.4)
+            break
+    
+    if not scores:
+        return 0.0
+    return max(scores)
 
 
 def get_time_score(now):
@@ -287,7 +332,7 @@ def extract_features(state, now, chat_context=None):
     
     # 紧急程度加分：加法而非乘法，urgency=0 时不影响
     # urgency=0.8 + k=0.4 -> 加 0.32，使调试场景 15 分钟即可触发
-    urgency = get_urgency_score(chat_context) if chat_context else 0.0
+    urgency = get_urgency_score(chat_context, state) if chat_context else 0.0
     effective_gap = min(1.0, base_gap + urgency * 0.4)
     
     return {
