@@ -353,16 +353,96 @@ def run_decision(config, state, verbose=False):
 
 
 # ============================================================
+# 对话上下文提取
+# ============================================================
+
+def get_recent_chat_context(num_messages=8):
+    """从最近的 session jsonl 中提取最后 N 条 user/assistant 文本消息"""
+    if not SESSIONS_DIR.exists():
+        return None
+    candidates = []
+    for f in SESSIONS_DIR.glob("*.jsonl"):
+        if ".lock" in f.name or ".bak" in f.name or ".trajectory" in f.name:
+            continue
+        candidates.append(f)
+    if not candidates:
+        return None
+    latest = max(candidates, key=lambda f: f.stat().st_mtime)
+    # 只读最后 50 行（足够取 num_messages 条有效消息）
+    try:
+        with open(latest, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()[-50:]
+    except Exception:
+        return None
+    messages = []
+    for line in all_lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+            msg = obj.get("message", {})
+            role = msg.get("role", "")
+            if role not in ("user", "assistant"):
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                texts = [c.get("text", "") for c in content if c.get("type") == "text" and c.get("text", "")]
+                text = " ".join(texts)
+            elif isinstance(content, str):
+                text = content
+            else:
+                continue
+            text = text.strip()
+            if not text:
+                continue
+            # 跳过心跳poll和HEARTBEAT_OK
+            if text in ("HEARTBEAT_OK", "NO_REPLY"):
+                continue
+            if "[OpenClaw heartbeat poll]" in text:
+                continue
+            # 每条消息截取前300字
+            if len(text) > 300:
+                text = text[:300] + "..."
+            messages.append(f"[{role}] {text}")
+        except Exception:
+            continue
+    # 取最后 num_messages 条
+    return "\n".join(messages[-num_messages:]) if messages else None
+
+
+# ============================================================
 # openclaw 系统事件注入
 # ============================================================
 
 def send_trigger_event(score, features):
     """触发时通过 cron wake 唤醒主会话，触发 agent turn"""
     feature_str = ", ".join(f"{k}={v:.2f}" for k, v in features.items())
+    context = get_recent_chat_context(8)
     message = (
         f"[自主决策器触发] score={score:.4f}\n"
         f"特征: {feature_str}\n"
-        f"请用自然语言主动跟点点打个招呼，就像朋友突然想找他说句话一样。"
+    )
+    if context:
+        message += (
+            f"\n## 最近对话上下文\n{context}\n\n"
+        )
+    message += (
+        "## 你的任务\n"
+        "根据上面的对话上下文，判断：\n"
+        "1. 上次聊天的话题方向（工作/闲聊/人生感悟/技术探索/情绪低落等）\n"
+        "2. 点点的情绪状态\n"
+        "3. 结尾状态（是否说要去忙、是否有未完成的话题）\n"
+        "4. 是否该主动发消息，以及发什么\n\n"
+        "判断原则：\n"
+        "- 上次聊情绪话题、心情不好 → 该发，安慰+转移注意力\n"
+        "- 上次在尝试新技术/新方案 → 该发，问一句结果如何\n"
+        "- 上次聊到一半被打断 → 该发，顺一下之前的话题\n"
+        "- 上次是轻松闲聊、间隔较久 → 该发，自然打个招呼\n"
+        "- 上次明确说去忙/去开会、没什么需要跟进 → 不该发，静默跳过\n"
+        "- 上次是工作对话、已结束、无回访点 → 不该发，静默跳过\n\n"
+        "如果该发：用自然语言，像朋友突然想找他说句话。不要提技术词。\n"
+        "如果不该发：回 HEARTBEAT_OK 静默跳过。"
     )
     try:
         subprocess.run(
@@ -370,7 +450,6 @@ def send_trigger_event(score, features):
             capture_output=True, timeout=90
         )
     except Exception as e:
-        # 系统事件发送失败不影响决策器本身
         with open(LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "timestamp": datetime.now().isoformat(),

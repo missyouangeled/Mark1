@@ -1,11 +1,13 @@
 {
-  "last_interaction": "2026-07-28T10:20:26.645860",
+  "last_interaction": "2026-07-28T10:23:23.621566",
   "last_trigger": "2026-07-28T10:11:13.614895",
   "today_triggers": 5,
   "today_date": "2026-07-28",
   "last_mood": "neutral",
   "pending_topic": false,
   "recent_interactions": [
-    "2026-07-28T10:20:26.645860"
+    "2026-07-28T10:20:26.645860",
+    "2026-07-28T10:21:22.251775",
+    "2026-07-28T10:23:23.621566"
   ]
 }
