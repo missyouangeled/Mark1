@@ -162,6 +162,32 @@ def check_chat_density():
 # 特征提取
 # ============================================================
 
+# 紧急程度关键词：从最近对话内容判断是否需要更快回访
+URGENCY_KEYWORDS_HIGH = [
+    "试试", "测试", "尝试", "报错", "错误", "失败", "bug", "fix", "修复",
+    "超时", "崩溃", "不行", "不对", "怎么办", "为什么", "排查", "根因",
+    "deploy", "部署", "上线", "发版", "来不及", "赶紧",
+]
+URGENCY_KEYWORDS_MED = [
+    "方案", "配置", "安装", "更新", "升级", "迁移", "重构",
+    "工作", "开会", "文档", "整理", "计划", "调研",
+]
+
+
+def get_urgency_score(context_text):
+    """从最近对话内容判断紧急程度 (0.0=普通闲聊, 0.3=一般工作, 0.8=技术尝试/调试)"""
+    if not context_text:
+        return 0.0
+    text = context_text.lower()
+    for kw in URGENCY_KEYWORDS_HIGH:
+        if kw in text:
+            return 0.8
+    for kw in URGENCY_KEYWORDS_MED:
+        if kw in text:
+            return 0.3
+    return 0.0
+
+
 def get_time_score(now):
     """一天中的时间映射：8:00-22:00 线性映射到 0.2-1.0，深夜 0-7 点为 0.1"""
     hour = now.hour + now.minute / 60.0
@@ -252,11 +278,19 @@ def get_trend_score(recent_interactions):
         return 0.2
 
 
-def extract_features(state, now):
+def extract_features(state, now, chat_context=None):
     """提取所有特征"""
+    base_gap = get_gap_score(state.get("last_interaction"))
+    
+    # 紧急程度系数：根据上次对话内容调整 gap_score
+    # urgency=0 -> gap 不变; urgency=0.8 -> gap×1.8（更快触发）
+    urgency = get_urgency_score(chat_context) if chat_context else 0.0
+    effective_gap = min(1.0, base_gap * (1.0 + urgency))
+    
     return {
         "time_score": get_time_score(now),
-        "gap_score": get_gap_score(state.get("last_interaction")),
+        "gap_score": effective_gap,
+        "urgency_score": urgency,  # 记录用，weights 里默认 0 不参与加权
         "frequency_score": get_frequency_score(state.get("today_triggers", 0)),
         "mood_score": get_mood_score(state.get("last_mood", "neutral")),
         "weekday_score": get_weekday_score(now),
@@ -344,7 +378,7 @@ def run_decision(config, state, verbose=False):
             print(f"[聊天中] 距上次对话 {gap_min:.1f}分钟, 跳过决策")
         return 0, 0.0, "chatting"
 
-    features = extract_features(state, now)
+    features = extract_features(state, now, chat_context=get_recent_chat_context(8))
 
     # 硬性拦截
     if check_quiet_hours(now, config["quiet_hours"]):
