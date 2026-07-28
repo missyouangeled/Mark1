@@ -1582,3 +1582,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260728-001] correction
+
+**Logged**: 2026-07-28T04:04:43.874Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: gap_score 这个的分数 我觉得要修改一下。 不能是直接 乘， 应该是 + ，gap_score + （系数计算。因为系数有可能是0），意思就是 如果没有紧急事件，先默认到30分钟 触发一次。 没有紧急事件也要触发。不是说就不触发了。 目前的逻辑先按这个走。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

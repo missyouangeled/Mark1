@@ -214,14 +214,14 @@ def get_gap_score(last_interaction):
     gap_minutes = (datetime.now() - last).total_seconds() / 60.0
     if gap_minutes < 5:
         return 0.0
+    elif gap_minutes < 15:
+        return 0.2
     elif gap_minutes < 30:
-        return 0.3
-    elif gap_minutes < 60:
         return 0.5
+    elif gap_minutes < 60:
+        return 0.8
     elif gap_minutes < 180:
-        return 0.7
-    elif gap_minutes < 360:
-        return 0.85
+        return 0.9
     else:
         return 1.0
 
@@ -287,10 +287,10 @@ def extract_features(state, now, chat_context=None):
     """提取所有特征"""
     base_gap = get_gap_score(state.get("last_interaction"))
     
-    # 紧急程度系数：根据上次对话内容调整 gap_score
-    # urgency=0 -> gap 不变; urgency=0.8 -> gap×1.8（更快触发）
+    # 紧急程度加分：加法而非乘法，urgency=0 时不影响
+    # urgency=0.8 + k=0.4 -> 加 0.32，使调试场景 15 分钟即可触发
     urgency = get_urgency_score(chat_context) if chat_context else 0.0
-    effective_gap = min(1.0, base_gap * (1.0 + urgency))
+    effective_gap = min(1.0, base_gap + urgency * 0.4)
     
     return {
         "time_score": get_time_score(now),
