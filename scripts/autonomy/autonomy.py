@@ -28,6 +28,7 @@ CONFIG_PATH = SCRIPT_DIR / "config.json"
 STATE_PATH = SCRIPT_DIR / "state.json"
 LOG_PATH = SCRIPT_DIR / "decisions.jsonl"
 ERROR_LOG_PATH = SCRIPT_DIR / "errors.jsonl"
+PENDING_TRIGGER_PATH = SCRIPT_DIR / "pending_trigger.txt"
 
 WORKSPACE = Path(os.environ.get(
     "OPENCLAW_WORKSPACE",
@@ -562,10 +563,21 @@ def send_trigger_event(score, features):
         "如果该发：用自然语言，像朋友突然想找他说句话。不要提技术词。\n"
         "如果不该发：回 HEARTBEAT_OK 静默跳过。"
     )
+    # 1. 写入文件中转（心跳时读取）
+    try:
+        with open(PENDING_TRIGGER_PATH, "w", encoding="utf-8") as f:
+            f.write(message)
+    except Exception as e:
+        with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "timestamp": datetime.now().isoformat(),
+                "error": f"write_pending_failed: {e}"
+            }, ensure_ascii=False) + "\n")
+    # 2. 发送系统事件唤醒主会话
     try:
         subprocess.run(
-            ["openclaw", "system", "event", "--mode", "now", "--expect-final", "--timeout", "60000", "--text", message],
-            capture_output=True, timeout=90
+            ["openclaw", "system", "event", "--mode", "now", "--text", message],
+            capture_output=True, timeout=30
         )
     except Exception as e:
         with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:

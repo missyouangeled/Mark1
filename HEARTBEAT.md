@@ -4,12 +4,17 @@
 # Add tasks below when you want the agent to check something periodically.
 
 ## 自主决策器触发检查
-当心跳上下文中包含系统事件 `[自主决策器触发]` 时：
+每次心跳时，先用 exec 检查 `scripts/autonomy/pending_trigger.txt` 是否存在：
 
-系统事件里会附带最近 8 条对话上下文。按照事件中的判断原则处理：
+```
+test -f ~/.openclaw/workspace/scripts/autonomy/pending_trigger.txt && echo "EXISTS" || echo "NONE"
+```
+
+- 如果 `NONE`：回 HEARTBEAT_OK 静默跳过
+- 如果 `EXISTS`：读取文件内容，然后删除文件，按以下规则处理：
 
 ### 判断流程（内部完成，不输出）
-1. 阅读附带的对话上下文，分析：
+1. 阅读文件中附带的对话上下文，分析：
    - 话题方向：工作 / 闲聊 / 人生感悟 / 技术探索 / 情绪低落 等
    - 情绪状态：开心 / 平静 / 低落 / 烦躁 等
    - 结尾状态：是否说了要去忙、是否有未完成的话题
