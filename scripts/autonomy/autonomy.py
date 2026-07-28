@@ -194,6 +194,7 @@ def get_urgency_score(context_text, state=None):
     维度2: 情绪低落 (0.6) - 需要关心
     维度3: 未完成话题 (0.5) - pending_topic
     维度4: 约定未跟进 (0.4) - 说了但没回来
+    只匹配 user 消息，忽略 assistant 消息。
     取最高分。"""
     if not context_text:
         # 没有对话上下文，只检查 pending_topic
@@ -202,8 +203,9 @@ def get_urgency_score(context_text, state=None):
         return 0.0
     
     lines = context_text.strip().split("\n")
-    # 只看最后3条消息判断当前话题方向
-    recent = "\n".join(lines[-3:]).lower()
+    # 只取最后3条消息，且只看 user 说的
+    user_lines = [l for l in lines[-6:] if l.startswith("[user]")]
+    recent = "\n".join(user_lines[-3:]).lower()
     
     scores = []
     
@@ -564,8 +566,11 @@ def send_trigger_event(score, features):
         "如果不该发：回 HEARTBEAT_OK 静默跳过。"
     )
     # 1. 写入文件中转（心跳时读取）
+    # 首行写入时间戳，用于过期检查
+    trigger_time = datetime.now().isoformat()
     try:
         with open(PENDING_TRIGGER_PATH, "w", encoding="utf-8") as f:
+            f.write(f"__trigger_time__:{trigger_time}\n")
             f.write(message)
     except Exception as e:
         with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:

@@ -11,7 +11,12 @@ test -f ~/.openclaw/workspace/scripts/autonomy/pending_trigger.txt && echo "EXIS
 ```
 
 - 如果 `NONE`：回 HEARTBEAT_OK 静默跳过
-- 如果 `EXISTS`：读取文件内容，然后删除文件，按以下规则处理：
+- 如果 `EXISTS`：读取文件内容，**先删除文件**，然后按以下规则处理：
+
+### 过期检查
+文件第一行格式：`__trigger_time__:<ISO时间戳>`
+- 如果触发时间超过 30 分钟，说明是残留文件，直接跳过回 HEARTBEAT_OK
+- 如果在 30 分钟内，继续处理
 
 ### 判断流程（内部完成，不输出）
 1. 阅读文件中附带的对话上下文，分析：
