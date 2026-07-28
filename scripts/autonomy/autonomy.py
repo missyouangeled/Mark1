@@ -98,10 +98,10 @@ def log_decision(features, score, decision, reason=""):
 # ============================================================
 
 def get_last_chat_time():
-    """检查最近一次对话活动的时间（session jsonl文件最后修改时间）"""
+    """检查最近一次真实对话活动的时间（排除心跳 poll）。
+    从 session jsonl 中倒序查找最后一条非心跳的 user 消息。"""
     if not SESSIONS_DIR.exists():
         return None
-    # 找最近修改的 session jsonl 文件（排除 .bak/.lock/.trajectory 等）
     candidates = []
     for f in SESSIONS_DIR.glob("*.jsonl"):
         if ".lock" in f.name or ".bak" in f.name or ".trajectory" in f.name:
@@ -109,9 +109,43 @@ def get_last_chat_time():
         candidates.append(f)
     if not candidates:
         return None
-    # 取最近修改的文件
     latest = max(candidates, key=lambda f: f.stat().st_mtime)
-    return datetime.fromtimestamp(latest.stat().st_mtime)
+    # 读最后 50 行，倒序找最后一条真实 user 消息
+    try:
+        with open(latest, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-50:]
+    except Exception:
+        return None
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+            msg = obj.get("message", {})
+            role = msg.get("role", "")
+            if role != "user":
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                texts = [c.get("text", "") for c in content if c.get("type") == "text"]
+                text = " ".join(texts)
+            else:
+                continue
+            # 排除心跳 poll
+            if "[OpenClaw heartbeat poll]" in text:
+                continue
+            # 找到真实 user 消息，取时间戳
+            ts = obj.get("timestamp")
+            if ts:
+                # jsonl 时间戳是 UTC（带 Z），转本地时间
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                return dt.astimezone().replace(tzinfo=None)
+        except Exception:
+            continue
+    return None
 
 
 def check_chat_density():
