@@ -26410,3 +26410,33 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260728-001] user-reported-error
+
+**Logged**: 2026-07-28T05:01:56.648Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+决策器刚刚触发了！12:39:33，score=0.601。系统事件已经发出去了，没有报错。gateway 日志显示模型被调用了。这次心跳应该就是决策器唤醒的。 让我看看上次对话内容，判断该说什么： 话题方向：工作（改了一上午决策器代码） 情绪状态：平静、有点期待 结尾状态：你说"先等着了"，我说"去忙吧" 按规则该发--你在等效果，间隔也够久了。该主动找你说句话。 这些 都不要一块写在回复里。。
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---
