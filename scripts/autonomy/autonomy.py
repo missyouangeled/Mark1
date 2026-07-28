@@ -207,23 +207,21 @@ def get_time_score(now):
 
 
 def get_gap_score(last_interaction):
-    """距离上次对话的时长：越久分越高"""
+    """距离上次对话的时长：指数增长，像思念一样随时间累积。
+    gap(t) = base × (1 + k)^t，每分钟递增 k。
+    不是阶梯跳变，是连续平滑增长。"""
     if not last_interaction:
         return 1.0  # 从没聊过，给最高分
     last = datetime.fromisoformat(last_interaction)
     gap_minutes = (datetime.now() - last).total_seconds() / 60.0
-    if gap_minutes < 5:
+    if gap_minutes < 0:
         return 0.0
-    elif gap_minutes < 15:
-        return 0.2
-    elif gap_minutes < 30:
-        return 0.5
-    elif gap_minutes < 60:
-        return 0.8
-    elif gap_minutes < 180:
-        return 0.9
-    else:
-        return 1.0
+    # base=0.25, k=0.045: 每分钟增长 4.5%
+    # 25分钟普通触发，15分钟调试触发
+    base = 0.25
+    k = 0.045
+    gap_score = base * ((1 + k) ** gap_minutes)
+    return min(1.0, gap_score)
 
 
 def get_frequency_score(today_count):

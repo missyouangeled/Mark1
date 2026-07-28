@@ -1606,3 +1606,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260728-002] correction
+
+**Logged**: 2026-07-28T04:10:47.658Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 不不不， 我觉得不要硬性规定 一定不触发。我更倾向于，动态反馈，计算这种。能自主行为的。gap_score 这个值 随时间增长，而不是说到了某个时间就直接等于另一个值，应该是 gap_score = gap_score + gap_score *（一个值） 。 让（gap_score + gap_score *（一个值））这个值 随线性增长，就好比随着时间的推移，我对你的思念逐步增加。先这样。改完看看效果 。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
