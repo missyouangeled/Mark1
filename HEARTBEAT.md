@@ -41,3 +41,19 @@ test -f ~/.openclaw/workspace/scripts/autonomy/pending_trigger.txt && echo "EXIS
    - 不要用列表、标题、分隔线等格式
    - 就一句话，像聊天一样
    - 如果不该发：回 HEARTBEAT_OK 静默跳过
+
+### 语音回复（决策器触发专用）
+如果决定发消息，用语音回复：
+1. 先想好要说的那句话（纯文本）
+2. 用 exec 调用豆包 TTS 生成语音：
+```bash
+node ~/.openclaw/skills/byted-ark-tts-skill/scripts/tts.js \
+  --text "要说的纯文本内容" \
+  --voice zh_female_sophie_uranus_bigtts \
+  --format wav \
+  --speed 1.0 \
+  --output /home/missyouangeled/.openclaw/workspace/media/tts/autonomy_$(date +%s).wav
+```
+3. 语音文件路径用 `MEDIA:<路径>` 发出，加上 `[[audio_as_voice]]` 标记
+4. 语速：情绪安慰时 0.9，日常闲聊 1.0
+5. 文本不要带情绪指令前缀（#...#），直接纯文本
