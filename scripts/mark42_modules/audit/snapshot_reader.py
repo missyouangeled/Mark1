@@ -194,28 +194,51 @@ class OpenClawSnapshotReader:
         return items
 
     def _extract_preferences(self, snap_path: Path) -> List[str]:
-        """从 MEMORY.md 提取偏好规则。"""
+        """从 MEMORY.md + memory/rules/ 提取偏好规则。
+
+        快照里可能不包含 memory/rules/ 目录，但如果包含，
+        优先从里面提取详细偏好规则。
+        """
         items = []
         mem_path = snap_path / "MEMORY.md"
-        if not mem_path.exists():
-            return items
+        if mem_path.exists():
+            text = mem_path.read_text(encoding="utf-8", errors="replace")
+            # 提取标题行和关键规则
+            for line in text.splitlines():
+                line = line.strip()
+                if line.startswith("## ") or line.startswith("### "):
+                    # 跳过纯结构标题，保留有意义的
+                    title = line.lstrip("# ").strip()
+                    if title and not title.startswith("⚠️"):
+                        items.append(title)
+                elif line.startswith("- **") and "**：" in line:
+                    # 提取粗体规则项
+                    m = re.match(r"- \*\*(.+?)\*\*[：:]\s*(.+)", line)
+                    if m:
+                        items.append(f"{m.group(1)}: {m.group(2)}")
 
-        text = mem_path.read_text(encoding="utf-8", errors="replace")
-        # 提取标题行和关键规则
-        for line in text.splitlines():
-            line = line.strip()
-            if line.startswith("## ") or line.startswith("### "):
-                # 跳过纯结构标题，保留有意义的
-                title = line.lstrip("# ").strip()
-                if title and not title.startswith("⚠️"):
-                    items.append(title)
-            elif line.startswith("- **") and "**：" in line:
-                # 提取粗体规则项
-                m = re.match(r"- \*\*(.+?)\*\*[：:]\s*(.+)", line)
-                if m:
-                    items.append(f"{m.group(1)}: {m.group(2)}")
+        # 从 memory/rules/ 目录补充详细偏好规则
+        rules_dir = snap_path / "memory" / "rules"
+        if rules_dir.exists():
+            for rule_file in sorted(rules_dir.glob("*.md")):
+                try:
+                    rule_text = rule_file.read_text(encoding="utf-8", errors="replace")
+                    for line in rule_text.splitlines():
+                        line = line.strip()
+                        # 提取规则标题和关键规则行
+                        if line.startswith("## ") and not line.startswith("## ⚠"):
+                            title = line.lstrip("# ").strip()
+                            if title and title not in items:
+                                items.append(f"[{rule_file.stem}] {title}")
+                        elif line.startswith("- ") and len(line) > 10:
+                            # 简短规则行，截取前 80 字符
+                            item = line[2:][:80]
+                            if item not in items:
+                                items.append(item)
+                except Exception:
+                    continue
 
-        return items[:20]  # 限制数量避免过长
+        return items[:30]  # 限制数量避免过长
 
     def _extract_projects(self, text: str) -> List[str]:
         """从 context-summary 提取项目状态。"""

@@ -1,1 +1,1 @@
-{"last_check": "2026-07-28T14:02:00+08:00", "status": "ok", "notifications": 0, "git_changes_pending": true}
+{"last_check": "2026-07-29T10:04:00+08:00", "status": "ok", "notifications": 0, "git_changes_pending": true, "pending_changes": ["heartbeat-state.json", "autonomy state files", "test images", "new TTS audio", "skill pending tasks"]}

@@ -80,10 +80,11 @@ class LLMChecker:
                 ],
                 temperature=0.0,
                 max_tokens=2000,
+                timeout=60,  # 60 秒超时，避免审计线程长时间悬挂
             )
             return self._parse_llm_response(response, pre_info)
         except Exception as e:
-            # LLM 失败，降级到规则引擎
+            # LLM 失败或超时，降级到规则引擎
             rule_result = RuleChecker().check(pre_info, post_summary)
             rule_result.error = f"LLM 降级: {e}"
             return rule_result

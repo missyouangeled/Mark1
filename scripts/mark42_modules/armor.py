@@ -634,27 +634,50 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     PLATFORM_PROBE_SEC = 60       # 探测期总时长
     PLATFORM_PROBE_INTERVAL = 10  # 每次检查间隔
     COMPACT_LOCK_FILE = XDG_STATE / "mark42" / "armor" / "compact.lock"
-    COMPACT_LOCK_TTL_SEC = 400    # 锁过期时间（compact 超时 + 缓冲）
+    COMPACT_LOCK_TTL_SEC = 620    # 锁过期时间（compact 超时 620s + 缓冲）
 
     def _try_acquire_compact_lock() -> bool:
-        """尝试获取 compact 锁。返回 True 表示获取成功。"""
+        """尝试获取 compact 锁。返回 True 表示获取成功。
+
+        使用 O_CREAT|O_EXCL 原子创建，避免竞态条件。
+        """
+        import errno as _errno
         COMPACT_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if COMPACT_LOCK_FILE.exists():
-            try:
-                lock_data = json.loads(COMPACT_LOCK_FILE.read_text())
-                lock_ts = lock_data.get("acquiredAt")
-                if lock_ts:
-                    from datetime import datetime as _dt
-                    lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
-                    if lock_age < COMPACT_LOCK_TTL_SEC:
-                        return False  # 锁未过期
-            except Exception:
-                pass  # 锁文件损坏，视为无锁
-        COMPACT_LOCK_FILE.write_text(json.dumps({
-            "acquiredAt": _now_iso(),
-            "pid": os.getpid(),
-        }, ensure_ascii=False))
-        return True
+
+        # 先尝试原子创建（O_CREAT|O_EXCL）
+        try:
+            fd = os.open(
+                str(COMPACT_LOCK_FILE),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+            os.write(fd, json.dumps({
+                "acquiredAt": _now_iso(),
+                "pid": os.getpid(),
+            }, ensure_ascii=False).encode())
+            os.close(fd)
+            return True
+        except OSError as e:
+            if e.errno != _errno.EEXIST:
+                # 非预期错误，保守起见不获取锁
+                return False
+
+        # 锁文件已存在，检查是否过期
+        try:
+            lock_data = json.loads(COMPACT_LOCK_FILE.read_text())
+            lock_ts = lock_data.get("acquiredAt")
+            if lock_ts:
+                from datetime import datetime as _dt
+                lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
+                if lock_age < COMPACT_LOCK_TTL_SEC:
+                    return False  # 锁未过期
+            # 锁已过期，原子替换
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+            return _try_acquire_compact_lock()  # 递归重试
+        except Exception:
+            # 锁文件损坏，删除后重试
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+            return _try_acquire_compact_lock()
 
     def _release_compact_lock() -> None:
         """释放 compact 锁。"""
@@ -747,12 +770,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         [
                             "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
                             "agent:main:main",
-                            "--timeout", "300000",
+                            "--timeout", "600000",  # OpenClaw 内部超时 600s
                             "--json",
                         ],
                         capture_output=True,
                         text=True,
-                        timeout=320,
+                        timeout=620,  # 比 OpenClaw 内部超时多 20s 缓冲
                     )
                     # ── 修复 (2026-07-29): LLM compact 后检查文件大小变化 ──
                     # 不管 rc 是 0 还是非 0，先看文件有没有变化：
@@ -811,7 +834,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                                 ],
                                 capture_output=True,
                                 text=True,
-                                timeout=200,
+                                timeout=200,  # 截短模式快，200s 够用
                             )
                         if compact_proc.returncode == 0:
                             post_bytes = active_session.stat().st_size
@@ -983,8 +1006,9 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
 
     # ── Post-Compact Audit hook（异步，不阻塞）──
-    # compact 完成后自动核对关键信息是否丢失
-    if not dry_run and index.get("compactTriggered"):
+    # compact 完成（无论成功或失败）后自动核对关键信息是否丢失
+    # 即使 compact 失败也审计——因为部分执行可能已丢失信息
+    if not dry_run:
         try:
             from .interfaces import get_audit
             _audit = get_audit()
@@ -993,6 +1017,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     pre_compact_snapshot={
                         "timestamp": _now_iso(),
                         "source": "pre-compact",
+                        "compactTriggered": index.get("compactTriggered", False),
+                        "compactError": index.get("compactError", ""),
                     },
                     post_compact_summary={
                         "timestamp": _now_iso(),

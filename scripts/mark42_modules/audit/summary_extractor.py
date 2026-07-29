@@ -58,10 +58,10 @@ class OpenClawSummaryExtractor:
     """
 
     # OpenClaw compaction 条目的标记
+    # OpenClaw 的 compaction 条目格式：{"type": "compaction", "summary": "...", ...}
     _COMPACTION_MARKERS = [
-        "<summary>",           # OpenClaw 标准 compaction 标记
-        "## Compaction",       # 备选格式
-        "compaction_summary",  # JSON 格式
+        '"type":"compaction"',      # OpenClaw 标准 compaction 条目
+        '"type": "compaction"',     # 带空格的变体
     ]
 
     def find_post_compact_summary(self, compact_timestamp: str) -> Optional[Dict[str, Any]]:
@@ -91,7 +91,12 @@ class OpenClawSummaryExtractor:
         return self._extract_from_sqlite(summary)
 
     def _extract_from_jsonl(self, session_path: Path) -> str:
-        """从 JSONL 文件读最后几条消息，找 compaction 摘要。"""
+        """从 JSONL 文件读最后几条消息，找 compaction 摘要。
+
+        OpenClaw compaction 条目格式：
+            {"type": "compaction", "summary": "## Decisions\n...", ...}
+        摘要文本在 `summary` 字段里，不在 `content` 字段里。
+        """
         try:
             # 读最后 100 行（compaction 摘要通常在最近）
             lines = []
@@ -113,15 +118,27 @@ class OpenClawSummaryExtractor:
                 except (json.JSONDecodeError, TypeError):
                     continue
 
+                # OpenClaw compaction 条目：type == "compaction"
+                if msg.get("type") == "compaction":
+                    # 摘要文本在 summary 字段里
+                    summary = msg.get("summary", "")
+                    if summary:
+                        return summary
+                    # summary 为空时，尝试 details 里的补充信息
+                    details = msg.get("details", {})
+                    if isinstance(details, dict):
+                        parts = []
+                        if details.get("readFiles"):
+                            parts.append(f"读取文件: {', '.join(details['readFiles'][:5])}")
+                        if details.get("modifiedFiles"):
+                            parts.append(f"修改文件: {', '.join(details['modifiedFiles'][:5])}")
+                        if parts:
+                            return "\n".join(parts)
+
+                # 兼容旧格式：有些版本 compaction 摘要在 system 消息的 content 里
                 content = msg.get("content", "")
                 role = msg.get("role", "")
-
-                # 检查是否是 compaction 摘要
-                if role == "system" and any(marker in content for marker in self._COMPACTION_MARKERS):
-                    return content
-
-                # 有些版本 compaction 摘要在 assistant 消息里
-                if role == "assistant" and "<summary>" in content:
+                if role == "system" and "<summary>" in content:
                     return content
 
             # 如果没找到明确标记，返回最后几条消息作为"当前上下文"

@@ -109,8 +109,20 @@ class BuiltinAudit:
         return {"queued": True, "taskId": f"audit-{thread.ident}"}
 
     def _async_run(self, pre: Dict[str, Any], post: Dict[str, Any]) -> None:
-        """异步执行审计（吞掉所有异常，不影响主流程）。"""
+        """异步执行审计（异常写入 broker，不影响主流程）。"""
         try:
             self.audit_compact(pre, post)
-        except Exception:
-            pass  # 审计自身失败不影响主流程
+        except Exception as e:
+            # 审计自身失败不影响主流程，但必须留痕
+            try:
+                from ..utils import _append_broker, _now_iso
+                _append_broker(
+                    "armor",
+                    "mark42.armor.audit.async_error",
+                    f"Post-Compact Audit 异步执行失败: {e}",
+                    "warn",
+                    str(e),
+                    {"error": str(e), "timestamp": _now_iso()},
+                )
+            except Exception:
+                pass  # broker 也失败了，只能吞掉
