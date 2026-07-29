@@ -211,7 +211,7 @@ class OpenClawSnapshotReader:
                     title = line.lstrip("# ").strip()
                     if title and not title.startswith("⚠️"):
                         items.append(title)
-                elif line.startswith("- **") and "**：" in line:
+                elif line.startswith("- **") and ("**：" in line or "**:" in line):
                     # 提取粗体规则项
                     m = re.match(r"- \*\*(.+?)\*\*[：:]\s*(.+)", line)
                     if m:

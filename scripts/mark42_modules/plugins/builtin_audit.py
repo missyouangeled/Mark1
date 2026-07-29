@@ -10,6 +10,7 @@ from ..audit.snapshot_reader import OpenClawSnapshotReader
 from ..audit.summary_extractor import OpenClawSummaryExtractor
 from ..audit.checker import LLMChecker
 from ..audit.report import write_report, send_alert
+from ..audit.pinning import ConstraintPinner
 
 
 class BuiltinAudit:
@@ -26,6 +27,7 @@ class BuiltinAudit:
         self._snapshot_reader = OpenClawSnapshotReader()
         self._summary_extractor = OpenClawSummaryExtractor()
         self._checker = LLMChecker()
+        self._pinner = ConstraintPinner()
 
     def audit_compact(
         self,
@@ -33,7 +35,7 @@ class BuiltinAudit:
         post_compact_summary: Dict[str, Any],
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """同步审计：对比 compact 前后。"""
+        """同步审计：对比 compact 前后 + 约束重注入。"""
         try:
             # 1. 读快照关键信息
             snapshot = self._snapshot_reader.find_latest_before(
@@ -68,6 +70,12 @@ class BuiltinAudit:
             report_path = write_report(result, snapshot, summary_ref)
             send_alert(result, report_path)
 
+            # 5. 约束重注入（无论审计结果如何，都重新注入关键约束）
+            # 灵感来源：arxiv Governance Decay 论文的 Constraint Pinning
+            # compact 后关键约束可能被摘要丢失，重新注入确保安全
+            inject_path = self._pinner.inject_to_file()
+            self._pinner.inject_via_broker()
+
             return {
                 "verdict": result.verdict,
                 "score": result.score,
@@ -82,6 +90,7 @@ class BuiltinAudit:
                 ],
                 "recommendation": result.recommendation,
                 "reportPath": report_path,
+                "pinnedConstraintsPath": inject_path,
                 "error": result.error,
             }
 

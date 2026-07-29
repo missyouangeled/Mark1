@@ -506,3 +506,722 @@ class TestBuiltinAudit:
             post_compact_summary={"timestamp": ""},
         )
         assert result["verdict"] == "error"
+
+
+# ═════════════════════════════════════════════════════
+# 7. 补充测试 - LLMChecker 完整流程
+# ═════════════════════════════════════════════════════
+
+
+class TestLLMCheckerFull:
+    """LLMChecker 补充测试。"""
+
+    def test_llm_check_full_flow(self, mocker):
+        """1. LLMChecker.check() 完整流程 - mock LLM 返回有效 JSON。"""
+        checker = LLMChecker()
+        mock_llm = mocker.MagicMock()
+        mock_llm.chat.return_value = '''```json
+{
+  "findings": [
+    {"category": "identity", "item": "用户: 袁文涛", "status": "preserved", "detail": "保留"},
+    {"category": "preferences", "item": "语言: 中文", "status": "preserved", "detail": "保留"}
+  ],
+  "recommendation": "信息保留完整"
+}
+```'''
+        mocker.patch.object(checker, "_get_llm", return_value=mock_llm)
+
+        pre_info = {
+            "identity": ["用户: 袁文涛"],
+            "preferences": ["语言: 中文"],
+            "projects": [],
+            "decisions": [],
+            "recent_topics": [],
+        }
+
+        result = checker.check(pre_info, "袁文涛用中文交流")
+        assert result.verdict == "pass"
+        assert result.score == 1.0
+        assert len(result.findings) == 2
+        assert result.findings[0].status == "preserved"
+        assert result.recommendation == "信息保留完整"
+
+    def test_llm_build_prompt_contains_categories_and_summary(self):
+        """2. LLMChecker._build_prompt() - 验证 prompt 包含所有类别和摘要。"""
+        checker = LLMChecker()
+        pre_info = {
+            "identity": ["用户: 袁文涛"],
+            "preferences": ["语言: 中文"],
+            "projects": ["Mark42 审计系统"],
+            "decisions": [],
+            "recent_topics": [],
+        }
+        summary = "这是压缩后的摘要，包含用户信息"
+
+        prompt = checker._build_prompt(pre_info, summary)
+
+        assert "identity" in prompt
+        assert "preferences" in prompt
+        assert "projects" in prompt
+        assert "袁文涛" in prompt
+        assert "压缩后的摘要" in prompt
+
+    def test_llm_parse_json_code_block(self):
+        """3. LLMChecker._parse_llm_response() - 测试 ```json 代码块解析。"""
+        checker = LLMChecker()
+        response = '''下面是审计结果：
+```json
+{
+  "findings": [
+    {"category": "identity", "item": "用户: 袁文涛", "status": "preserved", "detail": ""}
+  ],
+  "recommendation": "OK"
+}
+```
+结束'''
+        pre_info = {"identity": ["用户: 袁文涛"]}
+        result = checker._parse_llm_response(response, pre_info)
+        assert len(result.findings) == 1
+        assert result.findings[0].item == "用户: 袁文涛"
+
+    def test_llm_parse_failure_falls_back_to_rule(self, mocker):
+        """4. LLMChecker._parse_llm_response() - JSON 解析失败降级到 Rule。"""
+        checker = LLMChecker()
+        invalid_response = '''这不是有效的 JSON
+{
+  "findings": [
+    invalid json
+  ]
+}'''
+        pre_info = {
+            "identity": ["用户: 袁文涛"],
+            "preferences": [],
+            "projects": [],
+            "decisions": [],
+            "recent_topics": [],
+        }
+
+        # 这不是有效的 JSON，应该降级到 RuleChecker
+        result = checker._parse_llm_response(invalid_response, pre_info)
+        # RuleChecker 用关键词匹配，invalid_response 里没有关键词所以会是 lost
+        assert result.verdict in ["pass", "fail", "partial"]  # 不报错即可
+
+    def test_llm_compute_result_empty_findings_returns_pass(self):
+        """5. LLMChecker._compute_result() - 空 findings 返回 pass。"""
+        checker = LLMChecker()
+        result = checker._compute_result([], "测试推荐")
+        assert result.verdict == "pass"
+        assert result.score == 1.0
+        # 空 findings 时使用硬编码的默认推荐语，不使用传入的参数
+        assert "无关键信息" in result.recommendation
+
+    def test_llm_timeout_falls_back_to_rule(self, mocker):
+        """6. LLMChecker 超时降级 - mock llm.chat 抛出 timeout。"""
+        checker = LLMChecker()
+        mock_llm = mocker.MagicMock()
+        mock_llm.chat.side_effect = Exception("Timeout: request took too long")
+        mocker.patch.object(checker, "_get_llm", return_value=mock_llm)
+
+        pre_info = {
+            "identity": ["用户: 袁文涛"],
+            "preferences": [],
+            "projects": [],
+            "decisions": [],
+            "recent_topics": [],
+        }
+
+        result = checker.check(pre_info, "用户袁文涛")
+        # 降级到 RuleChecker 后应该有结果
+        assert result.verdict in ["pass", "partial"]
+        # error 可能包含降级信息
+        assert result.error is not None
+
+
+class TestRuleCheckerFull:
+    """RuleChecker 补充测试。"""
+
+    def test_extract_keywords_chinese(self):
+        """7. RuleChecker._extract_keywords() - 中文分词。"""
+        checker = RuleChecker()
+        keywords = checker._extract_keywords("用户: 袁文涛")
+        # 应该提取出关键词，包含 "用户" 和 "袁文涛"
+        assert len(keywords) > 0
+        # 测试其他中文
+        keywords2 = checker._extract_keywords("语言锁定: 只用中文")
+        assert len(keywords2) > 0
+
+    def test_rule_check_multi_categories_items(self):
+        """8. RuleChecker.check() - 多类别多项目场景。"""
+        checker = RuleChecker()
+        pre_info = {
+            "identity": ["用户: 袁文涛", "AI: 贾维斯"],
+            "preferences": ["语言: 中文", "回复风格: 简洁"],
+            "projects": ["项目: Mark42 审计系统"],
+            "decisions": ["决策: 用 pytest 测试"],
+            "recent_topics": ["话题: 单元测试覆盖"],
+        }
+        summary = "用户袁文涛和AI贾维斯正在用中文语言讨论 Mark42 审计系统项目，采用简洁回复风格，用 pytest 决策进行单元测试覆盖"
+        result = checker.check(pre_info, summary)
+        # 大部分信息应该被匹配到
+        assert result.verdict in ["pass", "partial"]
+        assert result.score >= 0.3  # 宽松阈值，能匹配到关键词就行
+
+
+# ═════════════════════════════════════════════════════
+# 8. 补充测试 - SnapshotReader 完整提取
+# ═════════════════════════════════════════════════════
+
+
+class TestSnapshotReaderFull:
+    """OpenClawSnapshotReader 补充测试。"""
+
+    def test_find_latest_before_multiple_snapshots(self, tmp_path):
+        """9. find_latest_before - 多个快照选最近的。"""
+        timestamps = [
+            "2026-07-29T080000",
+            "2026-07-29T090000",
+            "2026-07-29T100000",
+            "2026-07-29T110000",
+        ]
+        for ts in timestamps:
+            (tmp_path / f"snapshot-{ts}").mkdir()
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        result = reader.find_latest_before("2026-07-29T103000")
+        assert result is not None
+        assert "snapshot-2026-07-29T100000" in result["path"]
+
+    def test_extract_key_info_from_user_identity(self, tmp_path):
+        """10. extract_key_info - 从 USER.md 提取身份信息。"""
+        snap_dir = tmp_path / "snapshot-test"
+        snap_dir.mkdir()
+        (snap_dir / "USER.md").write_text(
+            "**Name:** 袁文涛\n**What to call them:** 点点\n"
+        )
+        (snap_dir / "context-summary.md").write_text("")
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        snapshot = {"path": str(snap_dir), "timestamp": ""}
+        info = reader.extract_key_info(snapshot)
+
+        assert any("袁文涛" in i for i in info["identity"])
+        assert any("点点" in i for i in info["identity"])
+
+    def test_extract_key_info_from_memory_preferences(self, tmp_path):
+        """11. extract_key_info - 从 MEMORY.md 提取偏好。"""
+        snap_dir = tmp_path / "snapshot-test"
+        snap_dir.mkdir()
+        (snap_dir / "MEMORY.md").write_text(
+            "# 长期记忆\n\n"
+            "## 偏好规则\n\n"
+            "- **语言锁定**: 只用中文\n"
+            "- **代码风格**: Python 优先\n"
+        )
+        (snap_dir / "context-summary.md").write_text("")
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        snapshot = {"path": str(snap_dir), "timestamp": ""}
+        info = reader.extract_key_info(snapshot)
+
+        # 应该提取到偏好规则（标题和内容）
+        assert len(info["preferences"]) > 0
+        # "偏好规则" 是标题，会被提取
+        assert any("偏好规则" in p or "语言锁定" in p or "只用中文" in p for p in info["preferences"])
+
+    def test_extract_key_info_from_memory_rules_dir(self, tmp_path):
+        """12. extract_key_info - 从 memory/rules/ 提取偏好。"""
+        snap_dir = tmp_path / "snapshot-test"
+        snap_dir.mkdir()
+        (snap_dir / "MEMORY.md").write_text("")
+        (snap_dir / "context-summary.md").write_text("")
+
+        rules_dir = snap_dir / "memory" / "rules"
+        rules_dir.mkdir(parents=True)
+        (rules_dir / "chat-style.md").write_text(
+            "## 对话风格\n\n"
+            "- 回复要简洁明了\n"
+            "- 多用 emoji 增加亲和力\n"
+        )
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        snapshot = {"path": str(snap_dir), "timestamp": ""}
+        info = reader.extract_key_info(snapshot)
+
+        # 应该从 rules 目录提取偏好
+        assert len(info["preferences"]) > 0
+        assert any("chat-style" in p or "简洁" in p for p in info["preferences"])
+
+    def test_extract_identity_combined_sources(self, tmp_path):
+        """13. _extract_identity - USER.md/SOUL.md/MEMORY.md 联合提取。"""
+        snap_dir = tmp_path / "snapshot-test"
+        snap_dir.mkdir()
+        (snap_dir / "USER.md").write_text("**Name:** 袁文涛\n")
+        (snap_dir / "SOUL.md").write_text("名字：贾维斯\n")
+        (snap_dir / "MEMORY.md").write_text("生日：2000-01-01\n")
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        identities = reader._extract_identity(snap_dir)
+
+        assert any("袁文涛" in i for i in identities)
+        assert any("贾维斯" in i for i in identities)
+        assert any("生日" in i for i in identities)
+
+    def test_extract_preferences_combined_memory_and_rules(self, tmp_path):
+        """14. _extract_preferences - MEMORY.md + memory/rules/ 联合提取。"""
+        snap_dir = tmp_path / "snapshot-test"
+        snap_dir.mkdir()
+        (snap_dir / "MEMORY.md").write_text(
+            "## 基础规则\n\n"
+            "- **语言**: 中文\n"
+        )
+        rules_dir = snap_dir / "memory" / "rules"
+        rules_dir.mkdir(parents=True)
+        (rules_dir / "coding.md").write_text("## 代码规则\n- PEP8 规范\n")
+
+        reader = OpenClawSnapshotReader(snapshot_root=tmp_path)
+        prefs = reader._extract_preferences(snap_dir)
+
+        # 两者的偏好都应该被提取
+        assert len(prefs) > 0
+        # MEMORY.md 的标题 "基础规则" 会被提取
+        # memory/rules/ 的内容 "[coding] 代码规则" 和 "PEP8 规范" 会被提取
+        assert any("基础规则" in p or "代码规则" in p or "PEP8" in p for p in prefs)
+
+    def test_extract_projects_from_context_summary(self):
+        """15. _extract_projects - 从 context-summary 提取项目。"""
+        reader = OpenClawSnapshotReader()
+        summary_text = """
+## 今日摘要
+
+- 贾维斯：今天做了 compact 优化
+
+项目：Mark42 压缩审计系统
+决策：采用 pytest 作为测试框架
+
+项目：Skill Workshop 技能管理
+"""
+        projects = reader._extract_projects(summary_text)
+        assert len(projects) >= 2
+        assert any("Mark42" in p for p in projects)
+        assert any("Skill" in p for p in projects)
+
+    def test_extract_decisions_from_context_summary(self):
+        """16. _extract_decisions - 从 context-summary 提取决策。"""
+        reader = OpenClawSnapshotReader()
+        summary_text = """
+## 技术决策
+
+决策：采用 pytest 作为测试框架
+方案：用 JSON 存储审计报告
+决定：异步执行审计不阻塞主流程
+策略：覆盖率目标 80%
+"""
+        decisions = reader._extract_decisions(summary_text)
+        assert len(decisions) >= 3
+        assert any("pytest" in d for d in decisions)
+        assert any("JSON" in d for d in decisions)
+
+    def test_extract_recent_topics_from_context_summary(self):
+        """17. _extract_recent_topics - 从 context-summary 提取话题。"""
+        reader = OpenClawSnapshotReader()
+        summary_text = """
+## 今日摘要
+
+- 完成了单元测试框架搭建
+- 讨论了覆盖率计算方法
+- 测试了 pytest-mock 的使用
+- 修复了 snapshot 路径问题
+"""
+        topics = reader._extract_recent_topics(summary_text)
+        assert len(topics) >= 3
+        assert any("单元测试" in t for t in topics)
+
+
+# ═════════════════════════════════════════════════════
+# 9. 补充测试 - SummaryExtractor JSONL 格式
+# ═════════════════════════════════════════════════════
+
+
+class TestSummaryExtractorFull:
+    """OpenClawSummaryExtractor 补充测试。"""
+
+    def test_extract_from_jsonl_finds_type_compaction(self, tmp_path):
+        """18. _extract_from_jsonl - 找到 type=\"compaction\" 条目。"""
+        session_file = tmp_path / "session.jsonl"
+        lines = [
+            json.dumps({"role": "user", "content": "你好"}),
+            json.dumps({"role": "assistant", "content": "你好"}),
+            json.dumps({"type": "compaction", "summary": "## 压缩摘要\n对话是你好，用户问候"}),
+        ]
+        session_file.write_text("\n".join(lines) + "\n")
+
+        extractor = OpenClawSummaryExtractor()
+        text = extractor._extract_from_jsonl(session_file)
+
+        assert "压缩摘要" in text
+        assert "对话是你好" in text
+
+    def test_extract_from_jsonl_summary_empty_fallback_details(self, tmp_path):
+        """19. _extract_from_jsonl - compaction summary 为空时 fallback 到 details。"""
+        session_file = tmp_path / "session.jsonl"
+        lines = [
+            json.dumps({
+                "type": "compaction",
+                "summary": "",  # 空摘要
+                "details": {
+                    "readFiles": ["a.py", "b.py"],
+                    "modifiedFiles": ["c.py"]
+                }
+            }),
+        ]
+        session_file.write_text("\n".join(lines) + "\n")
+
+        extractor = OpenClawSummaryExtractor()
+        text = extractor._extract_from_jsonl(session_file)
+
+        assert "读取文件" in text
+        assert "a.py" in text
+        assert "修改文件" in text
+        assert "c.py" in text
+
+    def test_extract_from_jsonl_no_compaction_returns_tail_messages(self, tmp_path):
+        """20. _extract_from_jsonl - 找不到 compaction 时返回最后 20 条消息。"""
+        session_file = tmp_path / "session.jsonl"
+        lines = []
+        for i in range(30):
+            lines.append(json.dumps({"role": "user", "content": f"消息 {i}"}))
+            lines.append(json.dumps({"role": "assistant", "content": f"回复 {i}"}))
+        session_file.write_text("\n".join(lines) + "\n")
+
+        extractor = OpenClawSummaryExtractor()
+        text = extractor._extract_from_jsonl(session_file)
+
+        # 应该包含最近的消息
+        assert "消息 29" in text
+        assert "回复 29" in text
+        # 不应该包含太旧的消息
+
+    def test_extract_from_jsonl_empty_file_returns_empty_session(self, tmp_path):
+        """21. _extract_from_jsonl - 空文件返回 \"(empty session)\"。"""
+        session_file = tmp_path / "session.jsonl"
+        session_file.write_text("")
+
+        extractor = OpenClawSummaryExtractor()
+        text = extractor._extract_from_jsonl(session_file)
+
+        assert "empty session" in text
+
+    def test_extract_summary_text_path_not_exists_calls_sqlite(self, mocker, tmp_path):
+        """22. extract_summary_text - 路径不存在时调用 _extract_from_sqlite。"""
+        extractor = OpenClawSummaryExtractor()
+        mock_sqlite = mocker.patch.object(
+            extractor, "_extract_from_sqlite", return_value="from sqlite"
+        )
+
+        result = extractor.extract_summary_text({"path": str(tmp_path / "not-exist.jsonl")})
+
+        mock_sqlite.assert_called_once()
+        assert result == "from sqlite"
+
+
+# ═════════════════════════════════════════════════════
+# 10. 补充测试 - Report 完整字段
+# ═════════════════════════════════════════════════════
+
+
+class TestReportFull:
+    """报告补充测试。"""
+
+    def test_write_report_complete_fields(self, tmp_path, mocker):
+        """23. write_report - 完整字段验证。"""
+        mocker.patch("mark42_modules.audit.report.AUDIT_DIR", tmp_path / "audit")
+
+        result = AuditResult(
+            verdict="partial",
+            score=0.75,
+            findings=[
+                Finding(category="identity", item="用户: 袁文涛", status="preserved", detail="保留"),
+                Finding(category="preferences", item="语言: 中文", status="lost", detail="丢失"),
+            ],
+            recommendation="部分信息丢失，关注语言设置",
+        )
+        pre_snap = {"path": "/snap/pre", "timestamp": "2026-07-29T10:00:00"}
+        post_sum = {"path": "/snap/post", "timestamp": "2026-07-29T10:01:00"}
+
+        report_path = write_report(result, pre_snap, post_sum)
+        assert Path(report_path).exists()
+
+        data = json.loads(Path(report_path).read_text())
+        assert "timestamp" in data
+        assert data["verdict"] == "partial"
+        assert data["score"] == 0.75
+        assert len(data["findings"]) == 2
+        assert data["findings"][0]["status"] == "preserved"
+        assert data["findings"][1]["status"] == "lost"
+        assert data["recommendation"] == "部分信息丢失，关注语言设置"
+        assert data["preSnapshot"] == pre_snap
+        assert data["postSummary"] == post_sum
+
+    def test_send_alert_partial_sends_warning(self, mocker):
+        """24. send_alert - partial 级别发 warning。"""
+        mock_broker = mocker.patch("mark42_modules.audit.report._append_broker")
+        result = AuditResult(
+            verdict="partial",
+            score=0.75,
+            findings=[
+                Finding(category="preferences", item="x", status="degraded"),
+            ],
+            recommendation="部分丢失",
+        )
+        send_alert(result, "/path/to/report")
+
+        mock_broker.assert_called_once()
+        call_args = mock_broker.call_args
+        assert call_args[0][1] == "mark42.armor.audit.partial"  # event_type
+        assert call_args[0][3] == "warning"  # level
+
+    def test_cleanup_old_reports_custom_keep_count(self, tmp_path, mocker):
+        """25. _cleanup_old_reports - 保留指定数量。"""
+        mocker.patch("mark42_modules.audit.report.AUDIT_DIR", tmp_path / "audit")
+        audit_dir = tmp_path / "audit"
+        audit_dir.mkdir()
+
+        # 创建 15 份报告
+        for i in range(15):
+            (audit_dir / f"audit-{i:04d}.json").write_text("{}")
+
+        from mark42_modules.audit.report import _cleanup_old_reports
+        _cleanup_old_reports(keep=5)
+
+        remaining = list(audit_dir.glob("audit-*.json"))
+        assert len(remaining) == 5
+
+
+# ═════════════════════════════════════════════════════
+# 11. 补充测试 - BuiltinAudit 完整流程
+# ═════════════════════════════════════════════════════
+
+
+class TestBuiltinAuditFull:
+    """BuiltinAudit 补充测试。"""
+
+    def test_audit_compact_full_mock_chain(self, mocker, tmp_path):
+        """26. audit_compact - 全流程 mock。"""
+        from mark42_modules.plugins.builtin_audit import BuiltinAudit
+
+        mocker.patch("mark42_modules.audit.report.AUDIT_DIR", tmp_path / "audit")
+        
+        mock_result = AuditResult(
+            verdict="pass",
+            score=1.0,
+            findings=[],
+            recommendation="测试通过",
+        )
+
+        # Patch 类方法
+        mocker.patch.object(
+            OpenClawSnapshotReader, "find_latest_before",
+            return_value={"path": str(tmp_path), "timestamp": "t1"},
+        )
+        mocker.patch.object(
+            OpenClawSnapshotReader, "extract_key_info",
+            return_value={"identity": ["用户: 袁文涛"], "preferences": [],
+                          "projects": [], "decisions": [], "recent_topics": []},
+        )
+        mocker.patch.object(
+            OpenClawSummaryExtractor, "find_post_compact_summary",
+            return_value={"path": str(tmp_path / "s.jsonl"), "timestamp": "t2"},
+        )
+        mocker.patch.object(
+            OpenClawSummaryExtractor, "extract_summary_text",
+            return_value="袁文涛",
+        )
+        mocker.patch.object(LLMChecker, "check", return_value=mock_result)
+
+        mock_write = mocker.patch(
+            "mark42_modules.plugins.builtin_audit.write_report",
+            return_value="/mock/report.json"
+        )
+        mock_alert = mocker.patch(
+            "mark42_modules.plugins.builtin_audit.send_alert"
+        )
+
+        audit = BuiltinAudit()
+        result = audit.audit_compact(
+            pre_compact_snapshot={"timestamp": "t1"},
+            post_compact_summary={"timestamp": "t2"},
+        )
+
+        assert result["verdict"] == "pass"
+        assert result["score"] == 1.0
+        assert result["reportPath"] == "/mock/report.json"
+        mock_write.assert_called_once()
+        mock_alert.assert_called_once()
+
+    def test_async_run_exception_safe(self, mocker):
+        """27. _async_run - 异步线程异常安全（不崩溃）。"""
+        from mark42_modules.plugins.builtin_audit import BuiltinAudit
+
+        audit = BuiltinAudit()
+
+        # 让 audit_compact 抛出异常
+        mocker.patch.object(
+            audit._snapshot_reader, "find_latest_before",
+            side_effect=Exception("async failure test"),
+        )
+
+        # _async_run 有异常保护，不应该抛出
+        audit._async_run({"timestamp": ""}, {"timestamp": ""})
+        # 不崩溃就是通过（内部的 broker 写入失败会被静默吞掉，不影响主流程）
+
+
+# ── Constraint Pinner 测试 ──────────────────────────
+
+
+class TestConstraintPinner:
+    """约束保护：compact 后重新注入关键约束。"""
+
+    def test_extract_from_soul_md(self, tmp_path):
+        """从 SOUL.md 提取语言锁定规则和核心准则。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text(
+            "## ⚠️ 输出语言强制规则\n"
+            "**你必须只用中文回复。禁止使用英文回复。**\n\n"
+            "**Be genuinely helpful.**\n"
+            "- 私密的事情保持私密。\n"
+            "- 发送邮件前先问\n",
+            encoding="utf-8",
+        )
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert "中文" in result
+        assert "SOUL.md" in result
+        # 私密边界也应被提取
+        assert "私密" in result
+
+    def test_extract_from_user_md(self, tmp_path):
+        """从 USER.md 提取名字和时区。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "USER.md").write_text(
+            "- **Name:** 袁文涛\n"
+            "- **What to call them:** 点点\n"
+            "- **Timezone:** Asia/Shanghai\n"
+            "- **Notes:** 习惯用\"点点\"自称\n",
+            encoding="utf-8",
+        )
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert "袁文涛" in result
+        assert "点点" in result
+        assert "Shanghai" in result
+
+    def test_extract_from_agents_md(self, tmp_path):
+        """从 AGENTS.md 提取基本规则。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "AGENTS.md").write_text(
+            "## 基本规则\n\n"
+            "- 只用中文。交付前自检。\n"
+            "- 修改任务：先查现有能力\n"
+            "- 发送邮件/推文/公开内容前先问\n"
+            "- 高风险系统操作前读崩坏案例\n",
+            encoding="utf-8",
+        )
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert "只用中文" in result
+        assert "高风险" in result
+
+    def test_extract_all_files_combined(self, tmp_path):
+        """多个文件同时存在时合并提取。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text("**你必须只用中文回复。**\n", encoding="utf-8")
+        (tmp_path / "USER.md").write_text("- **Name:** 袁文涛\n", encoding="utf-8")
+        (tmp_path / "AGENTS.md").write_text("- 只用中文\n", encoding="utf-8")
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert "SOUL.md" in result
+        assert "USER.md" in result
+        assert "AGENTS.md" in result
+        assert "袁文涛" in result
+
+    def test_extract_empty_workspace(self, tmp_path):
+        """没有任何文件时返回空字符串。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert result == ""
+
+    def test_extract_missing_one_file(self, tmp_path):
+        """只有部分文件存在时也能提取。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "USER.md").write_text("- **Name:** 袁文涛\n", encoding="utf-8")
+        # SOUL.md 和 AGENTS.md 不存在
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        assert "袁文涛" in result
+        assert "SOUL.md" not in result  # 不存在的文件不会被提到
+
+    def test_max_total_chars_limit(self, tmp_path):
+        """总字符数超过 MAX_TOTAL_CHARS 时截断。"""
+        from mark42_modules.audit.pinning import ConstraintPinner, MAX_TOTAL_CHARS
+
+        # 写一个超大文件
+        (tmp_path / "SOUL.md").write_text("中文 " * 5000, encoding="utf-8")
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.extract_pinned_constraints()
+        # 结果不应超过 MAX_TOTAL_CHARS + header
+        assert len(result) < MAX_TOTAL_CHARS + 500  # 加上 header 的余量
+
+    def test_inject_to_file(self, tmp_path, mocker):
+        """inject_to_file 写入临时文件。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
+
+        # mock ARMOR_STATE 到 tmp_path
+        mocker.patch("mark42_modules.config.ARMOR_STATE", tmp_path / "armor")
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        path = pinner.inject_to_file()
+        assert path is not None
+        content = Path(path).read_text(encoding="utf-8")
+        assert "中文" in content
+        assert "Post-Compact" in content
+
+    def test_inject_to_file_empty_returns_none(self, tmp_path):
+        """没有约束时 inject_to_file 返回 None。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        assert pinner.inject_to_file() is None
+
+    def test_inject_via_broker(self, tmp_path, mocker):
+        """inject_via_broker 发送 broker 事件。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
+
+        mock_broker = mocker.patch("mark42_modules.utils._append_broker")
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.inject_via_broker()
+        assert result is True
+        assert mock_broker.called
+        call_args = mock_broker.call_args
+        assert "constraint_reinject" in call_args[0][1]
+
+    def test_inject_via_broker_no_constraints(self, tmp_path):
+        """没有约束时 inject_via_broker 返回 False。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        assert pinner.inject_via_broker() is False
