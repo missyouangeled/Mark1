@@ -31,6 +31,7 @@ _DEFAULTS: Dict[str, str] = {
     "engine": "mark42_modules.plugins.builtin_engine:BuiltinEngine",
     "chaos": "mark42_modules.plugins.builtin_chaos:BuiltinChaos",
     "heavy": "mark42_modules.plugins.builtin_heavy:BuiltinHeavy",
+    "audit": "mark42_modules.plugins.builtin_audit:BuiltinAudit",
 }
 
 
@@ -91,6 +92,10 @@ def get_chaos() -> Any:
 
 def get_heavy() -> Any:
     return get("heavy")
+
+
+def get_audit() -> Any:
+    return get("audit")
 
 
 def list_all() -> Dict[str, Any]:

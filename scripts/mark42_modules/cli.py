@@ -604,6 +604,29 @@ def _print_metrics() -> None:
     print("\n".join(lines))
 
 
+def _print_audit_report(r: dict) -> None:
+    """打印审计报告。"""
+    verdict = r.get("verdict", "?")
+    emoji = {"pass": "✅", "partial": "⚠️", "fail": "❌", "skip": "⏭️", "error": "💥"}.get(verdict, "?")
+    print(f"🔍 Post-Compact Audit Report")
+    print(f"   {emoji} 结论: {verdict} (score={r.get('score', 0)})")
+    print(f"   时间: {r.get('timestamp', '')[:19]}")
+    if r.get("error"):
+        print(f"   错误: {r['error']}")
+    findings = r.get("findings", [])
+    if findings:
+        print(f"   核对项 ({len(findings)}):")
+        for f in findings:
+            status = f.get("status", "")
+            fe = {"preserved": "✅", "degraded": "⚠️", "lost": "❌"}.get(status, "?")
+            print(f"     {fe} [{f.get('category', '')}] {f.get('item', '')[:60]}")
+            if f.get("detail"):
+                print(f"        └ {f['detail'][:80]}")
+    print(f"   建议: {r.get('recommendation', '')}")
+    print(f"   快照: {r.get('preSnapshot', {}).get('path', '?')}")
+    print(f"   摘要: {r.get('postSummary', {}).get('path', '?')}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Mark42 模块化智能铠甲系统",
@@ -693,6 +716,13 @@ def main() -> None:
     heavy_p.add_argument("--resume", action="store_true", help="断点续传：重试所有 failed/pending 批次")
     heavy_p.add_argument("--retry", action="store_true", help="重试单个 failed 批次（配合 --batch 使用）")
     heavy_p.add_argument("--path", type=str, help="工作路径")
+
+    # ── Audit ──
+    audit_p = sub.add_parser("audit", help="🔍 压缩后审计")
+    audit_p.add_argument("--last", action="store_true", help="查看最近审计报告")
+    audit_p.add_argument("--list", action="store_true", help="列出所有审计报告")
+    audit_p.add_argument("--run", action="store_true", help="手动触发审计")
+    audit_p.add_argument("--show", type=str, help="查看指定报告")
 
     # ── Cost ──
     cost_p = sub.add_parser("cost", help="💰 LLM 成本追踪")
@@ -870,6 +900,77 @@ def main() -> None:
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
             print(f"   {trim_summary(result.get('summary', ''), 100)}")
+        return
+
+    if args.module == "audit":
+        import json as _json
+        from .config import ARMOR_STATE as _AS
+        _audit_dir = _AS / "audit"
+
+        if args.last:
+            # 查看最近报告
+            reports = sorted(_audit_dir.glob("audit-*.json"), reverse=True) if _audit_dir.exists() else []
+            if not reports:
+                print("🔍 暂无审计报告")
+                return
+            r = _json.loads(reports[0].read_text())
+            _print_audit_report(r)
+            return
+
+        if args.list:
+            # 列出所有报告
+            reports = sorted(_audit_dir.glob("audit-*.json"), reverse=True) if _audit_dir.exists() else []
+            if not reports:
+                print("🔍 暂无审计报告")
+                return
+            print(f"🔍 审计报告 ({len(reports)} 份)")
+            for rp in reports[:20]:
+                r = _json.loads(rp.read_text())
+                emoji = {"pass": "✅", "partial": "⚠️", "fail": "❌", "skip": "⏭️", "error": "💥"}.get(r.get("verdict", ""), "?")
+                print(f"  {emoji} {rp.name} | score={r.get('score', 0)} | {r.get('timestamp', '')[:19]}")
+            return
+
+        if args.run:
+            # 手动触发审计
+            from .interfaces import get_audit
+            from .utils import _now_iso
+            _audit = get_audit()
+            if _audit is None:
+                print("❌ 审计模块未注册")
+                return
+            print("🔍 开始审计...")
+            result = _audit.audit_compact(
+                pre_compact_snapshot={"timestamp": _now_iso(), "source": "manual"},
+                post_compact_summary={"timestamp": _now_iso(), "source": "manual"},
+            )
+            print(f"   结论: {result.get('verdict', '?')} (score={result.get('score', 0)})")
+            print(f"   建议: {result.get('recommendation', '')}")
+            if result.get("reportPath"):
+                print(f"   报告: {result['reportPath']}")
+            findings = result.get("findings", [])
+            if findings:
+                print(f"   核对项 ({len(findings)}):")
+                for f in findings:
+                    emoji = {"preserved": "✅", "degraded": "⚠️", "lost": "❌"}.get(f.get("status", ""), "?")
+                    print(f"     {emoji} [{f.get('category', '')}] {f.get('item', '')[:60]}")
+            return
+
+        if args.show:
+            # 查看指定报告
+            rp = _audit_dir / args.show if not args.show.startswith("/") else Path(args.show)
+            if not rp.exists():
+                print(f"❌ 报告不存在: {rp}")
+                return
+            r = _json.loads(rp.read_text())
+            _print_audit_report(r)
+            return
+
+        # 默认：显示帮助
+        print("🔍 Post-Compact Audit -- 用法:")
+        print("  mark42 audit --last    查看最近审计报告")
+        print("  mark42 audit --list    列出所有审计报告")
+        print("  mark42 audit --run     手动触发审计")
+        print("  mark42 audit --show <name>  查看指定报告")
         return
 
     if args.module == "engine":

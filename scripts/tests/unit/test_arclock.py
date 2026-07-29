@@ -176,7 +176,7 @@ class TestRegistry:
         statuses = list_all()
         assert isinstance(statuses, dict)
         # 应该有 9 个锁扣
-        assert len(statuses) == 9
+        assert len(statuses) == 10
         for name in ["compress", "memory", "consciousness", "archive",
                      "breaker", "health", "engine", "chaos", "heavy"]:
             assert name in statuses

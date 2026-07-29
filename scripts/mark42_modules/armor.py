@@ -982,6 +982,26 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         # 升级逻辑本身的错误不能影响主流程
         print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
 
+    # ── Post-Compact Audit hook（异步，不阻塞）──
+    # compact 完成后自动核对关键信息是否丢失
+    if not dry_run and index.get("compactTriggered"):
+        try:
+            from .interfaces import get_audit
+            _audit = get_audit()
+            if _audit is not None:
+                _audit.audit_compact_async(
+                    pre_compact_snapshot={
+                        "timestamp": _now_iso(),
+                        "source": "pre-compact",
+                    },
+                    post_compact_summary={
+                        "timestamp": _now_iso(),
+                        "source": "post-compact",
+                    },
+                )
+        except Exception:
+            pass  # audit hook 失败不影响主流程
+
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
 
