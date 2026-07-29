@@ -876,9 +876,15 @@ def main() -> None:
         from .engine import (
             engine_daemon, engine_kill, engine_list, engine_run_loop,
             engine_start, engine_templates, engine_watch_task,
+            engine_reload_templates,
         )
         if args.templates:
             engine_templates()
+        elif getattr(args, 'reload_templates', False):
+            result = engine_reload_templates()
+            print(f"🔄 Loop 模板重载完成: {result['oldCount']} -> {result['newCount']} 个模板")
+            for name in result['templates']:
+                print(f"   - {name}")
         elif args.list:
             engine_list()
         elif args.start:

@@ -85,9 +85,60 @@ def _load_templates() -> dict[str, Any]:
     return templates
 
 
+# ── G 项：Loop 模板热加载 ──
+# 记录上次加载时的文件 mtime，daemon 用来检测变更
+_template_cache: dict[str, Any] = {}
+_template_mtimes: dict[str, float] = {}
+
+
+def _check_template_files_changed() -> bool:
+    """检查模板配置文件是否有变更（mtime 变化）。"""
+    changed = False
+    for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+        try:
+            current_mtime = path.stat().st_mtime if path.exists() else 0.0
+            stored_mtime = _template_mtimes.get(str(path), 0.0)
+            if current_mtime != stored_mtime:
+                _template_mtimes[str(path)] = current_mtime
+                if stored_mtime > 0:  # 不是第一次加载
+                    changed = True
+        except OSError:
+            pass
+    return changed
+
+
+def _get_templates_cached() -> dict[str, Any]:
+    """获取模板（带缓存，文件变更时自动重载）。"""
+    global _template_cache
+    if not _template_cache or _check_template_files_changed():
+        _template_cache = _load_templates()
+        # 无论模板是否为空，都初始化 mtime 防止无限重载
+        for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+            try:
+                _template_mtimes[str(path)] = path.stat().st_mtime if path.exists() else 0.0
+            except OSError:
+                pass
+    return _template_cache
+
+
+def engine_reload_templates() -> dict[str, Any]:
+    """手动重载模板配置（CLI 可调用）。"""
+    global _template_cache
+    old_count = len(_template_cache)
+    _template_cache = _load_templates()
+    new_count = len(_template_cache)
+    # 更新 mtime 记录
+    for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+        try:
+            _template_mtimes[str(path)] = path.stat().st_mtime if path.exists() else 0.0
+        except OSError:
+            pass
+    return {"oldCount": old_count, "newCount": new_count, "templates": list(_template_cache.keys())}
+
+
 def _template_exists(name: str) -> bool:
     """检查模板名是否存在。"""
-    return name in _load_templates()
+    return name in _get_templates_cached()
 
 
 def _load_loops() -> dict[str, Any]:
@@ -111,7 +162,7 @@ def _save_loops(loops: dict[str, Any]) -> None:
 def engine_templates() -> None:
     """列出所有可用 Loop 模板。"""
     print("🔄 可用 Loop 模板:\n")
-    templates = _load_templates()
+    templates = _get_templates_cached()
     for name, cfg in sorted(templates.items()):
         period = cfg.get("period", 300)
         desc = cfg.get("description", "")
@@ -582,8 +633,18 @@ def engine_daemon(interval_s: int = 30) -> None:
             # ── 4. 保存游标 ──
             _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
             # ── 5. 每 10 次循环做一次 log rotation + mark42 状态快照 ──
+            # ── G 项：同时检查 Loop 模板文件是否变更 ──
             rotation_check_count += 1
             if rotation_check_count % 10 == 0:
+                # G 项：模板热加载检测
+                if _check_template_files_changed():
+                    global _template_cache
+                    _template_cache = _load_templates()
+                    print(f"[{ts}] 🔄 Loop 模板已热重载 ({len(_template_cache)} 个模板)")
+                    _append_broker("engine", "mark42.engine.templates.reloaded",
+                                   "Loop 模板热重载", "ok",
+                                   f"{len(_template_cache)} 个模板",
+                                   {"templateCount": len(_template_cache)})
                 log_rotate("all")
                 # D 项：把 Mark42 状态 JSON 写入 broker views，供 Control UI 消费
                 try:

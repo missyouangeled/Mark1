@@ -1654,3 +1654,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260728-004] correction
+
+**Logged**: 2026-07-28T08:46:02.651Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 应该是重启完了，看看是否都正常运行了。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

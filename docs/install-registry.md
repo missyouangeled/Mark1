@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-07-29
+
+### ✅ 升级：火山方舟 Agent Plan Medium -> Large
+- **时间**：2026-07-29 08:05 CST
+- **触发**：点点升级套餐，解锁视频生成能力
+- **套餐**：Agent Plan Large（¥500/月，250,000 AFP）
+- **新增能力**：
+  - Seedance 2.0 全系列视频生成（标准版/Fast/Mini）
+  - 火山 Supabase（AI-Native 数据库）
+  - 250,000 月度 AFP
+- **验证结果**：✅ 视频生成测试通过（Seedance 2.0 标准版，~2分钟出片）
+
+### ✅ 已安装：byted-ark-seedance-skill（豆包 Seedance 视频生成）
+- **时间**：2026-07-29（更早安装，Large 套餐后正式可用）
+- **来源**：官方 Skill 仓库
+- **安装路径**：`~/.openclaw/workspace/skills/byted-ark-seedance-skill/`
+- **版本**：4.0.0，作者 volcengine/agentplan
+- **视频模型**：doubao-seedance-2.0 / 2.0-fast / 2.0-mini / 1.5-pro
+- **API 端点**：`https://ark.cn-beijing.volces.com/api/plan/v3/contents/generations/tasks`
+- **是否成功**：✅ 2026-07-29 测试通过
+
+### ✅ 参数确认：Seedream 图片生成 watermark 参数
+- **时间**：2026-07-29 08:16 CST
+- **发现**：API 默认带「AI生成」水印，需传 `watermark: false` 关闭
+- **之前记录**：误以为是套餐差异导致水印消失，实际是参数问题
+- **已更新文件**：`docs/非主模型使用手册.md` + `MEMORY.md`
+
 ## 2026-07-27
 
 ### ✅ 安装：自主决策器（mark42-autonomy）

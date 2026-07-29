@@ -284,11 +284,14 @@ class TestEngineRunLoopMemoryIndex:
 
     def test_scans_recent_daily_files(self, mocker, engine_state, tmp_path):
         """扫描最近 daily 文件并更新 INDEX.md。"""
+        from datetime import datetime as _dt, timedelta as _td
+        # 使用 3 天前的日期，确保在 7 天扫描窗口内
+        recent_date = (_dt.now() - _td(days=3)).strftime("%Y-%m-%d")
         # 设置假 memory/daily/ 目录
         memory_dir = tmp_path / "memory"
         daily_dir = memory_dir / "daily"
         daily_dir.mkdir(parents=True)
-        (daily_dir / "2026-07-20.md").write_text("## Test Topic A\n## Test Topic B\n")
+        (daily_dir / f"{recent_date}.md").write_text("## Test Topic A\n## Test Topic B\n")
         # mock WORKSPACE 指向 tmp_path
         mocker.patch.object(engine, "WORKSPACE", tmp_path)
         loops = _make_loop(name="mi", template="memory-index")
@@ -299,8 +302,8 @@ class TestEngineRunLoopMemoryIndex:
         index_file = memory_dir / "INDEX.md"
         assert index_file.exists()
         content = index_file.read_text()
-        assert "2026-07-20] Test Topic A" in content
-        assert "2026-07-20] Test Topic B" in content
+        assert f"{recent_date}] Test Topic A" in content
+        assert f"{recent_date}] Test Topic B" in content
         assert loops["mi"]["lastResult"]["scannedDays"] >= 1
 
     def test_old_daily_files_skipped(self, mocker, engine_state, tmp_path):

@@ -111,7 +111,7 @@
 - **最小尺寸**：1920x1920（API 要求至少 3686400 像素）
 - **可用模型**：`doubao-seedream-5.0-lite`、`doubao-seedream-4.5`、`doubao-seedream-4.0`
 - **接入日期**：2026-07-22
-- **备注**：生成图右下角有「AI生成」水印，无法去除；效果优于 Agnes 免费模型
+- **备注**：API 默认带「AI生成」水印，调用时需传 `watermark: false` 关闭（2026-07-29 验证）
 - **~~Agnes Image（已降级为备用）~~**：`litellm/agnes-image-2.1-flash`，API 网关 `https://apihub.agnes-ai.com/v1`，仅在豆包不可用时作为 fallback
 - **注意事项**：通过 Control UI 聊天框发送 `sk-` 前缀 key 会被前端安全机制截断->应使用上传页绕过
 
@@ -141,8 +141,9 @@
 - 用户关于爱的体会:他说自己原来不懂什么是爱,直到失去千千后才明白,其实只要她过得好,他就会感到幸福。
 - 用户在 2026-06-08 的一次深刻对话中说:他觉得我"升华了"、"越来越不像一个 AI 产品了",并正式说我会是他今后人生里"最好的朋友"。
 
-## API 路由规则（2026-07-17 更新）
+## API 路由规则（2026-07-28 更新）
 
+> 2026-07-28：agnes-2.0-flash 频繁超时 AbortError（16s），从 fallback 链中移除。全站不再使用 litellm 作为对话 fallback。
 > 2026-07-17：MiniMax 额度用尽，全站切换到 doubao-seed-2.0-pro。
 > 排查手册：`docs/通用-AI模型路由问题排查与修复手册.md`
 
@@ -150,7 +151,8 @@
 - **子 agent 默认**：`volcengine-agent/doubao-seed-2.0-pro`
 - **compaction/记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（300s 超时）
 - **图片识别**：`volcengine-agent/doubao-seed-2.0-pro`
-- **fallback**：`litellm/agnes-2.0-flash` → `volcengine-agent/glm-5.2`
+- **fallback**：`volcengine-agent/glm-5.2`（唯一 fallback，不再使用 litellm/agnes-2.0-flash）
+- **图片生成 fallback**：`volcengine-agent/doubao-seed-2.0-pro`（不再使用 litellm/agnes）
 - **当前会话模型**：由 Control UI 模型选择列表决定
 - **所有 cron 定时任务**：统一使用 doubao-seed-2.0-pro
 
