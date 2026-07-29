@@ -833,6 +833,8 @@ def main() -> None:
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
             print(f"   {trim_summary(result.get('summary', ''), 100)}")
         elif args.dry_run or args.compress:
+            print("⚠️ 注意: OpenClaw 自带 auto-compaction，通常不需要手动触发")
+            print("   此命令会调 openclaw sessions compact，可能与 OpenClaw 自动 compact 冲突")
             result = armor_compress(dry_run=args.dry_run)
             import json as _j
             print(_j.dumps(result, indent=2, ensure_ascii=False))
