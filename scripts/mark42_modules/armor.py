@@ -616,28 +616,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         except Exception as e:
             print(f"⚠️ 预检 compaction 失败（非致命）: {e}")
 
-    # ── 修复 (2026-07-29): 动态上下文窗口检查 ──
-    # 如果 session 实际运行的模型上下文窗口远大于 primary model，
-    # 当前的 usage% 是按 primary model 算的，实际模型可能才用了很小比例。
-    # 例如：GLM-5.2 (1M) 跑到 87.5% of 128K = 11.2 万 token，
-    # 但对 GLM-5.2 的 1M 上下文来说才 11%，完全不需要压缩。
-    if not dry_run and usage >= THRESHOLD_WARN:
-        try:
-            actual_cw = _get_context_window()  # 现在会读 session 实际模型
-            primary_cw = DEFAULT_CONTEXT_WINDOW  # 128K fallback
-            # 重新按实际模型计算 usage
-            actual_usage = (usage * primary_cw / actual_cw) if actual_cw > primary_cw else usage
-            if actual_cw > primary_cw * 1.5 and actual_usage < THRESHOLD_WARN:
-                print(f"ℹ️ 实际模型上下文窗口 {actual_cw//1000}K >> primary {primary_cw//1000}K")
-                print(f"   按 actual model 重新计算: {usage}% -> {actual_usage:.1f}%，未达阈值，跳过 compact")
-                index["compactTriggered"] = False
-                index["compactError"] = f"actual-model-usage-low ({actual_usage:.1f}% of {actual_cw//1000}K)"
-                index["compressionEffective"] = False
-                index["preCompactBytes"] = None
-                _save_json(index_path, index)
-                return {"action": "skip-low-actual-usage", "reason": f"实际模型 {actual_cw//1000}K 上下文，使用率仅 {actual_usage:.1f}%", "check": check}
-        except Exception as e:
-            print(f"⚠️ 动态上下文检查失败（非致命）: {e}")
+    # ── 修复 (2026-07-29): _get_context_window() 现在读 session 实际运行模型 ──
+    # 之前读 primary config (doubao-seed-2.0-pro, 128K)，导致 GLM-5.2 (1M)
+    # 的 usage 被算成 87.5%（实际只有 9%），触发不必要的 compact。
+    # 现在 _get_context_window() 返回实际模型的 contextWindow，
+    # armor_check() 算的 usage 已经是正确的百分比，不需要额外折扣。
+    # 例如 GLM-5.2 (1M): 95K tokens -> usage = 9.5%，远低于 70% 阈值。
 
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
