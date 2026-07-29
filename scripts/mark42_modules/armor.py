@@ -993,14 +993,21 @@ def _inject_memory_index(index: dict[str, Any]) -> bool:
 
 
 def armor_guard(interval_s: int = 300) -> None:
-    """守护模式：每 N 秒检查一次，超阈值自动出手。
+    """守护模式：每 N 秒检查一次，超阈值预警。
 
-    - WARN 阈值(70%): 发送预警 + 自动触发压缩（LLM 模式，失败回退截短）
-    - ALERT 阈值(85%): 强制再次压缩（可能上一次没压够）
+    ⚠️ 修复 (2026-07-29): 不再主动调 openclaw sessions compact
+    原因：OpenClaw 自带 auto-compaction（enabled=true, mode=safeguard），
+    在 threshold maintenance 时会自动触发 compact。
+    Mark42 armor 调 openclaw sessions compact 会导致：
+    1. 两个 compact 并发 -> "Session changed before compaction" 冲突
+    2. compact 期间 gateway 被占住 -> 消息发不出去
+    3. Mark42 armor 的 compact 超时(320s) < OpenClaw compact 实际耗时(380s+) -> 超时浪费
+
+    正确做法：armor 只做监控+预警，compact 交给 OpenClaw 自己管。
     """
     _warn_sent_at = None  # 上次发送预警的时间戳，避免重复刷屏
     _warn_cooldown = 600  # 预警冷却 10 分钟
-    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查）")
+    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查，仅监控不主动 compact）")
     try:
         while True:
             check = armor_check()
@@ -1013,17 +1020,16 @@ def armor_guard(interval_s: int = 300) -> None:
                 and (_warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown)
             )
             if should_warn:
-                print(f"[{ts}] 🟡 上下文达 WARN 阈值，发送预警 + 触发压缩")
+                print(f"[{ts}] 🟡 上下文达 WARN 阈值 ({usage}%)，发送预警")
+                print(f"    ℹ️ OpenClaw auto-compaction 会在 threshold maintenance 时自动处理")
                 if _send_context_warn_event(usage):
                     _warn_sent_at = now_ts
-                # WARN 阶段直接压缩，不等 ALERT
-                result = armor_compress()
-                print(f"    -> {result.get('action')}")
             elif usage >= THRESHOLD_ALERT:
-                # ALERT 阶段：强制再次压缩（可能上一次没压够）
-                print(f"[{ts}] 🟠 ALERT 阈值，强制压缩")
-                result = armor_compress()
-                print(f"    -> {result.get('action')}")
+                # ALERT 阶段：发送告警，但不主动 compact
+                print(f"[{ts}] 🟠 ALERT 阈值 ({usage}%)，发送告警")
+                print(f"    ℹ️ OpenClaw auto-compaction 应已触发，如未触发请手动 /compact")
+                if _send_context_warn_event(usage):
+                    _warn_sent_at = now_ts
             time.sleep(interval_s)
     except KeyboardInterrupt:
         print("\n🛡️ 守护模式已退出")
