@@ -557,6 +557,65 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
     # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
     # _save_json 后修改 dict 不会回写到已写入的文件）。
+    # ── 修复 (2026-07-29): 压缩冷却期检查 ──
+    # 连续 compact 已压缩过的 session 是无效操作：LLM 摘要 + 结构化元数据
+    # 会让文件比原文还大。加 30 分钟冷却期避免反复蹂躏。
+    COMPACT_COOLDOWN_SEC = 1800  # 30 分钟
+    compact_cooldown_file = XDG_STATE / "mark42" / "armor" / "compact-cooldown.json"
+    if not dry_run and compact_cooldown_file.exists():
+        try:
+            import json as _json
+            cd = _json.loads(compact_cooldown_file.read_text())
+            last_ts = cd.get("lastCompactTs")
+            if last_ts:
+                from datetime import datetime as _dt
+                last_dt = _dt.fromisoformat(last_ts)
+                elapsed = (datetime.now() - last_dt).total_seconds()
+                if elapsed < COMPACT_COOLDOWN_SEC:
+                    remaining = int((COMPACT_COOLDOWN_SEC - elapsed) / 60)
+                    print(f"⏸️ 压缩冷却中（还剩 {remaining} 分钟），跳过本次 compact")
+                    index["compactTriggered"] = False
+                    index["compactError"] = f"cooldown-{remaining}min"
+                    index["compressionEffective"] = False
+                    index["preCompactBytes"] = None
+                    _save_json(index_path, index)
+                    return {"action": "skip-cooldown", "reason": f"冷却中，还剩 {remaining} 分钟", "check": check}
+        except Exception as e:
+            print(f"⚠️ 冷却期检查失败（非致命）: {e}")
+
+    # ── 修复 (2026-07-29): 预检 session 是否已被 compact 过 ──
+    # 如果 session 文件里已有 compaction 条目，说明最近被摘要过，
+    # 再跑 LLM compact 只会让摘要+元数据膨胀（实测变大 10KB+）
+    if not dry_run and active:
+        try:
+            with open(active, "r") as _f:
+                _head = _f.read(8192)  # 读前 8KB 够判断
+            if '"type":"compaction"' in _head or '"type": "compaction"' in _head:
+                print("⏸️ Session 已含 compaction 摘要，跳过 LLM compact（避免摘要膨胀）")
+                index["compactTriggered"] = False
+                index["compactError"] = "session-already-compacted"
+                index["compressionEffective"] = False
+                index["preCompactBytes"] = active.stat().st_size
+                _save_json(index_path, index)
+                # 写冷却期标记
+                try:
+                    compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
+                    compact_cooldown_file.write_text(
+                        json.dumps({"lastCompactTs": _now_iso(), "reason": "already-compacted"}, ensure_ascii=False)
+                    )
+                except Exception:
+                    pass
+                _append_broker(
+                    "armor", "mark42.armor.compact.skipped",
+                    "Session 已含摘要，跳过 compact",
+                    "info",
+                    "session 文件检测到 compaction 条目，跳过避免摘要膨胀",
+                    {"preBytes": index["preCompactBytes"], "usagePercent": usage},
+                )
+                return {"action": "skip-already-compacted", "reason": "session 已含 compaction 摘要", "check": check}
+        except Exception as e:
+            print(f"⚠️ 预检 compaction 失败（非致命）: {e}")
+
     if not dry_run and usage >= THRESHOLD_WARN:
         try:
             # ── Session Fence：压缩前验证 + 锁定 ──
@@ -603,90 +662,129 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         text=True,
                         timeout=320,
                     )
-                    if compact_proc.returncode != 0:
-                        # LLM 模式失败，回退到截短模式
-                        print("    ⚠️ LLM 压缩失败，回退到截短模式")
-                        compact_proc = subprocess.run(
-                            [
-                                "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
-                                "agent:main:main",
-                                "--max-lines", "200",
-                                "--timeout", "180000",
-                                "--json",
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=200,
+                    # ── 修复 (2026-07-29): LLM compact 后检查文件大小变化 ──
+                    # 不管 rc 是 0 还是非 0，先看文件有没有变化：
+                    # - 变大 = LLM 摘要膨胀（不要回退 maxlines）
+                    # - 变小 = compact 成功（即使 rc!=0 也算成功）
+                    # - 没变 = compact 真失败（才回退 maxlines）
+                    _post_llm_bytes = active_session.stat().st_size if active_session.exists() else pre_bytes
+                    _llm_made_it_bigger = _post_llm_bytes > pre_bytes
+                    _llm_made_it_smaller = _post_llm_bytes < pre_bytes
+                    if _llm_made_it_bigger:
+                        print(f"⚠️ LLM 摘要比原文大 (pre={pre_bytes}, post={_post_llm_bytes})，跳过 maxlines 回退")
+                        index["compactTriggered"] = True
+                        index["compactMethod"] = "openclaw-sessions-compact"
+                        index["preCompactBytes"] = pre_bytes
+                        index["postCompactBytes"] = _post_llm_bytes
+                        index["bytesSaved"] = pre_bytes - _post_llm_bytes
+                        index["compressionEffective"] = False
+                        index["compactError"] = "llm-summary-larger-than-original"
+                        _append_broker(
+                            "armor", "mark42.armor.compact.summary_inflated",
+                            "LLM 摘要比原文大，压缩反效果",
+                            "warn",
+                            f"pre={pre_bytes}B post={_post_llm_bytes}B diff={pre_bytes - _post_llm_bytes}B",
+                            {"preBytes": pre_bytes, "postBytes": _post_llm_bytes, "usagePercent": usage},
                         )
-                    if compact_proc.returncode == 0:
-                        # 验证压缩是否真的生效
-                        post_bytes = active_session.stat().st_size
+                    elif _llm_made_it_smaller:
+                        post_bytes = _post_llm_bytes
                         bytes_saved = pre_bytes - post_bytes
                         pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
-                        # ── Session Fence：压缩后验证完整性 ──
-                        fence_post = fence_record_post(active_session, fence_pre)
-                        if not fence_post["ok"]:
-                            print(f"⚠️ Session Fence 检测到外部篡改！pre={pre_bytes} post={post_bytes}")
-                            _append_broker(
-                                "armor", "mark42.armor.compact.fence_tampered",
-                                "Session Fence 检测到外部篡改",
-                                "warn",
-                                f"pre={pre_bytes}B post={post_bytes}B delta={fence_post['delta']}B",
-                                {"preSize": pre_bytes, "postSize": post_bytes, "tampered": True},
-                            )
-                        # 验证是否真变小 (0% = 无效, 才不会重复失败)
-                        if bytes_saved > 0:
-                            index["compactTriggered"] = True
-                            index["compactMethod"] = "openclaw-sessions-compact"
-                            index["preCompactBytes"] = pre_bytes
-                            index["postCompactBytes"] = post_bytes
-                            index["bytesSaved"] = bytes_saved
-                            index["compressionEffective"] = True
-                            print(
-                                f"🧹 会话截短成功: {pre_bytes//1024}KB → {post_bytes//1024}KB "
-                                f"(节省 {pct_saved}%)"
-                            )
-                            # 报 broker 成功事件
-                            _append_broker(
-                                "armor", "mark42.armor.compact.success",
-                                f"会话截短: {pct_saved}% 节省",
-                                "ok",
-                                f"压缩前 {pre_bytes//1024}KB → 压缩后 {post_bytes//1024}KB "
-                                f"({bytes_saved} bytes)",
-                                {
-                                    "preBytes": pre_bytes,
-                                    "postBytes": post_bytes,
-                                    "bytesSaved": bytes_saved,
-                                    "pctSaved": pct_saved,
-                                    "method": "openclaw-sessions-compact",
-                                },
-                            )
-                            # ── memory-index 自动注入：压缩后把保留的关键信息注入回会话 ──
-                            _inject_memory_index(index)
-                        else:
-                            # 返回 0 但 session 没变 (极少见, 可能已压缩)
-                            index["compactTriggered"] = True
-                            index["compactMethod"] = "openclaw-sessions-compact"
-                            index["compressionEffective"] = False
-                            index["compactError"] = "no-bytes-saved"
-                            index["preCompactBytes"] = pre_bytes  # J 修复: 也记
-                            index["postCompactBytes"] = post_bytes
-                            index["bytesSaved"] = bytes_saved
-                            print(f"⚠️ sessions.compact 返回成功但 session 未变小")
-                    else:
-                        err = (compact_proc.stderr or compact_proc.stdout)[:300]
-                        index["compactTriggered"] = False
-                        index["compactError"] = err
-                        index["compressionEffective"] = False
-                        index["preCompactBytes"] = pre_bytes  # J 修复: 也记
-                        print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
+                        index["compactTriggered"] = True
+                        index["compactMethod"] = "openclaw-sessions-compact"
+                        index["preCompactBytes"] = pre_bytes
+                        index["postCompactBytes"] = post_bytes
+                        index["bytesSaved"] = bytes_saved
+                        index["compressionEffective"] = True
+                        print(f"🧹 LLM 压缩成功: {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {pct_saved}%)")
                         _append_broker(
-                            "armor", "mark42.armor.compact.failed",
-                            f"sessions.compact 失败 rc={compact_proc.returncode}",
-                            "error",
-                            err,
-                            {"rc": compact_proc.returncode, "preBytes": pre_bytes},
+                            "armor", "mark42.armor.compact.success",
+                            f"LLM 压缩: {pct_saved}% 节省",
+                            "ok",
+                            f"{pre_bytes//1024}KB -> {post_bytes//1024}KB ({bytes_saved} bytes)",
+                            {"preBytes": pre_bytes, "postBytes": post_bytes, "bytesSaved": bytes_saved, "pctSaved": pct_saved},
                         )
+                        _inject_memory_index(index)
+                    else:
+                        # 文件没变化 -> compact 真失败或被拒绝 -> 才回退到 maxlines
+                        if compact_proc.returncode != 0:
+                            print("    ⚠️ LLM 压缩失败且文件未变，回退到截短模式")
+                            compact_proc = subprocess.run(
+                                [
+                                    "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
+                                    "agent:main:main",
+                                    "--max-lines", "150",
+                                    "--timeout", "180000",
+                                    "--json",
+                                ],
+                                capture_output=True,
+                                text=True,
+                                timeout=200,
+                            )
+                        if compact_proc.returncode == 0:
+                            post_bytes = active_session.stat().st_size
+                            bytes_saved = pre_bytes - post_bytes
+                            pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
+                            fence_post = fence_record_post(active_session, fence_pre)
+                            if not fence_post["ok"]:
+                                print(f"⚠️ Session Fence 检测到外部篡改！pre={pre_bytes} post={post_bytes}")
+                                _append_broker(
+                                    "armor", "mark42.armor.compact.fence_tampered",
+                                    "Session Fence 检测到外部篡改",
+                                    "warn",
+                                    f"pre={pre_bytes}B post={post_bytes}B delta={fence_post['delta']}B",
+                                    {"preSize": pre_bytes, "postSize": post_bytes, "tampered": True},
+                                )
+                            if bytes_saved > 0:
+                                index["compactTriggered"] = True
+                                index["compactMethod"] = "openclaw-sessions-compact"
+                                index["preCompactBytes"] = pre_bytes
+                                index["postCompactBytes"] = post_bytes
+                                index["bytesSaved"] = bytes_saved
+                                index["compressionEffective"] = True
+                                print(f"🧹 会话截短成功: {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {pct_saved}%)")
+                                _append_broker(
+                                    "armor", "mark42.armor.compact.success",
+                                    f"会话截短: {pct_saved}% 节省",
+                                    "ok",
+                                    f"压缩前 {pre_bytes//1024}KB -> 压缩后 {post_bytes//1024}KB ({bytes_saved} bytes)",
+                                    {"preBytes": pre_bytes, "postBytes": post_bytes, "bytesSaved": bytes_saved, "pctSaved": pct_saved, "method": "openclaw-sessions-compact"},
+                                )
+                                _inject_memory_index(index)
+                            else:
+                                index["compactTriggered"] = True
+                                # 区分：是否走了 maxlines 回退
+                                _used_fallback = '--max-lines' in ' '.join(compact_proc.args) if hasattr(compact_proc, 'args') else False
+                                index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback" if _used_fallback else "openclaw-sessions-compact"
+                                index["compressionEffective"] = False
+                                index["compactError"] = "no-bytes-saved-after-fallback" if _used_fallback else "no-bytes-saved"
+                                index["preCompactBytes"] = pre_bytes
+                                index["postCompactBytes"] = post_bytes
+                                index["bytesSaved"] = bytes_saved
+                                print("⚠️ sessions.compact 返回成功但 session 未缩小")
+                        else:
+                            err = (compact_proc.stderr or compact_proc.stdout)[:300]
+                            index["compactTriggered"] = False
+                            index["compactError"] = err
+                            index["compressionEffective"] = False
+                            index["preCompactBytes"] = pre_bytes
+                            print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
+                            _append_broker(
+                                "armor", "mark42.armor.compact.failed",
+                                f"sessions.compact 失败 rc={compact_proc.returncode}",
+                                "error",
+                                err,
+                                {"rc": compact_proc.returncode, "preBytes": pre_bytes},
+                            )
+                    # ── 压缩后写冷却期标记 ──
+                    try:
+                        compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
+                        compact_cooldown_file.write_text(
+                            json.dumps({"lastCompactTs": _now_iso(), "reason": "post-compact"}, ensure_ascii=False)
+                        )
+                    except Exception:
+                        pass
+
         except subprocess.TimeoutExpired:
             print("⚠️ sessions.compact 调用超时（200s）")
             index["compactTriggered"] = False
