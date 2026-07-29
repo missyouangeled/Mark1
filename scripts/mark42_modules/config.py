@@ -60,9 +60,57 @@ BROKER_EVENTS = BROKER_DIR / "events.jsonl"
 BROKER_DIRTY = BROKER_DIR / ".dirty"
 MARK42_BROKER_EVENTS = BROKER_DIR / "mark42-events.jsonl"
 
+# 上下文阈值 -- 基准值，实际使用时按模型上下文窗口动态调整
+# 小窗口 (128K): 用基准值 70/85/95
+# 大窗口 (1M):   更早介入 60/75/90 (context rot 更严重)
+# 通过 get_dynamic_thresholds(context_window) 动态计算
 THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))
 THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", "85"))
 THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", "95"))
+
+# 动态阈值计算参数
+# Anthropic 研究表明 context rot 在大窗口下更严重，应更早介入
+# 参考工厂实践：Claude Code 95%，社区建议 60-80%
+_DYNAMIC_WARN_BASE = 70      # 基准 WARN 阈值 (128K 窗口)
+_DYNAMIC_WARN_LARGE = 60     # 大窗口 (>=500K) 的 WARN 阈值
+_DYNAMIC_ALERT_BASE = 85
+_DYNAMIC_ALERT_LARGE = 75
+_DYNAMIC_CRIT_BASE = 95
+_DYNAMIC_CRIT_LARGE = 90
+_LARGE_WINDOW_THRESHOLD = 500000  # 超过 500K tokens 视为大窗口
+
+
+def get_dynamic_thresholds(context_window: int) -> tuple[int, int, int]:
+    """根据模型上下文窗口动态计算阈值。
+
+    小窗口 (128K): WARN=70 ALERT=85 CRIT=95 (基准值)
+    大窗口 (1M):   WARN=60 ALERT=75 CRIT=90 (更早介入，context rot 更严重)
+
+    中间值线性插值。
+
+    Args:
+        context_window: 模型的上下文窗口大小 (tokens)
+
+    Returns:
+        (warn_pct, alert_pct, crit_pct)
+    """
+    if context_window <= 0:
+        return THRESHOLD_WARN, THRESHOLD_ALERT, THRESHOLD_CRIT
+
+    if context_window >= _LARGE_WINDOW_THRESHOLD:
+        # 大窗口：更早介入
+        # 超过 1M 时进一步降低
+        if context_window >= 1_000_000:
+            return _DYNAMIC_WARN_LARGE, _DYNAMIC_ALERT_LARGE, _DYNAMIC_CRIT_LARGE
+        # 500K-1M 之间线性插值
+        ratio = (context_window - _LARGE_WINDOW_THRESHOLD) / (1_000_000 - _LARGE_WINDOW_THRESHOLD)
+        warn = int(_DYNAMIC_WARN_BASE - (_DYNAMIC_WARN_BASE - _DYNAMIC_WARN_LARGE) * ratio)
+        alert = int(_DYNAMIC_ALERT_BASE - (_DYNAMIC_ALERT_BASE - _DYNAMIC_ALERT_LARGE) * ratio)
+        crit = int(_DYNAMIC_CRIT_BASE - (_DYNAMIC_CRIT_BASE - _DYNAMIC_CRIT_LARGE) * ratio)
+        return warn, alert, crit
+    else:
+        # 小窗口：用基准值
+        return THRESHOLD_WARN, THRESHOLD_ALERT, THRESHOLD_CRIT
 
 BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(2 * 1024)))
 DEFAULT_CONTEXT_WINDOW = 131072

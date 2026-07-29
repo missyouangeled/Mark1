@@ -15,6 +15,7 @@ from .config import (
     ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
     DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
+    get_dynamic_thresholds,
     # 阶段 1: 压缩算法常量 (2026-06-24)
     ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
     ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
@@ -87,21 +88,23 @@ def armor_check() -> dict[str, Any]:
         est = {"estimatedTokens": 0}
     context_window = _get_context_window()
     usage_pct = round(est.get("estimatedTokens", 0) / context_window * 100, 1)
+    # 动态阈值：大窗口更早介入 (context rot 更严重)
+    _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(context_window)
     severity = "ok"
     status = "ok"
     summary = f"上下文 {usage_pct}%，正常"
-    if usage_pct >= THRESHOLD_CRIT:
+    if usage_pct >= _crit_pct:
         severity = "critical"
         status = "critical"
-        summary = f"⚠️ 上下文 {usage_pct}% 达到危险等级"
-    elif usage_pct >= THRESHOLD_ALERT:
+        summary = f"⚠️ 上下文 {usage_pct}% 达到危险等级 (阈值{_crit_pct}%)"
+    elif usage_pct >= _alert_pct:
         severity = "warn"
         status = "alert"
-        summary = f"⚠️ 上下文 {usage_pct}% 偏高，建议压缩"
-    elif usage_pct >= THRESHOLD_WARN:
+        summary = f"⚠️ 上下文 {usage_pct}% 偏高，建议压缩 (阈值{_alert_pct}%)"
+    elif usage_pct >= _warn_pct:
         severity = "info"
         status = "warn"
-        summary = f"💡 上下文 {usage_pct}%，关注中"
+        summary = f"💡 上下文 {usage_pct}%，关注中 (阈值{_warn_pct}%)"
     result = {
         "checkedAt": now_str,
         "host": os.uname().nodename,
@@ -466,8 +469,10 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     """
     check = armor_check()
     usage = check.get("usagePercent", 0)
-    if usage < THRESHOLD_WARN and not dry_run:
-        return {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {THRESHOLD_WARN}%", "check": check}
+    _ctx_window = check.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+    _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(_ctx_window)
+    if usage < _warn_pct and not dry_run:
+        return {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {_warn_pct}%", "check": check}
     active = _find_active_session()
     session_messages = _read_session_tail(active) if active else []
 
@@ -517,7 +522,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             "discarded": {"samples": discarded_summary, "count": len(discarded_items)},
             "degradationDetected": degradation,
             "strategyUsed": "heuristic-classify",
-            "recommendedAction": "/compact" if usage >= THRESHOLD_ALERT else "monitor",
+            "recommendedAction": "/compact" if usage >= _alert_pct else "monitor",
             "algoStats": algo_stats,
         }
         print("⚠️ LLM 不可用，回退到启发式分析")
@@ -527,7 +532,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     history_dir.mkdir(parents=True, exist_ok=True)
     _append_broker("health", "armor.compress",
                    f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
-                   "warn" if usage >= THRESHOLD_WARN else "ok",
+                   "warn" if usage >= _warn_pct else "ok",
                    f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
                    {"usagePercent": usage, "dryRun": dry_run})
     # ── C 项：标准化事件桥接 ──
@@ -711,7 +716,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         print(f"   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
         return False
 
-    if not dry_run and usage >= THRESHOLD_WARN:
+    if not dry_run and usage >= _warn_pct:
         # 1) 平台探测期
         platform_handled = _platform_compact_probe(usage)
         if platform_handled:
@@ -1143,18 +1148,20 @@ def armor_guard(interval_s: int = 300) -> None:
         while True:
             check = armor_check()
             usage = check.get("usagePercent", 0)
+            _ctx_window = check.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+            _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(_ctx_window)
             ts = datetime.now().strftime("%H:%M:%S")
             print(trim_detail(f"[{ts}] 上下文 {usage}% - {check.get('summary', '')}", 120))
             now_ts = time.time()
             should_warn = (
-                usage >= THRESHOLD_WARN
+                usage >= _warn_pct
                 and (_warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown)
             )
             if should_warn:
                 print(f"[{ts}] 🟡 上下文达 WARN 阈值 ({usage}%)，发送预警")
                 if _send_context_warn_event(usage):
                     _warn_sent_at = now_ts
-            elif usage >= THRESHOLD_ALERT:
+            elif usage >= _alert_pct:
                 # ALERT 阶段：触发 armor_compress 自主救场
                 # armor_compress 内含平台探测期 + compact 锁
                 print(f"[{ts}] 🟠 ALERT 阈值 ({usage}%)，启动自主救场")

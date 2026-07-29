@@ -11,6 +11,7 @@
     - 只读不写（不改 compact 结果）
     - 异步执行（不阻塞 compact）
     - 失败安全（审计自身失败不影响主流程）
+    - 低耦合：核对类别可配置，新增类别不需改 Checker/Report
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from typing import Any, Dict, List
 @dataclass
 class Finding:
     """单项核对结果。"""
-    category: str      # identity | preferences | projects | decisions | recent_topics
+    category: str      # identity | preferences | projects | decisions | recent_topics | artifacts
     item: str          # 具体项名称
     status: str        # preserved | degraded | lost
     detail: str = ""   # 说明
@@ -41,7 +42,7 @@ class AuditResult:
     error: str = ""    # 审计自身失败时的错误信息
 
 
-# ── 五大核对类别 ──────────────────────────────────────
+# ── 六大核对类别 ──────────────────────────────────────
 
 AUDIT_CATEGORIES = [
     "identity",        # 用户名、AI名、称呼方式
@@ -49,6 +50,7 @@ AUDIT_CATEGORIES = [
     "projects",         # 当前项目状态、决策、TODO
     "decisions",        # 技术方案、架构决策
     "recent_topics",    # 今天/昨天聊了什么
+    "artifacts",        # 改了哪些文件、创建了哪些目录
 ]
 
 # verdict 判定阈值

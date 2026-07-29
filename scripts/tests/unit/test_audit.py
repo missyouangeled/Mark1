@@ -55,7 +55,7 @@ class TestAuditDataModel:
     def test_audit_categories(self):
         assert "identity" in AUDIT_CATEGORIES
         assert "preferences" in AUDIT_CATEGORIES
-        assert len(AUDIT_CATEGORIES) == 5
+        assert len(AUDIT_CATEGORIES) == 6
 
     def test_verdict_thresholds(self):
         assert VERDICT_PASS_THRESHOLD == 0.8
@@ -1225,3 +1225,79 @@ class TestConstraintPinner:
 
         pinner = ConstraintPinner(workspace=tmp_path)
         assert pinner.inject_via_broker() is False
+
+
+# ── SummaryExtractor SQLite fallback 测试 ─────────
+
+
+class TestSummaryExtractorSQLite:
+    """SQLite fallback 路径测试（覆盖率从 72% -> 80%+）。"""
+
+    def test_sqlite_fallback_returns_content(self, mocker):
+        """SQLite fallback -- openclaw CLI 返回 compaction 条目。"""
+        from mark42_modules.audit.summary_extractor import OpenClawSummaryExtractor
+
+        ext = OpenClawSummaryExtractor()
+
+        # mock subprocess.run 返回 compaction 条目
+        mock_result = mocker.MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = json.dumps({
+            "type": "compaction",
+            "summary": "## Decisions\n1. 测试决策",
+        }, ensure_ascii=False)
+        mocker.patch("subprocess.run", return_value=mock_result)
+
+        text = ext._extract_from_sqlite({"path": "/nonexistent"})
+        assert "测试决策" in text
+
+    def test_sqlite_fallback_no_compaction_returns_tail(self, mocker):
+        """SQLite fallback -- 没有 compaction 条目时返回最近的对话。"""
+        from mark42_modules.audit.summary_extractor import OpenClawSummaryExtractor
+
+        ext = OpenClawSummaryExtractor()
+
+        mock_result = mocker.MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = json.dumps({"role": "user", "content": "最近的对话"}, ensure_ascii=False)
+        mocker.patch("subprocess.run", return_value=mock_result)
+
+        text = ext._extract_from_sqlite({"path": "/nonexistent"})
+        assert len(text) > 0
+
+    def test_sqlite_fallback_cli_error_returns_empty(self, mocker):
+        """SQLite fallback -- CLI 返回非零退出码。"""
+        from mark42_modules.audit.summary_extractor import OpenClawSummaryExtractor
+
+        ext = OpenClawSummaryExtractor()
+
+        mock_result = mocker.MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mocker.patch("subprocess.run", return_value=mock_result)
+
+        text = ext._extract_from_sqlite({"path": "/nonexistent"})
+        assert text == ""
+
+    def test_sqlite_fallback_timeout_returns_empty(self, mocker):
+        """SQLite fallback -- subprocess 超时。"""
+        from mark42_modules.audit.summary_extractor import OpenClawSummaryExtractor
+        import subprocess as _sp
+
+        ext = OpenClawSummaryExtractor()
+
+        mocker.patch("subprocess.run", side_effect=_sp.TimeoutExpired("openclaw", 15))
+
+        text = ext._extract_from_sqlite({"path": "/nonexistent"})
+        assert text == ""
+
+    def test_sqlite_fallback_command_not_found(self, mocker):
+        """SQLite fallback -- openclaw 命令不存在。"""
+        from mark42_modules.audit.summary_extractor import OpenClawSummaryExtractor
+
+        ext = OpenClawSummaryExtractor()
+
+        mocker.patch("subprocess.run", side_effect=FileNotFoundError("openclaw"))
+
+        text = ext._extract_from_sqlite({"path": "/nonexistent"})
+        assert text == ""

@@ -128,21 +128,23 @@ class OpenClawSnapshotReader:
             "projects": [],
             "decisions": [],
             "recent_topics": [],
+            "artifacts": [],
         }
 
         # 1. 从 USER.md / SOUL.md / MEMORY.md 提取身份和偏好
         info["identity"] = self._extract_identity(snap_path)
         info["preferences"] = self._extract_preferences(snap_path)
 
-        # 2. 从 context-summary.md 提取项目和决策
+        # 2. 从 context-summary.md 提取项目、决策、文件变更
         summary_path = snap_path / "context-summary.md"
         if summary_path.exists():
             text = summary_path.read_text(encoding="utf-8", errors="replace")
             info["projects"] = self._extract_projects(text)
             info["decisions"] = self._extract_decisions(text)
             info["recent_topics"] = self._extract_recent_topics(text)
+            info["artifacts"] = self._extract_artifacts(text)
 
-        # 3. 从 daily transcript 补充近期话题
+        # 3. 从 daily transcript 补充近期话题和文件变更
         transcripts = sorted(snap_path.glob("daily-*-transcript.md"))
         if transcripts:
             transcript_text = transcripts[-1].read_text(encoding="utf-8", errors="replace")
@@ -151,6 +153,11 @@ class OpenClawSnapshotReader:
             for t in topics:
                 if t not in info["recent_topics"]:
                     info["recent_topics"].append(t)
+            # 从 transcript 补充文件变更
+            transcript_artifacts = self._extract_artifacts_from_transcript(transcript_text)
+            for a in transcript_artifacts:
+                if a not in info["artifacts"]:
+                    info["artifacts"].append(a)
 
         return info
 
@@ -271,6 +278,34 @@ class OpenClawSnapshotReader:
                 if item not in items:
                     items.append(item)
         return items[:15]
+
+    def _extract_artifacts(self, text: str) -> List[str]:
+        """从 context-summary 提取修改的文件列表。
+
+        Factory.ai 研究发现 compact 后最容易丢的是「改了哪些文件」。
+        """
+        items = []
+        # 匹配 edit/write/tool result 里提到的文件路径
+        for m in re.finditer(r'(?:edit|write|read|修改|创建|删除|更新)[：:]?\s*[`"]?(\S+\.(?:py|md|json|js|ts|tsx|sh|yml|yaml|toml|txt))[`"]?', text, re.IGNORECASE):
+            path = m.group(1).strip()
+            if path and path not in items:
+                items.append(path)
+        # 也匹配明确的文件路径模式
+        for m in re.finditer(r'[`"]((?:~/|/|\.\./)?[\w/.-]+\.(?:py|md|json|js|ts|tsx|sh|yml|yaml|toml))[`":]', text):
+            path = m.group(1).strip()
+            if path and path not in items:
+                items.append(path)
+        return items[:15]
+
+    def _extract_artifacts_from_transcript(self, text: str) -> List[str]:
+        """从 daily transcript 提取文件变更。"""
+        items = []
+        # 匹配 Tool result 里的 edit/write 成功消息
+        for m in re.finditer(r'(?:Successfully|成功|写入|修改|创建)[：:]?\s*[`"]?(\S+\.(?:py|md|json|js|ts|tsx|sh|yml|yaml|toml|txt))[`":]?', text):
+            path = m.group(1).strip()
+            if path and path not in items:
+                items.append(path)
+        return items[:10]
 
     def _extract_topics_from_transcript(self, text: str) -> List[str]:
         """从 daily transcript 提取话题。"""
