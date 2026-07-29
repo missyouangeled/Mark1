@@ -397,10 +397,10 @@ def _list_project_files(path: Path) -> list[Path]:
 
 def _get_context_window() -> int:
     """获取当前会话上下文窗口大小。
-    策略：直接从 openclaw.json 的 providers 中读取主会话当前模型对应的 contextWindow。
+    策略：从 session jsonl 读实际运行模型，查其 contextWindow。
     优先级：
-      1. 当前主会话的 model+provider（从 sessions_list RPC 或会话 jsonl 获取）
-      2. openclaw.json agents.defaults.models.primary
+      1. 当前 session jsonl 中最后的 model_change 事件 -> 查该模型的 contextWindow
+      2. openclaw.json agents.defaults.model.primary
       3. openclaw.json 第一个有 contextWindow 的模型
       4. config.json contextWindow
       5. DEFAULT_CONTEXT_WINDOW
@@ -413,9 +413,39 @@ def _get_context_window() -> int:
         except Exception:
             pass
 
-    # 策略 1: 从 session jsonl 找当前 session 的 model（不再依赖 resolved）
-    # OpenClaw 会话 jsonl 顶层 type=session 没有 model 字段，只在 message 的 usage 里有
-    # 实际可靠路径：读 openclaw.json 的 agents.defaults.models.primary
+    # 策略 1: 从 session jsonl 找当前实际运行的模型
+    # 读取最后的 model_change 事件，而非依赖 openclaw.json 的 primary 配置
+    # 修复 (2026-07-29): 之前读 primary model (doubao-seed-2.0-pro, 128K)，
+    # 但 session 实际可能跑在 GLM-5.2 (1M)，导致阈值计算严重偏低
+    try:
+        active = _find_active_session()
+        if active and active.exists():
+            # 从文件末尾读取最后几 KB，找 model_change 事件
+            # 避免读整个大文件
+            file_size = active.stat().st_size
+            read_bytes = min(file_size, 65536)  # 末尾 64KB
+            with open(active, "rb") as _f:
+                _f.seek(file_size - read_bytes)
+                _tail = _f.read().decode("utf-8", errors="ignore")
+            # 找所有 model_change 行，取最后一条
+            _last_model = None
+            for _line in _tail.split("\n"):
+                if '"type":"model_change"' in _line or '"type": "model_change"' in _line:
+                    try:
+                        _last_model = json.loads(_line)
+                    except Exception:
+                        continue
+            if _last_model:
+                actual_provider = _last_model.get("provider", "")
+                actual_model = _last_model.get("modelId", "")
+                if actual_provider and actual_model:
+                    cw = _lookup_context_window(oc, actual_provider, actual_model)
+                    if cw:
+                        return cw
+    except Exception:
+        pass
+
+    # 策略 2: openclaw.json agents.defaults.model.primary
     primary_model = None
     primary_provider = None
     try:
