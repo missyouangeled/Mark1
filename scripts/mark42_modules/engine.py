@@ -3,6 +3,7 @@ Loop 注册/执行/终止 + daemon 守护 + 模板路由。
 """
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -11,6 +12,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 try:
     import yaml
@@ -240,7 +243,7 @@ def engine_kill(name: str) -> None:
     """终止一个 Loop。"""
     loops = _load_loops()
     if name not in loops:
-        print(f"❌ Loop '{name}' 不存在")
+        logger.error("Loop 不存在: %s", name); print(f"❌ Loop '{name}' 不存在")
         return
     old_status = loops[name].get("status", "?")
     loops[name]["status"] = "killed"
@@ -254,7 +257,7 @@ def engine_watch_task(task_name: str, interval_s: int = 30) -> None:
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务状态文件不存在: {status_file}")
+        logger.error("任务状态文件不存在: %s", status_file); print(f"❌ 任务状态文件不存在: {status_file}")
         return
     print(f"🔍 监控大工程: {task_name} (每 {interval_s}s)")
     print(f"   状态文件: {status_file}")
@@ -303,7 +306,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     """
     loops = _loops if _loops is not None else _load_loops()
     if name not in loops:
-        print(f"❌ Loop '{name}' 不存在")
+        logger.error("Loop 不存在: %s", name); print(f"❌ Loop '{name}' 不存在")
         return
     loop = loops[name]
     loop["status"] = "running"

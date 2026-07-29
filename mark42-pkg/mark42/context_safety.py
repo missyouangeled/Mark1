@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import subprocess
 from datetime import datetime
@@ -11,6 +12,8 @@ from typing import Any
 
 from .output_guard import trim_detail, trim_json_short
 from .utils import _now_iso
+
+logger = logging.getLogger(__name__)
 
 
 OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
@@ -66,9 +69,17 @@ def _load_openclaw_config() -> dict[str, Any]:
 
 
 def _save_openclaw_config(data: dict[str, Any]) -> None:
-    with open(OPENCLAW_CONFIG, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        f.write("\n")
+    """安全写入 openclaw.json（先备份，写入失败自动回滚）。"""
+    bak = Path(str(OPENCLAW_CONFIG) + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
+    shutil.copy2(OPENCLAW_CONFIG, bak)
+    try:
+        with open(OPENCLAW_CONFIG, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+    except Exception as e:
+        logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
+        shutil.copy2(bak, OPENCLAW_CONFIG)
+        raise
 
 
 def _backup_openclaw_config() -> Path:

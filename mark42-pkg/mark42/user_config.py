@@ -197,3 +197,166 @@ def init_user_config(force: bool = False) -> Path:
 def reload() -> dict[str, Any]:
     """强制重新加载配置。"""
     return load_config(force_reload=True)
+
+
+# ── 交互式配置向导 ────────────────────────────────────────
+
+
+def _prompt(msg: str, default: str | int | bool = None) -> str:
+    """带默认值的输入提示。"""
+    if default is not None:
+        return input(f"  {msg} [{default}]: ").strip() or str(default)
+    return input(f"  {msg}: ").strip()
+
+
+def _prompt_bool(msg: str, default: bool = True) -> bool:
+    """是/否提示。"""
+    d = "Y/n" if default else "y/N"
+    raw = input(f"  {msg} [{d}]: ").strip().lower()
+    if not raw:
+        return default
+    return raw in ("y", "yes", "true", "1")
+
+
+def _prompt_int(msg: str, default: int) -> int:
+    """整数提示。"""
+    raw = _prompt(msg, default)
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"  ⚠️ 无效数字，使用默认值 {default}")
+        return default
+
+
+def interactive_init() -> Path:
+    """交互式配置向导：引导用户一步步配置 Mark42。
+
+    步骤：
+    1. 路径配置（workspace / scratch）
+    2. 上下文阈值（warn / alert / crit）
+    3. LLM 模型选择
+    4. 守护进程参数
+    5. 日志级别
+    6. 生成配置文件
+    """
+    print()
+    print("╔════════════════════════════════════════╗")
+    print("║   Mark42 配置向导                       ║")
+    print("║   按回车使用默认值，Ctrl+C 取消        ║")
+    print("╚════════════════════════════════════════╝")
+    print()
+
+    # ── 1. 路径 ──
+    print("── 1/5 路径配置 ──")
+    workspace = _prompt("OpenClaw 工作区路径", "~/.openclaw/workspace")
+    openclaw_config = _prompt("OpenClaw 配置文件路径", "~/.openclaw/openclaw.json")
+    scratch = _prompt("临时文件目录（有数据盘可指定）", "~/.local/state/openclaw/scratch")
+    print()
+
+    # ── 2. 上下文阈值 ──
+    print("── 2/5 上下文阈值 ──")
+    print("  上下文使用率百分比，达到时触发对应行为")
+    warn = _prompt_int("🟡 预警阈值 (%)", 70)
+    alert = _prompt_int("🟠 告警阈值 (%)", 85)
+    crit = _prompt_int("🔴 紧急阈值 (%)", 95)
+    print()
+
+    # ── 3. LLM 模型 ──
+    print("── 3/5 LLM 模型 ──")
+    print("  模型配置从 openclaw.json 读取 API key，这里只选模型名")
+    llm_model = _prompt("分析模型", "doubao-seed-2.0-pro")
+    compress_model = _prompt("压缩模型", "doubao-seed-2.0-pro")
+    print()
+
+    # ── 4. 守护进程 ──
+    print("── 4/5 守护进程 ──")
+    scan_interval = _prompt_int("引擎扫描间隔（秒）", 30)
+    armor_interval = _prompt_int("铠甲检查间隔（秒）", 300)
+    auto_compress = _prompt_bool("自动触发压缩？", True)
+    auto_watch = _prompt_bool("自动监控 Heavy 任务？", True)
+    print()
+
+    # ── 5. 日志 ──
+    print("── 5/5 日志级别 ──")
+    print("  DEBUG / INFO / WARNING / ERROR")
+    log_level = _prompt("日志级别", "INFO")
+    print()
+
+    # ── 生成配置 ──
+    target = get_config_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    content = f"""# ────────────────────────────────────────────────────────────
+# Mark42 配置文件（由配置向导生成）
+# 路径: {target}
+#
+# 修改后重启生效:
+#   systemctl --user restart mark42-armor-guard
+#   systemctl --user restart mark42-engine-daemon
+# ────────────────────────────────────────────────────────────
+
+[paths]
+workspace = "{workspace}"
+openclaw_config = "{openclaw_config}"
+scratch = "{scratch}"
+xdg_state = "~/.local/state"
+
+[thresholds]
+warn  = {warn}
+alert = {alert}
+crit  = {crit}
+bytes_per_ktoken = 2048
+
+[models.llmAnalyze]
+model = "{llm_model}"
+provider = "volcengine-agent"
+max_tokens = 2000
+temperature = 0.1
+timeout = 120
+
+[models.llmCompress]
+model = "{compress_model}"
+provider = "volcengine-agent"
+max_tokens = 4000
+temperature = 0.0
+timeout = 120
+
+[daemon]
+scan_interval = {scan_interval}
+armor_check_interval = {armor_interval}
+auto_armor_compress = {str(auto_compress).lower()}
+auto_task_watch = {str(auto_watch).lower()}
+
+[logs]
+max_history_files = 50
+max_age_days = 30
+max_broker_events_mb = 10
+max_actions_lines = 500
+max_daemon_log_lines = 10000
+
+[compress]
+smart_crusher_enabled = false
+use_scheduler = true
+pii_enabled = true
+fail_safe = true
+experiment_mode = false
+
+[logging]
+level = "{log_level}"
+"""
+
+    target.write_text(content, encoding="utf-8")
+
+    print(f"✅ 配置文件已生成: {target}")
+    print()
+    print("下一步：")
+    print("  1. 运行 `mark42 --config` 查看配置")
+    print("  2. 运行 `mark42 armor --check` 检查上下文状态")
+    print("  3. 运行 `mark42 status` 查看系统状态")
+    print()
+
+    # 清除缓存
+    global _cache
+    _cache = None
+
+    return target

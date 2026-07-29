@@ -4,6 +4,17 @@
 
 版本：`v2.8.0`
 
+| 快速开始 | 完整教程 | 配置说明 | 架构设计 |
+|----------|----------|----------|----------|
+| [QUICKSTART.md](QUICKSTART.md) | [TUTORIAL.md](TUTORIAL.md) | [CONFIG-GUIDE.md](docs/CONFIG-GUIDE.md) | [ARCHITECTURE.md](ARCHITECTURE.md) |
+
+**3 步跑起来：**
+```bash
+cd mark42-pkg && bash install.sh   # 安装
+mark42 --init                      # 配置
+mark42 armor --check               # 检查
+```
+
 ---
 
 ## ✨ 功能概览

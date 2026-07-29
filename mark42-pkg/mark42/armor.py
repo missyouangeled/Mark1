@@ -3,6 +3,7 @@
 """
 
 import json
+import logging
 import os
 import subprocess
 import time
@@ -15,6 +16,7 @@ from .config import (
     ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
     DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
     THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
+    get_dynamic_thresholds,
     # 阶段 1: 压缩算法常量 (2026-06-24)
     ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
     ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
@@ -87,21 +89,23 @@ def armor_check() -> dict[str, Any]:
         est = {"estimatedTokens": 0}
     context_window = _get_context_window()
     usage_pct = round(est.get("estimatedTokens", 0) / context_window * 100, 1)
+    # 动态阈值：大窗口更早介入 (context rot 更严重)
+    _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(context_window)
     severity = "ok"
     status = "ok"
     summary = f"上下文 {usage_pct}%，正常"
-    if usage_pct >= THRESHOLD_CRIT:
+    if usage_pct >= _crit_pct:
         severity = "critical"
         status = "critical"
-        summary = f"⚠️ 上下文 {usage_pct}% 达到危险等级"
-    elif usage_pct >= THRESHOLD_ALERT:
+        summary = f"⚠️ 上下文 {usage_pct}% 达到危险等级 (阈值{_crit_pct}%)"
+    elif usage_pct >= _alert_pct:
         severity = "warn"
         status = "alert"
-        summary = f"⚠️ 上下文 {usage_pct}% 偏高，建议压缩"
-    elif usage_pct >= THRESHOLD_WARN:
+        summary = f"⚠️ 上下文 {usage_pct}% 偏高，建议压缩 (阈值{_alert_pct}%)"
+    elif usage_pct >= _warn_pct:
         severity = "info"
         status = "warn"
-        summary = f"💡 上下文 {usage_pct}%，关注中"
+        summary = f"💡 上下文 {usage_pct}%，关注中 (阈值{_warn_pct}%)"
     result = {
         "checkedAt": now_str,
         "host": os.uname().nodename,
@@ -409,7 +413,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
         # fail-safe 路径: 记录尝试 (ran=True) 但不实际处理
         stats["ran"] = True
         if ALGO_FAIL_SAFE:
-            print(f"⚠️ compression scheduler error (fail-safe 返回原文): {e}")
+            logger.warning("compression scheduler error (fail-safe 返回原文): %s", e)
         else:
             raise
 
@@ -454,7 +458,7 @@ def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
 
     except Exception as e:
         stats["error"] = f"smartcrush failed: {e}"
-        print(f"⚠️ compression hook error: {e}")
+        logger.warning("compression hook error: %s", e)
 
     return stats
 
@@ -466,8 +470,10 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     """
     check = armor_check()
     usage = check.get("usagePercent", 0)
-    if usage < THRESHOLD_WARN and not dry_run:
-        return {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {THRESHOLD_WARN}%", "check": check}
+    _ctx_window = check.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+    _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(_ctx_window)
+    if usage < _warn_pct and not dry_run:
+        return {"action": "skip", "reason": f"使用率 {usage}% 未达阈值 {_warn_pct}%", "check": check}
     active = _find_active_session()
     session_messages = _read_session_tail(active) if active else []
 
@@ -517,7 +523,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             "discarded": {"samples": discarded_summary, "count": len(discarded_items)},
             "degradationDetected": degradation,
             "strategyUsed": "heuristic-classify",
-            "recommendedAction": "/compact" if usage >= THRESHOLD_ALERT else "monitor",
+            "recommendedAction": "/compact" if usage >= _alert_pct else "monitor",
             "algoStats": algo_stats,
         }
         print("⚠️ LLM 不可用，回退到启发式分析")
@@ -527,7 +533,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     history_dir.mkdir(parents=True, exist_ok=True)
     _append_broker("health", "armor.compress",
                    f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
-                   "warn" if usage >= THRESHOLD_WARN else "ok",
+                   "warn" if usage >= _warn_pct else "ok",
                    f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
                    {"usagePercent": usage, "dryRun": dry_run})
     # ── C 项：标准化事件桥接 ──
@@ -557,153 +563,349 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
     # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
     # _save_json 后修改 dict 不会回写到已写入的文件）。
-    if not dry_run and usage >= THRESHOLD_WARN:
+    # ── 修复 (2026-07-29): 压缩冷却期检查 ──
+    # 连续 compact 已压缩过的 session 是无效操作：LLM 摘要 + 结构化元数据
+    # 会让文件比原文还大。加 30 分钟冷却期避免反复蹂躏。
+    COMPACT_COOLDOWN_SEC = 1800  # 30 分钟
+    compact_cooldown_file = XDG_STATE / "mark42" / "armor" / "compact-cooldown.json"
+    if not dry_run and compact_cooldown_file.exists():
         try:
-            active_session = _find_active_session()
-            if active_session:
-                pre_bytes = active_session.stat().st_size
-                # 调 OpenClaw sessions.compact RPC 做 LLM 摘要压缩
-                # 不加 --max-lines: 走 LLM 摘要模式（doubao-seed-2.0-pro），保留语义
-                # --timeout 300000: 5 分钟超时 (LLM 模式可能慢)
-                # 优先 LLM 摘要模式，失败则回退到截短模式
-                # LLM 模式保留语义但慢（60-180s）；截短模式快但丢信息
-                compact_proc = subprocess.run(
-                    [
-                        "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
-                        "agent:main:main",
-                        "--timeout", "300000",
-                        "--json",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=320,
+            import json as _json
+            cd = _json.loads(compact_cooldown_file.read_text())
+            last_ts = cd.get("lastCompactTs")
+            if last_ts:
+                from datetime import datetime as _dt
+                last_dt = _dt.fromisoformat(last_ts)
+                elapsed = (datetime.now() - last_dt).total_seconds()
+                if elapsed < COMPACT_COOLDOWN_SEC:
+                    remaining = int((COMPACT_COOLDOWN_SEC - elapsed) / 60)
+                    print(f"⏸️ 压缩冷却中（还剩 {remaining} 分钟），跳过本次 compact")
+                    index["compactTriggered"] = False
+                    index["compactError"] = f"cooldown-{remaining}min"
+                    index["compressionEffective"] = False
+                    index["preCompactBytes"] = None
+                    _save_json(index_path, index)
+                    return {"action": "skip-cooldown", "reason": f"冷却中，还剩 {remaining} 分钟", "check": check}
+        except Exception as e:
+            logger.warning("冷却期检查失败（非致命）: %s", e)
+
+    # ── 修复 (2026-07-29): 预检 session 是否已被 compact 过 ──
+    # 如果 session 文件里已有 compaction 条目，说明最近被摘要过，
+    # 再跑 LLM compact 只会让摘要+元数据膨胀（实测变大 10KB+）
+    if not dry_run and active:
+        try:
+            with open(active, "r") as _f:
+                _head = _f.read(8192)  # 读前 8KB 够判断
+            if '"type":"compaction"' in _head or '"type": "compaction"' in _head:
+                print("⏸️ Session 已含 compaction 摘要，跳过 LLM compact（避免摘要膨胀）")
+                index["compactTriggered"] = False
+                index["compactError"] = "session-already-compacted"
+                index["compressionEffective"] = False
+                index["preCompactBytes"] = active.stat().st_size
+                _save_json(index_path, index)
+                # 写冷却期标记
+                try:
+                    compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
+                    compact_cooldown_file.write_text(
+                        json.dumps({"lastCompactTs": _now_iso(), "reason": "already-compacted"}, ensure_ascii=False)
+                    )
+                except Exception:
+                    pass
+                _append_broker(
+                    "armor", "mark42.armor.compact.skipped",
+                    "Session 已含摘要，跳过 compact",
+                    "info",
+                    "session 文件检测到 compaction 条目，跳过避免摘要膨胀",
+                    {"preBytes": index["preCompactBytes"], "usagePercent": usage},
                 )
-                if compact_proc.returncode != 0:
-                    # LLM 模式失败，回退到截短模式
-                    print("    ⚠️ LLM 压缩失败，回退到截短模式")
+                return {"action": "skip-already-compacted", "reason": "session 已含 compaction 摘要", "check": check}
+        except Exception as e:
+            logger.warning("预检 compaction 失败（非致命）: %s", e)
+
+    # ── 修复 (2026-07-29): _get_context_window() 现在读 session 实际运行模型 ──
+    # 之前读 primary config (doubao-seed-2.0-pro, 128K)，导致 GLM-5.2 (1M)
+    # 的 usage 被算成 87.5%（实际只有 9%），触发不必要的 compact。
+    # 现在 _get_context_window() 返回实际模型的 contextWindow，
+    # armor_check() 算的 usage 已经是正确的百分比，不需要额外折扣。
+    # 例如 GLM-5.2 (1M): 95K tokens -> usage = 9.5%，远低于 70% 阈值。
+
+    # ── 平台探测期 + compact 锁 (2026-07-29) ──
+    # Mark42 是跨平台铠甲，armor_compress 是最后自主救场能力。
+    # 但不能与平台自带的 auto-compaction 冲突，所以加“平台优先探测”机制：
+    # 1. 发现 usage >= 阈值时，先等一个探测期（默认 60 秒）
+    # 2. 探测期内每 10 秒检查 usage 是否下降
+    # 3. usage 下降了 -> 平台已 compact，Mark42 跳过
+    # 4. 探测期结束 usage 仍无变化 -> 平台没反应，Mark42 自主出手
+    # 5. 出手前再检查 compact 锁，避免与另一个 Mark42 实例撞车
+    PLATFORM_PROBE_SEC = 60       # 探测期总时长
+    PLATFORM_PROBE_INTERVAL = 10  # 每次检查间隔
+    COMPACT_LOCK_FILE = XDG_STATE / "mark42" / "armor" / "compact.lock"
+    COMPACT_LOCK_TTL_SEC = 620    # 锁过期时间（compact 超时 620s + 缓冲）
+
+    def _try_acquire_compact_lock() -> bool:
+        """尝试获取 compact 锁。返回 True 表示获取成功。
+
+        使用 O_CREAT|O_EXCL 原子创建，避免竞态条件。
+        """
+        import errno as _errno
+        COMPACT_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        # 先尝试原子创建（O_CREAT|O_EXCL）
+        try:
+            fd = os.open(
+                str(COMPACT_LOCK_FILE),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+            os.write(fd, json.dumps({
+                "acquiredAt": _now_iso(),
+                "pid": os.getpid(),
+            }, ensure_ascii=False).encode())
+            os.close(fd)
+            return True
+        except OSError as e:
+            if e.errno != _errno.EEXIST:
+                # 非预期错误，保守起见不获取锁
+                return False
+
+        # 锁文件已存在，检查是否过期
+        try:
+            lock_data = json.loads(COMPACT_LOCK_FILE.read_text())
+            lock_ts = lock_data.get("acquiredAt")
+            if lock_ts:
+                from datetime import datetime as _dt
+                lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
+                if lock_age < COMPACT_LOCK_TTL_SEC:
+                    return False  # 锁未过期
+            # 锁已过期，原子替换
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+            return _try_acquire_compact_lock()  # 递归重试
+        except Exception:
+            # 锁文件损坏，删除后重试
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+            return _try_acquire_compact_lock()
+
+    def _release_compact_lock() -> None:
+        """释放 compact 锁。"""
+        try:
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    def _platform_compact_probe(usage_val: float) -> bool:
+        """平台探测期：等待平台自己 compact。
+        返回 True 表示平台已处理（usage 下降了），False 表示平台无反应。
+        """
+        if dry_run:
+            return False  # dry_run 不等
+        # 测试环境可跳过 sleep
+        import sys as _sys
+        _armor_mod = _sys.modules.get(__name__)
+        if _armor_mod and getattr(_armor_mod, "_PLATFORM_PROBE_SKIP_SLEEP", False):
+            print("   [test] 跳过平台探测期 sleep")
+            return False
+        print(f"👀 平台探测期 ({PLATFORM_PROBE_SEC}s)：等待平台 auto-compaction 反应...")
+        for i in range(PLATFORM_PROBE_SEC // PLATFORM_PROBE_INTERVAL):
+            time.sleep(PLATFORM_PROBE_INTERVAL)
+            probe_check = armor_check()
+            probe_usage = probe_check.get("usagePercent", 0)
+            if probe_usage < usage_val - 5:
+                # usage 下降了 5%+，说明平台自己 compact 了
+                print(f"   ✅ 探测到 usage 下降: {usage_val}% -> {probe_usage}%，平台已处理")
+                return True
+            print(f"   ⏳ [{(i+1)*PLATFORM_PROBE_INTERVAL}s] usage={probe_usage}% (无变化)")
+        print(f"   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
+        return False
+
+    if not dry_run and usage >= _warn_pct:
+        # 1) 平台探测期
+        platform_handled = _platform_compact_probe(usage)
+        if platform_handled:
+            index["compactTriggered"] = False
+            index["compactError"] = "platform-auto-compaction-handled"
+            index["compressionEffective"] = True
+            index["preCompactBytes"] = None
+            _save_json(index_path, index)
+            return {"action": "skip-platform-handled", "reason": "平台 auto-compaction 已处理", "check": check}
+
+        # 2) 获取 compact 锁
+        if not _try_acquire_compact_lock():
+            print("⏸️ compact 锁被占用，另一个 compact 正在进行，跳过")
+            index["compactTriggered"] = False
+            index["compactError"] = "compact-lock-busy"
+            index["compressionEffective"] = False
+            index["preCompactBytes"] = None
+            _save_json(index_path, index)
+            return {"action": "skip-locked", "reason": "另一个 compact 正在进行", "check": check}
+
+        try:
+            # ── Session Fence：压缩前验证 + 锁定 ──
+            from .session_fence import fence_verify, fence_record_pre, fence_record_post
+            active_session = _find_active_session()
+            if not active_session:
+                print("⚠️ 未找到活跃会话，跳过 compact")
+                index["compactTriggered"] = False
+                index["compactError"] = "no-active-session"
+                index["compressionEffective"] = False
+                index["preCompactBytes"] = None
+            else:
+                # fence 验证：检查 session 是否安全可操作
+                verify = fence_verify(active_session)
+                if not verify["ok"]:
+                    logger.warning("Session Fence 拦截: %s", verify["reason"])
+                    index["compactTriggered"] = False
+                    index["compactError"] = f"fence-blocked: {verify['reason']}"
+                    index["compressionEffective"] = False
+                    index["preCompactBytes"] = None
+                    _append_broker(
+                        "armor", "mark42.armor.compact.fence_blocked",
+                        f"Session Fence 拦截: {verify['reason']}",
+                        "warn",
+                        f"原因: {verify['reason']}",
+                        {"fenceReason": verify["reason"], "usagePercent": usage},
+                    )
+                else:
+                    fence_pre = fence_record_pre(active_session)
+                    pre_bytes = active_session.stat().st_size
+                    # 调 OpenClaw sessions.compact RPC 做 LLM 摘要压缩
+                    # 不加 --max-lines: 走 LLM 摘要模式（doubao-seed-2.0-pro），保留语义
+                    # --timeout 300000: 5 分钟超时 (LLM 模式可能慢)
+                    # 优先 LLM 摘要模式，失败则回退到截短模式
+                    # LLM 模式保留语义但慢（60-180s）；截短模式快但丢信息
                     compact_proc = subprocess.run(
                         [
                             "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
                             "agent:main:main",
-                            "--max-lines", "200",
-                            "--timeout", "180000",
+                            "--timeout", "600000",  # OpenClaw 内部超时 600s
                             "--json",
                         ],
                         capture_output=True,
                         text=True,
-                        timeout=200,
+                        timeout=620,  # 比 OpenClaw 内部超时多 20s 缓冲
                     )
-                if compact_proc.returncode == 0:
-                    # 验证压缩是否真的生效
-                    post_bytes = active_session.stat().st_size
-                    bytes_saved = pre_bytes - post_bytes
-                    pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
-                    # 验证是否真变小 (0% = 无效, 才不会重复失败)
-                    if bytes_saved > 0:
+                    # ── 修复 (2026-07-29): LLM compact 后检查文件大小变化 ──
+                    # 不管 rc 是 0 还是非 0，先看文件有没有变化：
+                    # - 变大 = LLM 摘要膨胀（不要回退 maxlines）
+                    # - 变小 = compact 成功（即使 rc!=0 也算成功）
+                    # - 没变 = compact 真失败（才回退 maxlines）
+                    _post_llm_bytes = active_session.stat().st_size if active_session.exists() else pre_bytes
+                    _llm_made_it_bigger = _post_llm_bytes > pre_bytes
+                    _llm_made_it_smaller = _post_llm_bytes < pre_bytes
+                    if _llm_made_it_bigger:
+                        logger.warning("LLM 摘要比原文大 (pre=%d, post=%d)，跳过 maxlines 回退", pre_bytes, _post_llm_bytes)
+                        index["compactTriggered"] = True
+                        index["compactMethod"] = "openclaw-sessions-compact"
+                        index["preCompactBytes"] = pre_bytes
+                        index["postCompactBytes"] = _post_llm_bytes
+                        index["bytesSaved"] = pre_bytes - _post_llm_bytes
+                        index["compressionEffective"] = False
+                        index["compactError"] = "llm-summary-larger-than-original"
+                        _append_broker(
+                            "armor", "mark42.armor.compact.summary_inflated",
+                            "LLM 摘要比原文大，压缩反效果",
+                            "warn",
+                            f"pre={pre_bytes}B post={_post_llm_bytes}B diff={pre_bytes - _post_llm_bytes}B",
+                            {"preBytes": pre_bytes, "postBytes": _post_llm_bytes, "usagePercent": usage},
+                        )
+                    elif _llm_made_it_smaller:
+                        post_bytes = _post_llm_bytes
+                        bytes_saved = pre_bytes - post_bytes
+                        pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
                         index["compactTriggered"] = True
                         index["compactMethod"] = "openclaw-sessions-compact"
                         index["preCompactBytes"] = pre_bytes
                         index["postCompactBytes"] = post_bytes
                         index["bytesSaved"] = bytes_saved
                         index["compressionEffective"] = True
-                        print(
-                            f"🧹 会话截短成功: {pre_bytes//1024}KB → {post_bytes//1024}KB "
-                            f"(节省 {pct_saved}%)"
-                        )
-                        # 报 broker 成功事件
+                        print(f"🧹 LLM 压缩成功: {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {pct_saved}%)")
                         _append_broker(
                             "armor", "mark42.armor.compact.success",
-                            f"会话截短: {pct_saved}% 节省",
+                            f"LLM 压缩: {pct_saved}% 节省",
                             "ok",
-                            f"压缩前 {pre_bytes//1024}KB → 压缩后 {post_bytes//1024}KB "
-                            f"({bytes_saved} bytes)",
-                            {
-                                "preBytes": pre_bytes,
-                                "postBytes": post_bytes,
-                                "bytesSaved": bytes_saved,
-                                "pctSaved": pct_saved,
-                                "method": "openclaw-sessions-compact",
-                            },
+                            f"{pre_bytes//1024}KB -> {post_bytes//1024}KB ({bytes_saved} bytes)",
+                            {"preBytes": pre_bytes, "postBytes": post_bytes, "bytesSaved": bytes_saved, "pctSaved": pct_saved},
                         )
+                        _inject_memory_index(index)
                     else:
-                        # LLM compact 返回 rc=0 但文件没缩小。
-                        # 根因：压缩期间用户仍在聊天，新消息追加抵消了截短；
-                        # 或会话已经足够小，LLM 摘要后反而更大。
-                        # 修复 (2026-07-23)：不再只标记失败就完事，
-                        # 而是回退到 --max-lines 截短模式，确保真正缩小文件。
-                        compact_stdout = (compact_proc.stdout or "")[:500]
-                        print(f"⚠️ LLM compact 返回成功但文件未缩小 "
-                              f"(pre={pre_bytes}, post={post_bytes}, diff={bytes_saved})")
-                        print(f"   stdout: {compact_stdout[:200]}")
-                        print(f"   回退到 --max-lines 200 截短模式")
-                        fallback_proc = subprocess.run(
-                            [
-                                "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
-                                "agent:main:main",
-                                "--max-lines", "200",
-                                "--timeout", "180000",
-                                "--json",
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=200,
-                        )
-                        if fallback_proc.returncode == 0:
-                            post_bytes2 = active_session.stat().st_size
-                            bytes_saved2 = pre_bytes - post_bytes2
-                            pct_saved2 = round(bytes_saved2 / pre_bytes * 100, 1) if pre_bytes > 0 else 0
-                            index["compactTriggered"] = True
-                            index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback"
-                            index["preCompactBytes"] = pre_bytes
-                            index["postCompactBytes"] = post_bytes2
-                            index["bytesSaved"] = bytes_saved2
-                            index["llmCompactStdout"] = compact_stdout[:300]
-                            if bytes_saved2 > 0:
+                        # 文件没变化 -> compact 真失败或被拒绝 -> 才回退到 maxlines
+                        if compact_proc.returncode != 0:
+                            print("    ⚠️ LLM 压缩失败且文件未变，回退到截短模式")
+                            compact_proc = subprocess.run(
+                                [
+                                    "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
+                                    "agent:main:main",
+                                    "--max-lines", "150",
+                                    "--timeout", "180000",
+                                    "--json",
+                                ],
+                                capture_output=True,
+                                text=True,
+                                timeout=200,  # 截短模式快，200s 够用
+                            )
+                        if compact_proc.returncode == 0:
+                            post_bytes = active_session.stat().st_size
+                            bytes_saved = pre_bytes - post_bytes
+                            pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
+                            fence_post = fence_record_post(active_session, fence_pre)
+                            if not fence_post["ok"]:
+                                logger.warning("Session Fence 检测到外部篡改！pre=%d post=%d", pre_bytes, post_bytes)
+                                _append_broker(
+                                    "armor", "mark42.armor.compact.fence_tampered",
+                                    "Session Fence 检测到外部篡改",
+                                    "warn",
+                                    f"pre={pre_bytes}B post={post_bytes}B delta={fence_post['delta']}B",
+                                    {"preSize": pre_bytes, "postSize": post_bytes, "tampered": True},
+                                )
+                            if bytes_saved > 0:
+                                index["compactTriggered"] = True
+                                index["compactMethod"] = "openclaw-sessions-compact"
+                                index["preCompactBytes"] = pre_bytes
+                                index["postCompactBytes"] = post_bytes
+                                index["bytesSaved"] = bytes_saved
                                 index["compressionEffective"] = True
-                                index["compactError"] = None
-                                print(f"🧹 截短回退成功: {pre_bytes//1024}KB -> {post_bytes2//1024}KB "
-                                      f"(节省 {pct_saved2}%)")
+                                print(f"🧹 会话截短成功: {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {pct_saved}%)")
                                 _append_broker(
                                     "armor", "mark42.armor.compact.success",
-                                    f"截短回退成功: {pct_saved2}% 节省",
+                                    f"会话截短: {pct_saved}% 节省",
                                     "ok",
-                                    f"LLM compact 未缩小，截短回退: {pre_bytes//1024}KB -> {post_bytes2//1024}KB",
-                                    {"preBytes": pre_bytes, "postBytes": post_bytes2,
-                                     "bytesSaved": bytes_saved2, "method": "maxlines-fallback"},
+                                    f"压缩前 {pre_bytes//1024}KB -> 压缩后 {post_bytes//1024}KB ({bytes_saved} bytes)",
+                                    {"preBytes": pre_bytes, "postBytes": post_bytes, "bytesSaved": bytes_saved, "pctSaved": pct_saved, "method": "openclaw-sessions-compact"},
                                 )
+                                _inject_memory_index(index)
                             else:
+                                index["compactTriggered"] = True
+                                # 区分：是否走了 maxlines 回退
+                                _used_fallback = '--max-lines' in ' '.join(compact_proc.args) if hasattr(compact_proc, 'args') else False
+                                index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback" if _used_fallback else "openclaw-sessions-compact"
                                 index["compressionEffective"] = False
-                                index["compactError"] = "no-bytes-saved-after-fallback"
-                                print(f"⚠️ 截短回退后仍未缩小 (pre={pre_bytes}, post={post_bytes2})")
+                                index["compactError"] = "no-bytes-saved-after-fallback" if _used_fallback else "no-bytes-saved"
+                                index["preCompactBytes"] = pre_bytes
+                                index["postCompactBytes"] = post_bytes
+                                index["bytesSaved"] = bytes_saved
+                                print("⚠️ sessions.compact 返回成功但 session 未缩小")
                         else:
-                            fb_err = (fallback_proc.stderr or fallback_proc.stdout)[:300]
-                            index["compactTriggered"] = True
-                            index["compactMethod"] = "openclaw-sessions-compact-maxlines-fallback"
+                            err = (compact_proc.stderr or compact_proc.stdout)[:300]
+                            index["compactTriggered"] = False
+                            index["compactError"] = err
                             index["compressionEffective"] = False
-                            index["compactError"] = f"fallback-failed: {fb_err}"
                             index["preCompactBytes"] = pre_bytes
-                            index["postCompactBytes"] = active_session.stat().st_size
-                            index["bytesSaved"] = pre_bytes - active_session.stat().st_size
-                            print(f"⚠️ 截短回退也失败: {fb_err}")
-                else:
-                    err = (compact_proc.stderr or compact_proc.stdout)[:300]
-                    index["compactTriggered"] = False
-                    index["compactError"] = err
-                    index["compressionEffective"] = False
-                    index["preCompactBytes"] = pre_bytes  # J 修复: 也记
-                    print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
-                    _append_broker(
-                        "armor", "mark42.armor.compact.failed",
-                        f"sessions.compact 失败 rc={compact_proc.returncode}",
-                        "error",
-                        err,
-                        {"rc": compact_proc.returncode, "preBytes": pre_bytes},
-                    )
-            else:
-                print("⚠️ 未找到活跃会话，跳过 compact")
-                index["compactTriggered"] = False
-                index["compressionEffective"] = False
-                index["preCompactBytes"] = pre_bytes  # J 修复: 也记
+                            logger.warning("sessions.compact 失败 (rc=%d): %s", compact_proc.returncode, err)
+                            _append_broker(
+                                "armor", "mark42.armor.compact.failed",
+                                f"sessions.compact 失败 rc={compact_proc.returncode}",
+                                "error",
+                                err,
+                                {"rc": compact_proc.returncode, "preBytes": pre_bytes},
+                            )
+                    # ── 压缩后写冷却期标记 ──
+                    try:
+                        compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
+                        compact_cooldown_file.write_text(
+                            json.dumps({"lastCompactTs": _now_iso(), "reason": "post-compact"}, ensure_ascii=False)
+                        )
+                    except Exception:
+                        pass
+
         except subprocess.TimeoutExpired:
             print("⚠️ sessions.compact 调用超时（200s）")
             index["compactTriggered"] = False
@@ -715,10 +917,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             index["compressionEffective"] = False
             index["compactError"] = "openclaw-not-found"
         except Exception as e:
-            print(f"⚠️ compact 触发失败: {e}")
+            logger.warning("compact 触发失败: %s", e)
             index["compactTriggered"] = False
             index["compressionEffective"] = False
             index["compactError"] = str(e)
+        finally:
+            _release_compact_lock()
     # ⚠️ 必须在所有字段（含 compactTriggered/compactError）设置完后再写文件
     _save_json(index_path, index)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -798,7 +1002,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     "armor", "mark42.armor.compact.ineffective",
                     f"连续 {ineffective_count}/{total_count} 次压缩未生效",
                     "warn",
-                    trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / session fence 状态", 160),
+                    trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / compact 子命令", 160),
                     {"ineffectiveCount": ineffective_count, "totalCount": total_count,
                      "preUsage": usage},
                 )
@@ -806,6 +1010,29 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     except Exception as e:
         # 升级逻辑本身的错误不能影响主流程
         print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
+
+    # ── Post-Compact Audit hook（异步，不阻塞）──
+    # compact 完成（无论成功或失败）后自动核对关键信息是否丢失
+    # 即使 compact 失败也审计——因为部分执行可能已丢失信息
+    if not dry_run:
+        try:
+            from .interfaces import get_audit
+            _audit = get_audit()
+            if _audit is not None:
+                _audit.audit_compact_async(
+                    pre_compact_snapshot={
+                        "timestamp": _now_iso(),
+                        "source": "pre-compact",
+                        "compactTriggered": index.get("compactTriggered", False),
+                        "compactError": index.get("compactError", ""),
+                    },
+                    post_compact_summary={
+                        "timestamp": _now_iso(),
+                        "source": "post-compact",
+                    },
+                )
+        except Exception:
+            pass  # audit hook 失败不影响主流程
 
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
@@ -839,36 +1066,106 @@ def _send_context_warn_event(usage: float) -> bool:
         return False
 
 
-def armor_guard(interval_s: int = 300) -> None:
-    """守护模式：每 N 秒检查一次，超阈值自动出手。
+def _inject_memory_index(index: dict[str, Any]) -> bool:
+    """压缩后自动注入 memory-index 到主会话。
+    
+    将压缩时保留的关键信息通过 systemEvent 注入回会话，
+    确保 AI 不会因为压缩丢失重要上下文。
+    
+    Returns: True=注入成功, False=失败
+    """
+    import subprocess as _sp
+    preserved = index.get("preserved", {})
+    
+    # 构建注入文本
+    lines = ["📝 [Mark42 memory-index] 压缩后自动注入关键信息："]
+    
+    # 用户身份
+    user_id = preserved.get("userIdentity", "")
+    if user_id:
+        lines.append(f"- 用户身份: {user_id}")
+    
+    # 按角色保留的消息
+    by_role = preserved.get("byRole", {})
+    for role in ("user", "assistant"):
+        msgs = by_role.get(role, [])
+        if msgs:
+            label = "用户" if role == "user" else "AI"
+            lines.append(f"- {label}关键消息:")
+            for msg in msgs[:3]:  # 最多 3 条
+                preview = str(msg)[:200]
+                lines.append(f"  - {preview}")
+    
+    # LLM 分析结果
+    if index.get("modelGenerated"):
+        active_projects = preserved.get("activeProjects", [])
+        if active_projects:
+            lines.append(f"- 活跃项目: {', '.join(str(p) for p in active_projects[:3])}")
+    
+    # 压缩信息
+    strategy = index.get("strategyUsed", "unknown")
+    pre_bytes = index.get("preCompactBytes", 0)
+    post_bytes = index.get("postCompactBytes", 0)
+    if pre_bytes and post_bytes:
+        saved = pre_bytes - post_bytes
+        lines.append(f"- 压缩: {strategy}, {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {saved//1024}KB)")
+    
+    text = "\n".join(lines)
+    
+    try:
+        result = _sp.run(
+            ["/home/missyouangeled/.npm-global/bin/openclaw", "system", "event",
+             "--text", text,
+             "--mode", "next-heartbeat",
+             "--session-key", "agent:main:main"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            print(f"    📝 已注入 memory-index 到主会话 ({len(lines)} 行)")
+            return True
+        else:
+            print(f"    ⚠️ memory-index 注入失败: {result.stderr.strip()[:100]}")
+            return False
+    except Exception as e:
+        print(f"    ⚠️ memory-index 注入异常: {e}")
+        return False
 
-    - WARN 阈值(70%): 发送预警 + 自动触发压缩（LLM 模式，失败回退截短）
-    - ALERT 阈值(85%): 强制再次压缩（可能上一次没压够）
+
+def armor_guard(interval_s: int = 300) -> None:
+    """守护模式：每 N 秒检查一次，超阈值自主救场。
+
+    设计哲学：平台优先，Mark42 兜底。
+    - WARN 阈值(70%): 发送预警，进入观察
+    - ALERT 阈值(85%): 调用 armor_compress 自主救场
+    - armor_compress 内含平台探测期：先等 60 秒看平台是否自己 compact
+    - 如果平台处理了 -> 跳过
+    - 如果平台没反应 -> Mark42 出手
+    - 出手前再检查 compact 锁，避免与另一个 compact 实例撞车
     """
     _warn_sent_at = None  # 上次发送预警的时间戳，避免重复刷屏
     _warn_cooldown = 600  # 预警冷却 10 分钟
-    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查）")
+    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查，平台优先 + 自主兜底）")
     try:
         while True:
             check = armor_check()
             usage = check.get("usagePercent", 0)
+            _ctx_window = check.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
+            _warn_pct, _alert_pct, _crit_pct = get_dynamic_thresholds(_ctx_window)
             ts = datetime.now().strftime("%H:%M:%S")
             print(trim_detail(f"[{ts}] 上下文 {usage}% - {check.get('summary', '')}", 120))
             now_ts = time.time()
             should_warn = (
-                usage >= THRESHOLD_WARN
+                usage >= _warn_pct
                 and (_warn_sent_at is None or now_ts - _warn_sent_at >= _warn_cooldown)
             )
             if should_warn:
-                print(f"[{ts}] 🟡 上下文达 WARN 阈值，发送预警 + 触发压缩")
+                print(f"[{ts}] 🟡 上下文达 WARN 阈值 ({usage}%)，发送预警")
                 if _send_context_warn_event(usage):
                     _warn_sent_at = now_ts
-                # WARN 阶段直接压缩，不等 ALERT
-                result = armor_compress()
-                print(f"    -> {result.get('action')}")
-            elif usage >= THRESHOLD_ALERT:
-                # ALERT 阶段：强制再次压缩（可能上一次没压够）
-                print(f"[{ts}] 🟠 ALERT 阈值，强制压缩")
+            elif usage >= _alert_pct:
+                # ALERT 阶段：触发 armor_compress 自主救场
+                # armor_compress 内含平台探测期 + compact 锁
+                print(f"[{ts}] 🟠 ALERT 阈值 ({usage}%)，启动自主救场")
                 result = armor_compress()
                 print(f"    -> {result.get('action')}")
             time.sleep(interval_s)
@@ -895,7 +1192,7 @@ def armor_compress_async(dry_run: bool = False, wait: bool = False,
     """
     try:
         # P1.2 修复: 顶局 import 便于 mock (原函数体 import 难测)
-        from mark42.compress_queue import CompressRequest, get_compress_queue
+        from mark42_modules.compress_queue import CompressRequest, get_compress_queue
     except ImportError as e:
         return {"status": "error", "reason": f"queue module not available: {e}"}
 
@@ -945,7 +1242,93 @@ def armor_compress_queue_stats() -> dict[str, Any]:
     """查看压缩队列统计"""
     try:
         # P1.2 修复: 顶局 import 便于 mock
-        from mark42.compress_queue import get_compress_queue
+        from mark42_modules.compress_queue import get_compress_queue
         return get_compress_queue().stats
     except ImportError as e:
         return {"error": f"queue module not available: {e}"}
+
+
+# ── G10: LLM 压缩成功率统计 + fallback SLO 告警 ──
+
+# SLO 阈值：fallback 率超过此值触发告警
+FALLBACK_SLO_THRESHOLD = 0.20  # 20%
+
+
+def armor_llm_stats(window: int = 50) -> dict[str, Any]:
+    """统计最近 N 次压缩的 LLM 成功率 / fallback 率。
+
+    从 actions.jsonl 读取历史记录，按 compactMethod 分类统计。
+    - LLM 路径：compactMethod 含 'llm' 或 'smartcrush'
+    - Fallback 路径：compactMethod 含 'fallback' 或 'maxlines' 或 'heuristic'
+    - 其他（如 openclaw-sessions-compact）：单列
+    """
+    actions_log = ARMOR_STATE / "actions.jsonl"
+    if not actions_log.exists():
+        return {"total": 0, "llmSuccess": 0, "fallback": 0, "other": 0,
+                "llmRate": 0.0, "fallbackRate": 0.0, "sloBreached": False}
+
+    try:
+        with open(actions_log) as f:
+            lines = f.readlines()[-window:]
+    except Exception:
+        return {"error": "读取 actions.jsonl 失败"}
+
+    total = 0
+    llm_success = 0
+    fallback = 0
+    other = 0
+    errors = 0
+
+    for line in lines:
+        try:
+            d = json.loads(line.strip())
+            if d.get("action") not in ("compress", "compress-dryrun"):
+                continue
+            total += 1
+            method = d.get("compactMethod") or ""
+            is_error = bool(d.get("compactError"))
+
+            if "llm" in method.lower() or "smartcrush" in method.lower():
+                llm_success += 1
+            elif "fallback" in method.lower() or "maxlines" in method.lower() or "heuristic" in method.lower():
+                fallback += 1
+            elif is_error:
+                errors += 1
+            else:
+                other += 1
+        except Exception:
+            continue
+
+    effective_total = llm_success + fallback
+    llm_rate = (llm_success / effective_total) if effective_total > 0 else 0.0
+    fallback_rate = (fallback / effective_total) if effective_total > 0 else 0.0
+
+    result = {
+        "total": total,
+        "llmSuccess": llm_success,
+        "fallback": fallback,
+        "other": other,
+        "errors": errors,
+        "llmRate": round(llm_rate * 100, 1),
+        "fallbackRate": round(fallback_rate * 100, 1),
+        "sloThreshold": FALLBACK_SLO_THRESHOLD * 100,
+        "sloBreached": fallback_rate > FALLBACK_SLO_THRESHOLD,
+        "window": min(window, len(lines)),
+    }
+
+    # SLO 告警：fallback 率超阈值时发 broker 事件
+    if result["sloBreached"] and effective_total >= 5:
+        try:
+            from .utils import _append_broker
+            _append_broker(
+                "armor", "mark42.armor.llm.slo_breach",
+                f"LLM fallback 率 {fallback_rate*100:.1f}% 超过 SLO 阈值 {FALLBACK_SLO_THRESHOLD*100:.0f}%",
+                "warn",
+                f"最近 {effective_total} 次压缩中 fallback {fallback} 次",
+                {"fallbackRate": fallback_rate, "threshold": FALLBACK_SLO_THRESHOLD,
+                 "window": effective_total},
+            )
+        except Exception:
+            pass
+
+    return result

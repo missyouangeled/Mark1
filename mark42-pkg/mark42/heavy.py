@@ -2,8 +2,8 @@
 大工程预检 + 上下文感知自动分批 + 收工验证。
 """
 
-import logging
 import json
+import logging
 import os
 import select
 import shutil
@@ -14,37 +14,37 @@ from typing import Any
 
 from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
 from .utils import _append_broker, _load_json, _now_iso, _save_json, _list_project_files
-from .armor import armor_check, armor_compress
 
-logger = logging.getLogger("mark42.heavy")
+logger = logging.getLogger(__name__)
+from .interfaces import get_compress
 
 
 def heavy_preflight(path_str: str) -> None:
     """大工程预检。"""
     p = Path(path_str).expanduser().resolve()
-    logger.info(f"⚙️ 重型战甲预检: {p}\n")
+    print(f"⚙️ 重型战甲预检: {p}\n")
     if not p.exists():
-        logger.warning(f"❌ 路径不存在: {p}")
+        logger.error("路径不存在: %s", p); print(f"❌ 路径不存在: {p}")
         return
     files = _list_project_files(p)
     total_size = sum(f.stat().st_size for f in files)
-    logger.info(f"📂 文件数: {len(files)}")
-    logger.info(f"💾 总大小: {total_size / (1024*1024):.1f} MB")
-    check = armor_check()
+    print(f"📂 文件数: {len(files)}")
+    print(f"💾 总大小: {total_size / (1024*1024):.1f} MB")
+    check = get_compress().check()
     usage = check.get("usagePercent", 0)
     remaining = 100 - usage
-    logger.info(f"🧠 上下文余量: {remaining:.0f}% (当前 {usage}%)")
+    print(f"🧠 上下文余量: {remaining:.0f}% (当前 {usage}%)")
     if remaining < 20:
-        logger.info(f"   ⚠️ 不足 — 强烈建议后台执行")
+        print(f"   ⚠️ 不足 — 强烈建议后台执行")
     elif remaining < 50:
-        logger.info(f"   💡 偏紧 — 建议后台执行")
+        print(f"   💡 偏紧 — 建议后台执行")
     else:
-        logger.info(f"   ✅ 充足 — 可前台启动")
+        print(f"   ✅ 充足 — 可前台启动")
     mem = os.popen("free -h | grep Mem | awk '{print $2}'").read().strip()
-    logger.info(f"🖥️ 内存: {mem}")
+    print(f"🖥️ 内存: {mem}")
     for mp in ["/", "/mnt/data"]:
         out = os.popen(f"df -h {mp} | tail -1 | awk '{{print $4\"/\"$2}}'").read().strip()
-        logger.info(f"💽 {mp}: 剩余 {out}" if out else "")
+        print(f"💽 {mp}: 剩余 {out}" if out else "")
 
 
 def heavy_detect(path_str: str) -> dict[str, Any]:
@@ -90,7 +90,7 @@ def heavy_detect(path_str: str) -> dict[str, Any]:
     }
 
     # 检查上下文
-    check = armor_check()
+    check = get_compress().check()
     usage = check.get("usagePercent", 0)
     result["metrics"]["contextUsage"] = usage
 
@@ -138,25 +138,25 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
     """
     r = heavy_detect(path_str)
     if not r["exists"]:
-        logger.warning(f"❌ 路径不存在: {r['path']}")
+        logger.error("路径不存在: %s", r["path"]); print(f"❌ 路径不存在: {r["path"]}")
         return
     m = r["metrics"]
-    logger.info(f"🔍 大工程检测: {r['path']}")
-    logger.info(f"   📂 {m['files']} 文件  |  💾 {m['sizeMB']:.1f}MB  |  📁 最深 {m['maxDepth']} 层")
-    logger.info(f"   🧠 上下文: {m['contextUsage']}%")
+    print(f"🔍 大工程检测: {r['path']}")
+    print(f"   📂 {m['files']} 文件  |  💾 {m['sizeMB']:.1f}MB  |  📁 最深 {m['maxDepth']} 层")
+    print(f"   🧠 上下文: {m['contextUsage']}%")
     if not r["isHeavy"]:
-        logger.info(f"\n✅ {r['advice']}")
+        print(f"\n✅ {r['advice']}")
         return
 
-    logger.info(f"\n⚠️ 已达到大工程标准：")
+    print(f"\n⚠️ 已达到大工程标准：")
     for reason in r["reasons"]:
-        logger.info(f"   • {reason}")
-    logger.info(f"\n💡 {r['advice']}")
+        print(f"   • {reason}")
+    print(f"\n💡 {r['advice']}")
 
     if auto_mode == "full":
         # 全自动：直接开工
         task_name = _auto_task_name(path_str)
-        logger.info(f"\n🚀 全自动模式：直接开工 → {task_name}")
+        print(f"\n🚀 全自动模式：直接开工 → {task_name}")
         heavy_start(path_str, task_name)
         return
 
@@ -164,9 +164,9 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
         # 半自动：倒计时 30s
         import time
         task_name = _auto_task_name(path_str)
-        logger.info(f"\n⏳ 半自动模式：30 秒后自动开工 → {task_name}")
-        logger.info(f"   拒绝：输入 'n' 或 Ctrl+C")
-        logger.info(f"   立即开工：输入 'y' 或按回车跳过等待")
+        print(f"\n⏳ 半自动模式：30 秒后自动开工 → {task_name}")
+        print(f"   拒绝：输入 'n' 或 Ctrl+C")
+        print(f"   立即开工：输入 'y' 或按回车跳过等待")
         try:
             import select
             print(f"   ", end="", flush=True)
@@ -177,49 +177,49 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
                 if rlist:
                     line = sys.stdin.readline().strip().lower()
                     if line in ("n", "no", "不", "拒绝"):
-                        logger.info(f"\n❌ 已取消。手动开工:")
-                        logger.info(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+                        print(f"\n❌ 已取消。手动开工:")
+                        print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
                         return
                     elif line in ("y", "yes", "是", "好", "开", ""):
-                        logger.info(f"\n✅ 立即开工")
+                        print(f"\n✅ 立即开工")
                         heavy_start(path_str, task_name)
                         return
                 time.sleep(1)
             # 倒计时结束，自动开工
-            logger.info(f"\n✅ 倒计时结束，自动开工")
+            print(f"\n✅ 倒计时结束，自动开工")
             heavy_start(path_str, task_name)
         except (KeyboardInterrupt, EOFError):
-            logger.info(f"\n❌ 已取消。手动开工:")
-            logger.info(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+            print(f"\n❌ 已取消。手动开工:")
+            print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
         return
 
     # "ask" 模式：只提示
     task_name = _auto_task_name(path_str)
-    logger.info(f"\n💡 手动开工命令:")
-    logger.info(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+    print(f"\n💡 手动开工命令:")
+    print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
 
 
 def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> None:
     """大工程开工 — 上下文感知自动分批。"""
     target = Path(path_str).expanduser().resolve()
     if not target.exists():
-        logger.warning(f"❌ 路径不存在: {target}")
+        logger.error("路径不存在: %s", target); print(f"❌ 路径不存在: {target}")
         return
     task_dir = SCRATCH / task_name
     task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / ".keep").write_text("keep\n", encoding="utf-8")
-    check = armor_check()
+    check = get_compress().check()
     usage = check.get("usagePercent", 0)
-    logger.info(f"⚙️ 重型战甲开工: {task_name}")
-    logger.info(f"   目标: {target}")
-    logger.info(f"   Scratch: {task_dir}")
-    logger.info(f"   🧠 上下文: {usage}%")
+    print(f"⚙️ 重型战甲开工: {task_name}")
+    print(f"   目标: {target}")
+    print(f"   Scratch: {task_dir}")
+    print(f"   🧠 上下文: {usage}%")
     if context_aware:
         if usage >= THRESHOLD_ALERT:
-            logger.info(f"   ⚠️ 上下文偏高，自动触发压缩...")
-            armor_compress()
+            print(f"   ⚠️ 上下文偏高，自动触发压缩...")
+            get_compress().compress()
         elif usage >= THRESHOLD_WARN:
-            logger.info(f"   💡 建议后台执行（上下文偏紧）")
+            print(f"   💡 建议后台执行（上下文偏紧）")
     files = _list_project_files(target)
     total_files = len(files)
     total_size = sum(f.stat().st_size for f in files)
@@ -232,8 +232,8 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     # 分母 200 是经验校准值：100 个文件、20% 余量 → 10 文件/批
     batch_size = max(1, min(30, int(total_files * remaining_pct / 200)))
     num_batches = max(1, (total_files + batch_size - 1) // batch_size)
-    logger.info(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
-    logger.info(f"   📦 批次: {num_batches} 批 (每批 ≤{batch_size} 个文件)")
+    print(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
+    print(f"   📦 批次: {num_batches} 批 (每批 ≤{batch_size} 个文件)")
     batches = []
     for i in range(0, total_files, batch_size):
         chunk = files[i:i + batch_size]
@@ -279,12 +279,12 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     _append_broker("tasks", "heavy.task.started", f"大工程开工: {task_name}", "ok",
                    f"{total_files} 文件 | {num_batches} 批次 | {total_size_mb:.1f}MB",
                    {"taskName": task_name, "totalFiles": total_files, "batches": num_batches})
-    logger.info(f"\n   📋 批次清单:")
+    print(f"\n   📋 批次清单:")
     for b in batches:
-        logger.info(f"      {b['id']}: {b['count']} 文件 ({b['sizeMB']:.1f}MB)")
-    logger.info(f"\n✅ 已开工。使用以下命令监控：")
-    logger.info(f"   python3 scripts/mark42.py engine --watch-task {task_name}")
-    logger.info(f"   完工后: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
+        print(f"      {b['id']}: {b['count']} 文件 ({b['sizeMB']:.1f}MB)")
+    print(f"\n✅ 已开工。使用以下命令监控：")
+    print(f"   python3 scripts/mark42.py engine --watch-task {task_name}")
+    print(f"   完工后: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
 
 
 def heavy_finish(task_name: str) -> None:
@@ -292,7 +292,7 @@ def heavy_finish(task_name: str) -> None:
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        logger.warning(f"❌ 任务 '{task_name}' 不存在")
+        logger.error("任务不存在: %s", task_name); print(f"❌ 任务 '{task_name}' 不存在")
         return
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
@@ -300,10 +300,10 @@ def heavy_finish(task_name: str) -> None:
     done = sum(1 for s in subtasks.values() if s.get("status") in ("done", "completed"))
     failed = sum(1 for s in subtasks.values() if s.get("status") in ("failed", "error"))
     pending = sum(1 for s in subtasks.values() if s.get("status") == "pending")
-    logger.info(f"🏁 大工程收工: {task_name}")
-    logger.info(f"   结果: ✅ {done}/{total} 成功  |  ❌ {failed} 失败  |  ⏳ {pending} 未完成")
+    print(f"🏁 大工程收工: {task_name}")
+    print(f"   结果: ✅ {done}/{total} 成功  |  ❌ {failed} 失败  |  ⏳ {pending} 未完成")
     if failed > 0 or pending > 0:
-        logger.info(f"   ⚠️ 不建议收工，请先处理失败/未完成子任务")
+        print(f"   ⚠️ 不建议收工，请先处理失败/未完成子任务")
         return
     heavy_status = HEAVY_STATE / f"{task_name}.json"
     hs = _load_json(heavy_status)
@@ -316,7 +316,7 @@ def heavy_finish(task_name: str) -> None:
     _append_broker("tasks", "heavy.task.done", f"大工程收工: {task_name}", "ok",
                    f"全部 {total} 子任务完成",
                    {"taskName": task_name, "total": total})
-    logger.info(f"✅ 任务 '{task_name}' 已归档")
+    print(f"✅ 任务 '{task_name}' 已归档")
 
 
 def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None,
@@ -336,24 +336,25 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        logger.warning(f"❌ 任务 '{task_name}' 未开工，请先 heavy --start")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
     if not subtasks:
-        logger.warning(f"❌ 任务无子任务")
+        logger.error("任务无子任务"); print("❌ 任务无子任务")
         return
     # 确定目标 batch
     target_id = batch_id
     if target_id:
         if target_id not in subtasks:
-            logger.info(f"❌ 批次 '{target_id}' 不存在")
+            logger.error("批次不存在: %s", target_id); print(f"❌ 批次 '{target_id}' 不存在")
             return
         allowed = ("pending",) if not retry else ("pending", "failed")
         if subtasks[target_id]["status"] not in allowed:
-            logger.info(f"⚠️ 批次 '{target_id}' 状态为 '{subtasks[target_id]['status']}'，跳过")
+            logger.warning("批次状态异常，跳过: %s (状态: %s)", target_id, subtasks[target_id]["status"])
             return
     else:
+        # 优先 pending，retry 模式也找 failed
         search_statuses = ("pending", "failed") if retry else ("pending",)
         for bid, bt in sorted(subtasks.items()):
             if bt.get("status") in search_statuses:
@@ -361,19 +362,19 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
                 break
         if not target_id:
             if retry:
-                logger.info(f"✅ 无 pending/failed 子任务需要处理")
+                print(f"✅ 无 pending/failed 子任务需要处理")
             else:
-                logger.info(f"✅ 所有批次已完成，无 pending 子任务")
+                print(f"✅ 所有批次已完成，无 pending 子任务")
             return
     batch = subtasks[target_id]
     files = batch.get("files", [])
     target_path = Path(st.get("targetPath", str(task_dir.parent)))
-    logger.info(f"⚙️ 执行 {target_id}: {batch['count']} 文件 ({batch['sizeMB']:.2f}MB)")
-    logger.info(f"   文件列表:")
+    print(f"⚙️ 执行 {target_id}: {batch['count']} 文件 ({batch['sizeMB']:.2f}MB)")
+    print(f"   文件列表:")
     for f in files[:5]:
-        logger.info(f"      {f}")
+        print(f"      {f}")
     if len(files) > 5:
-        logger.info(f"      ... 共 {len(files)} 个")
+        print(f"      ... 共 {len(files)} 个")
     # 标记为 running（记录重试信息）
     retry_count = batch.get("retryCount", 0)
     if retry:
@@ -454,41 +455,48 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
                            f"任务: {task_name} | 脚本: {script_path.name} | 日志: {log_path.name}",
                            {"taskName": task_name, "batchId": target_id, "pid": proc.pid,
                             "dryRun": False})
-            logger.info(f"   🚀 启动后台进程 PID={proc.pid}")
-            logger.info(f"   📄 日志: {log_path}")
+            print(f"   🚀 启动后台进程 PID={proc.pid}")
+            print(f"   📄 日志: {log_path}")
         except Exception as e:
             result["action"] = "start_failed"
             result["error"] = str(e)
-            logger.info(f"   ❌ 启动失败: {e}")
+            print(f"   ❌ 启动失败: {e}")
     else:
-        logger.info(f"   📤 已入队: {queue_file}")
-        logger.info(f"   执行脚本: {script_path}")
+        print(f"   📤 已入队: {queue_file}")
+        print(f"   执行脚本: {script_path}")
         if not command:
-            logger.info(f"   ⚠️ 未传 --command，脚本仅 echo 列出文件（默认 no-op）")
-        logger.info(f"   💡 仅入队，未启动。需 --execute-now 才真跑")
+            print(f"   ⚠️ 未传 --command，脚本仅 echo 列出文件（默认 no-op）")
+        print(f"   💡 仅入队，未启动。需 --execute-now 才真跑")
     return result
 
 
 def heavy_execute_all(task_name: str, command: str | None = None,
                        execute_now: bool = False, retry: bool = False) -> list[dict[str, Any]]:
-    """自动准备所有 pending 子任务。默认仅入队，不传 execute_now 不真跑。"""
+    """自动准备所有 pending（或 failed）子任务。默认仅入队，不传 execute_now 不真跑。
+
+    retry=True 时也会包含 failed 批次（断点续传）。
+    """
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        logger.warning(f"❌ 任务 '{task_name}' 未开工")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return []
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
-    pending = [bid for bid, bt in subtasks.items() if bt.get("status") == "pending"]
+    search_statuses = ("pending", "failed") if retry else ("pending",)
+    pending = [bid for bid, bt in subtasks.items() if bt.get("status") in search_statuses]
     if not pending:
-        logger.info(f"✅ 无 pending 子任务")
+        print(f"✅ 无待处理子任务")
         return []
-    logger.info(f"⚙️ 处理全部 {len(pending)} 个 pending 批次: {', '.join(pending)}")
-    logger.info(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
+    label = "pending/failed" if retry else "pending"
+    print(f"⚙️ 处理全部 {len(pending)} 个 {label} 批次: {', '.join(pending)}")
+    print(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
     results = []
     for bid in pending:
-        r = heavy_execute(task_name, bid, command=command, execute_now=execute_now)
-        results.append(r)
+        r = heavy_execute(task_name, bid, command=command,
+                          execute_now=execute_now, retry=retry)
+        if isinstance(r, dict):
+            results.append(r)
     return results
 
 
@@ -501,33 +509,38 @@ def heavy_resume(task_name: str, command: str | None = None,
     2. 筛选 status=failed 或 status=pending 的批次
     3. 逐个重新执行（调用 heavy_execute with retry=True）
     4. 返回汇总结果
+
+    Returns:
+        dict 包含 resumed/total/remaining 字段
     """
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        logger.warning(f"❌ 任务 '{task_name}' 未开工，请先 heavy --start")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return {"error": "task not found"}
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
+    # 找到所有需要重试的批次
     retryable = []
     for bid, bt in sorted(subtasks.items()):
         if bt.get("status") in ("failed", "pending"):
             retryable.append(bid)
     if not retryable:
-        logger.info(f"✅ 任务 '{task_name}' 无需续传，所有批次已完成")
+        print(f"✅ 任务 '{task_name}' 无需续传，所有批次已完成")
         return {"resumed": 0, "total": len(subtasks), "remaining": 0}
-    logger.info(f"🔄 断点续传: {task_name}")
-    logger.info(f"   需要重试: {len(retryable)} 个批次 ({', '.join(retryable)})")
-    logger.info(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
+    print(f"🔄 断点续传: {task_name}")
+    print(f"   需要重试: {len(retryable)} 个批次 ({', '.join(retryable)})")
+    print(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
     results = []
     for bid in retryable:
-        logger.info(f"   ⚙️ 重试 {bid}...")
+        print(f"   ⚙️ 重试 {bid}...")
         r = heavy_execute(task_name, bid, command=command,
                           execute_now=execute_now, retry=True)
         if isinstance(r, dict):
             results.append({"batchId": bid, **r})
     done = sum(1 for r in results if r.get("action") in ("queued", "started"))
     failed = sum(1 for r in results if r.get("action") == "start_failed")
+    # 统计剩余未完成
     st = _load_json(status_file)
     remaining = sum(1 for bt in st.get("subtasks", {}).values()
                     if bt.get("status") in ("pending", "failed", "running"))
@@ -543,8 +556,8 @@ def heavy_resume(task_name: str, command: str | None = None,
                    f"断点续传: {task_name}", "ok" if failed == 0 else "warn",
                    f"重试 {len(retryable)} 批 | 成功 {done} | 失败 {failed} | 剩余 {remaining}",
                    {"taskName": task_name, **{k: v for k, v in summary.items() if k != "details"}})
-    logger.info(f"📊 续传统计:")
-    logger.info(f"   重试: {len(retryable)} | 成功: {done} | 失败: {failed} | 剩余: {remaining}")
+    print(f"📊 续传统计:")
+    print(f"   重试: {len(retryable)} | 成功: {done} | 失败: {failed} | 剩余: {remaining}")
     return summary
 
 
@@ -552,10 +565,10 @@ def heavy_cleanup(task_name: str) -> None:
     """清理指定大工程的 scratch 目录。"""
     task_dir = SCRATCH / task_name
     if not task_dir.exists():
-        logger.warning(f"❌ scratch 目录不存在: {task_dir}")
+        logger.error("scratch 目录不存在: %s", task_dir); print(f"❌ scratch 目录不存在: {task_dir}")
         return
     shutil.rmtree(task_dir)
     heavy_status = HEAVY_STATE / f"{task_name}.json"
     if heavy_status.exists():
         heavy_status.unlink()
-    logger.info(f"🧹 已清理: {task_name}")
+    print(f"🧹 已清理: {task_name}")

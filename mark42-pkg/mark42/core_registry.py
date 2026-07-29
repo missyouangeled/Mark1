@@ -172,14 +172,16 @@ def probe_core(core_id: str) -> Dict[str, Any]:
             return {"status": "healthy" if ok else "down",
                     "reason": "" if ok else "gateway 不可达"}
         elif core_id == "core_3_memory_vector_engine":
-            # QMD 通过 MCP/CLI 工作，不是 HTTP。检查 qmd 命令可用 + 索引存在
-            import shutil
-            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
-            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
-            if os.path.isfile(qmd_bin) and os.path.isfile(index_path):
-                return {"status": "healthy", "reason": "qmd index ready"}
-            else:
-                return {"status": "down", "reason": "qmd 命令或索引不可用"}
+            # 通过 ArcLock 注册器检查记忆搜索后端
+            try:
+                from .interfaces import get_memory
+                mem = get_memory()
+                if mem and mem.health():
+                    return {"status": "healthy", "reason": "memory backend ready"}
+                else:
+                    return {"status": "down", "reason": "memory backend unavailable"}
+            except Exception as e:
+                return {"status": "down", "reason": f"memory probe error: {e}"}
         elif core_id == "core_2_armor_consciousness":
             # 意识层走 API，不直接探活（太慢），默认 healthy
             return {"status": "healthy", "reason": "api provider (skip probe)"}
@@ -205,21 +207,21 @@ def probe_core(core_id: str) -> Dict[str, Any]:
     if rt == "local_python":
         try:
             if core_id == "core_4_text_compressor":
-                from mark42.text_compressor import TextCompressor
+                from mark42_modules.text_compressor import TextCompressor
                 TextCompressor()
                 return {"status": "healthy", "reason": "text_compressor loaded"}
             elif core_id == "core_7_pii_redact":
-                from mark42.pii_redactor import PIIRedactor
+                from mark42_modules.pii_redactor import PIIRedactor
                 PIIRedactor()
                 return {"status": "healthy", "reason": "pii_redactor loaded"}
             elif core_id == "core_6_log_classify":
-                from mark42.log_classifier import LogClassifier
+                from mark42_modules.log_classifier import LogClassifier
                 clf = LogClassifier()
                 ok = clf.health_check()
                 return {"status": "healthy" if ok else "down",
                         "reason": "log_classifier loaded" if ok else "health_check failed"}
             elif core_id == "core_8_anomaly_detect":
-                from mark42.anomaly_detector import AnomalyDetector
+                from mark42_modules.anomaly_detector import AnomalyDetector
                 ad = AnomalyDetector()
                 ok = ad.health_check()
                 return {"status": "healthy" if ok else "down",
@@ -273,7 +275,7 @@ class CoreRegistry:
         恢复为 healthy 时自动清理 FAILURE.md。
         """
         # 延迟导入避免循环依赖
-        from mark42.failure_contract import create_contract_for_core, write_failure_md, remove_failure_md
+        from mark42_modules.failure_contract import create_contract_for_core, write_failure_md, remove_failure_md
         
         results = {}
         for core_id in self.cores:
@@ -316,7 +318,7 @@ class CoreRegistry:
         self._save()
         
         # R13-D: 隔离 → 生成 FAILURE.md
-        from mark42.failure_contract import create_contract_for_core, write_failure_md
+        from mark42_modules.failure_contract import create_contract_for_core, write_failure_md
         criticality = self.cores[core_id].criticality
         contract = create_contract_for_core(core_id, "degraded", criticality, reason)
         write_failure_md(core_id, contract)
@@ -338,7 +340,7 @@ class CoreRegistry:
         
         # R13-D: 恢复为 healthy → 删除 FAILURE.md
         if new_status == "healthy":
-            from mark42.failure_contract import remove_failure_md
+            from mark42_modules.failure_contract import remove_failure_md
             remove_failure_md(core_id)
         
         return True

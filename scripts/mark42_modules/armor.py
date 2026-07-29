@@ -3,6 +3,7 @@
 """
 
 import json
+import logging
 import os
 import subprocess
 import time
@@ -412,7 +413,7 @@ def _hook_via_scheduler(session_messages: list[dict[str, Any]],
         # fail-safe 路径: 记录尝试 (ran=True) 但不实际处理
         stats["ran"] = True
         if ALGO_FAIL_SAFE:
-            print(f"⚠️ compression scheduler error (fail-safe 返回原文): {e}")
+            logger.warning("compression scheduler error (fail-safe 返回原文): %s", e)
         else:
             raise
 
@@ -457,7 +458,7 @@ def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
 
     except Exception as e:
         stats["error"] = f"smartcrush failed: {e}"
-        print(f"⚠️ compression hook error: {e}")
+        logger.warning("compression hook error: %s", e)
 
     return stats
 
@@ -586,7 +587,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     _save_json(index_path, index)
                     return {"action": "skip-cooldown", "reason": f"冷却中，还剩 {remaining} 分钟", "check": check}
         except Exception as e:
-            print(f"⚠️ 冷却期检查失败（非致命）: {e}")
+            logger.warning("冷却期检查失败（非致命）: %s", e)
 
     # ── 修复 (2026-07-29): 预检 session 是否已被 compact 过 ──
     # 如果 session 文件里已有 compaction 条目，说明最近被摘要过，
@@ -619,7 +620,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 )
                 return {"action": "skip-already-compacted", "reason": "session 已含 compaction 摘要", "check": check}
         except Exception as e:
-            print(f"⚠️ 预检 compaction 失败（非致命）: {e}")
+            logger.warning("预检 compaction 失败（非致命）: %s", e)
 
     # ── 修复 (2026-07-29): _get_context_window() 现在读 session 实际运行模型 ──
     # 之前读 primary config (doubao-seed-2.0-pro, 128K)，导致 GLM-5.2 (1M)
@@ -751,7 +752,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 # fence 验证：检查 session 是否安全可操作
                 verify = fence_verify(active_session)
                 if not verify["ok"]:
-                    print(f"⚠️ Session Fence 拦截: {verify['reason']}")
+                    logger.warning("Session Fence 拦截: %s", verify["reason"])
                     index["compactTriggered"] = False
                     index["compactError"] = f"fence-blocked: {verify['reason']}"
                     index["compressionEffective"] = False
@@ -791,7 +792,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     _llm_made_it_bigger = _post_llm_bytes > pre_bytes
                     _llm_made_it_smaller = _post_llm_bytes < pre_bytes
                     if _llm_made_it_bigger:
-                        print(f"⚠️ LLM 摘要比原文大 (pre={pre_bytes}, post={_post_llm_bytes})，跳过 maxlines 回退")
+                        logger.warning("LLM 摘要比原文大 (pre=%d, post=%d)，跳过 maxlines 回退", pre_bytes, _post_llm_bytes)
                         index["compactTriggered"] = True
                         index["compactMethod"] = "openclaw-sessions-compact"
                         index["preCompactBytes"] = pre_bytes
@@ -847,7 +848,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                             pct_saved = round(bytes_saved / pre_bytes * 100, 1) if pre_bytes > 0 else 0
                             fence_post = fence_record_post(active_session, fence_pre)
                             if not fence_post["ok"]:
-                                print(f"⚠️ Session Fence 检测到外部篡改！pre={pre_bytes} post={post_bytes}")
+                                logger.warning("Session Fence 检测到外部篡改！pre=%d post=%d", pre_bytes, post_bytes)
                                 _append_broker(
                                     "armor", "mark42.armor.compact.fence_tampered",
                                     "Session Fence 检测到外部篡改",
@@ -888,7 +889,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                             index["compactError"] = err
                             index["compressionEffective"] = False
                             index["preCompactBytes"] = pre_bytes
-                            print(f"⚠️ sessions.compact 失败 (rc={compact_proc.returncode}): {err}")
+                            logger.warning("sessions.compact 失败 (rc=%d): %s", compact_proc.returncode, err)
                             _append_broker(
                                 "armor", "mark42.armor.compact.failed",
                                 f"sessions.compact 失败 rc={compact_proc.returncode}",
@@ -916,7 +917,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             index["compressionEffective"] = False
             index["compactError"] = "openclaw-not-found"
         except Exception as e:
-            print(f"⚠️ compact 触发失败: {e}")
+            logger.warning("compact 触发失败: %s", e)
             index["compactTriggered"] = False
             index["compressionEffective"] = False
             index["compactError"] = str(e)

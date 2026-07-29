@@ -3,6 +3,7 @@
 """
 
 import json
+import logging
 import os
 import select
 import shutil
@@ -13,6 +14,8 @@ from typing import Any
 
 from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
 from .utils import _append_broker, _load_json, _now_iso, _save_json, _list_project_files
+
+logger = logging.getLogger(__name__)
 from .interfaces import get_compress
 
 
@@ -21,7 +24,7 @@ def heavy_preflight(path_str: str) -> None:
     p = Path(path_str).expanduser().resolve()
     print(f"⚙️ 重型战甲预检: {p}\n")
     if not p.exists():
-        print(f"❌ 路径不存在: {p}")
+        logger.error("路径不存在: %s", p); print(f"❌ 路径不存在: {p}")
         return
     files = _list_project_files(p)
     total_size = sum(f.stat().st_size for f in files)
@@ -135,7 +138,7 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
     """
     r = heavy_detect(path_str)
     if not r["exists"]:
-        print(f"❌ 路径不存在: {r['path']}")
+        logger.error("路径不存在: %s", r["path"]); print(f"❌ 路径不存在: {r["path"]}")
         return
     m = r["metrics"]
     print(f"🔍 大工程检测: {r['path']}")
@@ -200,7 +203,7 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     """大工程开工 — 上下文感知自动分批。"""
     target = Path(path_str).expanduser().resolve()
     if not target.exists():
-        print(f"❌ 路径不存在: {target}")
+        logger.error("路径不存在: %s", target); print(f"❌ 路径不存在: {target}")
         return
     task_dir = SCRATCH / task_name
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -289,7 +292,7 @@ def heavy_finish(task_name: str) -> None:
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务 '{task_name}' 不存在")
+        logger.error("任务不存在: %s", task_name); print(f"❌ 任务 '{task_name}' 不存在")
         return
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
@@ -333,22 +336,22 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务 '{task_name}' 未开工，请先 heavy --start")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
     if not subtasks:
-        print(f"❌ 任务无子任务")
+        logger.error("任务无子任务"); print("❌ 任务无子任务")
         return
     # 确定目标 batch
     target_id = batch_id
     if target_id:
         if target_id not in subtasks:
-            print(f"❌ 批次 '{target_id}' 不存在")
+            logger.error("批次不存在: %s", target_id); print(f"❌ 批次 '{target_id}' 不存在")
             return
         allowed = ("pending",) if not retry else ("pending", "failed")
         if subtasks[target_id]["status"] not in allowed:
-            print(f"⚠️ 批次 '{target_id}' 状态为 '{subtasks[target_id]['status']}'，跳过")
+            logger.warning("批次状态异常，跳过: %s (状态: %s)", target_id, subtasks[target_id]["status"])
             return
     else:
         # 优先 pending，retry 模式也找 failed
@@ -476,7 +479,7 @@ def heavy_execute_all(task_name: str, command: str | None = None,
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务 '{task_name}' 未开工")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return []
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
@@ -513,7 +516,7 @@ def heavy_resume(task_name: str, command: str | None = None,
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务 '{task_name}' 未开工，请先 heavy --start")
+        logger.error("任务未开工: %s", task_name); print(f"❌ 任务 '{task_name}' 未开工")
         return {"error": "task not found"}
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
@@ -562,7 +565,7 @@ def heavy_cleanup(task_name: str) -> None:
     """清理指定大工程的 scratch 目录。"""
     task_dir = SCRATCH / task_name
     if not task_dir.exists():
-        print(f"❌ scratch 目录不存在: {task_dir}")
+        logger.error("scratch 目录不存在: %s", task_dir); print(f"❌ scratch 目录不存在: {task_dir}")
         return
     shutil.rmtree(task_dir)
     heavy_status = HEAVY_STATE / f"{task_name}.json"

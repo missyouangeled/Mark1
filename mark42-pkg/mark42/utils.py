@@ -151,8 +151,21 @@ def _append_broker(source_view: str, event_type: str, label: str, level: str,
         for key in ("summary", "detail", "preview", "message"):
             if key in event["metadata"]:
                 event["metadata"][key] = trim_detail(event["metadata"][key])
-    with open(str(MARK42_BROKER_EVENTS), "a") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    # 加 fcntl 锁防止多进程并发写入导致行拼接
+    import fcntl as _fcntl
+    lock_path = str(MARK42_BROKER_EVENTS) + ".lock"
+    with open(lock_path, "w") as lock_fh:
+        try:
+            _fcntl.flock(lock_fh.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass  # 另一进程在写，跳过锁直接 append（OS 级 write 仍原子）
+        with open(str(MARK42_BROKER_EVENTS), "a") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            f.flush()
+        try:
+            _fcntl.flock(lock_fh.fileno(), _fcntl.LOCK_UN)
+        except:
+            pass
 
 def _safe_mtime(path: Path) -> float:
     try:
@@ -384,10 +397,10 @@ def _list_project_files(path: Path) -> list[Path]:
 
 def _get_context_window() -> int:
     """获取当前会话上下文窗口大小。
-    策略：直接从 openclaw.json 的 providers 中读取主会话当前模型对应的 contextWindow。
+    策略：从 session jsonl 读实际运行模型，查其 contextWindow。
     优先级：
-      1. 当前主会话的 model+provider（从 sessions_list RPC 或会话 jsonl 获取）
-      2. openclaw.json agents.defaults.models.primary
+      1. 当前 session jsonl 中最后的 model_change 事件 -> 查该模型的 contextWindow
+      2. openclaw.json agents.defaults.model.primary
       3. openclaw.json 第一个有 contextWindow 的模型
       4. config.json contextWindow
       5. DEFAULT_CONTEXT_WINDOW
@@ -400,9 +413,42 @@ def _get_context_window() -> int:
         except Exception:
             pass
 
-    # 策略 1: 从 session jsonl 找当前 session 的 model（不再依赖 resolved）
-    # OpenClaw 会话 jsonl 顶层 type=session 没有 model 字段，只在 message 的 usage 里有
-    # 实际可靠路径：读 openclaw.json 的 agents.defaults.models.primary
+    # 策略 1: 从 session jsonl 找当前实际运行的模型
+    # 读取文件开头和末尾，找最后的 model_change 事件
+    # 修复 (2026-07-29): 之前读 primary model (doubao-seed-2.0-pro, 128K)，
+    # 但 session 实际可能跑在 GLM-5.2 (1M)，导致阈值计算严重偏低
+    try:
+        active = _find_active_session()
+        if active and active.exists():
+            file_size = active.stat().st_size
+            # model_change 通常在文件开头（session 创建时）或中间（用户切模型时）
+            # 读开头 8KB + 末尾 64KB
+            _head = ""
+            _tail = ""
+            with open(active, "rb") as _f:
+                _head = _f.read(8192).decode("utf-8", errors="ignore")
+                if file_size > 8192:
+                    _f.seek(file_size - 65536)
+                    _tail = _f.read().decode("utf-8", errors="ignore")
+            # 合并搜索
+            _last_model = None
+            for _line in (_head + "\n" + _tail).split("\n"):
+                if '"type":"model_change"' in _line or '"type": "model_change"' in _line:
+                    try:
+                        _last_model = json.loads(_line)
+                    except Exception:
+                        continue
+            if _last_model:
+                actual_provider = _last_model.get("provider", "")
+                actual_model = _last_model.get("modelId", "")
+                if actual_provider and actual_model:
+                    cw = _lookup_context_window(oc, actual_provider, actual_model)
+                    if cw:
+                        return cw
+    except Exception:
+        pass
+
+    # 策略 2: openclaw.json agents.defaults.model.primary
     primary_model = None
     primary_provider = None
     try:

@@ -3,6 +3,7 @@ Loop 注册/执行/终止 + daemon 守护 + 模板路由。
 """
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -12,17 +13,135 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 from .config import (
     ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, BROKER_EVENTS, BROKER_DIR, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN, WORKSPACE,
+    LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH,
 )
 from .utils import (
     _append_broker, _load_json, _now_iso, _now_ts, _save_json,
 )
+from .interfaces import get_compress
+
 from .output_guard import trim_detail, trim_summary
-from .armor import armor_check, armor_compress
 from .logs import log_rotate
 
 ENGINE_LOOPS = ENGINE_STATE / "loops.json"
+
+
+# ── 内置默认模板（代码兜底） ──
+_BUILTIN_TEMPLATES = {
+    "context-guard": {"period": 300, "description": "持续监控上下文健康 + 自动出手"},
+    "task-watch": {"period": 30, "description": "大工程执行 + 全程护航"},
+    "health-watch": {"period": 600, "description": "系统健康监控（CPU/内存/磁盘）"},
+    "model-fallback": {"period": 60, "description": "监测模型可用性状态"},
+    "memory-index": {"period": 21600, "description": "记忆自动归类——扫描最近 daily 文件 + 更新 INDEX.md 锚点"},
+}
+
+
+def _load_templates() -> dict[str, Any]:
+    """加载 Loop 模板配置。
+    
+    优先级：
+    1. 用户自定义模板（WORKSPACE/loop_templates.yaml）- 覆盖同名内置模板
+    2. 内置模板配置文件（SCRIPTS/mark42_modules/loop_templates.yaml）
+    3. 代码硬编码兜底模板
+    """
+    templates = dict(_BUILTIN_TEMPLATES)
+    
+    # 加载内置配置文件
+    if yaml and LOOP_TEMPLATES_PATH.exists():
+        try:
+            with open(LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if data and isinstance(data, dict) and "templates" in data:
+                    for name, cfg in data["templates"].items():
+                        if isinstance(cfg, dict):
+                            templates[name] = {
+                                "period": cfg.get("period", 300),
+                                "description": cfg.get("description", ""),
+                            }
+        except Exception:
+            pass
+    
+    # 加载用户自定义配置（覆盖同名）
+    if yaml and USER_LOOP_TEMPLATES_PATH.exists():
+        try:
+            with open(USER_LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                if data and isinstance(data, dict) and "templates" in data:
+                    for name, cfg in data["templates"].items():
+                        if isinstance(cfg, dict):
+                            templates[name] = {
+                                "period": cfg.get("period", 300),
+                                "description": cfg.get("description", ""),
+                            }
+        except Exception:
+            pass
+    
+    return templates
+
+
+# ── G 项：Loop 模板热加载 ──
+# 记录上次加载时的文件 mtime，daemon 用来检测变更
+_template_cache: dict[str, Any] = {}
+_template_mtimes: dict[str, float] = {}
+
+
+def _check_template_files_changed() -> bool:
+    """检查模板配置文件是否有变更（mtime 变化）。"""
+    changed = False
+    for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+        try:
+            current_mtime = path.stat().st_mtime if path.exists() else 0.0
+            stored_mtime = _template_mtimes.get(str(path), 0.0)
+            if current_mtime != stored_mtime:
+                _template_mtimes[str(path)] = current_mtime
+                if stored_mtime > 0:  # 不是第一次加载
+                    changed = True
+        except OSError:
+            pass
+    return changed
+
+
+def _get_templates_cached() -> dict[str, Any]:
+    """获取模板（带缓存，文件变更时自动重载）。"""
+    global _template_cache
+    if not _template_cache or _check_template_files_changed():
+        _template_cache = _load_templates()
+        # 无论模板是否为空，都初始化 mtime 防止无限重载
+        for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+            try:
+                _template_mtimes[str(path)] = path.stat().st_mtime if path.exists() else 0.0
+            except OSError:
+                pass
+    return _template_cache
+
+
+def engine_reload_templates() -> dict[str, Any]:
+    """手动重载模板配置（CLI 可调用）。"""
+    global _template_cache
+    old_count = len(_template_cache)
+    _template_cache = _load_templates()
+    new_count = len(_template_cache)
+    # 更新 mtime 记录
+    for path in [LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH]:
+        try:
+            _template_mtimes[str(path)] = path.stat().st_mtime if path.exists() else 0.0
+        except OSError:
+            pass
+    return {"oldCount": old_count, "newCount": new_count, "templates": list(_template_cache.keys())}
+
+
+def _template_exists(name: str) -> bool:
+    """检查模板名是否存在。"""
+    return name in _get_templates_cached()
 
 
 def _load_loops() -> dict[str, Any]:
@@ -46,38 +165,17 @@ def _save_loops(loops: dict[str, Any]) -> None:
 def engine_templates() -> None:
     """列出所有可用 Loop 模板。"""
     print("🔄 可用 Loop 模板:\n")
-    templates = [
-        ("context-guard", "300s",
-         "持续监控上下文健康 + 自动出手\n"
-         "     Observe: armor --check\n"
-         "     Decide:  if usage > 85% → trigger compress; if > 70% → warn\n"
-         "     Act:     armor --compress"),
-        ("health-watch", "600s",
-         "系统健康监控（CPU/内存/磁盘）\n"
-         "     Observe: free -h && df -h / /mnt/data\n"
-         "     Decide:  if disk < 5GB or mem < 500MB → alert\n"
-         "     Act:     write broker warning event"),
-        ("model-fallback", "60s",
-         "监测模型可用性状态\n"
-         "     Observe: 扫描 broker 事件中 model.fallback 信号\n"
-         "     Decide:  检测到故障 → 写 Mark42 broker 警告\n"
-         "     Act:     在 status dashboard 展示 failover 历史\n"
-         "     ⚠️ 模型切换由 OpenClaw 内置 failover 自动完成，铠甲不接管"),
-        ("task-watch", "30s",
-         "大工程执行 + 全程护航\n"
-         "     Observe: heavy task status via scratch/{name}/status.json\n"
-         "     Decide:  if stalled → alert; if done → verify; if failed → retry\n"
-         "     Act:     notify frontstage via broker"),
-        ("memory-index", "21600s",
-         "记忆自动归类——扫描最近 daily 文件 + 更新 INDEX.md 锚点\n"
-         "     Observe: 扫描最近 7 天 memory/daily/ 文件\n"
-         "     Decide:  识别新主题/事件/改进要求 → 追加到 memory/INDEX.md\n"
-         "     Act:     写入 memory/INDEX.md 主题锚点条目（去重）"),
-    ]
-    for name, period, desc in templates:
-        print(f"  📋 {name}")
-        print(f"     {desc}")
-        print(f"     周期: {period}\n")
+    templates = _get_templates_cached()
+    for name, cfg in sorted(templates.items()):
+        period = cfg.get("period", 300)
+        desc = cfg.get("description", "")
+        is_builtin = name in _BUILTIN_TEMPLATES
+        builtin_tag = "" if is_builtin else " [自定义]"
+        print(f"  📋 {name}{builtin_tag}")
+        if desc:
+            for line in desc.split("\n"):
+                print(f"     {line}")
+        print(f"     周期: {period}s\n")
 
 
 def engine_list() -> None:
@@ -128,6 +226,9 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
     print(f"   任务: {task}")
     print(f"   周期: {interval_s}s  |  最大循环: {max_cycles or '无限'}")
     if template:
+        # 模板名验证
+        if not _template_exists(template):
+            print(f"   ⚠️ 模板 '{template}' 未在配置中定义，将使用通用执行路径")
         # 【L 修复 2026-06-30】只查模板的 docstring, 不用 f-string 空拼接
         # 原 template_desc = f" — {engine_templates.__doc__}" 是死代码, if False 进一步取消显示
         template_help = ""
@@ -142,7 +243,7 @@ def engine_kill(name: str) -> None:
     """终止一个 Loop。"""
     loops = _load_loops()
     if name not in loops:
-        print(f"❌ Loop '{name}' 不存在")
+        logger.error("Loop 不存在: %s", name); print(f"❌ Loop '{name}' 不存在")
         return
     old_status = loops[name].get("status", "?")
     loops[name]["status"] = "killed"
@@ -156,7 +257,7 @@ def engine_watch_task(task_name: str, interval_s: int = 30) -> None:
     task_dir = SCRATCH / task_name
     status_file = task_dir / "status.json"
     if not status_file.exists():
-        print(f"❌ 任务状态文件不存在: {status_file}")
+        logger.error("任务状态文件不存在: %s", status_file); print(f"❌ 任务状态文件不存在: {status_file}")
         return
     print(f"🔍 监控大工程: {task_name} (每 {interval_s}s)")
     print(f"   状态文件: {status_file}")
@@ -205,7 +306,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     """
     loops = _loops if _loops is not None else _load_loops()
     if name not in loops:
-        print(f"❌ Loop '{name}' 不存在")
+        logger.error("Loop 不存在: %s", name); print(f"❌ Loop '{name}' 不存在")
         return
     loop = loops[name]
     loop["status"] = "running"
@@ -215,12 +316,15 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     task = loop["task"]
     print(f"▶️ 执行 Loop '{name}': {task}")
     if template_name == "context-guard":
-        check = armor_check()
+        check = get_compress().check()
         usage = check.get("usagePercent", 0)
         print(f"   🔍 Observe: 上下文 {usage}%")
+        # 平台优先 + Mark42 兜底 (2026-07-29):
+        # armor_compress 内含平台探测期（60s 等平台自己 compact）+ compact 锁
+        # - WARN 阶段: 只监控+预警
+        # - ALERT 阶段: 触发 armor_compress 自主救场
         if usage >= THRESHOLD_ALERT:
-            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，触发压缩")
-            # v3-5: 先走 Consciousness.handle_issue 链路（L4->advisor, L5->档案）
+            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，启动自主救场")
             try:
                 from .consciousness import Consciousness
                 cs = Consciousness()
@@ -230,27 +334,17 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 handle_result = cs.handle_issue(issue, dry_run=False)
                 path = handle_result.get("path", "")
                 print(f"   🔗 v3-5 路由: {path}")
-                rem = handle_result.get("remediation", {})
-                if rem.get("ok") and not rem.get("dry_run"):
-                    verify = armor_check()
-                    new_usage = verify.get("usagePercent", 0)
-                    print(f"   ✅ Verify: {usage}% -> {new_usage}%")
-                    loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
-                                          "v3_5_path": path}
-                else:
-                    result = armor_compress()
-                    verify = armor_check()
-                    new_usage = verify.get("usagePercent", 0)
-                    print(f"   ✅ Verify: {usage}% -> {new_usage}%")
-                    loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage,
-                                          "v3_5_path": path, "v3_5_result": handle_result}
+                loop["lastResult"] = {"action": "compress", "usage": usage, "v3_5_path": path}
             except Exception as e:
                 print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
-                result = armor_compress()
-                verify = armor_check()
+                result = get_compress().compress()
+                verify = get_compress().check()
                 new_usage = verify.get("usagePercent", 0)
                 print(f"   ✅ Verify: {usage}% -> {new_usage}%")
                 loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
+        elif usage >= THRESHOLD_WARN:
+            print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，预警，等平台处理")
+            loop["lastResult"] = {"action": "monitor", "usage": usage}
         else:
             print(f"   ✅ Decide: 未达阈值，继续监控")
             loop["lastResult"] = {"action": "monitor", "usage": usage}
@@ -330,12 +424,14 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         new_anchors = []
         if memory_dir.exists():
             from datetime import datetime as _dt, timedelta as _td
-            cutoff = _dt.now() - _td(days=7)
+            # 用日期比较而非时间戳比较，避免 00:00:00 < 当前时刻导致跳过当天
+            today = _dt.now().date()
+            cutoff_date = today - _td(days=7)
             for df in sorted(memory_dir.glob("*.md"), reverse=True):
                 try:
                     date_str = df.stem
-                    dt = _dt.strptime(date_str, "%Y-%m-%d")
-                    if dt < cutoff:
+                    dt = _dt.strptime(date_str, "%Y-%m-%d").date()
+                    if dt < cutoff_date:
                         continue
                     scanned += 1
                     content = df.read_text()[:2000]
@@ -363,12 +459,23 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         loop["lastResult"] = {"scannedDays": scanned, "newAnchors": len(new_anchors)}
     else:
         # 通用/自定义 Loop 回退
-        task_lower = task.lower()
-        if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
-            result = armor_compress()
-            loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+        if template_name:
+            # 用户自定义模板（不含执行逻辑）- 使用 generic 路径
+            print(f"   ℹ️ 自定义模板 '{template_name}' 使用通用执行路径")
+            # 仅记录 broker 事件，不执行特定逻辑
+            loop["lastResult"] = {
+                "action": "executed",
+                "template": template_name,
+                "note": "自定义模板通用路径",
+            }
         else:
-            loop["lastResult"] = {"action": "executed", "note": "通用任务"}
+            # 无模板的通用 Loop
+            task_lower = task.lower()
+            if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
+                result = get_compress().compress()
+                loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+            else:
+                loop["lastResult"] = {"action": "executed", "note": "通用任务"}
     
     # ── C 项：Loop 执行完成 → emit 标准化事件 ──
     _append_broker("engine", "mark42.engine.loop.completed",
@@ -495,40 +602,6 @@ def engine_daemon(interval_s: int = 30) -> None:
                                        {"taskName": task_name})
             # ── 2. 重新加载 loops（处理 broker 事件中可能新增的） ──
             loops = _load_loops()
-            # ── 2.5 卡死恢复：重置超时 "running" 的 Loop ──
-            # 如果一个 Loop 停留在 "running" 状态超过其 interval 的 2 倍，
-            # 说明上次执行被中断（daemon 重启/被杀/子进程超时），重置为 "registered"。
-            # 根因：2026-07-20 daemon 被 SIGKILL 杀死时 context-guard 正在执行，
-            # status="running" 已写入磁盘，重启后调度器只挑 "registered"，
-            # 导致该 Loop 永久卡死。
-            stale_reset_count = 0
-            for name, loop in loops.items():
-                if loop.get("status") != "running":
-                    continue
-                last_run = loop.get("lastRun", "")
-                if not last_run:
-                    loop["status"] = "registered"
-                    stale_reset_count += 1
-                    continue
-                try:
-                    last_ts = datetime.fromisoformat(last_run).timestamp()
-                    interval = loop.get("interval", 300)
-                    if _now_ts() - last_ts > interval * 2:
-                        print(f"⚠️ Loop '{name}' 卡在 running 已 {int(_now_ts() - last_ts)}s "
-                              f"(>2×{interval}s)，重置为 registered")
-                        loop["status"] = "registered"
-                        stale_reset_count += 1
-                except Exception:
-                    loop["status"] = "registered"
-                    stale_reset_count += 1
-            if stale_reset_count:
-                _save_loops(loops)
-                _append_broker("engine", "mark42.engine.loop.stale_reset",
-                               f"{stale_reset_count} 个 Loop 从卡死状态恢复",
-                               "warn",
-                               f"重置的 Loop 已恢复为 registered，将在本 tick 执行",
-                               {"count": stale_reset_count})
-                loops = _load_loops()  # 重新加载，确保下面的执行用最新状态
             # ── 3. 执行到期 Loop ──
             executed_any = False
             for name, loop in list(loops.items()):
@@ -556,8 +629,18 @@ def engine_daemon(interval_s: int = 30) -> None:
             # ── 4. 保存游标 ──
             _save_json(cursor_file, {**cursor, "lastScan": _now_iso()})
             # ── 5. 每 10 次循环做一次 log rotation + mark42 状态快照 ──
+            # ── G 项：同时检查 Loop 模板文件是否变更 ──
             rotation_check_count += 1
             if rotation_check_count % 10 == 0:
+                # G 项：模板热加载检测
+                if _check_template_files_changed():
+                    global _template_cache
+                    _template_cache = _load_templates()
+                    print(f"[{ts}] 🔄 Loop 模板已热重载 ({len(_template_cache)} 个模板)")
+                    _append_broker("engine", "mark42.engine.templates.reloaded",
+                                   "Loop 模板热重载", "ok",
+                                   f"{len(_template_cache)} 个模板",
+                                   {"templateCount": len(_template_cache)})
                 log_rotate("all")
                 # D 项：把 Mark42 状态 JSON 写入 broker views，供 Control UI 消费
                 try:

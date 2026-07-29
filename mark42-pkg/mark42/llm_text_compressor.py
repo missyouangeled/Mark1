@@ -34,7 +34,7 @@ import urllib.request
 from typing import Any
 
 # 【2026-07-13】不能用相对路径, perf_bench/algo_scheduler 从外部 import
-from mark42.utils import safe_call
+from mark42_modules.utils import safe_call
 
 
 log = logging.getLogger("mark42.llm_text_compressor")

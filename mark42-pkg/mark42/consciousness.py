@@ -196,8 +196,8 @@ class Consciousness:
 
         # 1) armor 上下文使用率
         try:
-            from .armor import armor_check
-            check = armor_check()
+            from .interfaces import get_compress
+            check = get_compress().check()
             raw["armor"] = check
             usage = check.get("usagePercent", 0)
             if usage >= 85:                          # THRESHOLD_ALERT 默认 85
@@ -744,10 +744,13 @@ def _remediate_dummy(issue: Dict[str, Any]) -> Dict[str, Any]:
 # ── v3-5b 真实修复执行器（替换 _remediate_dummy） ──
 
 def _remediate_context_alert(issue: Dict[str, Any]) -> Dict[str, Any]:
-    """上下文告警 -> 调用 armor.compress()。"""
+    """上下文告警 -> 调用 armor.compress() 自主救场。
+
+    armor_compress 内含平台探测期 + compact 锁，不会与平台 auto-compaction 冲突。
+    """
     try:
-        from .armor import armor_compress
-        result = armor_compress(dry_run=False)
+        from .interfaces import get_compress
+        result = get_compress().compress(dry_run=False)
         return {"ok": True, "action": "armor_compress", "result": result}
     except Exception as e:
         return {"ok": False, "action": "armor_compress", "reason": str(e)}
@@ -798,13 +801,21 @@ def _remediate_embed_index_missing(issue: Dict[str, Any]) -> Dict[str, Any]:
 def _remediate_loop_not_registered(issue: Dict[str, Any]) -> Dict[str, Any]:
     """Loop 未注册 -> 重新注册。"""
     try:
-        from .engine import engine_start
         template = issue.get("context", {}).get("template", "")
         task = issue.get("context", {}).get("task", "")
         interval = issue.get("context", {}).get("interval", 300)
         if not template:
             return {"ok": False, "action": "loop_register",
                     "reason": "缺少 template 名，无法重新注册"}
+        from .interfaces import get_engine
+        # 使用注册器获取引擎实现
+        engine_impl = get_engine()
+        if engine_impl and hasattr(engine_impl, 'register_loop'):
+            engine_impl.register_loop(name=task or template, template=template,
+                                       interval=interval, task=task or template)
+            return {"ok": True, "action": "loop_register", "template": template}
+        # 回退：直接调 engine_start
+        from .engine import engine_start
         engine_start(task=task or template, interval_s=interval, template=template)
         return {"ok": True, "action": "loop_register", "template": template}
     except Exception as e:

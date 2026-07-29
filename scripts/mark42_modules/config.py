@@ -1,10 +1,13 @@
 """Mark42 常量、配置系统模块。"""
 
 import json
+import logging
 import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ── 本地基础工具（不依赖 utils，避免循环导入） ──
 

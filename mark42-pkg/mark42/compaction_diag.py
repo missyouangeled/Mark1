@@ -5,11 +5,14 @@ v2.0 (2026-06-16): 升级至病因层——令牌感知、双层阈值、摘要�
 """
 
 import json
+import logging
 import os
 import re
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from typing import Any
 
 from .config import DEFAULT_CONTEXT_WINDOW
@@ -842,9 +845,14 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
         bak = Path(str(_OPENCLAW_JSON) + ".bak." + datetime.now().strftime("%Y%m%d"))
         shutil.copy2(_OPENCLAW_JSON, bak)
 
-        # 写入
-        with open(_OPENCLAW_JSON, "w") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        # 写入（带异常保护）
+        try:
+            with open(_OPENCLAW_JSON, "w") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
+            shutil.copy2(bak, _OPENCLAW_JSON)
+            return {"status": "error", "error": str(e), "rollback": "已恢复备份"}
 
         return {
             "appliedAt": _now_iso(),
@@ -997,6 +1005,7 @@ def print_apply_result(result: dict[str, Any]) -> None:
         print(f"  备份: {result.get('backupPath', '?')}")
         print(f"  重启 Gateway 后生效: openclaw gateway restart")
     elif status == "error":
+        logger.error("压缩错误: %s", result.get("summary", ""))
         print(f"  ❌ 错误: {result.get('summary', '')}")
     else:
         print(f"  ℹ️  {result.get('summary', '')}")

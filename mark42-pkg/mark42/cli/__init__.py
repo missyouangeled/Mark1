@@ -632,6 +632,7 @@ def main() -> None:
   mark42.py assemble
         """,
     )
+    parser.add_argument("--version", action="version", version="Mark42 v2.7.0", help="显示版本号")
     parser.add_argument("--init", action="store_true", help="初始化 Mark42 配置")
     parser.add_argument("--config", action="store_true", help="查看当前配置")
     parser.add_argument("--tune-compaction", action="store_true", help="诊断并调优 OpenClaw 压缩配置")
@@ -781,8 +782,12 @@ def main() -> None:
 
     if not args.module:
         if args.init:
-            from ..config import mark42_init
-            mark42_init()
+            from ..user_config import interactive_init, get_config_path
+            if get_config_path().exists():
+                print(f"⚙️ 配置文件已存在: {get_config_path()}")
+                print("  使用 --config 查看，或删除后重新 --init")
+                return
+            interactive_init()
             return
         if args.config:
             from ..config import mark42_config
