@@ -134,6 +134,23 @@ def _isolate_mark42_state(monkeypatch, tmp_path):
     # pytest 自动清理 tmp_path
 
 
+# ── 1.1 armor 平台探测期 sleep mock (autouse) ──
+
+@pytest.fixture(autouse=True)
+def _mock_armor_probe_sleep(monkeypatch):
+    """自动 mock armor 的平台探测期 sleep，避免真睡 60 秒。
+
+    armor_compress 内含平台探测期（60s 等待平台 auto-compaction），
+    测试里不需要真睡。
+    只 patch armor_guard 内部用的 sleep，不影响其他模块的 time.sleep。
+    """
+    import mark42_modules.armor as _armor
+    # 只 patch armor 模块引用的 time.sleep
+    # 不能直接 patch time.sleep（会影响 compress_queue 等模块）
+    # 用一个 flag 让 _platform_compact_probe 跳过 sleep
+    monkeypatch.setattr(_armor, "_PLATFORM_PROBE_SKIP_SLEEP", True, raising=False)
+
+
 # ── 1.5 CircuitBreaker 单例清理（autouse）──
 
 @pytest.fixture(autouse=True)

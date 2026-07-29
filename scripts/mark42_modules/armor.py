@@ -623,7 +623,92 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # armor_check() 算的 usage 已经是正确的百分比，不需要额外折扣。
     # 例如 GLM-5.2 (1M): 95K tokens -> usage = 9.5%，远低于 70% 阈值。
 
+    # ── 平台探测期 + compact 锁 (2026-07-29) ──
+    # Mark42 是跨平台铠甲，armor_compress 是最后自主救场能力。
+    # 但不能与平台自带的 auto-compaction 冲突，所以加“平台优先探测”机制：
+    # 1. 发现 usage >= 阈值时，先等一个探测期（默认 60 秒）
+    # 2. 探测期内每 10 秒检查 usage 是否下降
+    # 3. usage 下降了 -> 平台已 compact，Mark42 跳过
+    # 4. 探测期结束 usage 仍无变化 -> 平台没反应，Mark42 自主出手
+    # 5. 出手前再检查 compact 锁，避免与另一个 Mark42 实例撞车
+    PLATFORM_PROBE_SEC = 60       # 探测期总时长
+    PLATFORM_PROBE_INTERVAL = 10  # 每次检查间隔
+    COMPACT_LOCK_FILE = XDG_STATE / "mark42" / "armor" / "compact.lock"
+    COMPACT_LOCK_TTL_SEC = 400    # 锁过期时间（compact 超时 + 缓冲）
+
+    def _try_acquire_compact_lock() -> bool:
+        """尝试获取 compact 锁。返回 True 表示获取成功。"""
+        COMPACT_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if COMPACT_LOCK_FILE.exists():
+            try:
+                lock_data = json.loads(COMPACT_LOCK_FILE.read_text())
+                lock_ts = lock_data.get("acquiredAt")
+                if lock_ts:
+                    from datetime import datetime as _dt
+                    lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
+                    if lock_age < COMPACT_LOCK_TTL_SEC:
+                        return False  # 锁未过期
+            except Exception:
+                pass  # 锁文件损坏，视为无锁
+        COMPACT_LOCK_FILE.write_text(json.dumps({
+            "acquiredAt": _now_iso(),
+            "pid": os.getpid(),
+        }, ensure_ascii=False))
+        return True
+
+    def _release_compact_lock() -> None:
+        """释放 compact 锁。"""
+        try:
+            COMPACT_LOCK_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    def _platform_compact_probe(usage_val: float) -> bool:
+        """平台探测期：等待平台自己 compact。
+        返回 True 表示平台已处理（usage 下降了），False 表示平台无反应。
+        """
+        if dry_run:
+            return False  # dry_run 不等
+        # 测试环境可跳过 sleep
+        import sys as _sys
+        _armor_mod = _sys.modules.get(__name__)
+        if _armor_mod and getattr(_armor_mod, "_PLATFORM_PROBE_SKIP_SLEEP", False):
+            print("   [test] 跳过平台探测期 sleep")
+            return False
+        print(f"👀 平台探测期 ({PLATFORM_PROBE_SEC}s)：等待平台 auto-compaction 反应...")
+        for i in range(PLATFORM_PROBE_SEC // PLATFORM_PROBE_INTERVAL):
+            time.sleep(PLATFORM_PROBE_INTERVAL)
+            probe_check = armor_check()
+            probe_usage = probe_check.get("usagePercent", 0)
+            if probe_usage < usage_val - 5:
+                # usage 下降了 5%+，说明平台自己 compact 了
+                print(f"   ✅ 探测到 usage 下降: {usage_val}% -> {probe_usage}%，平台已处理")
+                return True
+            print(f"   ⏳ [{(i+1)*PLATFORM_PROBE_INTERVAL}s] usage={probe_usage}% (无变化)")
+        print(f"   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
+        return False
+
     if not dry_run and usage >= THRESHOLD_WARN:
+        # 1) 平台探测期
+        platform_handled = _platform_compact_probe(usage)
+        if platform_handled:
+            index["compactTriggered"] = False
+            index["compactError"] = "platform-auto-compaction-handled"
+            index["compressionEffective"] = True
+            index["preCompactBytes"] = None
+            _save_json(index_path, index)
+            return {"action": "skip-platform-handled", "reason": "平台 auto-compaction 已处理", "check": check}
+
+        # 2) 获取 compact 锁
+        if not _try_acquire_compact_lock():
+            print("⏸️ compact 锁被占用，另一个 compact 正在进行，跳过")
+            index["compactTriggered"] = False
+            index["compactError"] = "compact-lock-busy"
+            index["compressionEffective"] = False
+            index["preCompactBytes"] = None
+            _save_json(index_path, index)
+            return {"action": "skip-locked", "reason": "另一个 compact 正在进行", "check": check}
+
         try:
             # ── Session Fence：压缩前验证 + 锁定 ──
             from .session_fence import fence_verify, fence_record_pre, fence_record_post
@@ -807,6 +892,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
             index["compactTriggered"] = False
             index["compressionEffective"] = False
             index["compactError"] = str(e)
+        finally:
+            _release_compact_lock()
     # ⚠️ 必须在所有字段（含 compactTriggered/compactError）设置完后再写文件
     _save_json(index_path, index)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -993,21 +1080,19 @@ def _inject_memory_index(index: dict[str, Any]) -> bool:
 
 
 def armor_guard(interval_s: int = 300) -> None:
-    """守护模式：每 N 秒检查一次，超阈值预警。
+    """守护模式：每 N 秒检查一次，超阈值自主救场。
 
-    ⚠️ 修复 (2026-07-29): 不再主动调 openclaw sessions compact
-    原因：OpenClaw 自带 auto-compaction（enabled=true, mode=safeguard），
-    在 threshold maintenance 时会自动触发 compact。
-    Mark42 armor 调 openclaw sessions compact 会导致：
-    1. 两个 compact 并发 -> "Session changed before compaction" 冲突
-    2. compact 期间 gateway 被占住 -> 消息发不出去
-    3. Mark42 armor 的 compact 超时(320s) < OpenClaw compact 实际耗时(380s+) -> 超时浪费
-
-    正确做法：armor 只做监控+预警，compact 交给 OpenClaw 自己管。
+    设计哲学：平台优先，Mark42 兜底。
+    - WARN 阈值(70%): 发送预警，进入观察
+    - ALERT 阈值(85%): 调用 armor_compress 自主救场
+    - armor_compress 内含平台探测期：先等 60 秒看平台是否自己 compact
+    - 如果平台处理了 -> 跳过
+    - 如果平台没反应 -> Mark42 出手
+    - 出手前再检查 compact 锁，避免与另一个 compact 实例撞车
     """
     _warn_sent_at = None  # 上次发送预警的时间戳，避免重复刷屏
     _warn_cooldown = 600  # 预警冷却 10 分钟
-    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查，仅监控不主动 compact）")
+    print(f"🛡️ 上下文铠甲守护模式启动（每 {interval_s}s 检查，平台优先 + 自主兜底）")
     try:
         while True:
             check = armor_check()
@@ -1021,15 +1106,14 @@ def armor_guard(interval_s: int = 300) -> None:
             )
             if should_warn:
                 print(f"[{ts}] 🟡 上下文达 WARN 阈值 ({usage}%)，发送预警")
-                print(f"    ℹ️ OpenClaw auto-compaction 会在 threshold maintenance 时自动处理")
                 if _send_context_warn_event(usage):
                     _warn_sent_at = now_ts
             elif usage >= THRESHOLD_ALERT:
-                # ALERT 阶段：发送告警，但不主动 compact
-                print(f"[{ts}] 🟠 ALERT 阈值 ({usage}%)，发送告警")
-                print(f"    ℹ️ OpenClaw auto-compaction 应已触发，如未触发请手动 /compact")
-                if _send_context_warn_event(usage):
-                    _warn_sent_at = now_ts
+                # ALERT 阶段：触发 armor_compress 自主救场
+                # armor_compress 内含平台探测期 + compact 锁
+                print(f"[{ts}] 🟠 ALERT 阈值 ({usage}%)，启动自主救场")
+                result = armor_compress()
+                print(f"    -> {result.get('action')}")
             time.sleep(interval_s)
     except KeyboardInterrupt:
         print("\n🛡️ 守护模式已退出")

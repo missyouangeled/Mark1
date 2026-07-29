@@ -316,14 +316,12 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         check = get_compress().check()
         usage = check.get("usagePercent", 0)
         print(f"   🔍 Observe: 上下文 {usage}%")
-        # ⚠️ 修复 (2026-07-29): context-guard 不再主动触发 compact
-        # OpenClaw 自带 auto-compaction (enabled=true, mode=safeguard)
-        # 在 threshold maintenance 时自动触发，比 Mark42 更早更准。
-        # Mark42 主动调 openclaw sessions compact 会导致并发冲突。
-        # context-guard 只做监控+预警，compact 交给 OpenClaw。
+        # 平台优先 + Mark42 兜底 (2026-07-29):
+        # armor_compress 内含平台探测期（60s 等平台自己 compact）+ compact 锁
+        # - WARN 阶段: 只监控+预警
+        # - ALERT 阶段: 触发 armor_compress 自主救场
         if usage >= THRESHOLD_ALERT:
-            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，发送告警")
-            print(f"   ℹ️ OpenClaw auto-compaction 应已触发，如未触发请手动 /compact")
+            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，启动自主救场")
             try:
                 from .consciousness import Consciousness
                 cs = Consciousness()
@@ -333,12 +331,16 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 handle_result = cs.handle_issue(issue, dry_run=False)
                 path = handle_result.get("path", "")
                 print(f"   🔗 v3-5 路由: {path}")
-                loop["lastResult"] = {"action": "alert", "usage": usage, "v3_5_path": path}
+                loop["lastResult"] = {"action": "compress", "usage": usage, "v3_5_path": path}
             except Exception as e:
-                print(f"   ⚠️ v3-5 链路异常: {e}")
-                loop["lastResult"] = {"action": "alert", "usage": usage}
+                print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
+                result = get_compress().compress()
+                verify = get_compress().check()
+                new_usage = verify.get("usagePercent", 0)
+                print(f"   ✅ Verify: {usage}% -> {new_usage}%")
+                loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
         elif usage >= THRESHOLD_WARN:
-            print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，记录但由 OpenClaw 自动处理")
+            print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，预警，等平台处理")
             loop["lastResult"] = {"action": "monitor", "usage": usage}
         else:
             print(f"   ✅ Decide: 未达阈值，继续监控")

@@ -744,18 +744,16 @@ def _remediate_dummy(issue: Dict[str, Any]) -> Dict[str, Any]:
 # ── v3-5b 真实修复执行器（替换 _remediate_dummy） ──
 
 def _remediate_context_alert(issue: Dict[str, Any]) -> Dict[str, Any]:
-    """上下文告警 -> 不再主动 compact，交给 OpenClaw auto-compaction。
-    
-    修复 (2026-07-29): OpenClaw 自带 auto-compaction (enabled=true, mode=safeguard)，
-    在 threshold maintenance 时自动触发。Mark42 主动调 openclaw sessions compact
-    会导致并发冲突（"Session changed before compaction"）。
+    """上下文告警 -> 调用 armor.compress() 自主救场。
+
+    armor_compress 内含平台探测期 + compact 锁，不会与平台 auto-compaction 冲突。
     """
-    usage = issue.get("value", 0)
-    return {
-        "ok": True,
-        "action": "notify",
-        "reason": f"上下文 {usage}% - OpenClaw auto-compaction 会自动处理，无需 Mark42 干预",
-    }
+    try:
+        from .interfaces import get_compress
+        result = get_compress().compress(dry_run=False)
+        return {"ok": True, "action": "armor_compress", "result": result}
+    except Exception as e:
+        return {"ok": False, "action": "armor_compress", "reason": str(e)}
 
 
 def _remediate_process_down(issue: Dict[str, Any]) -> Dict[str, Any]:

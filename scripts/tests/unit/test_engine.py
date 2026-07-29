@@ -174,9 +174,8 @@ class TestEngineRunLoopContextGuard:
         assert loops["ctx-loop"]["cycle"] == 1
 
     def test_high_usage_triggers_compress(self, mocker, engine_state):
-        """使用率 >= ALERT 时发送告警，不再主动 compact。
-        修复 (2026-07-29): context-guard 不再调 openclaw sessions compact，
-        compact 交给 OpenClaw auto-compaction 处理。context-guard 只监控+预警。
+        """使用率 >= ALERT 时触发自主救场 (armor_compress)。
+        armor_compress 内含平台探测期 + compact 锁，不会与平台冲突。
         """
         loops = _make_loop(name="ctx-loop", template="context-guard")
         # mock get_compress() 返回的锁扣对象
@@ -192,9 +191,8 @@ class TestEngineRunLoopContextGuard:
 
         engine.engine_run_loop("ctx-loop", persist=False, _loops=loops)
 
-        # 不再主动调 compress
-        mock_lock.return_value.compress.assert_not_called()
-        assert loops["ctx-loop"]["lastResult"]["action"] == "alert"
+        # ALERT 阶段应该触发 compress（通过 v3-5 链路）
+        assert loops["ctx-loop"]["lastResult"]["action"] == "compress"
         assert loops["ctx-loop"]["lastResult"]["usage"] == 90.0
 
 
