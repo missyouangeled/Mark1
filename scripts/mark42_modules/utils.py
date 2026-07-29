@@ -414,22 +414,25 @@ def _get_context_window() -> int:
             pass
 
     # 策略 1: 从 session jsonl 找当前实际运行的模型
-    # 读取最后的 model_change 事件，而非依赖 openclaw.json 的 primary 配置
+    # 读取文件开头和末尾，找最后的 model_change 事件
     # 修复 (2026-07-29): 之前读 primary model (doubao-seed-2.0-pro, 128K)，
     # 但 session 实际可能跑在 GLM-5.2 (1M)，导致阈值计算严重偏低
     try:
         active = _find_active_session()
         if active and active.exists():
-            # 从文件末尾读取最后几 KB，找 model_change 事件
-            # 避免读整个大文件
             file_size = active.stat().st_size
-            read_bytes = min(file_size, 65536)  # 末尾 64KB
+            # model_change 通常在文件开头（session 创建时）或中间（用户切模型时）
+            # 读开头 8KB + 末尾 64KB
+            _head = ""
+            _tail = ""
             with open(active, "rb") as _f:
-                _f.seek(file_size - read_bytes)
-                _tail = _f.read().decode("utf-8", errors="ignore")
-            # 找所有 model_change 行，取最后一条
+                _head = _f.read(8192).decode("utf-8", errors="ignore")
+                if file_size > 8192:
+                    _f.seek(file_size - 65536)
+                    _tail = _f.read().decode("utf-8", errors="ignore")
+            # 合并搜索
             _last_model = None
-            for _line in _tail.split("\n"):
+            for _line in (_head + "\n" + _tail).split("\n"):
                 if '"type":"model_change"' in _line or '"type": "model_change"' in _line:
                     try:
                         _last_model = json.loads(_line)
