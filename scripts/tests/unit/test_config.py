@@ -363,3 +363,119 @@ class TestConfigLifecycle:
         assert "legacyModel: old-format-model  (旧格式)" in out
         assert "扫描间隔: 30s" in out
         assert "大工程检测: 启用" in out
+
+
+# ── 动态阈值测试 (7/29 新增) ──
+
+
+class TestDynamicThresholds:
+    """get_dynamic_thresholds() 动态阈值计算
+
+    小窗口 (128K): WARN=70 ALERT=85 CRIT=95 (基准值)
+    大窗口 (1M):   WARN=60 ALERT=75 CRIT=90 (更早介入, context rot 更严重)
+    中间值 (500K-1M): 线性插值
+    """
+
+    def test_small_window_returns_baseline(self):
+        """小窗口 (<500K) 返回基准值 70/85/95"""
+        # 128K (典型小窗口)
+        warn, alert, crit = cfg.get_dynamic_thresholds(128 * 1024)
+        assert warn == 70
+        assert alert == 85
+        assert crit == 95
+
+        # 0 tokens (边界)
+        warn, alert, crit = cfg.get_dynamic_thresholds(0)
+        assert warn == 70
+        assert alert == 85
+        assert crit == 95
+
+        # 499K (刚低于大窗口阈值)
+        warn, alert, crit = cfg.get_dynamic_thresholds(499999)
+        assert warn == 70
+        assert alert == 85
+        assert crit == 95
+
+    def test_large_window_1m_returns_reduced_thresholds(self):
+        """大窗口 (>=1M) 返回降低后的阈值 60/75/90"""
+        warn, alert, crit = cfg.get_dynamic_thresholds(1_000_000)
+        assert warn == 60
+        assert alert == 75
+        assert crit == 90
+
+        # 2M (超大窗口) 也返回同样的值
+        warn, alert, crit = cfg.get_dynamic_thresholds(2_000_000)
+        assert warn == 60
+        assert alert == 75
+        assert crit == 90
+
+    def test_intermediate_window_linear_interpolation(self):
+        """中间值 (500K-1M) 线性插值
+
+        500K: 70/85/95 (基准值起点)
+        750K: 65/80/92 (中点)
+        1M:   60/75/90 (终点)
+        """
+        # 500K 阈值点
+        warn, alert, crit = cfg.get_dynamic_thresholds(500000)
+        assert warn == 70
+        assert alert == 85
+        assert crit == 95
+
+        # 750K (中点)
+        warn, alert, crit = cfg.get_dynamic_thresholds(750000)
+        assert warn == 65
+        assert alert == 80
+        assert crit == 92
+
+    def test_boundary_values(self):
+        """边界值测试: 0, 500000, 1000000, 2000000"""
+        # 0: 返回基准值
+        warn, alert, crit = cfg.get_dynamic_thresholds(0)
+        assert (warn, alert, crit) == (70, 85, 95)
+
+        # 500000: 大窗口阈值起点
+        warn, alert, crit = cfg.get_dynamic_thresholds(500000)
+        assert (warn, alert, crit) == (70, 85, 95)
+
+        # 1000000: 大窗口终点
+        warn, alert, crit = cfg.get_dynamic_thresholds(1000000)
+        assert (warn, alert, crit) == (60, 75, 90)
+
+        # 2000000: 超过 1M 后保持不变
+        warn, alert, crit = cfg.get_dynamic_thresholds(2000000)
+        assert (warn, alert, crit) == (60, 75, 90)
+
+    def test_env_override_affects_small_window(self):
+        """环境变量覆盖影响小窗口的基准值"""
+        env = os.environ.copy()
+        env["MARK42_CTX_WARN_PCT"] = "75"
+        env["MARK42_CTX_ALERT_PCT"] = "88"
+        env["MARK42_CTX_CRIT_PCT"] = "97"
+        result = _run_in_subprocess(
+            "from mark42_modules.config import get_dynamic_thresholds; "
+            "w,a,c = get_dynamic_thresholds(128*1024); "
+            "print(f'{w},{a},{c}')",
+            env=env,
+        )
+        w, a, c = map(int, result.strip().split(","))
+        assert w == 75
+        assert a == 88
+        assert c == 97
+
+    def test_env_override_affects_zero_window(self):
+        """环境变量覆盖影响 context_window <= 0 的 fallback 路径"""
+        env = os.environ.copy()
+        env["MARK42_CTX_WARN_PCT"] = "72"
+        env["MARK42_CTX_ALERT_PCT"] = "87"
+        env["MARK42_CTX_CRIT_PCT"] = "96"
+        result = _run_in_subprocess(
+            "from mark42_modules.config import get_dynamic_thresholds; "
+            "w,a,c = get_dynamic_thresholds(0); "
+            "print(f'{w},{a},{c}')",
+            env=env,
+        )
+        w, a, c = map(int, result.strip().split(","))
+        assert w == 72
+        assert a == 87
+        assert c == 96

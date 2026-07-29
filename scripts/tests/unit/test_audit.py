@@ -996,6 +996,54 @@ class TestReportFull:
         remaining = list(audit_dir.glob("audit-*.json"))
         assert len(remaining) == 5
 
+    def test_cleanup_old_reports_oserror_ignored(self, tmp_path, mocker):
+        """【report.py 行 92-95】删除文件失败时忽略 OSError。"""
+        mocker.patch("mark42_modules.audit.report.AUDIT_DIR", tmp_path / "audit")
+        audit_dir = tmp_path / "audit"
+        audit_dir.mkdir()
+
+        # 创建一些报告
+        for i in range(5):
+            (audit_dir / f"audit-{i:04d}.json").write_text("{}")
+
+        # mock Path.unlink 抛出 OSError
+        mocker.patch("pathlib.Path.unlink", side_effect=OSError("file busy"))
+
+        from mark42_modules.audit.report import _cleanup_old_reports
+        # 不应该抛出异常
+        _cleanup_old_reports(keep=2)
+
+        # 所有文件应该都保留（因为 unlink 都失败了）
+        remaining = list(audit_dir.glob("audit-*.json"))
+        assert len(remaining) == 5
+
+    def test_send_alert_counts_all_status_types(self, mocker):
+        """【report.py 行 75-77】send_alert 统计 lost/degraded/preserved 数量。"""
+        from mark42_modules.audit.report import send_alert
+        from mark42_modules.audit import AuditResult, Finding
+
+        mock_broker = mocker.patch("mark42_modules.audit.report._append_broker")
+
+        result = AuditResult(
+            verdict="fail",
+            score=0.5,
+            findings=[
+                Finding(category="identity", item="1", status="lost"),
+                Finding(category="identity", item="2", status="lost"),  # lostCount=2
+                Finding(category="preferences", item="3", status="degraded"),  # degradedCount=1
+                Finding(category="projects", item="4", status="preserved"),  # preservedCount=1
+            ],
+            recommendation="测试",
+        )
+        send_alert(result, "/path/to/report.json")
+
+        mock_broker.assert_called_once()
+        call_args = mock_broker.call_args
+        broker_meta = call_args[0][5]  # 第 6 个参数是 metadata dict
+        assert broker_meta["lostCount"] == 2
+        assert broker_meta["degradedCount"] == 1
+        assert broker_meta["preservedCount"] == 1
+
 
 # ═════════════════════════════════════════════════════
 # 11. 补充测试 - BuiltinAudit 完整流程
@@ -1225,6 +1273,70 @@ class TestConstraintPinner:
 
         pinner = ConstraintPinner(workspace=tmp_path)
         assert pinner.inject_via_broker() is False
+
+    def test_extract_essential_lines_max_lines_boundary(self, tmp_path):
+        """【pinning.py 行 77-78】MAX_LINES_PER_FILE 边界，超过后截断。"""
+        from mark42_modules.audit.pinning import ConstraintPinner, MAX_LINES_PER_FILE
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        
+        # 创建超过 MAX_LINES_PER_FILE 行数的 AGENTS.md
+        extra_lines = "\n".join([f"- 规则 {i}" for i in range(MAX_LINES_PER_FILE + 5)])
+        (tmp_path / "AGENTS.md").write_text(extra_lines, encoding="utf-8")
+        
+        result = pinner.extract_pinned_constraints()
+        # 应该被截断到 MAX_LINES_PER_FILE 行
+        # 每一行以 "- 规则" 开头，计数不应该超过 MAX_LINES_PER_FILE
+        lines_count = result.count("- 规则")
+        assert lines_count <= MAX_LINES_PER_FILE
+
+    def test_extract_essential_lines_empty_returns_empty(self, tmp_path):
+        """【pinning.py 行 136-139】没有匹配到关键内容时返回空字符串。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        
+        # 文件有内容但没有匹配到任何关键模式
+        # 注意：不能包含 "中文" "English" "语言" 等关键词
+        (tmp_path / "SOUL.md").write_text(
+            "普通内容，无粗体规则，无锁定关键词\n"
+            "只是一些普通的文本行\n"
+            "Another plain line without bold markers\n",
+            encoding="utf-8",
+        )
+        
+        result = pinner.extract_pinned_constraints()
+        # 空内容不会生成 header，直接返回空
+        assert result == ""
+
+    def test_inject_via_broker_exception_returns_false(self, tmp_path, mocker):
+        """【pinning.py 行 173-174】broker 写入异常时静默返回 False。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
+        
+        # mock _append_broker 抛出异常
+        mocker.patch("mark42_modules.utils._append_broker", side_effect=Exception("broker down"))
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.inject_via_broker()
+        # 异常被捕获，返回 False
+        assert result is False
+
+    def test_inject_to_file_exception_returns_none(self, tmp_path, mocker):
+        """【pinning.py 行 201-202】文件写入异常时静默返回 None。"""
+        from mark42_modules.audit.pinning import ConstraintPinner
+
+        (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
+        
+        # mock Path.write_text 抛出异常（通过 mock ARMOR_STATE 为不可写路径）
+        mocker.patch("mark42_modules.config.ARMOR_STATE", tmp_path)
+        # 直接让 mkdir 失败
+        mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError("read-only fs"))
+
+        pinner = ConstraintPinner(workspace=tmp_path)
+        result = pinner.inject_to_file()
+        assert result is None
 
 
 # ── SummaryExtractor SQLite fallback 测试 ─────────
