@@ -24,6 +24,7 @@
 """
 
 import logging
+logger = logging.getLogger(__name__)
 import queue as std_queue
 import threading
 import time

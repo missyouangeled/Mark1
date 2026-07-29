@@ -8,6 +8,8 @@ import os
 import subprocess
 import time
 import urllib.request
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from pathlib import Path
 from typing import Any

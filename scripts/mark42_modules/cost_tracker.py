@@ -12,6 +12,8 @@ Mark42 成本追踪模块
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
 import csv
 import json
 from dataclasses import asdict, dataclass, field

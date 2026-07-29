@@ -17,6 +17,8 @@ Mark42 v3 R11 混沌工程引擎
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
 import json
 import os
 import shutil

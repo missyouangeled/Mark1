@@ -34,6 +34,8 @@ from .log_setup import get_logger
 
 logger = get_logger(__name__)
 
+import logging
+logger = logging.getLogger(__name__)
 import json
 import subprocess
 import urllib.request
