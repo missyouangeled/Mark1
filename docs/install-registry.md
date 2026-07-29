@@ -33,6 +33,17 @@
 - **之前记录**：误以为是套餐差异导致水印消失，实际是参数问题
 - **已更新文件**：`docs/非主模型使用手册.md` + `MEMORY.md`
 
+### ✅ 配置：Agnes 2.5 Flash（免费对话模型）
+- **时间**：2026-07-29 09:06 CST
+- **触发**：点点看到 Agnes 2.5 Flash 已上线，要求配置上
+- **来源**：已有 Agnes API Key（`credentials/api/agnes.env`），新增模型到 openclaw.json
+- **API 端点**：`https://apihub.agnes-ai.com/v1`（OpenAI 兼容）
+- **模型名**：`agnes-2.5-flash`（litellm 通道：`litellm/agnes-2.5-flash`）
+- **参数**：512K 上下文 / 65536 输出 / 支持 text+image 输入
+- **费用**：$0/百万 token（免费）
+- **当前状态**：⚠️ Agnes API 服务器连接超时（2026-07-29 09:06 测试），配置已就绪，待服务器恢复即可用
+- **已知问题**：Agnes 服务器间歇性不可用（历史记录见非主模型使用手册）
+
 ## 2026-07-27
 
 ### ✅ 安装：自主决策器（mark42-autonomy）
