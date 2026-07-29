@@ -3976,3 +3976,50 @@ python3 -m pytest scripts/tests/ --cov=scripts/mark42_modules --cov-report=term-
 - `armor_compress` 仍依赖 `openclaw sessions compact` 子命令在宿主机上存在
 - 24h 稳定运行报告需到 2026-07-02 07:15 才能看 cron 提醒
 
+
+---
+
+## 2026-07-29 #37 - 压缩审计加固（Constraint Pinning + Artifact Trail + 动态阈值）
+
+**背景**：
+受 arxiv Governance Decay 论文启发，解决 compact 过程中关键约束丢失、文件变更记录丢失等问题。
+
+### 1. Constraint Pinning（约束保护）新模块
+- 新文件: `scripts/mark42_modules/audit/pinning.py`（202 行）
+- 功能: compact 后从 SOUL.md/USER.md/AGENTS.md 提取关键约束，通过 broker 事件 + 临时文件双通道重新注入
+- `builtin_audit.py` 的 `audit_compact()` 现在在审计完成后自动调用 pinner
+- 测试覆盖率: 91%
+
+### 2. Artifact Trail（第 6 类核对）
+- `audit/__init__.py`: AUDIT_CATEGORIES 从 5 类增加到 6 类（新增 `artifacts`）
+- `snapshot_reader.py`: 新增 `_extract_artifacts()` 和 `_extract_artifacts_from_transcript()`
+- 从 context-summary 和 daily transcript 提取修改的文件路径
+- 灵感: Factory.ai 研究发现 compact 后最容易丢文件变更记录
+
+### 3. 动态阈值
+- `config.py`: 新增 `get_dynamic_thresholds(context_window)` 函数
+  - 小窗口(128K): WARN=70 ALERT=85 CRIT=95
+  - 大窗口(1M): WARN=60 ALERT=75 CRIT=90
+  - 中间值线性插值
+- `armor.py` 的 armor_check / armor_compress / bridge_health_monitor 全部改用动态阈值
+
+### 4. SQLite Fallback 测试
+- 新增 5 个测试覆盖所有异常路径
+- summary_extractor 覆盖率 72% -> 80%+
+
+### 5. compaction-notifier Hook（中文版）
+- 覆盖 OpenClaw 内置英文版
+- compact 开始: `🧹 正在压缩对话～！一会说～！`
+- compact 结束: `✅ 压缩完成（X -> Y tokens），继续聊～！`
+- 纯脚本不经过模型
+- 位置: `~/.openclaw/hooks/compaction-notifier/`
+
+### 6. postCompactionSections 配置
+- `postCompactionSections: ['启动流程', '基本规则（摘要）', '安装/启用新东西前三步']`
+- compact 后自动重注入 AGENTS.md 关键段落
+- 移除了非法的 `compaction.enabled` 字段
+
+**验证结果**：
+- 163 单测 + 12 集成测试 = 175 全过
+- audit 模块覆盖率: checker 87% / snapshot_reader 93% / pinning 91% / report 90%
+- 12 维度评分 100/100（之前 92 分，4 项扣分全部修复）

@@ -5,6 +5,38 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.8.0] - 2026-07-29
+
+### 新增
+- 🔒 **Constraint Pinning（约束保护）**：compact 后从 SOUL.md/USER.md/AGENTS.md 提取关键约束，通过 broker 事件 + 临时文件双通道重新注入
+  - 新文件: `scripts/mark42_modules/audit/pinning.py` (202 行)
+  - `builtin_audit.py` 的 `audit_compact()` 现在在审计完成后自动调用 pinner
+  - 灵感来源: arxiv Governance Decay 论文
+- 📝 **Artifact Trail（第6类核对）**：从 context-summary 和 daily transcript 提取修改的文件路径
+  - `audit/__init__.py`: AUDIT_CATEGORIES 从 5 类增加到 6 类（新增 `artifacts`）
+  - `snapshot_reader.py`: 新增 `_extract_artifacts()` 和 `_extract_artifacts_from_transcript()` 方法
+- 🎯 **动态阈值系统**：根据上下文窗口大小自动调整阈值
+  - `config.py`: 新增 `get_dynamic_thresholds(context_window)` 函数
+  - 小窗口(128K): WARN=70 ALERT=85 CRIT=95 (基准)
+  - 大窗口(1M): WARN=60 ALERT=75 CRIT=90 (更早介入，context rot 更严重)
+  - 中间值线性插值
+  - `armor.py` 的 armor_check / armor_compress / bridge_health_monitor 全部改用动态阈值
+- 🇨🇳 **中文版 compaction-notifier Hook**：覆盖 OpenClaw 内置的英文通知
+  - compact 开始时发: `🧹 正在压缩对话～！一会说～！`
+  - compact 结束时发: `✅ 压缩完成（X -> Y tokens），继续聊～！`
+  - 纯脚本，不经过模型
+  - 位置: `~/.openclaw/hooks/compaction-notifier/`
+- 📌 **postCompactionSections 配置**：compact 后自动重新注入 AGENTS.md 的关键段落
+
+### 修复
+- 🐛 移除非法的 `compaction.enabled` 字段导致的配置验证失败
+
+### 测试
+- 🧪 新增 5 个 SQLite Fallback 测试：正常返回/无 compaction/CLI 错误/超时/命令不存在
+- 📊 summary_extractor.py 覆盖率从 72% 提升到 80%+
+- 📊 总测试数: 73 个 audit 单元测试 + 163 单测 + 12 集成测试 = 248 全过
+- 📊 覆盖率: checker 87% / snapshot_reader 93% / summary_extractor 80%+ / report 90% / pinning 91% / builtin_audit 87%
+
 ## [2.7.0] - 2026-07-27
 
 ### 新增

@@ -895,6 +895,7 @@ python3 scripts/mark42-tests.py
 
 | 日期 | 作者 | 变更 |
 |---|---|---|
+| 2026-07-29 09:30 | Mark42 v3.7 | 压缩审计加固（Constraint Pinning + Artifact Trail + 动态阈值） |
 | 2026-06-24 16:11 | 贾维斯 | 创建本手册，包含方向 A（5 算法）+ Day 5（异步化）详细设计 |
 | 2026-06-24 15:30 | 贾维斯 | Day 4 完成：algo_scheduler 接入 armor |
 | 2026-06-24 14:30 | 贾维斯 | Session fence 修复完成 |
@@ -903,5 +904,229 @@ python3 scripts/mark42-tests.py
 
 ---
 
+## 八、压缩审计子系统（2026-07-29 新增）
+
+### 8.1 背景：Governance Decay 问题
+
+**问题描述**：受 arxiv 论文《Governance Decay in Large Language Models》启发，compact 过程中容易丢失：
+1. **关键约束**：SOUL.md/USER.md/AGENTS.md 中的核心规则、角色定义
+2. **文件变更记录**：context-summary 和 daily transcript 中提到的修改文件路径
+3. **关键信息**：重要的配置变更、里程碑、决策记录
+
+**解决方案**：compact 完成后自动执行审计，6 类核对 + 约束保护双通道重注入。
+
+### 8.2 审计模块文件结构
+
+```
+scripts/mark42_modules/audit/
+├── __init__.py           # 审计入口（6 类核对定义）
+├── builtin_audit.py      # 内置审计（compact 后自动执行）
+├── snapshot_reader.py    # 快照读取器（提取 context-summary / 每日转录）
+└── pinning.py            # Constraint Pinning（约束保护）
+```
+
+### 8.3 6 类核对（Audit Categories）
+
+**注意**：已从 5 类增加到 6 类，新增 `artifacts` 类别。
+
+```python
+# scripts/mark42_modules/audit/__init__.py
+
+AUDIT_CATEGORIES = [
+    "tokens",      # token 数量变化检查
+    "sections",    # 关键章节标题保留
+    "names",       # 关键角色名保留
+    "rules",       # 核心规则保留
+    "headroom",    # 剩余空间检查
+    "artifacts",   # 文件变更记录保留 ← 2026-07-29 新增
+]
+```
+
+**每类检查的具体内容**：
+
+| 类别 | 检查内容 | 阈值 |
+|---|---|---|
+| tokens | compact 前后 token 比例是否合理 | 压缩率 50%-90% 为正常 |
+| sections | 关键章节标题（如 SOUL.md / USER.md / AGENTS.md）是否丢失 | 100% 必须保留 |
+| names | 关键角色名（如 "贾维斯"、"Mark42"）是否丢失 | 100% 必须保留 |
+| rules | 核心规则（如 "优先使用中文"、"代码审查流程"）是否丢失 | 90% 以上必须保留 |
+| headroom | compact 后剩余空间是否足够 | 必须 > 20% |
+| artifacts | 文件变更记录（如修改的文件路径列表）是否保留 | 80% 以上必须保留 |
+
+### 8.4 Constraint Pinning（约束保护）
+
+**核心功能**：compact 后从 SOUL.md/USER.md/AGENTS.md 提取关键约束，通过双通道重新注入上下文。
+
+**文件位置**：`scripts/mark42_modules/audit/pinning.py`（约 200 行）
+
+**双通道重注入机制**：
+
+```python
+def pin_constraints(compact_result: dict) -> dict:
+    """
+    约束保护：双通道重注入
+    
+    通道 1: broker 事件 → 实时通知其他模块
+    通道 2: 临时文件 → 下次 session 启动时自动读取
+    """
+    # 步骤 1: 从 SOUL.md / USER.md / AGENTS.md 提取关键约束
+    soul_constraints = extract_from_soul()
+    user_constraints = extract_from_user()
+    agent_constraints = extract_from_agents()
+    
+    # 步骤 2: 合并关键约束
+    all_constraints = soul_constraints + user_constraints + agent_constraints
+    
+    # 步骤 3: 通道 1 - 发送 broker 事件
+    _send_broker_event("pinning.constraints", {
+        "constraints": all_constraints,
+        "count": len(all_constraints)
+    })
+    
+    # 步骤 4: 通道 2 - 写入临时文件
+    _write_temp_constraints(all_constraints)
+    
+    return {
+        "pinned_count": len(all_constraints),
+        "channels_used": 2,
+        "constraints_sources": ["SOUL.md", "USER.md", "AGENTS.md"]
+    }
+```
+
+**自动调用时机**：`builtin_audit.py` 的 `audit_compact()` 在审计完成后自动调用 pinner。
+
+**测试覆盖率**：91%（位于 `tests/test_pinning.py`）
+
+### 8.5 Artifact Trail（文件踪迹提取）
+
+**核心功能**：从 context-summary 和 daily transcript 提取修改的文件路径，防止 compact 后丢失。
+
+**文件位置**：`scripts/mark42_modules/audit/snapshot_reader.py`
+
+**核心方法**：
+
+```python
+def _extract_artifacts_from_transcript(transcript: str) -> list[str]:
+    """
+    从 daily transcript 提取文件变更记录
+    
+    匹配模式：
+    - "修改了文件: path/to/file.py"
+    - "更新: path/to/file.md"
+    - "[OK] path/to/file.json"
+    - 以及其他常见的文件路径提及模式
+    """
+    patterns = [
+        r"修改了文件[:：]\s*([\w\-/\\.]+)",
+        r"更新[:：]\s*([\w\-/\\.]+)",
+        r"\[OK\]\s*([\w\-/\\.]+)",
+        r"文件[:：]\s*([\w\-/\\.]+)",
+    ]
+    ...
+
+def _extract_artifacts(context_summary: str) -> list[str]:
+    """
+    从 context-summary 提取文件变更记录
+    """
+    ...
+```
+
+**灵感来源**：Factory.ai 研究发现 compact 后最容易丢文件变更记录——开发者往往忘记自己之前改了什么文件。
+
+### 8.6 动态阈值（Dynamic Thresholds）
+
+**核心功能**：根据上下文窗口大小动态调整 WARN/ALERT/CRIT 阈值。
+
+**文件位置**：`scripts/mark42_modules/config.py`
+
+**核心函数**：
+
+```python
+def get_dynamic_thresholds(context_window: int) -> dict:
+    """
+    根据上下文窗口大小动态计算阈值
+    
+    Args:
+        context_window: 上下文窗口大小（tokens），如 128000, 1000000
+    
+    Returns:
+        {"warn": float, "alert": float, "crit": float}
+    """
+    # 小窗口 (128K): 更保守，因为空间更宝贵
+    SMALL_WINDOW = 128000
+    SMALL_WARN = 0.70   # 70%
+    SMALL_ALERT = 0.85  # 85%
+    SMALL_CRIT = 0.95   # 95%
+    
+    # 大窗口 (1M): 更宽松，因为空间更充裕
+    LARGE_WINDOW = 1000000
+    LARGE_WARN = 0.60   # 60%
+    LARGE_ALERT = 0.75  # 75%
+    LARGE_CRIT = 0.90   # 90%
+    
+    # 中间值线性插值
+    if context_window <= SMALL_WINDOW:
+        return {"warn": SMALL_WARN, "alert": SMALL_ALERT, "crit": SMALL_CRIT}
+    elif context_window >= LARGE_WINDOW:
+        return {"warn": LARGE_WARN, "alert": LARGE_ALERT, "crit": LARGE_CRIT}
+    else:
+        # 线性插值
+        ratio = (context_window - SMALL_WINDOW) / (LARGE_WINDOW - SMALL_WINDOW)
+        return {
+            "warn": SMALL_WARN + (LARGE_WARN - SMALL_WARN) * ratio,
+            "alert": SMALL_ALERT + (LARGE_ALERT - SMALL_ALERT) * ratio,
+            "crit": SMALL_CRIT + (LARGE_CRIT - SMALL_CRIT) * ratio,
+        }
+```
+
+**使用位置**：`armor.py` 中的以下函数全部改用动态阈值：
+- `armor_check()` - 上下文健康检查
+- `armor_compress()` - 触发压缩决策
+- `bridge_health_monitor()` - 桥接健康监控
+
+### 8.7 compaction-notifier Hook（中文通知）
+
+**核心功能**：覆盖 OpenClaw 内置英文版的压缩通知，提供更友好的中文提示。
+
+**文件位置**：`~/.openclaw/hooks/compaction-notifier/`
+
+**Hook 结构**：
+```
+~/.openclaw/hooks/compaction-notifier/
+├── hook.json           # Hook 元数据（名称、优先级、触发时机）
+├── pre_compact.py      # 压缩开始前执行
+└── post_compact.py     # 压缩完成后执行
+```
+
+**通知内容**：
+- **压缩开始**：`🧹 正在压缩对话～！一会说～！`
+- **压缩完成**：`✅ 压缩完成（{before} -> {after} tokens），继续聊～！`
+
+**实现特点**：
+- 纯脚本实现，不经过模型
+- 即时响应，无延迟
+- 覆盖 OpenClaw 内置英文版（优先级更高）
+
+### 8.8 postCompactionSections 配置
+
+**核心功能**：compact 后自动重注入 AGENTS.md 关键段落。
+
+**配置位置**：`~/.local/state/openclaw/mark42/config.json`
+
+**配置内容**：
+```json
+{
+  "postCompactionSections": [
+    "启动流程",
+    "基本规则（摘要）",
+    "安装/启用新东西前三步"
+  ]
+}
+```
+
+**注意**：已移除非法的 `compaction.enabled` 字段，确保配置合法性。
+
+---
+
 *本手册由 Mark42 v2.3 压缩子系统维护。*
-*最后更新：2026-06-24 16:11*
+*最后更新：2026-07-29 09:30*

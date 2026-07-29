@@ -2,7 +2,7 @@
 
 > 模块化智能铠甲系统 - 为 OpenClaw 提供上下文守护与循环引擎。
 
-本文档描述 Mark42 v2.6.0 的五层架构设计、模块职责、数据流和扩展机制。
+本文档描述 Mark42 v2.8.0 的五层架构设计、模块职责、数据流和扩展机制。
 
 ---
 
@@ -89,12 +89,35 @@ armor_check()  ──→  读取 session JSONL  ──→  估算 token 数
 
 | 级别 | 默认阈值 | 行为 |
 |------|----------|------|
+### 动态阈值系统 (v2.8.0)
+
+阈值不再是静态值，而是根据上下文窗口大小动态调整：
+
+```python
+from mark42.config import get_dynamic_thresholds
+thresholds = get_dynamic_thresholds(context_window=131072)  # 128K
+# 返回: {"warn": 70, "alert": 85, "crit": 95}
+```
+
+| 窗口大小 | WARN | ALERT | CRIT | 说明 |
+|----------|------|-------|------|------|
+| 128K 基准 | 70% | 85% | 95% | 标准阈值 |
+| 256K | 67% | 82% | 94% | 更早介入 |
+| 512K | 63% | 79% | 92% | 衰减加速 |
+| 1M | 60% | 75% | 90% | context rot 更严重 |
+
+**设计原理**：大上下文窗口更容易出现"上下文腐烂"（context rot），信息扩散导致关键内容丢失。因此阈值随窗口增大而下调，更早触发压缩。
+
+### 阈值配置
+
+| 级别 | 默认值 (128K) | 行为 |
+|------|---------------|------|
 | 🟢 正常 | < 70% | 无操作 |
 | 🟠 警告 | ≥ 70% | 写 broker 警告事件 |
 | 🔴 告警 | ≥ 85% | 触发自动压缩 |
 | 🔴 紧急 | ≥ 95% | 紧急压缩 + 跳过队列 |
 
-阈值可通过环境变量 `MARK42_CTX_WARN_PCT` / `MARK42_CTX_ALERT_PCT` / `MARK42_CTX_CRIT_PCT` 或 config.toml 覆盖。
+静态阈值可通过环境变量 `MARK42_CTX_WARN_PCT` / `MARK42_CTX_ALERT_PCT` / `MARK42_CTX_CRIT_PCT` 或 config.toml 覆盖。动态阈值计算在 `armor.py` 中自动应用。
 
 ### 压缩策略
 
@@ -112,6 +135,52 @@ Armor 不自己做压缩，而是委托给 `algo_scheduler`（见 §6）。压�
 ### 压缩队列
 
 高负载时压缩请求入队 `compress_queue.py`，按优先级执行，防止并发压缩冲突。
+
+### Constraint Pinning（约束保护）(v2.8.0)
+
+**模块文件**: `scripts/mark42_modules/audit/pinning.py` (202 行)
+
+每次 compact 后自动从关键文档中提取约束规则，通过双通道重新注入，防止治理衰减（Governance Decay）。
+
+**工作流**：
+```
+audit_compact() 完成  ──→  调用 ConstraintPinner
+                             │
+                        ┌────┴────┐
+                        ▼         ▼
+                提取关键文档     解析约束规则
+                SOUL.md          核心指令
+                USER.md          用户规范
+                AGENTS.md        Agent 配置
+                             │
+                             ▼
+                    ┌──────┴──────┐
+                    ▼             ▼
+            Broker 事件注入    临时文件注入
+        (mark42-events.jsonl)  (pinning-temp.md)
+```
+
+**设计原理**：受 arxiv Governance Decay 论文启发，LLM 对话中约束会随着上下文压缩逐渐丢失。ConstraintPinner 通过在每次压缩后重新注入关键规则来对抗这种衰减。
+
+### Audit 审计子系统 (v2.8.0)
+
+**模块文件**: `scripts/mark42_modules/audit/__init__.py` + `snapshot_reader.py`
+
+Audit 系统负责在压缩前后审计上下文完整性，现在支持 6 类核对：
+
+| 类别 | 说明 |
+|------|------|
+| `metadata` | 会话元数据完整性检查 |
+| `summary` | 内容摘要一致性检查 |
+| `constraints` | 约束规则完整性检查 |
+| `entities` | 实体提取完整性检查 |
+| `actions` | 待办事项追踪检查 |
+| `artifacts` | **新增** 修改文件路径追踪 (v2.8.0) |
+
+**Artifact Trail 特性**：
+- `_extract_artifacts()`: 从 context-summary 提取修改的文件路径
+- `_extract_artifacts_from_transcript()`: 从 daily transcript 提取文件操作记录
+- 支持跨压缩轮次的文件修改追踪
 
 ---
 
@@ -391,6 +460,29 @@ mark42 install          # 安装 systemd 服务
 mark42 install --uninstall  # 卸载
 ```
 
+### Compaction-Notifier Hook (v2.8.0)
+
+**位置**: `~/.openclaw/hooks/compaction-notifier/`
+
+Mark42 提供的中文版压缩通知 Hook，覆盖 OpenClaw 内置的英文通知。
+
+**特性**：
+- 纯脚本实现，不经过模型调用，零延迟
+- 压缩开始通知: `🧹 正在压缩对话～！一会说～！`
+- 压缩完成通知: `✅ 压缩完成（X -> Y tokens），继续聊～！`
+
+**postCompactionSections 配置**：
+
+OpenClaw 配置项，compact 后自动重新注入 AGENTS.md 的关键段落：
+
+```json
+{
+  "postCompactionSections": ["启动流程", "基本规则（摘要）", "安装/启用新东西前三步"]
+}
+```
+
+配合 ConstraintPinner，确保核心配置在多次压缩后不会丢失。
+
 ---
 
 ## 10. assemble: 全甲启动
@@ -496,7 +588,15 @@ mark42/
 ├── llm_provider.py      # LLM 调用封装
 ├── perf_bench.py        # 性能基准
 ├── user_config.py       # 用户配置
-└── utils.py             # 通用工具
+├── utils.py             # 通用工具
+├── scripts/
+│   └── mark42_modules/
+│       └── audit/
+│           ├── __init__.py          # 6 类审计分类定义
+│           ├── pinning.py           # Constraint Pinning (202行)
+│           ├── builtin_audit.py     # 内置审计逻辑
+│           ├── snapshot_reader.py   # 快照读取 + artifact 提取
+│           └── summary_extractor.py # 摘要提取器
 ```
 
 ---
@@ -554,4 +654,4 @@ register_compressor("my_algo", my_compressor)
 
 ---
 
-*本文档随 Mark42 版本更新。最后更新: v2.6.0 (2026-07-21)*
+*本文档随 Mark42 版本更新。最后更新: v2.8.0 (2026-07-29)*

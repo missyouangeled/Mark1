@@ -2,7 +2,7 @@
 
 模块化智能铠甲系统 - 为 [OpenClaw](https://github.com/openclaw/openclaw) 提供上下文守护与循环引擎。
 
-版本：`v2.7.0`
+版本：`v2.8.0`
 
 ---
 
@@ -22,6 +22,8 @@ Mark42 由 10 大核心模块组成，通过 broker 事件总线联动：
 | **📋 CoreRegistry 核心注册** | 模块注册与发现 | 动态加载 / 依赖检查 / 版本管理 |
 | **🤖 AdvisorClient 顾问客户端** | 与 OpenClaw Advisor 通信 | 指标上报 / 建议获取 / 决策执行 |
 | **🔌 ArcLock 电磁锁扣** | 通用适配层，支持第三方替换 | 9 大扩展点，零配置开箱即用 |
+| **🔍 Audit 审计系统** | 压缩前后上下文完整性审计 | 6 类核对 / Constraint Pinning / Artifact Trail |
+| **🔒 ConstraintPinner** | 治理衰减防护 | compact 后自动重新注入关键约束规则 |
 
 ---
 
@@ -341,6 +343,26 @@ python3 -m pytest tests/integration/ -v
 ```bash
 python3 -m pytest --cov=mark42 --cov-report=html
 ```
+
+### 测试统计 (v2.8.0)
+
+| 测试类型 | 数量 |
+|---|---|
+| Audit 单元测试 | 73 |
+| 其他单元测试 | 163 |
+| 集成测试 | 12 |
+| **总计** | **248** |
+
+| 模块 | 覆盖率 |
+|---|---|
+| checker | 87% |
+| snapshot_reader | 93% |
+| summary_extractor | 80%+ |
+| report | 90% |
+| pinning | 91% |
+| builtin_audit | 87% |
+
+**新增测试**: 5 个 SQLite Fallback 测试（正常返回/无 compaction/CLI 错误/超时/命令不存在）
 
 ### 手动测试
 

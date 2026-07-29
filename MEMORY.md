@@ -117,7 +117,7 @@
 
 ## 项目
 
-- **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲），初步设计已完成，待商业渠道调研后开工。详见 `PROJECT_INDEX.md` 和 `docs/design/mark42-context-loop-heavy.md`。
+- **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲）。compact 审计 6 类核对 + Constraint Pinning + 动态阈值 + 中文 compaction-notifier hook，评分 100/100。详见 `PROJECT_INDEX.md` 和 `docs/design/`。
 
 ## 记忆归档索引
 

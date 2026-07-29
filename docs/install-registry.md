@@ -561,3 +561,16 @@
 - **仓库大小**: ~507 MB
 - **状态**: 收藏待装。本机内存 7.7G 偏紧，clone 时 OOM。等硬件升级或换机后再装
 - **日期**: 2026-07-21
+
+---
+
+## compaction-notifier 中文 Hook - 2026-07-29 启用
+
+- **时间**: 2026-07-29 12:05 CST
+- **类型**: OpenClaw Hook（managed，覆盖内置）
+- **位置**: `~/.openclaw/hooks/compaction-notifier/`（HOOK.md + handler.js）
+- **事件**: `session:compact:before` / `session:compact:after`
+- **功能**: compact 开始/结束时发送中文聊天通知，纯脚本不经过模型
+- **消息**: `🧹 正在压缩对话～！一会说～！` / `✅ 压缩完成（X -> Y tokens），继续聊～！`
+- **覆盖**: 内置英文版 compaction-notifier
+- **状态**: 已启用，已验证

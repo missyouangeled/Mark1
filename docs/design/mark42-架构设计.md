@@ -41,6 +41,11 @@
 |  | `compaction_diag.py` | 压缩诊断 + 修复 |
 |  | `pii_redactor.py` | PII 脱敏 |
 |  | `log_deduplicator.py` | 日志去重 |
+| **审计子系统** | `audit/__init__.py` | 审计入口（6 类核对：tokens/sections/names/rules/headroom/artifacts） |
+|  | `audit/builtin_audit.py` | 内置审计（compact 后自动执行） |
+|  | `audit/snapshot_reader.py` | 快照读取器（提取 context-summary / 每日转录） |
+|  | `audit/pinning.py` | Constraint Pinning（约束保护，关键约束双通道重注入） |
+| **Hook 层** | `~/.openclaw/hooks/compaction-notifier/` | 压缩通知（中文 hook，覆盖 OpenClaw 内置英文版） |
 | **支撑模块** | `cli.py` | argparse + status dashboard |
 |  | `config.py` | XDG 路径 + 配置初始化 |
 |  | `utils.py` | JSON 加载、文件锁 |
@@ -160,16 +165,21 @@ python3 scripts/mark42.py armor --guard
 
 ### 2.3 核心能力
 
+**【2026-07-29 更新】阈值已改为动态阈值**：
+- 小窗口(128K): WARN=70 ALERT=85 CRIT=95
+- 大窗口(1M): WARN=60 ALERT=75 CRIT=90
+- 中间值线性插值
+
 ```
 ┌────────────────────────────────────────────┐
 │           上下文铠甲 — 内部流程              │
 │                                            │
 │  ① 检测（复用 context-monitor）             │
 │     每 5min 或事件触发                      │
-│     ├── <70% → 静默记录                    │
-│     ├── 70-85% → 🟡 准备出手               │
-│     ├── 85-95% → 🟠 自动压缩               │
-│     └── >95% → 🔴 紧急分区                 │
+│     ├── <WARN  → 静默记录                    │
+│     ├── WARN-ALERT → 🟡 准备出手               │
+│     ├── ALERT-CRIT → 🟠 自动压缩               │
+│     └── >CRIT → 🔴 紧急分区                 │
 │                                            │
 │  ② 诊断（复用 context-degradation.md）      │
 │     判定当前是哪种退化：                     │
@@ -240,6 +250,43 @@ python3 scripts/mark42.py armor --guard
 ├── actions.jsonl        # 出手记录（带时间戳）
 └── history/             # 历史 memory-index 存档（可回滚）
 ```
+
+### 2.6 压缩审计子系统（2026-07-29 新增）
+
+compact 完成后自动执行审计，确保关键信息不丢失：
+
+```
+┌─────────────────────────────────────────────┐
+│         压缩审计子系统 — 6 类核对             │
+│                                             │
+│  ① tokens 核对：token 数量变化正常           │
+│  ② sections 核对：关键章节标题保留           │
+│  ③ names 核对：关键角色名保留                │
+│  ④ rules 核对：核心规则保留                  │
+│  ⑤ headroom 核对：剩余空间足够               │
+│  ⑥ artifacts 核对：文件变更记录保留（新增）   │
+│                                             │
+│  ── Constraint Pinning（约束保护） ──        │
+│  compact 后从 SOUL.md/USER.md/AGENTS.md     │
+│  提取关键约束，通过 broker 事件 + 临时文件    │
+│  双通道重新注入上下文                        │
+│                                             │
+│  ── Artifact Trail（文件踪迹） ──            │
+│  从 context-summary 和 daily transcript      │
+│  提取修改的文件路径，防止 compact 后丢失      │
+└─────────────────────────────────────────────┘
+```
+
+**审计入口**：`builtin_audit.py` 的 `audit_compact()` 在审计完成后自动调用 `pinning.py` 进行约束保护。
+
+### 2.7 compaction-notifier Hook（2026-07-29 新增）
+
+覆盖 OpenClaw 内置英文版的压缩通知：
+
+- **compact 开始**：`🧹 正在压缩对话～！一会说～！`
+- **compact 结束**：`✅ 压缩完成（X -> Y tokens），继续聊～！`
+
+纯脚本实现，不经过模型。位置：`~/.openclaw/hooks/compaction-notifier/`
 
 ---
 

@@ -10,7 +10,8 @@
 2. [config.toml 配置](#2-configtoml-配置)
 3. [arclock.yaml 配置](#3-arclockyaml-配置)
 4. [systemd 服务配置](#4-systemd-服务配置)
-5. [环境变量](#5-环境变量)
+5. [Compaction-Notifier Hook 配置](#5-compaction-notifier-hook-配置-v280)
+6. [环境变量](#6-环境变量)
 
 ---
 
@@ -68,7 +69,9 @@
   "broker": {
     "enabled": true,
     "events_file": "~/.local/state/openclaw/broker/events.jsonl"
-  }
+  },
+
+  "postCompactionSections": ["启动流程", "基本规则（摘要）", "安装/启用新东西前三步"]
 }
 ```
 
@@ -145,7 +148,30 @@
 }
 ```
 
-### 1.3 模型路由配置
+### 1.3 postCompactionSections 配置 (v2.8.0)
+
+`postCompactionSections` 是 OpenClaw 的压缩后自动注入配置，配合 Mark42 的 ConstraintPinner 确保核心配置在多次压缩后不会丢失。
+
+```json
+"postCompactionSections": [
+  "启动流程",
+  "基本规则（摘要）",
+  "安装/启用新东西前三步"
+]
+```
+
+**工作机制**：
+1. 每次 compact 后，OpenClaw 自动从 AGENTS.md 提取配置的章节
+2. 将这些章节内容重新注入到压缩后的会话开头
+3. 配合 ConstraintPinner 的双通道注入，形成三重保护
+
+**推荐配置的章节**：
+- `启动流程` - Agent 启动时的关键初始化步骤
+- `基本规则（摘要）` - 核心行为规范
+- `安全规则` - 不可违反的安全约束
+- `输出格式` - 统一的响应格式要求
+
+### 1.4 模型路由配置
 
 `models.routing` 字段用于指定不同任务使用哪个模型供应商：
 
@@ -258,15 +284,50 @@ level = "INFO"
 
 ### 2.2 阈值配置详解
 
+#### 动态阈值系统 (v2.8.0)
+
+从 v2.8.0 开始，Mark42 使用**动态阈值系统**，阈值根据上下文窗口大小自动调整，以对抗"上下文腐烂"（context rot）现象。
+
+**原理**：大上下文窗口中信息更容易扩散，关键内容丢失更快。因此阈值随窗口增大而下调，更早触发压缩。
+
+**动态阈值计算公式**：
+
+```python
+def get_dynamic_thresholds(context_window: int) -> dict:
+    """根据上下文窗口大小返回动态阈值
+    
+    基准 (128K):  WARN=70, ALERT=85, CRIT=95
+    目标 (1M):    WARN=60, ALERT=75, CRIT=90
+    中间值线性插值
+    """
+```
+
+| 窗口大小 | WARN | ALERT | CRIT | 说明 |
+|----------|------|-------|------|------|
+| 128K (基准) | 70% | 85% | 95% | 标准阈值 |
+| 256K | 67% | 82% | 94% | 更早介入 |
+| 512K | 63% | 79% | 92% | 衰减加速 |
+| 1M | 60% | 75% | 90% | context rot 更严重 |
+
 #### 三级阈值机制
 
-Mark42 使用三级阈值机制来保护上下文：
-
-| 级别 | 默认值 | 触发行为 | 说明 |
+| 级别 | 默认值 (128K) | 触发行为 | 说明 |
 |---|---|---|---|
 | **WARN** | 70% | 发送预警 + 自动 LLM 压缩 | 温和压缩，保留大部分语义 |
 | **ALERT** | 85% | 强制再次压缩 + 更激进策略 | 深度压缩，优先保留关键信息 |
 | **CRIT** | 95% | 紧急处理 + SmartCrusher | 极端压缩，必要时删除非关键数据 |
+
+#### 静态覆盖（可选）
+
+如果需要禁用动态阈值，使用固定值，可以通过配置文件或环境变量覆盖：
+
+```toml
+# config.toml - 静态阈值覆盖
+[thresholds]
+warn  = 70
+alert = 85
+crit  = 95
+```
 
 #### 调优建议
 
@@ -277,11 +338,8 @@ warn  = 60
 alert = 75
 crit  = 85
 
-# 大模型（128K 上下文）- 更保守
-[thresholds]
-warn  = 75
-alert = 88
-crit  = 95
+# 大模型（128K 上下文）- 动态阈值自动生效
+# 无需额外配置，armor.py 自动读取窗口大小计算阈值
 ```
 
 ### 2.3 模型路由详解
@@ -937,7 +995,55 @@ systemctl --user list-timers mark42-watchdog.timer
 
 ---
 
-## 5. 环境变量
+## 5. Compaction-Notifier Hook 配置 (v2.8.0)
+
+**位置**: `~/.openclaw/hooks/compaction-notifier/`
+
+Mark42 提供的中文版压缩通知 Hook，覆盖 OpenClaw 内置的英文通知。
+
+### 5.1 安装 Hook
+
+```bash
+# 复制 Hook 到 OpenClaw Hook 目录
+cp -r mark42-pkg/hooks/compaction-notifier ~/.openclaw/hooks/
+```
+
+### 5.2 Hook 特性
+
+| 特性 | 说明 |
+|---|---|
+| **纯脚本实现** | 不经过模型调用，零延迟 |
+| **中文通知** | 覆盖默认英文通知 |
+| **Token 统计** | 显示压缩前后 Token 数量变化 |
+| **无额外配置** | 放置即生效 |
+
+### 5.3 通知内容
+
+- **压缩开始**: `🧹 正在压缩对话～！一会说～！`
+- **压缩完成**: `✅ 压缩完成（X -> Y tokens），继续聊～！`
+
+### 5.4 工作原理
+
+```
+OpenClaw 触发 compact
+        │
+        ▼
+  调用 compaction-notifier hook
+        │
+        ├─> 开始阶段 → 发送 "正在压缩" 通知
+        │
+        ▼
+  执行上下文压缩
+        │
+        ▼
+  再次调用 compaction-notifier hook
+        │
+        └─> 完成阶段 → 发送 "压缩完成" 通知（含 Token 统计）
+```
+
+---
+
+## 6. 环境变量
 
 Mark42 支持通过环境变量覆盖配置。
 
