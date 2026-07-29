@@ -1678,3 +1678,27 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260729-001] correction
+
+**Logged**: 2026-07-29T09:06:13.194Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 说的不是这个 压缩 是 Compation 内嵌压缩和上下文会话压缩。 其实之前用了一段时间 感觉挺好的，然后就出问题了。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

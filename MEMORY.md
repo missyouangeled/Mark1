@@ -149,7 +149,7 @@
 
 - **主会话默认**：`volcengine-agent/doubao-seed-2.0-pro`
 - **子 agent 默认**：`volcengine-agent/doubao-seed-2.0-pro`
-- **compaction/记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（300s 超时）
+- **compaction/记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（300s 超时，128K contextWindow）
 - **图片识别**：`volcengine-agent/doubao-seed-2.0-pro`
 - **fallback**：`volcengine-agent/glm-5.2`（唯一 fallback，不再使用 litellm/agnes-2.0-flash）
 - **图片生成 fallback**：`volcengine-agent/doubao-seed-2.0-pro`（不再使用 litellm/agnes）
