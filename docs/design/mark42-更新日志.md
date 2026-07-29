@@ -5,7 +5,55 @@
 
 ---
 
-## 2026-07-27 #36 - 全量体检修复 + G10/G11/G13/G16/G21/G23 六项缺失补齐
+## 2026-07-29 #38 - 四大可用性修复：安装器/配置向导/用户文档/错误处理
+
+**版本**: v2.8.1
+**提交**: 5c8131ae
+**文件变更**: 68 个文件, +4563/-412 行
+
+### 变更清单
+
+**1. 安装器修复**
+- 同步 scripts/mark42_modules/ -> mark42-pkg/mark42/（44->75 .py 文件）
+- 新增子包: audit/ (6文件), interfaces/ (11文件), plugins/ (11文件)
+- pyproject.toml 添加 loop_templates.yaml 到 package-data
+- CLI 添加 `--version` 参数
+- 验证: pip install -e . 成功, mark42 --version -> v2.7.0, import mark42/audit/plugins/interfaces 全 OK
+
+**2. 交互式配置向导**
+- user_config.py 新增 interactive_init() 函数
+- 5 步引导: 路径配置 -> 上下文阈值 -> LLM 模型 -> 守护进程 -> 日志级别
+- CLI --init 接入向导, 已有配置时提示不覆盖
+- 配置生成到 ~/.config/mark42/config.toml
+
+**3. 用户文档三件套**
+- QUICKSTART.md (1.6KB): 5 分钟上手, 5 步每步1分钟
+- TUTORIAL.md (5.3KB): 7 章 - 什么是/安装/配置/日常/进阶/排障/FAQ
+- INDEX.md (2.7KB): 文档导航 + 命令/配置/systemd 速查 + 学习路径
+- README.md 开头添加快速导航表和 3 步命令
+
+**4. 错误处理升级**
+- 6 个模块添加 logging: heavy.py, armor.py, engine.py, compaction_diag.py, context_safety.py, config.py
+- heavy.py: 10 处错误 print -> logger.error + print
+- armor.py: 9 处警告 print -> logger.warning
+- engine.py: 3 处错误 print -> logger.error + print
+- compaction_diag.py: openclaw.json 写入加 try/except 自动回滚
+- context_safety.py: _save_openclaw_config() 加备份 + 写入失败自动回滚
+- 所有 CLI 输出的 print 保留（用户仍可见）
+
+**5. 崩坏案例**
+- 案例 15: subagent 修改 context_safety.py 导致 openclaw.json gateway.mode 丢失
+- 预防措施: subagent 禁止读写 openclaw.json, 修改前必须备份, edit 失败不允许 fallback write
+
+### 验证结果
+- ✅ 80 个测试全过 (heavy 41 + armor 29 + compaction_diag + context_safety + engine + config)
+- ✅ openclaw.json 未被修改 (diff 确认)
+- ✅ pip install -e . 成功
+- ✅ mark42 --version, import mark42 全 OK
+
+---
+
+## 2026-07-29 #37 - 全量审查 + 14模块测试补齐
 
 **背景**：
 点点要求全量检查 Mark42，查到任何问题都要修复。发现 3 个 Bug + 截图列出 6 项缺失项，全部修复。

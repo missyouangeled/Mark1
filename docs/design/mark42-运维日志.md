@@ -269,3 +269,25 @@ export MARK42_LLM_AUTO_THRESHOLD=5120
 - 无需手动操作，守护自动拾取新模块
 - 建议首次 compact 后检查 audit 报告: `mark42.py audit last`
 - 建议验证中文 Hook 生效: 触发一次 compact，观察通知内容
+
+## 三、四大可用性修复（2026-07-29 14:35）
+
+### 修复内容
+
+1. **安装器**: 44->75 文件同步, pip install -e . 成功, mark42 --version -> v2.7.0
+2. **配置向导**: interactive_init() 5 步交互式配置, CLI --init 接入
+3. **用户文档**: QUICKSTART.md + TUTORIAL.md + INDEX.md + README.md 导航更新
+4. **错误处理**: 6 个模块加 logging + openclaw.json 写入加备份回滚
+
+### 崩溃记录
+
+- 13:38-13:56: 4 个 subagent 并行修复时, context_safety.py 被篡改导致 gateway.mode 丢失
+- Gateway 连续 3 次重启失败, VM 快照恢复
+- 已记录为崩坏案例 15, 预防措施已写入
+- 第二次手动修复未触发任何问题, openclaw.json 全程未变
+
+### 测试验证
+
+- 80 个测试全过 (heavy/armor/compaction_diag/context_safety/engine/config)
+- openclaw config validate -> Config valid
+- pip install -e . -> Successfully installed mark42-2.7.0

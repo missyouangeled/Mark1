@@ -13,7 +13,8 @@
 
 ### 代码体量
 
-- **18 个模块文件**（`scripts/mark42_modules/*.py`）
+- **66 个模块文件**（`scripts/mark42_modules/` 含子包）
+- **75 个包文件**（`mark42-pkg/mark42/` 含 audit/ interfaces/ plugins/ 子包）
 - **1 个 CLI 入口** `scripts/mark42.py`
 - **316 passed / 8 skipped / 45.9% 覆盖**（2026-07-01 上午早期实跑基线）
 - **后续测试推进已继续提升到 452 passed / 1 skipped / 63.2% 覆盖**；最新测试口径请看 `docs/design/mark42-测试覆盖接力开发方向-20260701.md`

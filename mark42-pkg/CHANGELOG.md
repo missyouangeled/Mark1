@@ -5,6 +5,39 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.8.1] - 2026-07-29
+
+### 新增
+- 📦 **安装器修复**：同步 scripts/mark42_modules/ -> mark42-pkg/mark42/（44->75 文件）
+  - 新增 audit/ interfaces/ plugins/ 三个子包
+  - pyproject.toml 添加 loop_templates.yaml 到 package-data
+  - CLI 添加 `--version` 参数
+  - `pip install -e .` 验证成功, `mark42 --version` -> v2.7.0
+- 🧙 **交互式配置向导**：`user_config.py` 新增 `interactive_init()` 函数
+  - 5 步引导: 路径 -> 阈值 -> 模型 -> 守护进程 -> 日志
+  - CLI `--init` 接入向导，已有配置时提示不覆盖
+- 📖 **用户文档三件套**：
+  - QUICKSTART.md: 5 分钟快速上手（1.6KB）
+  - TUTORIAL.md: 7 章完整教程（5.3KB）含安装/配置/日常/进阶/排障/FAQ
+  - INDEX.md: 文档导航 + 命令速查 + 配置速查 + systemd 速查
+  - README.md 开头添加快速导航表格和 3 步命令
+
+### 修复
+- 🛡️ **错误处理升级**：6 个模块从 print+return 升级为 logging + 异常保护
+  - `heavy.py`: +logging, 10 处错误 print -> logger.error + print（用户可见 + 持久记录）
+  - `armor.py`: +logging, 9 处警告 print -> logger.warning
+  - `engine.py`: +logging, 3 处错误 print -> logger.error + print
+  - `compaction_diag.py`: +logging, openclaw.json 写入加 try/except 自动回滚
+  - `context_safety.py`: +logging, `_save_openclaw_config()` 加备份 + 写入失败自动回滚
+  - `config.py`: +logging
+  - 所有 CLI 输出的 print 保留（用户仍可见），仅错误/警告走 logger
+
+### 文档
+- 📝 崩坏案例 15: subagent 修改 context_safety.py 导致 gateway.mode 丢失
+
+### 测试
+- ✅ 80 个测试全过（heavy 41 + armor 29 + compaction_diag + context_safety + engine + config）
+
 ## [2.8.0] - 2026-07-29
 
 ### 新增

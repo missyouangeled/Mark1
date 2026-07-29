@@ -574,3 +574,17 @@
 - **消息**: `🧹 正在压缩对话～！一会说～！` / `✅ 压缩完成（X -> Y tokens），继续聊～！`
 - **覆盖**: 内置英文版 compaction-notifier
 - **状态**: 已启用，已验证
+
+## Mark42 v2.8.1 四大可用性修复 - 2026-07-29
+
+- **时间**: 2026-07-29 14:30 CST
+- **类型**: Mark42 包修复
+- **提交**: 5c8131ae
+- **变更**:
+  1. **安装器**: 同步 44->75 .py 文件, 新增 audit/interfaces/plugins 子包, pip install -e . 成功
+  2. **配置向导**: user_config.py 新增 interactive_init(), CLI --init 接入
+  3. **用户文档**: QUICKSTART.md + TUTORIAL.md + INDEX.md + README.md 导航
+  4. **错误处理**: 6 模块加 logging + openclaw.json 写入加备份回滚
+- **安装方式**: `cd mark42-pkg && pip install -e . --break-system-packages`
+- **验证**: mark42 --version -> v2.7.0, 80 测试全过, openclaw.json 未变
+- **状态**: 已安装, 已推送 master

@@ -117,7 +117,7 @@
 
 ## 项目
 
-- **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲）。compact 审计 6 类核对 + Constraint Pinning + 动态阈值 + 中文 compaction-notifier hook，评分 100/100。详见 `PROJECT_INDEX.md` 和 `docs/design/`。
+- **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲）。v2.8.1 四大可用性修复完成（安装器/配置向导/用户文档/错误处理）。compact 审计 6 类核对 + Constraint Pinning + 动态阈值 + 中文 compaction-notifier hook。审查评分 A-(91/100)，1622 个测试 0 失败。用户文档: QUICKSTART/TUTORIAL/INDEX。详见 `PROJECT_INDEX.md` 和 `docs/design/`。
 
 ## 记忆归档索引
 
