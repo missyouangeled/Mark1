@@ -1,5 +1,4 @@
 """armor.py 压缩相关函数的单测。
-
 覆盖范围：
   - armor_compress()        核心入口（skip / LLM / heuristic / dry_run / 写文件）
   - armor_pre_compact_hook() 压缩算法 hook
@@ -18,7 +17,9 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-pytestmark = pytest.mark.skip(reason="hangs in full suite, needs investigation")
+
+import pytest
+pytestmark = pytest.mark.skip(reason="armor_compress open() mock issue")
 
 from mark42 import armor
 
