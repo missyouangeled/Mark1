@@ -88,7 +88,8 @@ else
   XDG_STATE_HOME="$(dirname "$(dirname "$STATE_DIR")")"
 fi
 
-MARK42_CLI="$WORKSPACE/scripts/mark42.py"
+# Mark42 CLI 调用方式：从已删的 scripts/mark42.py 改为 python -m mark42（pip 安装的包）
+MARK42_CLI="-m mark42"
 LOG_DIR="$STATE_DIR/logs"
 BOOTSTRAP_SERVICE_SRC="$WORKSPACE/tools/mark42-bootstrap/mark42-bootstrap.service"
 ARMOR_SERVICE_SRC="$WORKSPACE/tools/mark42-armor-guard/mark42-armor-guard.service"
@@ -121,7 +122,11 @@ need_cmd "$PYTHON_BIN"
 need_cmd systemctl
 need_cmd sed
 need_cmd install
-need_file "$MARK42_CLI"
+# 校验 mark42 包可导入（代替旧的 need_file scripts/mark42.py）
+if ! "$PYTHON_BIN" -c "import mark42" >/dev/null 2>&1; then
+  echo "错误：mark42 包不可导入（请先 pip install -e mark42-pkg/）" >&2
+  exit 1
+fi
 need_file "$BOOTSTRAP_SERVICE_SRC"
 need_file "$ARMOR_SERVICE_SRC"
 need_file "$ENGINE_SERVICE_SRC"
@@ -183,7 +188,7 @@ if [ "$APPLY" -ne 1 ]; then
 fi
 
 echo "应用 Mark42 context safety 基线..."
-"$PYTHON_BIN" "$MARK42_CLI" context-safety apply
+"$PYTHON_BIN" -m mark42 context-safety apply
 
 install -d "$USER_UNIT_DIR" "$STATE_DIR" "$LOG_DIR" "$SCRATCH_ROOT" "$STATE_DIR/engine"
 BACKUP_DIR=""

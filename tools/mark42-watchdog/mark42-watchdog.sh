@@ -11,7 +11,7 @@
 set -e
 
 MARK42_WORKSPACE="${MARK42_WORKSPACE:-/home/missyouangeled/.openclaw/workspace}"
-MARK42_CLI="${MARK42_CLI:-$MARK42_WORKSPACE/scripts/mark42.py}"
+MARK42_CLI="${MARK42_CLI:--m mark42}"  # 默认用 python -m mark42 调用（不再依赖已删的 scripts/mark42.py）
 MARK42_PYTHON_BIN="${MARK42_PYTHON_BIN:-python3}"
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 MARK42_STATE_DIR="${MARK42_STATE_DIR:-$XDG_STATE_HOME/openclaw/mark42}"
@@ -129,8 +129,8 @@ else
 fi
 
 # ── 2. 进程检查 ──
-engine_pid=$(pgrep -f "mark42.py engine --daemon" | head -1 || echo "")
-armor_pid=$(pgrep -f "mark42.py armor --guard" | head -1 || echo "")
+engine_pid=$(pgrep -f "mark42 engine --daemon" | head -1 || echo "")
+armor_pid=$(pgrep -f "mark42 armor --guard" | head -1 || echo "")
 
 if [ -z "$engine_pid" ]; then
     reason="${reason:+$reason; }engine-daemon 进程不在"
@@ -147,7 +147,7 @@ fi
 loops_check=$(python3 -c "
 import json, subprocess
 try:
-    r = subprocess.run(['$MARK42_PYTHON_BIN', '$MARK42_CLI', 'status', '--json'],
+    r = subprocess.run(['$MARK42_PYTHON_BIN', '-m', 'mark42', 'status', '--json'],
                       capture_output=True, text=True, timeout=10)
     d = json.loads(r.stdout)
     eng = d.get('engine', {})
@@ -174,12 +174,12 @@ if [ -n "$loops_check" ]; then
             reason="${reason:+$reason; }4 Loop 有挂 (active=$expected_active/$expected_total)"
             # 【🟡3】本地 log 留痕
             log "⚠️ 4 Loop 状态: $expected_active/$expected_total (expected: $expected_total)"
-            notify_alert "loops-missing" "🚨 mark42 4 Loop 状态: $expected_active/$expected_total。可能是 engine_daemon 出问题,需查 \`mark42.py status\`"
+            notify_alert "loops-missing" "🚨 mark42 4 Loop 状态: $expected_active/$expected_total。可能是 engine_daemon 出问题,需查 \`mark42 status\`"
         elif [ -n "$bad_loops" ]; then
             reason="${reason:+$reason; }Loop 状态不为 registered: $bad_loops"
             # 【🟡3】本地 log 留痕
             log "⚠️ Loop 状态不为 registered: $bad_loops"
-            notify_alert "loops-degraded" "🚨 mark42 Loop 状态异常: $bad_loops。看 \`mark42.py status --json\` 查细节"
+            notify_alert "loops-degraded" "🚨 mark42 Loop 状态异常: $bad_loops。看 \`mark42 status --json\` 查细节"
         fi
     fi
 else
@@ -194,8 +194,8 @@ if [ -n "$need_restart" ]; then
     run_and_log systemctl --user restart mark42-engine-daemon.service || log "   engine-daemon 重启失败"
     run_and_log systemctl --user restart mark42-armor-guard.service || log "   armor-guard 重启失败"
     sleep 5
-    new_engine=$(pgrep -f "mark42.py engine --daemon" | head -1 || echo "")
-    new_armor=$(pgrep -f "mark42.py armor --guard" | head -1 || echo "")
+    new_engine=$(pgrep -f "mark42 engine --daemon" | head -1 || echo "")
+    new_armor=$(pgrep -f "mark42 armor --guard" | head -1 || echo "")
     if [ -n "$new_engine" ] && [ -n "$new_armor" ]; then
         log "✅ 重启成功: engine=$new_engine, armor=$new_armor"
     else

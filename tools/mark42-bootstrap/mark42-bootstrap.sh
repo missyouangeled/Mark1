@@ -9,7 +9,7 @@
 set -e
 
 MARK42_WORKSPACE="${MARK42_WORKSPACE:-/home/missyouangeled/.openclaw/workspace}"
-MARK42_CLI="${MARK42_CLI:-$MARK42_WORKSPACE/scripts/mark42.py}"
+MARK42_CLI="${MARK42_CLI:--m mark42}"  # 默认用 python -m mark42 调用（不再依赖已删的 scripts/mark42.py）
 MARK42_PYTHON_BIN="${MARK42_PYTHON_BIN:-python3}"
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 MARK42_STATE_DIR="${MARK42_STATE_DIR:-$XDG_STATE_HOME/openclaw/mark42}"
@@ -31,7 +31,7 @@ log "=== Mark42 Bootstrap 启动 ==="
 # 等待 Mark42 初始化完成（首次可能需要 --init）
 if [ ! -f "$CONFIG_FILE" ]; then
     log "Mark42 未初始化，执行 --init"
-    "$MARK42_PYTHON_BIN" "$MARK42_CLI" --init >> "$LOGFILE" 2>&1
+    "$MARK42_PYTHON_BIN" -m mark42 --init >> "$LOGFILE" 2>&1
 fi
 
 # 等待 Gateway 就绪（最多等 30 秒）
@@ -94,7 +94,7 @@ register_loop() {
     local task="$2"
     local period="$3"
     log "注册 Loop: $template → $task ($period s)"
-    "$MARK42_PYTHON_BIN" "$MARK42_CLI" engine --start --task "$task" --template "$template" --interval "$period" >> "$LOGFILE" 2>&1 || {
+    "$MARK42_PYTHON_BIN" -m mark42 engine --start --task "$task" --template "$template" --interval "$period" >> "$LOGFILE" 2>&1 || {
         log "   ⚠️ 注册失败（可能已存在，忽略）"
     }
 }
@@ -110,8 +110,9 @@ register_loop "memory-index"   "记忆自动归类"   21600
 log "🛡️ 启动守护进程..."
 
 # 先确保旧的 assemble 子进程已清理（如果存在）
-pkill -f "mark42.py armor --guard" 2>/dev/null || true
-pkill -f "mark42.py engine --daemon" 2>/dev/null || true
+# 匹配 "mark42 armor/engine"（兼容 python -m mark42 和旧 scripts/mark42.py 两种进程名）
+pkill -f "mark42 armor --guard" 2>/dev/null || true
+pkill -f "mark42 engine --daemon" 2>/dev/null || true
 sleep 1
 
 # 重新启动

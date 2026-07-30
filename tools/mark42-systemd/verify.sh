@@ -69,7 +69,7 @@ if [ -z "$WORKSPACE" ]; then
   WORKSPACE="$(cd "$SCRIPT_DIR/../.." && pwd)"
 fi
 
-MARK42_CLI="$WORKSPACE/scripts/mark42.py"
+MARK42_CLI="-m mark42"  # 从已删的 scripts/mark42.py 改为 python -m mark42
 
 pass() {
   PASS_COUNT=$((PASS_COUNT + 1))
@@ -115,10 +115,10 @@ else
   fail "workspace 目录不存在：$WORKSPACE"
 fi
 
-if [ -f "$MARK42_CLI" ]; then
-  pass "Mark42 CLI 存在：$MARK42_CLI"
+if "$PYTHON_BIN" -c "import mark42" >/dev/null 2>&1; then
+  pass "Mark42 包可导入（python -m mark42）"
 else
-  fail "缺少 Mark42 CLI：$MARK42_CLI"
+  fail "Mark42 包不可导入（请 pip install -e mark42-pkg/）"
 fi
 
 if systemctl --user show-environment >/dev/null 2>&1; then
@@ -206,20 +206,20 @@ else
   warn "未找到 openclaw 命令；无法补充读取 Gateway 状态面"
 fi
 
-if "$PYTHON_BIN" "$MARK42_CLI" context-safety verify >/dev/null 2>&1; then
+if "$PYTHON_BIN" -m mark42 context-safety verify >/dev/null 2>&1; then
   pass "Mark42 context safety verify 通过"
 else
   fail "Mark42 context safety verify 未通过"
 fi
 
 STATUS_TMP="$(mktemp)"
-if "$PYTHON_BIN" "$MARK42_CLI" status --json >"$STATUS_TMP" 2>&1; then
-  pass "mark42.py status --json 可运行"
+if "$PYTHON_BIN" -m mark42 status --json >"$STATUS_TMP" 2>&1; then
+  pass "mark42 status --json 可运行"
 
   if SUMMARY="$($PYTHON_BIN -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); engine=data.get("engine") or {}; armor=data.get("armor") or {}; logs=data.get("logs") or {}; print(f"activeLoops={engine.get('"'"'activeLoops'"'"','"'"'unknown'"'"')} totalLoops={engine.get('"'"'totalLoops'"'"','"'"'unknown'"'"')} armorStatus={armor.get('"'"'status'"'"','"'"'unknown'"'"')} rotationCount={logs.get('"'"'rotationCount'"'"','"'"'unknown'"'"')}")' "$STATUS_TMP")"; then
     pass "Mark42 状态摘要：$SUMMARY"
   else
-    warn "mark42.py status --json 可运行，但摘要提取失败；建议人工复核"
+    warn "mark42 status --json 可运行，但摘要提取失败；建议人工复核"
   fi
 
   if "$PYTHON_BIN" -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); engine=data.get("engine") or {}; loops=engine.get("activeLoops"); raise SystemExit(0 if isinstance(loops, int) and loops > 0 else 1)' "$STATUS_TMP" >/dev/null 2>&1; then
@@ -231,10 +231,10 @@ if "$PYTHON_BIN" "$MARK42_CLI" status --json >"$STATUS_TMP" 2>&1; then
   if "$PYTHON_BIN" -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); armor=data.get("armor") or {}; status=armor.get("status"); raise SystemExit(0 if status in {"ok", "warn"} else 1)' "$STATUS_TMP" >/dev/null 2>&1; then
     pass "Armor 状态可读"
   else
-    warn "Armor 状态暂未达到预期；建议人工复核 mark42.py status --json"
+    warn "Armor 状态暂未达到预期；建议人工复核 mark42 status --json"
   fi
 else
-  fail "mark42.py status --json 失败：当前无法读取 Mark42 运行状态"
+  fail "mark42 status --json 失败：当前无法读取 Mark42 运行状态"
 fi
 
 printf '\n== summary ==\n'

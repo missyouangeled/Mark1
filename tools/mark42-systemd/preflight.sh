@@ -82,7 +82,7 @@ else
   XDG_STATE_HOME="$(dirname "$(dirname "$STATE_DIR")")"
 fi
 
-MARK42_CLI="$WORKSPACE/scripts/mark42.py"
+MARK42_CLI="-m mark42"  # 从已删的 scripts/mark42.py 改为 python -m mark42
 CONFIG_FILE="$HOME/.openclaw/openclaw.json"
 
 pass() {
@@ -207,10 +207,10 @@ else
   fail "workspace 目录不存在：$WORKSPACE"
 fi
 
-if [ -f "$MARK42_CLI" ]; then
-  pass "Mark42 CLI 存在：$MARK42_CLI"
+if "$PYTHON_BIN" -c "import mark42" >/dev/null 2>&1; then
+  pass "Mark42 包可导入（python -m mark42）"
 else
-  fail "缺少 Mark42 CLI：$MARK42_CLI"
+  fail "Mark42 包不可导入（请 pip install -e mark42-pkg/）"
 fi
 
 if systemctl --user show-environment >/dev/null 2>&1; then
