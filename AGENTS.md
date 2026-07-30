@@ -18,6 +18,7 @@
 > 3. postCompactionSections 是否仍配置正确（compaction 后重注入 AGENTS.md 段落）
 > 4. sH 函数/chat.inject 机制是否在当前版本恢复（如恢复则改回代码层面注入）
 > 5. bootstrap 文件注入列表是否包含本文件（AGENTS.md + 文末认知沉淀段落）
+6. mark42-pkg 测试文件是否全部被 pytest 收集（tests/ 下不应少于 45 个文件）
 
 ## 启动流程
 

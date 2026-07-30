@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
 
 # 导入待测试模块
-from scripts.mark42_modules.context_safety import (
+from mark42.context_safety import (
     context_safety_status,
     context_safety_apply,
     context_safety_verify,
@@ -138,10 +138,10 @@ class TestContextSafetyStatus:
                 }
             }
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=baseline_config):
                     # mock _get_current_session_override
-                    mocker.patch("scripts.mark42_modules.context_safety._get_current_session_override", return_value={})
+                    mocker.patch("mark42.context_safety._get_current_session_override", return_value={})
                     # mock print to avoid clutter
                     mocker.patch("builtins.print")
                     
@@ -174,9 +174,9 @@ class TestContextSafetyStatus:
                 }
             }
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=bad_config):
-                    mocker.patch("scripts.mark42_modules.context_safety._get_current_session_override", return_value={})
+                    mocker.patch("mark42.context_safety._get_current_session_override", return_value={})
                     mocker.patch("builtins.print")
                     
                     result = context_safety_status()
@@ -223,14 +223,14 @@ class TestContextSafetyApply:
                 }
             }
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=fully_compliant_config):
                     with patch("json.dump"):
                         # mock validate
-                        mocker.patch("scripts.mark42_modules.context_safety._run_openclaw_validate", return_value=(True, ""))
+                        mocker.patch("mark42.context_safety._run_openclaw_validate", return_value=(True, ""))
                         mocker.patch("builtins.print")
                         # mock backup not called
-                        mock_backup = mocker.patch("scripts.mark42_modules.context_safety._backup_openclaw_config")
+                        mock_backup = mocker.patch("mark42.context_safety._backup_openclaw_config")
                         
                         result = context_safety_apply()
         
@@ -244,12 +244,12 @@ class TestContextSafetyApply:
             # 空配置，所有项都需要修改
             empty_config = {}
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=empty_config):
                     with patch("json.dump"):
-                        mocker.patch("scripts.mark42_modules.context_safety._run_openclaw_validate", return_value=(True, ""))
+                        mocker.patch("mark42.context_safety._run_openclaw_validate", return_value=(True, ""))
                         mocker.patch("builtins.print")
-                        mock_backup = mocker.patch("scripts.mark42_modules.context_safety._backup_openclaw_config")
+                        mock_backup = mocker.patch("mark42.context_safety._backup_openclaw_config")
                         
                         result = context_safety_apply()
         
@@ -262,15 +262,15 @@ class TestContextSafetyApply:
         with patch.object(Path, "exists", return_value=True):
             empty_config = {}
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=empty_config):
                     with patch("json.dump"):
                         mock_validate = mocker.patch(
-                            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+                            "mark42.context_safety._run_openclaw_validate",
                             return_value=(True, "validated")
                         )
                         mocker.patch("builtins.print")
-                        mocker.patch("scripts.mark42_modules.context_safety._backup_openclaw_config")
+                        mocker.patch("mark42.context_safety._backup_openclaw_config")
                         
                         result = context_safety_apply()
         
@@ -283,15 +283,15 @@ class TestContextSafetyApply:
         with patch.object(Path, "exists", return_value=True):
             empty_config = {}
             
-            with patch("scripts.mark42_modules.context_safety.open", mock_open()):
+            with patch("mark42.context_safety.open", mock_open()):
                 with patch("json.load", return_value=empty_config):
                     with patch("json.dump"):
                         mocker.patch(
-                            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+                            "mark42.context_safety._run_openclaw_validate",
                             return_value=(False, "validation failed")
                         )
                         mocker.patch("builtins.print")
-                        mocker.patch("scripts.mark42_modules.context_safety._backup_openclaw_config")
+                        mocker.patch("mark42.context_safety._backup_openclaw_config")
                         
                         result = context_safety_apply()
         
@@ -304,18 +304,18 @@ class TestContextSafetyVerify:
     def test_verify_all_passes(self, mocker):
         """测试所有检查通过时返回 0"""
         # mock status 检查全部通过
-        mock_status = mocker.patch("scripts.mark42_modules.context_safety.context_safety_status")
+        mock_status = mocker.patch("mark42.context_safety.context_safety_status")
         mock_status.return_value = {"summary": {"pass": 20, "warn": 0, "fail": 0}}
         
         # mock validate 通过
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+            "mark42.context_safety._run_openclaw_validate",
             return_value=(True, "")
         )
         
         # mock smoke checks 通过
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_light_smoke_checks",
+            "mark42.context_safety._run_light_smoke_checks",
             return_value=(True, [])
         )
         
@@ -327,17 +327,17 @@ class TestContextSafetyVerify:
 
     def test_verify_validation_fails(self, mocker):
         """测试验证失败时返回非 0"""
-        mock_status = mocker.patch("scripts.mark42_modules.context_safety.context_safety_status")
+        mock_status = mocker.patch("mark42.context_safety.context_safety_status")
         mock_status.return_value = {"summary": {"pass": 20, "warn": 0, "fail": 0}}
         
         # validate 失败
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+            "mark42.context_safety._run_openclaw_validate",
             return_value=(False, "failed")
         )
         
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_light_smoke_checks",
+            "mark42.context_safety._run_light_smoke_checks",
             return_value=(True, [])
         )
         
@@ -349,16 +349,16 @@ class TestContextSafetyVerify:
 
     def test_verify_status_has_fails(self, mocker):
         """测试状态检查有失败时返回非 0"""
-        mock_status = mocker.patch("scripts.mark42_modules.context_safety.context_safety_status")
+        mock_status = mocker.patch("mark42.context_safety.context_safety_status")
         mock_status.return_value = {"summary": {"pass": 15, "warn": 3, "fail": 2}}
         
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+            "mark42.context_safety._run_openclaw_validate",
             return_value=(True, "")
         )
         
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_light_smoke_checks",
+            "mark42.context_safety._run_light_smoke_checks",
             return_value=(True, [])
         )
         
@@ -370,17 +370,17 @@ class TestContextSafetyVerify:
 
     def test_verify_smoke_fails(self, mocker):
         """测试冒烟检查失败时返回非 0"""
-        mock_status = mocker.patch("scripts.mark42_modules.context_safety.context_safety_status")
+        mock_status = mocker.patch("mark42.context_safety.context_safety_status")
         mock_status.return_value = {"summary": {"pass": 20, "warn": 0, "fail": 0}}
         
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_openclaw_validate",
+            "mark42.context_safety._run_openclaw_validate",
             return_value=(True, "")
         )
         
         # smoke 失败
         mocker.patch(
-            "scripts.mark42_modules.context_safety._run_light_smoke_checks",
+            "mark42.context_safety._run_light_smoke_checks",
             return_value=(False, ["FAIL: something went wrong"])
         )
         

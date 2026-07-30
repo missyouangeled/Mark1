@@ -12,7 +12,7 @@
   - 报告格式化: format_report 三段结构 + report_line 单行格式
 
 设计:
-  - conftest autouse 已经把 mark42_modules.* reload 一遍, perf_bench 是顶层可执行
+  - conftest autouse 已经把 mark42.* reload 一遍, perf_bench 是顶层可执行
     脚本, 不依赖 mark42 状态路径, 所以无需额外 fixture.
   - 直接 import perf_bench 后取属性(下划线函数也不屏蔽).
   - 默认不跑真实 bench_* / main()；若需要覆盖，只做全 mock smoke，避免 tracemalloc + 真压缩 + 真队列往返 + 真写盘污染.
@@ -31,10 +31,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# perf_bench 是顶层脚本模块, 从 mark42_modules 子包里 import 才能让
+# perf_bench 是顶层脚本模块, 从 mark42 子包里 import 才能让
 # pytest-cov 把它计入 coverage 统计 (裸名 import 不会让 sys.modules 看到
 # `mark42.perf_bench` 这个全限定名).
-from mark42_modules import perf_bench as pb  # noqa: E402
+from mark42 import perf_bench as pb  # noqa: E402
 
 
 # ──────────────── helpers ────────────────
