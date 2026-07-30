@@ -1,6 +1,4 @@
-import pytest; pytestmark = pytest.mark.skip(reason="requires examples module not in pkg")
 """
-import pytest; pytest.importorskip("examples")
 Headroom ArcLock 适配器单元测试。
 
 测试范围:
@@ -18,6 +16,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
+pytestmark = pytest.mark.skip(reason="requires examples module")
 
 # 确保 examples 目录在 PYTHONPATH 中
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"

@@ -196,7 +196,7 @@ def test_restart_service_failure_logs_error(tmp_path):
 def test_watchdog_check_all_normal(tmp_path):
     """Test watchdog_check when everything is normal (no restart needed)."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     # Create valid heartbeat
     heartbeat_file = state_dir / "engine" / "daemon-heartbeat.json"
@@ -231,7 +231,7 @@ def test_watchdog_check_all_normal(tmp_path):
 def test_watchdog_check_heartbeat_timeout(tmp_path):
     """Test watchdog_check triggers restart when heartbeat times out."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     # Old timestamp (timed out)
@@ -264,7 +264,7 @@ def test_watchdog_check_heartbeat_timeout(tmp_path):
 def test_watchdog_check_engine_dead(tmp_path):
     """Test watchdog_check triggers restart when engine is dead."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
@@ -305,7 +305,7 @@ def test_watchdog_check_engine_dead(tmp_path):
 def test_watchdog_check_armor_dead(tmp_path):
     """Test watchdog_check triggers restart when armor is dead."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
@@ -346,7 +346,7 @@ def test_watchdog_check_armor_dead(tmp_path):
 def test_watchdog_check_both_dead(tmp_path):
     """Test watchdog_check restarts both when both processes are dead."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     from datetime import datetime, timezone
@@ -385,7 +385,7 @@ def test_watchdog_check_both_dead(tmp_path):
 def test_watchdog_check_logs_restart(tmp_path):
     """Test watchdog_check logs restart events."""
     state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     heartbeat_file = state_dir / "daemon-heartbeat.json"
     heartbeat_file.write_text(json.dumps({"lastTick": "2020-01-01T00:00:00+00:00"}))

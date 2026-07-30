@@ -1,5 +1,4 @@
 """Loop 模板热加载测试群。
-import pytest; pytestmark = pytest.mark.skip(reason="requires external conftest fixtures (engine_state)")
 
 覆盖范围：
   - _load_templates() 加载默认模板
@@ -207,7 +206,6 @@ templates:
 # ─────────────────────── engine_start 模板验证 ───────────────────────
 
 class TestEngineStartTemplateValidation:
-    pytestmark = pytest.mark.skip(reason="requires external conftest fixtures (engine_state)")
     """engine_start() 模板名验证测试群。"""
 
     def test_valid_template_no_warning(self, mocker, capsys, engine_state):
