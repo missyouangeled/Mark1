@@ -13,14 +13,10 @@ OpenClaw 实现：从 /mnt/data/openclaw/session-backup/ 读最新快照。
 
 from __future__ import annotations
 
-import json
-import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
-
-from ..config import WORKSPACE
+from typing import Any, Protocol, runtime_checkable
 
 # ── 数据盘快照根目录 ──────────────────────────────────
 
@@ -34,7 +30,7 @@ _SNAPSHOT_ROOT = Path("/mnt/data/openclaw/session-backup")
 class SnapshotReader(Protocol):
     """快照读取器接口 -- 不同平台实现不同。"""
 
-    def find_latest_before(self, timestamp: str) -> Optional[Dict[str, Any]]:
+    def find_latest_before(self, timestamp: str) -> dict[str, Any] | None:
         """找到指定时间之前最新的快照。
 
         Args:
@@ -46,7 +42,7 @@ class SnapshotReader(Protocol):
         """
         ...
 
-    def extract_key_info(self, snapshot: Dict[str, Any]) -> Dict[str, List[str]]:
+    def extract_key_info(self, snapshot: dict[str, Any]) -> dict[str, list[str]]:
         """从快照中提取关键信息。
 
         Returns:
@@ -80,7 +76,7 @@ class OpenClawSnapshotReader:
     def __init__(self, snapshot_root: Path | None = None) -> None:
         self.root = snapshot_root or _SNAPSHOT_ROOT
 
-    def find_latest_before(self, timestamp: str) -> Optional[Dict[str, Any]]:
+    def find_latest_before(self, timestamp: str) -> dict[str, Any] | None:
         """找到指定时间之前最新的快照目录。"""
         if not self.root.exists():
             return None
@@ -115,14 +111,14 @@ class OpenClawSnapshotReader:
             "timestamp": snap_ts.isoformat(),
         }
 
-    def extract_key_info(self, snapshot: Dict[str, Any]) -> Dict[str, List[str]]:
+    def extract_key_info(self, snapshot: dict[str, Any]) -> dict[str, list[str]]:
         """从快照中提取 5 类关键信息。"""
         snap_path = Path(snapshot.get("path", ""))
         if not snap_path.exists():
             return {cat: [] for cat in
                     ["identity", "preferences", "projects", "decisions", "recent_topics"]}
 
-        info: Dict[str, List[str]] = {
+        info: dict[str, list[str]] = {
             "identity": [],
             "preferences": [],
             "projects": [],
@@ -163,7 +159,7 @@ class OpenClawSnapshotReader:
 
     # ── 内部提取方法 ──────────────────────────────────
 
-    def _extract_identity(self, snap_path: Path) -> List[str]:
+    def _extract_identity(self, snap_path: Path) -> list[str]:
         """从 USER.md / SOUL.md 提取身份信息。"""
         items = []
 
@@ -200,7 +196,7 @@ class OpenClawSnapshotReader:
 
         return items
 
-    def _extract_preferences(self, snap_path: Path) -> List[str]:
+    def _extract_preferences(self, snap_path: Path) -> list[str]:
         """从 MEMORY.md + memory/rules/ 提取偏好规则。
 
         快照里可能不包含 memory/rules/ 目录，但如果包含，
@@ -247,7 +243,7 @@ class OpenClawSnapshotReader:
 
         return items[:30]  # 限制数量避免过长
 
-    def _extract_projects(self, text: str) -> List[str]:
+    def _extract_projects(self, text: str) -> list[str]:
         """从 context-summary 提取项目状态。"""
         items = []
         # 提取带「项目」「Project」「Mark42」等关键词的段落
@@ -257,7 +253,7 @@ class OpenClawSnapshotReader:
                 items.append(item)
         return items[:10]
 
-    def _extract_decisions(self, text: str) -> List[str]:
+    def _extract_decisions(self, text: str) -> list[str]:
         """从 context-summary 提取决策。"""
         items = []
         for m in re.finditer(r"(?:决策|方案|决定|架构|策略)[：:]\s*(.+)", text):
@@ -266,7 +262,7 @@ class OpenClawSnapshotReader:
                 items.append(item)
         return items[:10]
 
-    def _extract_recent_topics(self, text: str) -> List[str]:
+    def _extract_recent_topics(self, text: str) -> list[str]:
         """从 context-summary 提取近期话题。"""
         items = []
         # 提取对话摘要里的行
@@ -279,7 +275,7 @@ class OpenClawSnapshotReader:
                     items.append(item)
         return items[:15]
 
-    def _extract_artifacts(self, text: str) -> List[str]:
+    def _extract_artifacts(self, text: str) -> list[str]:
         """从 context-summary 提取修改的文件列表。
 
         Factory.ai 研究发现 compact 后最容易丢的是「改了哪些文件」。
@@ -297,7 +293,7 @@ class OpenClawSnapshotReader:
                 items.append(path)
         return items[:15]
 
-    def _extract_artifacts_from_transcript(self, text: str) -> List[str]:
+    def _extract_artifacts_from_transcript(self, text: str) -> list[str]:
         """从 daily transcript 提取文件变更。"""
         items = []
         # 匹配 Tool result 里的 edit/write 成功消息
@@ -307,7 +303,7 @@ class OpenClawSnapshotReader:
                 items.append(path)
         return items[:10]
 
-    def _extract_topics_from_transcript(self, text: str) -> List[str]:
+    def _extract_topics_from_transcript(self, text: str) -> list[str]:
         """从 daily transcript 提取话题。"""
         items = []
         # 提取用户消息

@@ -15,21 +15,29 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    ARMOR_STATE, BROKER_EVENTS, BYTES_PER_KTOKEN, CONFIG_PATH,
-    DEFAULT_CONTEXT_WINDOW, THRESHOLD_ALERT, THRESHOLD_CRIT,
-    THRESHOLD_WARN, WORKSPACE, XDG_STATE, resolve_model,
-    get_dynamic_thresholds,
-    # 阶段 1: 压缩算法常量 (2026-06-24)
-    ALGO_SMARTCRUSH_ENABLED, ALGO_EXPERIMENT_MODE,
+    ALGO_EXPERIMENT_MODE,
+    ALGO_FAIL_SAFE,
+    ALGO_SMARTCRUSH_ENABLED,
     ALGO_SMARTCRUSH_MIN_CONTENT_SIZE,
     # 阶段 1 Day 4: 调度器接入控制 (2026-06-24)
-    ALGO_USE_SCHEDULER, ALGO_PII_ENABLED, ALGO_FAIL_SAFE,
-)
-from .utils import (
-    _append_broker, _estimate_tokens_smart, _find_active_session,
-    _get_context_window, _load_json, _now_iso, _now_ts, _save_json,
+    ALGO_USE_SCHEDULER,
+    ARMOR_STATE,
+    BYTES_PER_KTOKEN,
+    DEFAULT_CONTEXT_WINDOW,
+    OPENCLAW_BIN,
+    XDG_STATE,
+    get_dynamic_thresholds,
+    resolve_model,
 )
 from .output_guard import compact_preview, trim_detail
+from .utils import (
+    _append_broker,
+    _estimate_tokens_smart,
+    _find_active_session,
+    _get_context_window,
+    _now_iso,
+    _save_json,
+)
 
 # 阶段 1 压缩算法 (2026-06-24 新增, 借鉴 Headroom)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
@@ -43,7 +51,8 @@ except ImportError as e:
 # 阶段 1 Day 4: 算法调度器 (2026-06-24)
 # 设计: docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
 try:
-    from .algo_scheduler import process as algo_scheduler_process, decide as algo_scheduler_decide
+    from .algo_scheduler import decide as algo_scheduler_decide
+    from .algo_scheduler import process as algo_scheduler_process
     _SCHEDULER_AVAILABLE = True
 except ImportError as e:
     _SCHEDULER_AVAILABLE = False
@@ -596,7 +605,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 再跑 LLM compact 只会让摘要+元数据膨胀（实测变大 10KB+）
     if not dry_run and active:
         try:
-            with open(active, "r") as _f:
+            with open(active) as _f:
                 _head = _f.read(8192)  # 读前 8KB 够判断
             if '"type":"compaction"' in _head or '"type": "compaction"' in _head:
                 print("⏸️ Session 已含 compaction 摘要，跳过 LLM compact（避免摘要膨胀）")
@@ -611,8 +620,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     compact_cooldown_file.write_text(
                         json.dumps({"lastCompactTs": _now_iso(), "reason": "already-compacted"}, ensure_ascii=False)
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("ignored error: %s", e)
                 _append_broker(
                     "armor", "mark42.armor.compact.skipped",
                     "Session 已含摘要，跳过 compact",
@@ -691,8 +700,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         """释放 compact 锁。"""
         try:
             COMPACT_LOCK_FILE.unlink(missing_ok=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
     def _platform_compact_probe(usage_val: float) -> bool:
         """平台探测期：等待平台自己 compact。
@@ -716,7 +725,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 print(f"   ✅ 探测到 usage 下降: {usage_val}% -> {probe_usage}%，平台已处理")
                 return True
             print(f"   ⏳ [{(i+1)*PLATFORM_PROBE_INTERVAL}s] usage={probe_usage}% (无变化)")
-        print(f"   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
+        print("   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
         return False
 
     if not dry_run and usage >= _warn_pct:
@@ -742,7 +751,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
 
         try:
             # ── Session Fence：压缩前验证 + 锁定 ──
-            from .session_fence import fence_verify, fence_record_pre, fence_record_post
+            from .session_fence import fence_record_post, fence_record_pre, fence_verify
             active_session = _find_active_session()
             if not active_session:
                 print("⚠️ 未找到活跃会话，跳过 compact")
@@ -776,7 +785,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                     # LLM 模式保留语义但慢（60-180s）；截短模式快但丢信息
                     compact_proc = subprocess.run(
                         [
-                            "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
+                            OPENCLAW_BIN, "sessions", "compact",
                             "agent:main:main",
                             "--timeout", "600000",  # OpenClaw 内部超时 600s
                             "--json",
@@ -834,7 +843,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                             print("    ⚠️ LLM 压缩失败且文件未变，回退到截短模式")
                             compact_proc = subprocess.run(
                                 [
-                                    "/home/missyouangeled/.npm-global/bin/openclaw", "sessions", "compact",
+                                    OPENCLAW_BIN, "sessions", "compact",
                                     "agent:main:main",
                                     "--max-lines", "150",
                                     "--timeout", "180000",
@@ -905,8 +914,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         compact_cooldown_file.write_text(
                             json.dumps({"lastCompactTs": _now_iso(), "reason": "post-compact"}, ensure_ascii=False)
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("ignored error: %s", e)
 
         except subprocess.TimeoutExpired:
             print("⚠️ sessions.compact 调用超时（200s）")
@@ -1033,8 +1042,8 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         "source": "post-compact",
                     },
                 )
-        except Exception:
-            pass  # audit hook 失败不影响主流程
+        except Exception as e:
+            logger.warning("ignored error: %s", e)  # audit hook 失败不影响主流程
 
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
@@ -1051,7 +1060,7 @@ def _send_context_warn_event(usage: float) -> bool:
     )
     try:
         result = _sp.run(
-            ["/home/missyouangeled/.npm-global/bin/openclaw", "system", "event",
+            [OPENCLAW_BIN, "system", "event",
              "--text", text,
              "--mode", "next-heartbeat",
              "--session-key", "agent:main:main"],
@@ -1070,23 +1079,23 @@ def _send_context_warn_event(usage: float) -> bool:
 
 def _inject_memory_index(index: dict[str, Any]) -> bool:
     """压缩后自动注入 memory-index 到主会话。
-    
+
     将压缩时保留的关键信息通过 systemEvent 注入回会话，
     确保 AI 不会因为压缩丢失重要上下文。
-    
+
     Returns: True=注入成功, False=失败
     """
     import subprocess as _sp
     preserved = index.get("preserved", {})
-    
+
     # 构建注入文本
     lines = ["📝 [Mark42 memory-index] 压缩后自动注入关键信息："]
-    
+
     # 用户身份
     user_id = preserved.get("userIdentity", "")
     if user_id:
         lines.append(f"- 用户身份: {user_id}")
-    
+
     # 按角色保留的消息
     by_role = preserved.get("byRole", {})
     for role in ("user", "assistant"):
@@ -1097,13 +1106,13 @@ def _inject_memory_index(index: dict[str, Any]) -> bool:
             for msg in msgs[:3]:  # 最多 3 条
                 preview = str(msg)[:200]
                 lines.append(f"  - {preview}")
-    
+
     # LLM 分析结果
     if index.get("modelGenerated"):
         active_projects = preserved.get("activeProjects", [])
         if active_projects:
             lines.append(f"- 活跃项目: {', '.join(str(p) for p in active_projects[:3])}")
-    
+
     # 压缩信息
     strategy = index.get("strategyUsed", "unknown")
     pre_bytes = index.get("preCompactBytes", 0)
@@ -1111,12 +1120,12 @@ def _inject_memory_index(index: dict[str, Any]) -> bool:
     if pre_bytes and post_bytes:
         saved = pre_bytes - post_bytes
         lines.append(f"- 压缩: {strategy}, {pre_bytes//1024}KB -> {post_bytes//1024}KB (节省 {saved//1024}KB)")
-    
+
     text = "\n".join(lines)
-    
+
     try:
         result = _sp.run(
-            ["/home/missyouangeled/.npm-global/bin/openclaw", "system", "event",
+            [OPENCLAW_BIN, "system", "event",
              "--text", text,
              "--mode", "next-heartbeat",
              "--session-key", "agent:main:main"],
@@ -1330,7 +1339,7 @@ def armor_llm_stats(window: int = 50) -> dict[str, Any]:
                 {"fallbackRate": fallback_rate, "threshold": FALLBACK_SLO_THRESHOLD,
                  "window": effective_total},
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
     return result

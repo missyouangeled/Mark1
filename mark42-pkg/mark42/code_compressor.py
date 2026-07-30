@@ -14,8 +14,10 @@
 """
 
 import ast
+import logging
+
+logger = logging.getLogger(__name__)
 import re
-from typing import Any
 
 from mark42.utils import safe_call
 
@@ -223,8 +225,8 @@ class CodeCompressor:
             else:
                 try:
                     lines.append(f"    {ast.unparse(stmt)}")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("ignored error: %s", e)
         return lines
 
     def _compress_regex(self, content: str, stats: dict) -> str:
@@ -305,7 +307,7 @@ class Bar:
         return self.x
 '''
     out, stats = cc.compress(py_code)
-    print(f"\n[测试 1] Python 函数+类 (含 docstring)")
+    print("\n[测试 1] Python 函数+类 (含 docstring)")
     print(f"  原 {stats['original_bytes']}B → 压 {stats['crushed_bytes']}B (压缩率 {stats['ratio']*100:.1f}%)")
     print(f"  removed_docstrings={stats['removed_docstrings']}")
     check("1.1 is_code=True", stats["is_code"])
@@ -321,7 +323,7 @@ class Bar:
         big_func += f"    x_{i} = {i}\n"
     big_func += "    return x_49\n"
     out, stats = cc.compress(big_func)
-    print(f"\n[测试 2] 大函数截断 (50 条语句)")
+    print("\n[测试 2] 大函数截断 (50 条语句)")
     check("2.1 标记 truncated_functions", stats["truncated_functions"] >= 1)
     check("2.2 输出含截断标记", "more statements" in out)
 
@@ -336,7 +338,7 @@ async def fetch():
     return await something()
 '''
     out, stats = cc.compress(deco_code)
-    print(f"\n[测试 3] 装饰器 + async")
+    print("\n[测试 3] 装饰器 + async")
     check("3.1 保留装饰器", "@property" in out)
     check("3.2 保留 async", "async def fetch" in out)
 
@@ -353,14 +355,14 @@ function foo(x) {
 const bar = 42;
 '''
     out, stats = cc.compress(js_code)
-    print(f"\n[测试 4] JavaScript 正则压缩")
+    print("\n[测试 4] JavaScript 正则压缩")
     check("4.1 注释被移除", "这是注释" not in out)
     check("4.2 块注释被移除", "块注释" not in out)
     check("4.3 保留 function", "function foo" in out)
 
     # ---- 测试 5: 非代码 passthrough ----
     out, stats = cc.compress("hello world this is just text\nnothing here\n")
-    print(f"\n[测试 5] 非代码 passthrough")
+    print("\n[测试 5] 非代码 passthrough")
     check("5.1 is_code=False", stats["is_code"] is False)
     check("5.2 mode=passthrough", stats["mode"] == "passthrough")
 
@@ -368,7 +370,7 @@ const bar = 42;
     # 多关键词, 超过 min_code_size, 强制走 AST 路径并报错
     bad_code = "def broken(:\n" + "    pass\n" * 20 + "\n"
     out, stats = cc.compress(bad_code)
-    print(f"\n[测试 6] 语法错误 fail-safe")
+    print("\n[测试 6] 语法错误 fail-safe")
     print(f"  mode={stats['mode']}, is_code={stats['is_code']}")
     check("6.1 不崩溃", stats["mode"] in ("error", "passthrough"))
     check("6.2 返回原文 (fail-safe)", "broken" in out)
@@ -376,7 +378,7 @@ const bar = 42;
     # ---- 测试 7: 小代码 passthrough ----
     small = "def f(): pass\n"
     out, stats = cc.compress(small)
-    print(f"\n[测试 7] 小代码 passthrough")
+    print("\n[测试 7] 小代码 passthrough")
     check("7.1 mode=passthrough", stats["mode"] == "passthrough")
 
     # ---- 测试 8: 空内容 ----

@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +26,12 @@ class BreakerState:
     core_id: str
     status: str = "closed"  # closed | open | half_open
     consecutive_failures: int = 0
-    opened_at: Optional[float] = None   # time.monotonic() 时间戳
-    half_open_at: Optional[float] = None
+    opened_at: float | None = None   # time.monotonic() 时间戳
+    half_open_at: float | None = None
     recovery_timeout_s: float = 30.0     # 断路后 30s 半开试探
     failure_threshold: int = 3           # 连续失败 3 次断路
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "core_id": self.core_id,
             "status": self.status,
@@ -40,7 +40,7 @@ class BreakerState:
             "recovery_in_s": self._recovery_in_s(),
         }
 
-    def _recovery_in_s(self) -> Optional[float]:
+    def _recovery_in_s(self) -> float | None:
         if self.status == "open" and self.opened_at:
             remaining = self.recovery_timeout_s - (time.monotonic() - self.opened_at)
             return round(max(0, remaining), 1)
@@ -74,7 +74,7 @@ class CircuitBreaker:
     def __init__(self):
         # 单例共享状态：同一进程内所有 CircuitBreaker() 实例共享 _breakers
         if not hasattr(self, '_shared_breakers'):
-            type(self)._shared_breakers: Dict[str, BreakerState] = {}
+            type(self)._shared_breakers: dict[str, BreakerState] = {}
         self._breakers = type(self)._shared_breakers
 
     @classmethod
@@ -137,13 +137,13 @@ class CircuitBreaker:
             logger.warning("熔断器 %s 断路（连续失败 %d 次）: %s",
                           core_id, b.consecutive_failures, reason)
 
-    def get_state(self, core_id: str) -> Dict[str, Any]:
+    def get_state(self, core_id: str) -> dict[str, Any]:
         """获取熔断器状态。"""
         # 先检查是否该半开
         self.can_call(core_id)
         return self._get(core_id).to_dict()
 
-    def list_all(self) -> list[Dict[str, Any]]:
+    def list_all(self) -> list[dict[str, Any]]:
         """列出所有非 closed 熔断器状态。"""
         # 检查所有 open 状态是否该半开
         for core_id in list(self._breakers.keys()):

@@ -1,7 +1,8 @@
 """ArcLock 熔断器锁扣接口。"""
 
 from __future__ import annotations
-from typing import Any, Dict, Protocol, runtime_checkable
+
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -20,6 +21,6 @@ class BreakerLock(Protocol):
         """记录失败。"""
         ...
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         """所有熔断器状态。"""
         ...

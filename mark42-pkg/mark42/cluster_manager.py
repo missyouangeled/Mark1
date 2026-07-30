@@ -35,16 +35,17 @@ from .log_setup import get_logger
 logger = get_logger(__name__)
 
 import logging
+
 logger = logging.getLogger(__name__)
 import json
 import subprocess
 import urllib.request
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .core_registry import CORE_DEFINITIONS, CoreRegistry
+from .core_registry import CoreRegistry
 
 # ── 常量 ────────────────────────────────────────────────────────────
 
@@ -546,8 +547,8 @@ class ClusterManager:
                 current["last_restart"] = datetime.now().isoformat()
                 current["restart_count"] = restart_count
                 status_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
 
         _record_action(
             "cluster_restart",
@@ -566,7 +567,7 @@ class ClusterManager:
             "cluster": cluster_name,
             "restart_count": restart_count,
             "should_replace": should_replace,
-            "message": restart_message + (f"（已达上限，下次需替换）" if should_replace else ""),
+            "message": restart_message + ("（已达上限，下次需替换）" if should_replace else ""),
         }
 
     def replace(self, cluster_name: str, source: str = "backup") -> dict[str, Any]:
@@ -598,8 +599,8 @@ class ClusterManager:
                     current["last_replace"] = datetime.now().isoformat()
                     current["replace_source"] = source
                     status_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("ignored error: %s", e)
 
         # 2. 初始化新集群（纯净状态）
         # 重新创建目录结构
@@ -649,8 +650,8 @@ class ClusterManager:
                     capture_output=True,
                     timeout=30,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
         elif cluster_name == "cluster-consciousness":
             try:
                 subprocess.run(
@@ -658,8 +659,8 @@ class ClusterManager:
                     capture_output=True,
                     timeout=30,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
 
         _record_action(
             "cluster_replace",
@@ -692,8 +693,8 @@ class ClusterManager:
                 if status_file.exists():
                     try:
                         status_data = json.loads(status_file.read_text(encoding="utf-8"))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("ignored error: %s", e)
                 restart_count = self.get_failure_count(cd["name"])
 
             results.append(

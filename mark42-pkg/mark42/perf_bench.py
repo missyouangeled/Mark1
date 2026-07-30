@@ -13,15 +13,15 @@ P2-6 目标：
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 import tracemalloc
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from statistics import median, quantiles
-from typing import Callable, Any
+from typing import Any
 
 
 def _flush():
@@ -32,14 +32,14 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
+from algo_scheduler import process as scheduler_process
+from code_compressor import codecrush
+from compress_queue import CompressQueue, CompressRequest
+from diff_compressor import diff_compress
+from llm_text_compressor import llm_text_compress_async
+from log_deduplicator import logdedup
 from smart_crusher import smartcrush
 from text_compressor import text_compress
-from code_compressor import codecrush
-from log_deduplicator import logdedup
-from diff_compressor import diff_compress
-from algo_scheduler import process as scheduler_process
-from compress_queue import CompressRequest, CompressQueue
-from llm_text_compressor import llm_text_compress_async
 
 
 @dataclass

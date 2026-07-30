@@ -7,7 +7,6 @@
 import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Optional
 
 logger = logging.getLogger("mark42.metrics_server")
 
@@ -18,8 +17,8 @@ def _collect_metrics() -> str:
     复用 cli.py 中 _print_metrics() 的逻辑，但返回字符串而非打印到 stdout。
     """
     from .armor import armor_check, armor_llm_stats
-    from .engine import _load_loops
     from .circuit_breaker import CircuitBreaker
+    from .engine import _load_loops
 
     lines = []
 
@@ -29,7 +28,7 @@ def _collect_metrics() -> str:
         lines.append("# HELP mark42_context_usage_percent Context usage percentage.")
         lines.append("# TYPE mark42_context_usage_percent gauge")
         lines.append(f'mark42_context_usage_percent {check.get("usagePercent", 0)}')
-        lines.append(f'mark42_context_severity 1')
+        lines.append('mark42_context_severity 1')
         lines.append(f'mark42_context_window_tokens {check.get("contextWindow", 0)}')
         lines.append(f'mark42_context_estimated_tokens {check.get("estimatedTokens", 0)}')
     except Exception as e:
@@ -116,8 +115,8 @@ class MetricsServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 9100):
         self.host = host
         self.port = port
-        self._server: Optional[ThreadingHTTPServer] = None
-        self._thread: Optional[threading.Thread] = None
+        self._server: ThreadingHTTPServer | None = None
+        self._thread: threading.Thread | None = None
 
     def start(self):
         """启动 HTTP 服务（阻塞）。"""

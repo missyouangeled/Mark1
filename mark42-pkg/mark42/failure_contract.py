@@ -25,7 +25,7 @@ from .log_setup import get_logger
 
 logger = get_logger(__name__)
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any

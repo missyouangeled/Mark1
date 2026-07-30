@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-from . import AUDIT_CATEGORIES, Finding, AuditResult, VERDICT_PASS_THRESHOLD, VERDICT_FAIL_CATEGORIES
-
+from . import AUDIT_CATEGORIES, VERDICT_FAIL_CATEGORIES, VERDICT_PASS_THRESHOLD, AuditResult, Finding
 
 # ── 接口 ──────────────────────────────────────────────
 
@@ -25,7 +24,7 @@ class Checker(Protocol):
 
     def check(
         self,
-        pre_info: Dict[str, List[str]],
+        pre_info: dict[str, list[str]],
         post_summary: str,
     ) -> AuditResult:
         """对比关键信息与摘要，返回核对结果。"""
@@ -60,7 +59,7 @@ class LLMChecker:
 
     def check(
         self,
-        pre_info: Dict[str, List[str]],
+        pre_info: dict[str, list[str]],
         post_summary: str,
     ) -> AuditResult:
         """用 LLM 做语义对比。"""
@@ -110,7 +109,7 @@ class LLMChecker:
 }
 ```"""
 
-    def _build_prompt(self, pre_info: Dict[str, List[str]], post_summary: str) -> str:
+    def _build_prompt(self, pre_info: dict[str, list[str]], post_summary: str) -> str:
         """构造 LLM 核对 prompt。"""
         lines = ["请核对以下压缩前的关键信息是否在压缩后的摘要中保留：\n"]
         lines.append("## 压缩前的关键信息\n")
@@ -128,9 +127,9 @@ class LLMChecker:
 
         return "\n".join(lines)
 
-    def _parse_llm_response(self, response: str, pre_info: Dict[str, List[str]]) -> AuditResult:
+    def _parse_llm_response(self, response: str, pre_info: dict[str, list[str]]) -> AuditResult:
         """解析 LLM 返回的 JSON。"""
-        findings: List[Finding] = []
+        findings: list[Finding] = []
 
         # 尝试从 response 提取 JSON
         json_str = response
@@ -160,7 +159,7 @@ class LLMChecker:
         # 计算分数和 verdict
         return self._compute_result(findings, recommendation)
 
-    def _compute_result(self, findings: List[Finding], recommendation: str = "") -> AuditResult:
+    def _compute_result(self, findings: list[Finding], recommendation: str = "") -> AuditResult:
         """从 findings 计算 verdict 和 score。"""
         if not findings:
             return AuditResult(
@@ -217,11 +216,11 @@ class RuleChecker:
 
     def check(
         self,
-        pre_info: Dict[str, List[str]],
+        pre_info: dict[str, list[str]],
         post_summary: str,
     ) -> AuditResult:
         """用关键词匹配核对。"""
-        findings: List[Finding] = []
+        findings: list[Finding] = []
         summary_lower = post_summary.lower()
 
         for cat in AUDIT_CATEGORIES:
@@ -257,7 +256,7 @@ class RuleChecker:
         # 用 LLMChecker 的计算逻辑
         return LLMChecker()._compute_result(findings)
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """从信息项中提取关键词。"""
         # 移除标点和特殊字符
         cleaned = re.sub(r"[^\w\s]", " ", text)

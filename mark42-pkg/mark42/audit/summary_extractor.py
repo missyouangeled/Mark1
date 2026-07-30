@@ -7,15 +7,11 @@ OpenClaw 实现：从 session SQLite/JSONL 读 compaction 条目。
 from __future__ import annotations
 
 import json
-import os
 import subprocess
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from ..config import XDG_STATE
 from ..utils import _find_active_session
-
 
 # ── 接口 ──────────────────────────────────────────────
 
@@ -24,7 +20,7 @@ from ..utils import _find_active_session
 class SummaryExtractor(Protocol):
     """摘要提取器接口 -- 不同平台实现不同。"""
 
-    def find_post_compact_summary(self, compact_timestamp: str) -> Optional[Dict[str, Any]]:
+    def find_post_compact_summary(self, compact_timestamp: str) -> dict[str, Any] | None:
         """找到 compact 后的摘要。
 
         Args:
@@ -36,7 +32,7 @@ class SummaryExtractor(Protocol):
         """
         ...
 
-    def extract_summary_text(self, summary: Dict[str, Any]) -> str:
+    def extract_summary_text(self, summary: dict[str, Any]) -> str:
         """提取摘要文本。"""
         ...
 
@@ -64,7 +60,7 @@ class OpenClawSummaryExtractor:
         '"type": "compaction"',     # 带空格的变体
     ]
 
-    def find_post_compact_summary(self, compact_timestamp: str) -> Optional[Dict[str, Any]]:
+    def find_post_compact_summary(self, compact_timestamp: str) -> dict[str, Any] | None:
         """找到 compact 后的摘要。"""
         session_path = _find_active_session()
         if session_path is None or not session_path.exists():
@@ -76,7 +72,7 @@ class OpenClawSummaryExtractor:
             "timestamp": compact_timestamp,
         }
 
-    def extract_summary_text(self, summary: Dict[str, Any]) -> str:
+    def extract_summary_text(self, summary: dict[str, Any]) -> str:
         """从 session 提取 compaction 摘要文本。"""
         session_path = Path(summary.get("path", ""))
         if not session_path.exists():
@@ -100,7 +96,7 @@ class OpenClawSummaryExtractor:
         try:
             # 读最后 100 行（compaction 摘要通常在最近）
             lines = []
-            with open(session_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(session_path, encoding="utf-8", errors="replace") as f:
                 # 从末尾读
                 f.seek(0, 2)
                 size = f.tell()
@@ -160,10 +156,10 @@ class OpenClawSummaryExtractor:
 
             return tail_text or "(empty session)"
 
-        except (OSError, IOError):
+        except OSError:
             return ""
 
-    def _extract_from_sqlite(self, summary: Dict[str, Any]) -> str:
+    def _extract_from_sqlite(self, summary: dict[str, Any]) -> str:
         """从 SQLite 读 compaction 摘要（通过 openclaw CLI）。"""
         try:
             result = subprocess.run(

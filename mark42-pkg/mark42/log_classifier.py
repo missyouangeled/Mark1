@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ── 分类规则 ─────────────────────────────────────────
 
 # source 关键词映射
-SOURCE_RULES: List[Dict[str, Any]] = [
+SOURCE_RULES: list[dict[str, Any]] = [
     {
         "id": "R-HEALTH",
         "match_fields": ["source", "sourceView", "sourceEventType"],
@@ -78,7 +78,7 @@ SOURCE_RULES: List[Dict[str, Any]] = [
 ]
 
 # 级别关键词映射
-LEVEL_RULES: Dict[str, List[str]] = {
+LEVEL_RULES: dict[str, list[str]] = {
     "critical": ["crash", "panic", "oom", "killed", "fatal", "corruption"],
     "error": ["error", "failed", "failure", "denied", "unauthorized", "timeout"],
     "warning": ["warn", "alert", "stale", "degraded", "slow", "retry"],
@@ -94,11 +94,11 @@ class ClassificationResult:
     category: str = "unknown"
     level: str = "info"
     action: str = "monitor"
-    matched_rule: Optional[str] = None
-    matched_keyword: Optional[str] = None
+    matched_rule: str | None = None
+    matched_keyword: str | None = None
     confidence: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -116,7 +116,7 @@ class LogClassifier:
         self.level_rules = LEVEL_RULES
         self._stats = {"total": 0, "classified": 0, "unknown": 0}
 
-    def classify(self, event: Dict[str, Any]) -> ClassificationResult:
+    def classify(self, event: dict[str, Any]) -> ClassificationResult:
         """分类单条 broker 事件。
 
         Args:
@@ -173,7 +173,7 @@ class LogClassifier:
             confidence=confidence,
         )
 
-    def _classify_level(self, text: str, source_rule: Optional[Dict]) -> str:
+    def _classify_level(self, text: str, source_rule: dict | None) -> str:
         """根据关键词判断级别。"""
         for level, keywords in self.level_rules.items():
             for kw in keywords:
@@ -184,11 +184,11 @@ class LogClassifier:
             return source_rule.get("default_level", "info")
         return "info"
 
-    def classify_batch(self, events: List[Dict[str, Any]]) -> List[ClassificationResult]:
+    def classify_batch(self, events: list[dict[str, Any]]) -> list[ClassificationResult]:
         """批量分类。"""
         return [self.classify(e) for e in events]
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """分类统计。"""
         return dict(self._stats)
 
@@ -204,7 +204,7 @@ class LogClassifier:
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_classify_test(event_str: str) -> Dict[str, Any]:
+def cli_classify_test(event_str: str) -> dict[str, Any]:
     """CLI: 测试分类单条事件。"""
     clf = LogClassifier()
     try:
@@ -214,12 +214,12 @@ def cli_classify_test(event_str: str) -> Dict[str, Any]:
     result = clf.classify(event)
     return result.to_dict()
 
-def cli_classify_stats() -> Dict[str, Any]:
+def cli_classify_stats() -> dict[str, Any]:
     """CLI: 分类统计。"""
     clf = LogClassifier()
     return clf.stats()
 
-def cli_classify_recent(limit: int = 20) -> List[Dict[str, Any]]:
+def cli_classify_recent(limit: int = 20) -> list[dict[str, Any]]:
     """CLI: 分类最近的 broker 事件。"""
     broker_file = Path.home() / ".local" / "state" / "openclaw" / "broker" / "events.jsonl"
     if not broker_file.exists():

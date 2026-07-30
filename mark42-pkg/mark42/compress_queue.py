@@ -24,6 +24,7 @@
 """
 
 import logging
+
 logger = logging.getLogger(__name__)
 import queue as std_queue
 import threading
@@ -31,8 +32,6 @@ import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
-
 
 log = logging.getLogger("mark42.compress_queue")
 

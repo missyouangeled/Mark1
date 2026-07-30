@@ -19,12 +19,9 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
-from typing import Dict, List, Optional, Any
 
 from ..config import WORKSPACE
-
 
 # ── 默认 pinned 文件 ─────────────────────────────────
 
@@ -60,7 +57,7 @@ class ConstraintPinner:
         Returns:
             约束文本，可直接注入为 system 消息
         """
-        sections: List[str] = []
+        sections: list[str] = []
         total_chars = 0
 
         for fname in DEFAULT_PINNED_FILES:
@@ -93,7 +90,7 @@ class ConstraintPinner:
             - AGENTS.md: 提取基本规则摘要
         """
         lines = text.splitlines()
-        essential: List[str] = []
+        essential: list[str] = []
         count = 0
 
         if filename == "SOUL.md":
@@ -173,7 +170,7 @@ class ConstraintPinner:
         except Exception:
             return False
 
-    def inject_to_file(self, constraints: str | None = None) -> Optional[str]:
+    def inject_to_file(self, constraints: str | None = None) -> str | None:
         """将约束写入临时文件，供 armor 下次检查时读取。
 
         Returns:
@@ -187,7 +184,6 @@ class ConstraintPinner:
 
         try:
             from ..config import ARMOR_STATE
-            from ..utils import _now_iso
 
             inject_dir = ARMOR_STATE / "audit" / "injections"
             inject_dir.mkdir(parents=True, exist_ok=True)

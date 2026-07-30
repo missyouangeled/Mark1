@@ -1,15 +1,16 @@
 """内置记忆搜索锁扣实现：包装 QMD 向量引擎。"""
 
 from __future__ import annotations
+
 import os
 import shutil
-from typing import Any, Dict, List
+from typing import Any
 
 
 class BuiltinMemory:
     """将 QMD 向量搜索引擎包装为 MemoryLock 接口。"""
 
-    def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         try:
             import subprocess
             result = subprocess.run(
@@ -24,7 +25,7 @@ class BuiltinMemory:
         except Exception:
             return []
 
-    def index(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def index(self, documents: list[dict[str, Any]]) -> dict[str, Any]:
         # QMD 通过文件系统索引，不直接支持程序化写入
         return {"indexed": 0, "status": "not_implemented_for_qmd"}
 

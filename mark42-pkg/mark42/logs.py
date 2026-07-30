@@ -2,15 +2,20 @@
 
 import fcntl
 import json
-import os
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import (
-    ARMOR_STATE, BROKER_DIR, LOG_DIR, MARK42_BROKER_EVENTS,
-    MAX_ACTIONS_LINES, MAX_BROKER_EVENTS_MB, MAX_DAEMON_LOG_MB,
-    MAX_DAEMON_LOG_LINES, MAX_HISTORY_FILES, MAX_LOG_AGE_DAYS,
+    ARMOR_STATE,
+    LOG_DIR,
+    MARK42_BROKER_EVENTS,
+    MAX_ACTIONS_LINES,
+    MAX_BROKER_EVENTS_MB,
+    MAX_DAEMON_LOG_LINES,
+    MAX_DAEMON_LOG_MB,
+    MAX_HISTORY_FILES,
+    MAX_LOG_AGE_DAYS,
 )
 from .utils import safe_call
 
@@ -69,7 +74,7 @@ def rotate_actions_log() -> dict:
     if not log_path.exists():
         return {"trimmed": 0, "note": "无 actions 日志"}
     try:
-        with open(log_path, "r") as f:
+        with open(log_path) as f:
             lines = f.readlines()
         if len(lines) <= MAX_ACTIONS_LINES:
             return {"trimmed": 0, "lines": len(lines)}
@@ -83,14 +88,14 @@ def rotate_actions_log() -> dict:
 
 def rotate_broker_events() -> dict:
     """若 broker events.jsonl >= MAX_BROKER_EVENTS_MB 则裁剪尾部。
-    
+
     【2026-06-30 全面审查 I 修复 v2】原本是 size_mb <= MAX_BROKER_EVENTS_MB 才裁，
     改为 <,留安全余量（10MB 临界不裁的问题）。
-    
+
     【2026-06-30 10:11 优化】keep_count 乘 0.9 SAFETY_FACTOR, 裁完 < 9MB。
     原逻辑: size_mb=10, MAX/size=1.0, keep_count=100% 行, 裁完仍 10MB。
     改后: keep_count=90% 行, 裁后 ~9MB, 留 10% 余量 (1MB) 足够兼容即将产生的新事件。
-    
+
     【2026-06-30 10:13 🟡2 修复】加 fcntl.flock 独占锁保证裁剪原子性。
     原问题: armor-guard / engine-daemon 多个进程并发 append broker, 裁的瞬间可能丢中间事件。
     修后: 读+写 全程占独占锁, 阻止其他进程同时改 broker 事件。
@@ -114,7 +119,7 @@ def rotate_broker_events() -> dict:
                 return {"sizeMB": round(size_mb, 2), "trimmed": 0}
             # 保留尾部的量 = 总行数 * (SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb)
             # SAFETY_FACTOR=0.9 是保证裁后 < 9MB (留 1MB 余量) 而不是 10MB 临界
-            with open(MARK42_BROKER_EVENTS, "r") as f:
+            with open(MARK42_BROKER_EVENTS) as f:
                 lines = f.readlines()
             keep_count = max(100, int(len(lines) * SAFETY_FACTOR * MAX_BROKER_EVENTS_MB / size_mb))
             kept = lines[-keep_count:]
@@ -205,7 +210,7 @@ def log_rotate(target: str = "all") -> dict:
         if v.get("trimmed_files", 0) > 0:
             print(f"   {k}: 截尾 {v['trimmed_files']} 个日志 ({v.get('trimmed_lines', 0)} 行)")
     if total == 0:
-        print(f"   ℹ️ 无需清理")
+        print("   ℹ️ 无需清理")
     return {"status": "ok", "results": results, "totalItems": total}
 
 
@@ -215,12 +220,12 @@ def log_rotate_status() -> None:
     print("🧹 日志轮替状态:\n")
     print(f"   上次轮替: {state.get('lastRotation', '从未')}")
     print(f"   累计次数: {state.get('rotationCount', 0)}")
-    print(f"\n   阈值:")
+    print("\n   阈值:")
     print(f"     历史文件: ≤{MAX_HISTORY_FILES} 个")
     print(f"     actions.jsonl: ≤{MAX_ACTIONS_LINES} 行")
     print(f"     broker events: ≤{MAX_BROKER_EVENTS_MB}MB")
     print(f"     老化天数: {MAX_LOG_AGE_DAYS} 天")
-    print(f"\n   当前状态:")
+    print("\n   当前状态:")
     # armor history
     history_dir = ARMOR_STATE / "history"
     if history_dir.exists():

@@ -21,13 +21,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .config import MARK42_STATE
 
@@ -44,7 +42,7 @@ APPROVAL_LOG_FILE = ARCHIVE_DIR / "approvals.jsonl"  # L3 自动批准审计
 CONFIG_FILE = ARCHIVE_DIR / "config.json"
 
 # v3 §4.3 L3 防护默认配置
-DEFAULT_L3_CONFIG: Dict[str, Any] = {
+DEFAULT_L3_CONFIG: dict[str, Any] = {
     "cooldown_max": 5,                   # 连续自动批准 ≤ 5 次
     "cooldown_window_days": 30,          # 30 天内计数窗口
     "hard_blacklist_categories": [
@@ -75,7 +73,7 @@ class ArchiveEntry:
     occurrence_count: int
     category: str
     signature: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     diagnosis: str = ""
     is_new_type: bool = True
 
@@ -92,13 +90,13 @@ class ArchiveEntry:
     auto_approval_at: str = ""
     auto_approval_count: int = 0                 # 连续自动批准计数（cooldown 用）
 
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ArchiveEntry":
+    def from_dict(cls, d: dict[str, Any]) -> ArchiveEntry:
         # 兼容缺字段的旧条目
         known = {f for f in cls.__dataclass_fields__.keys()}
         return cls(**{k: v for k, v in d.items() if k in known})
@@ -106,9 +104,10 @@ class ArchiveEntry:
 
 # ── 工具函数 ─────────────────────────────────────────
 
-import threading
 import os as _os_lock
-_file_locks: Dict[str, threading.Lock] = {}
+import threading
+
+_file_locks: dict[str, threading.Lock] = {}
 _file_locks_meta_lock = threading.Lock()
 
 
@@ -133,7 +132,7 @@ def _ensure_archive_dir() -> None:
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _load_l3_config() -> Dict[str, Any]:
+def _load_l3_config() -> dict[str, Any]:
     """从 CONFIG_FILE 读 L3 配置；不存在返回默认（不崩）。"""
     if not CONFIG_FILE.exists():
         return DEFAULT_L3_CONFIG
@@ -148,17 +147,17 @@ def _load_l3_config() -> Dict[str, Any]:
         return DEFAULT_L3_CONFIG
 
 
-def _save_l3_config(cfg: Dict[str, Any]) -> None:
+def _save_l3_config(cfg: dict[str, Any]) -> None:
     _ensure_archive_dir()
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
 
-def _read_entries() -> List[ArchiveEntry]:
+def _read_entries() -> list[ArchiveEntry]:
     """读全部条目；不存在 → 空列表。"""
     if not ENTRIES_FILE.exists():
         return []
-    out: List[ArchiveEntry] = []
+    out: list[ArchiveEntry] = []
     with open(ENTRIES_FILE, encoding="utf-8") as f:
         for ln, line in enumerate(f, 1):
             line = line.strip()
@@ -180,7 +179,7 @@ def _append_entry(entry: ArchiveEntry) -> None:
             f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
 
 
-def _rewrite_entries(entries: List[ArchiveEntry]) -> None:
+def _rewrite_entries(entries: list[ArchiveEntry]) -> None:
     """整体覆盖写 entries.jsonl（用于状态变更）。
 
     并发安全：使用进程内锁 + os.replace 原子替换
@@ -195,7 +194,7 @@ def _rewrite_entries(entries: List[ArchiveEntry]) -> None:
         _os_lock.replace(tmp, ENTRIES_FILE)
 
 
-def _append_audit(entry_id: str, action: str, payload: Dict[str, Any]) -> None:
+def _append_audit(entry_id: str, action: str, payload: dict[str, Any]) -> None:
     """L3 自动批准的审计日志（R7 自动行为必有据可查）。"""
     _ensure_archive_dir()
     rec = {
@@ -213,12 +212,12 @@ def _append_audit(entry_id: str, action: str, payload: Dict[str, Any]) -> None:
 class ErrorArchive:
     """错误档案读写主类。"""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or _load_l3_config()
 
     # ── 查询 ──
 
-    def lookup(self, signature: str, category: str = "") -> Optional[ArchiveEntry]:
+    def lookup(self, signature: str, category: str = "") -> ArchiveEntry | None:
         """根据 signature 查档案（精确匹配 + 相似匹配两阶段）。
 
         返回：
@@ -247,8 +246,8 @@ class ErrorArchive:
                     return e
         return None
 
-    def list_entries(self, status: Optional[str] = None,
-                     category: Optional[str] = None) -> List[ArchiveEntry]:
+    def list_entries(self, status: str | None = None,
+                     category: str | None = None) -> list[ArchiveEntry]:
         """列出条目；可按 status/category 过滤。"""
         out = _read_entries()
         if status:
@@ -259,7 +258,7 @@ class ErrorArchive:
         out.sort(key=lambda e: e.ts_last_seen, reverse=True)
         return out
 
-    def get(self, entry_id: str) -> Optional[ArchiveEntry]:
+    def get(self, entry_id: str) -> ArchiveEntry | None:
         for e in _read_entries():
             if e.id == entry_id:
                 return e
@@ -269,8 +268,8 @@ class ErrorArchive:
 
     def record(self, category: str, signature: str,
                diagnosis: str = "",
-               context: Optional[Dict[str, Any]] = None,
-               tags: Optional[List[str]] = None,
+               context: dict[str, Any] | None = None,
+               tags: list[str] | None = None,
                decided_by: str = "",
                method: str = "",
                notes: str = "",
@@ -325,7 +324,7 @@ class ErrorArchive:
 
     # ── L3 防护（v3 §4.3 R12 钉死） ──
 
-    def approve_for_auto(self, entry_id: str, scope: str = "exact_match") -> Dict[str, Any]:
+    def approve_for_auto(self, entry_id: str, scope: str = "exact_match") -> dict[str, Any]:
         """用户授权下次自动执行。
 
         返回 dict：
@@ -373,7 +372,7 @@ class ErrorArchive:
             "warnings": [],
         }
 
-    def increment_auto_count(self, entry_id: str) -> Dict[str, Any]:
+    def increment_auto_count(self, entry_id: str) -> dict[str, Any]:
         """战甲自动执行一次后调用：计数 +1；超 5 次强制重新确认。
 
         返回：
@@ -419,7 +418,7 @@ class ErrorArchive:
         _append_audit(entry_id, "auto_apply", {"count": entry.auto_approval_count})
 
         # 是否快到上限（提前告警）— 钉死: ≤ 5 次允许, 第 5 次告警, 第 6 次拦截
-        warnings: List[str] = []
+        warnings: list[str] = []
         if entry.auto_approval_count == cooldown_max:
             warnings.append(
                 f"⚠️ 已连续自动批准 {cooldown_max} 次（达到上限）。下次类似异常将强制要求重新确认。"
@@ -428,7 +427,7 @@ class ErrorArchive:
         return {"allowed": True, "require_reconfirm": False,
                 "count": entry.auto_approval_count, "warnings": warnings}
 
-    def reject(self, entry_id: str, notes: str = "") -> Dict[str, Any]:
+    def reject(self, entry_id: str, notes: str = "") -> dict[str, Any]:
         """用户拒绝：以后不再按这个方案走（RESOLVED → REJECTED 实际是 NEW → REJECTED）。"""
         entry = self.get(entry_id)
         if entry is None:
@@ -450,10 +449,10 @@ class ErrorArchive:
 
     # ── 工具 ──
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """统计概览（CLI 用）。"""
         all_e = _read_entries()
-        by_status: Dict[str, int] = {}
+        by_status: dict[str, int] = {}
         for e in all_e:
             by_status[e.resolution_status] = by_status.get(e.resolution_status, 0) + 1
         return {
@@ -529,7 +528,7 @@ def _cli() -> int:
     elif args.cmd == "stats":
         s = arc.stats()
         print(f"\n总条目: {s['total']}")
-        print(f"按状态:")
+        print("按状态:")
         for k, v in s["by_status"].items():
             print(f"  {k:18s} {v}")
         print(f"已授权自动执行: {s['auto_approved_count']}\n")

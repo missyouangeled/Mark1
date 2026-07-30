@@ -9,16 +9,14 @@ Mark42 v3 §3.7 · 模块级协议健康监控
 
 from __future__ import annotations
 
-import json
 import logging
+
 logger = logging.getLogger(__name__)
 import os
 import time
-import urllib.request
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .config import MARK42_STATE
 from .log_setup import get_logger
@@ -35,15 +33,15 @@ class ModuleHealth:
     module_id: str
     module_name: str
     status: str = "green"  # green | yellow | red
-    latency_ms: Optional[int] = None
+    latency_ms: int | None = None
     error_rate: float = 0.0  # 0.0-1.0
     saturation: float = 0.0  # 0.0-1.0
     traffic_per_min: int = 0
     contract_passed: bool = True
-    fallback_active: Optional[str] = None
-    last_check: Optional[str] = None
+    fallback_active: str | None = None
+    last_check: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @property
@@ -81,7 +79,7 @@ class ModuleHealthMonitor:
     def __init__(self):
         MODULE_HEALTH_DIR.mkdir(parents=True, exist_ok=True)
 
-    def check_all(self) -> List[ModuleHealth]:
+    def check_all(self) -> list[ModuleHealth]:
         """检查所有模块三态 + 4 Golden Signals。"""
         results = []
         for mod in self.MODULES:
@@ -89,7 +87,7 @@ class ModuleHealthMonitor:
             results.append(health)
         return results
 
-    def _check_module(self, mod: Dict[str, Any]) -> ModuleHealth:
+    def _check_module(self, mod: dict[str, Any]) -> ModuleHealth:
         """检查单个模块。"""
         mid = mod["id"]
         name = mod["name"]
@@ -179,7 +177,7 @@ class ModuleHealthMonitor:
 
         return health
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """摘要。"""
         results = self.check_all()
         green = sum(1 for r in results if r.status == "green")

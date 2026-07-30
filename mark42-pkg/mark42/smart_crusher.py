@@ -152,7 +152,7 @@ def _run_tests():
         ]
     }, ensure_ascii=False)
     test1_output, test1_stats = crusher.crush(test1_input)
-    print(f"\n[测试 1] 100 个用户对象数组 (每条 500 字符 bio)")
+    print("\n[测试 1] 100 个用户对象数组 (每条 500 字符 bio)")
     print(f"  原始: {test1_stats['original_bytes']} bytes")
     print(f"  压缩: {test1_stats['crushed_bytes']} bytes")
     print(f"  压缩率: {test1_stats['ratio'] * 100:.1f}%")
@@ -165,7 +165,7 @@ def _run_tests():
 
     nested = {"a": {"b": {"c": {"d": {"e": {"f": "deep value"}}}}}}
     test2_output, test2_stats = crusher.crush(json.dumps(nested))
-    print(f"\n[测试 2] 深度嵌套对象 (depth 6)")
+    print("\n[测试 2] 深度嵌套对象 (depth 6)")
     print(f"  深度截断: {test2_stats['depth_truncated']}")
     assert test2_stats['depth_truncated'] >= 1
     assert "truncated" in test2_output
@@ -173,27 +173,27 @@ def _run_tests():
 
     test3_input = json.dumps({"timestamps": list(range(1000)), "values": [i * 1.5 for i in range(1000)]})
     test3_output, test3_stats = crusher.crush(test3_input)
-    print(f"\n[测试 3] 1000 元素数值数组")
+    print("\n[测试 3] 1000 元素数值数组")
     print(f"  数值数组压缩: {test3_stats['numeric_arrays_compressed']}")
     assert test3_stats['numeric_arrays_compressed'] == 2
     assert "numeric array" in test3_output
     print("  ✓ 通过")
 
     test4_output, test4_stats = crusher.crush("\n".join(f"line {i}" for i in range(100)))
-    print(f"\n[测试 4] 100 行纯文本")
+    print("\n[测试 4] 100 行纯文本")
     print(f"  mode: {test4_stats.get('mode')}")
     assert test4_stats.get('mode') == 'mixed_lines'
     assert "more lines" in test4_output
     print("  ✓ 通过")
 
     test5_output, test5_stats = crusher.crush("")
-    print(f"\n[测试 5] 空内容")
+    print("\n[测试 5] 空内容")
     assert test5_output == ""
     assert test5_stats['ratio'] == 0.0
     print("  ✓ 通过")
 
     test6_output, test6_stats = crusher.crush('{"a": 1, "b": 2}')
-    print(f"\n[测试 6] 小 JSON (无压缩需求)")
+    print("\n[测试 6] 小 JSON (无压缩需求)")
     print(f"  压缩率: {test6_stats['ratio'] * 100:.1f}% (可能为 0 或负)")
     print("  ✓ 通过 (小内容不需压缩)")
 

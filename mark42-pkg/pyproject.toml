@@ -23,12 +23,20 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: System :: Monitoring",
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
     # Mark42 仅依赖 Python 标准库，无第三方依赖
 ]
+
+[project.urls]
+Homepage = "https://github.com/missyouangeled/Mark1"
+Repository = "https://github.com/missyouangeled/Mark1"
+Documentation = "https://github.com/missyouangeled/Mark1/blob/master/mark42-pkg/README.md"
+Changelog = "https://github.com/missyouangeled/Mark1/blob/master/mark42-pkg/CHANGELOG.md"
+Issues = "https://github.com/missyouangeled/Mark1/issues"
 
 [project.scripts]
 mark42 = "mark42.cli:main"

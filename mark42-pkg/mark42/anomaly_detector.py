@@ -15,16 +15,14 @@ Mark42 v3 · 核心 8 · 异常检测器
 
 from __future__ import annotations
 
-import json
 import logging
 import math
-import os
 import shutil
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class AnomalyAlert:
     message: str = ""
     timestamp: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -60,14 +58,14 @@ class MetricSample:
 class ThresholdDetector:
     """阈值检测器 -- 最简单的异常检测。"""
 
-    def __init__(self, thresholds: Dict[str, Dict[str, float]]):
+    def __init__(self, thresholds: dict[str, dict[str, float]]):
         """
         Args:
             thresholds: {"disk_free_gb": {"warn": 5, "crit": 2}, ...}
         """
         self.thresholds = thresholds
 
-    def check(self, metric: str, value: float) -> Optional[AnomalyAlert]:
+    def check(self, metric: str, value: float) -> AnomalyAlert | None:
         rules = self.thresholds.get(metric)
         if not rules:
             return None
@@ -105,9 +103,9 @@ class ZScoreDetector:
     def __init__(self, window_size: int = 20, z_threshold: float = 2.5):
         self.window_size = window_size
         self.z_threshold = z_threshold
-        self._windows: Dict[str, deque] = {}
+        self._windows: dict[str, deque] = {}
 
-    def add_sample(self, metric: str, value: float) -> Optional[AnomalyAlert]:
+    def add_sample(self, metric: str, value: float) -> AnomalyAlert | None:
         """添加采样并检测异常。"""
         if metric not in self._windows:
             self._windows[metric] = deque(maxlen=self.window_size)
@@ -153,20 +151,20 @@ class AnomalyDetector:
         "context_usage_pct": {"warn_high": 85, "crit_high": 95},
     }
 
-    def __init__(self, thresholds: Optional[Dict] = None):
+    def __init__(self, thresholds: dict | None = None):
         self.thresholds = thresholds or self.DEFAULT_THRESHOLDS
         self.threshold_detector = ThresholdDetector(self.thresholds)
         self.zscore_detector = ZScoreDetector(window_size=20, z_threshold=2.5)
-        self._history: List[AnomalyAlert] = []
+        self._history: list[AnomalyAlert] = []
 
-    def collect_metrics(self) -> Dict[str, float]:
+    def collect_metrics(self) -> dict[str, float]:
         """采集当前系统指标。"""
         metrics = {}
         try:
             usage = shutil.disk_usage("/")
             metrics["disk_free_gb"] = round(usage.free / (1024**3), 2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
         try:
             with open("/proc/meminfo") as f:
@@ -174,8 +172,8 @@ class AnomalyDetector:
                     if line.startswith("MemAvailable:"):
                         metrics["mem_avail_mb"] = int(line.split()[1]) // 1024
                         break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
         # context_usage_pct 由外部传入或从 armor 读取
         try:
@@ -189,10 +187,10 @@ class AnomalyDetector:
 
         return metrics
 
-    def check(self, metrics: Optional[Dict[str, float]] = None) -> List[AnomalyAlert]:
+    def check(self, metrics: dict[str, float] | None = None) -> list[AnomalyAlert]:
         """检测异常。"""
         metrics = metrics or self.collect_metrics()
-        alerts: List[AnomalyAlert] = []
+        alerts: list[AnomalyAlert] = []
 
         for metric, value in metrics.items():
             # 阈值检测
@@ -214,7 +212,7 @@ class AnomalyDetector:
 
         return alerts
 
-    def history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def history(self, limit: int = 10) -> list[dict[str, Any]]:
         """查看历史异常。"""
         return [a.to_dict() for a in self._history[-limit:]]
 
@@ -226,7 +224,7 @@ class AnomalyDetector:
         except Exception:
             return False
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """统计。"""
         return {
             "total_alerts": len(self._history),
@@ -237,7 +235,7 @@ class AnomalyDetector:
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_anomaly_check() -> Dict[str, Any]:
+def cli_anomaly_check() -> dict[str, Any]:
     """CLI: 检测一次。"""
     ad = AnomalyDetector()
     alerts = ad.check()
@@ -247,12 +245,12 @@ def cli_anomaly_check() -> Dict[str, Any]:
         "metrics": ad.collect_metrics(),
     }
 
-def cli_anomaly_history(limit: int = 10) -> List[Dict[str, Any]]:
+def cli_anomaly_history(limit: int = 10) -> list[dict[str, Any]]:
     """CLI: 历史异常。"""
     ad = AnomalyDetector()
     return ad.history(limit)
 
-def cli_anomaly_stats() -> Dict[str, Any]:
+def cli_anomaly_stats() -> dict[str, Any]:
     """CLI: 统计。"""
     ad = AnomalyDetector()
     return ad.stats()

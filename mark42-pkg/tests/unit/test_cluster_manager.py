@@ -14,7 +14,7 @@ Mark42 v3 §3.6.3 R14 · 集群管理器单元测试
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -24,13 +24,10 @@ from mark42.cluster_manager import (
     ClusterConfig,
     ClusterManager,
     HealthCheckResult,
-    _check_contract_passed,
     _check_port_accessible,
     _check_process_running,
     _record_action,
-    _write_failure_md,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 

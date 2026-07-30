@@ -1,7 +1,8 @@
 """内置错误档案锁扣实现：包装 ErrorArchive 类。"""
 
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any
 
 
 class BuiltinArchive:
@@ -18,7 +19,7 @@ class BuiltinArchive:
             return None
         return entry.to_dict() if hasattr(entry, "to_dict") else entry
 
-    def add(self, entry: Dict[str, Any]) -> str:
+    def add(self, entry: dict[str, Any]) -> str:
         result = self._impl.record(
             category=entry.get("category", ""),
             signature=entry.get("signature", ""),

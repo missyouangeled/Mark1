@@ -1,10 +1,6 @@
 """Test failure_contract.py R13-D 降级响应契约。"""
 
-import json
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-import pytest
 
 from mark42.failure_contract import (
     CORE_FAILURE_CONFIG,

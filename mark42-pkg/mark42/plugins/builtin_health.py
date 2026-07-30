@@ -1,15 +1,16 @@
 """内置健康监控锁扣实现：包装 engine.py health-watch 逻辑。"""
 
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any
 
 
 class BuiltinHealth:
     """将 engine.py 的健康监控包装为 HealthLock 接口。"""
 
-    def check_health(self) -> Dict[str, Any]:
+    def check_health(self) -> dict[str, Any]:
+
         import psutil
-        import os
 
         try:
             vm = psutil.virtual_memory()

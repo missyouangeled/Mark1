@@ -13,13 +13,13 @@ Mark42 成本追踪模块
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 import csv
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from .config import MARK42_STATE
 from .log_setup import get_logger
@@ -260,7 +260,7 @@ def cli_cost_today() -> dict:
     print(f"  总 tokens: {summary['total_tokens']}")
     print(f"  总费用: ¥{summary['total_cost']:.4f}")
     if summary['by_model']:
-        print(f"  按模型:")
+        print("  按模型:")
         for model, stats in summary['by_model'].items():
             print(f"    {model:<30} {stats['calls']} 次  {stats['tokens']} tokens  ¥{stats['cost']:.4f}")
     return summary
@@ -275,7 +275,7 @@ def cli_cost_month() -> dict:
     print(f"  总 tokens: {summary['total_tokens']}")
     print(f"  总费用: ¥{summary['total_cost']:.4f}")
     if summary.get('by_day'):
-        print(f"  按天:")
+        print("  按天:")
         for day in sorted(summary['by_day'].keys()):
             d = summary['by_day'][day]
             print(f"    {day}  {d['calls']} 次  ¥{d['cost']:.4f}")

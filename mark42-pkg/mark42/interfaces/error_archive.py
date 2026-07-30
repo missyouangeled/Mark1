@@ -1,7 +1,8 @@
 """ArcLock 错误档案锁扣接口。"""
 
 from __future__ import annotations
-from typing import Any, Dict, Protocol, runtime_checkable
+
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -12,7 +13,7 @@ class ArchiveLock(Protocol):
         """查找历史记录。"""
         ...
 
-    def add(self, entry: Dict[str, Any]) -> str:
+    def add(self, entry: dict[str, Any]) -> str:
         """添加新记录，返回 ID。"""
         ...
 

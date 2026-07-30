@@ -29,18 +29,22 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
-
-from .config import ARMOR_STATE, ENGINE_STATE, MARK42_STATE, CONFIG_PATH
-from .error_archive import ErrorArchive, STATUS_AUTO_APPROVED, STATUS_RESOLVED
-from .llm_provider import (
-    ChatMessage, LLMProvider, build_consciousness, build_advisor, load_config,
-)
+from typing import Any
 
 from .advisor_client import AdvisorClient, AdvisorResult
+from .config import ENGINE_STATE
+from .error_archive import ErrorArchive
+from .llm_provider import (
+    ChatMessage,
+    LLMProvider,
+    build_advisor,
+    build_consciousness,
+    load_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +62,7 @@ CST = timezone(timedelta(hours=8))
 # 格式: (signature 匹配, 确定性等级, 动作)
 #   确定性等级: "100%" / "high" / "low" / "unknown"
 #   动作: "auto_remediate" / "ask_advisor" / "ask_user" / "lookup_archive"
-DETERMINISTIC_RULES: List[Dict[str, Any]] = [
+DETERMINISTIC_RULES: list[dict[str, Any]] = [
     {
         "id": "rule-001",
         "name": "scratch 目录临时文件",
@@ -117,10 +121,10 @@ class SelfCheckResult:
     """C1 自检结果。"""
     checked_at: str
     healthy: bool
-    issues: List[Dict[str, Any]] = field(default_factory=list)
-    raw: Dict[str, Any] = field(default_factory=dict)
+    issues: list[dict[str, Any]] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -128,14 +132,14 @@ class SelfCheckResult:
 class CertaintyAssessment:
     """C2 评估结果。"""
     certainty: str                # "100%" / "high" / "low" / "unknown"
-    matched_rule: Optional[str]   # 命中的规则 id
-    archive_entry_id: Optional[str]  # 错误档案条目 id（如有）
+    matched_rule: str | None   # 命中的规则 id
+    archive_entry_id: str | None  # 错误档案条目 id（如有）
     archive_auto_approved: bool   # 档案是否已批准
     action: str                   # "auto_remediate" / "ask_advisor" / "ask_user" / "lookup_archive"
     reason: str
     next_step: str                # 给上层（v2 子 Loop）看的下一步建议
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -143,13 +147,13 @@ class CertaintyAssessment:
 class DialogRequest:
     """C4 主动对话请求。"""
     trigger: str                  # 触发原因
-    context: Dict[str, Any]       # 上下文
+    context: dict[str, Any]       # 上下文
     question: str                 # 要问的问题
-    options: List[Dict[str, str]] = field(default_factory=list)   # [{id, label, desc}]
+    options: list[dict[str, str]] = field(default_factory=list)   # [{id, label, desc}]
     severity: str = "info"        # "info" / "warning" / "critical"
     to: str = "user"              # "user" / "advisor"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -159,10 +163,10 @@ class Consciousness:
     """战甲自主意识层主类（v3-3 落地）。"""
 
     def __init__(self,
-                 llm: Optional[LLMProvider] = None,
-                 archive: Optional[ErrorArchive] = None,
-                 rules: Optional[List[Dict[str, Any]]] = None,
-                 config: Optional[Dict[str, Any]] = None):
+                 llm: LLMProvider | None = None,
+                 archive: ErrorArchive | None = None,
+                 rules: list[dict[str, Any]] | None = None,
+                 config: dict[str, Any] | None = None):
         """
         依赖注入（方便单测 mock）：
         - llm: 主 LLM provider（v3-1 已实现）
@@ -191,8 +195,8 @@ class Consciousness:
         """
         from .utils import _load_json
         now = datetime.now(CST).isoformat()
-        issues: List[Dict[str, Any]] = []
-        raw: Dict[str, Any] = {}
+        issues: list[dict[str, Any]] = []
+        raw: dict[str, Any] = {}
 
         # 1) armor 上下文使用率
         try:
@@ -285,7 +289,7 @@ class Consciousness:
 
     # ── C2. 评估确定性（100% 确定 · 基于规则） ──
 
-    def assess_certainty(self, issue: Dict[str, Any]) -> CertaintyAssessment:
+    def assess_certainty(self, issue: dict[str, Any]) -> CertaintyAssessment:
         """根据 issue 评估确定性。
 
         流程（v3 §4.5）：
@@ -350,10 +354,10 @@ class Consciousness:
 
     # ── C3. 100% 确定的修复 ──
 
-    def auto_remediate(self, issue: Dict[str, Any],
+    def auto_remediate(self, issue: dict[str, Any],
                        assessment: CertaintyAssessment,
                        dry_run: bool = True,
-                       override_plan: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                       override_plan: dict[str, Any] | None = None) -> dict[str, Any]:
         """按规则执行 auto_remediate。
 
         行为纪律：
@@ -397,9 +401,9 @@ class Consciousness:
 
     # ── C4. 主动发起对话 ──
 
-    def dialog(self, issue: Dict[str, Any],
+    def dialog(self, issue: dict[str, Any],
                assessment: CertaintyAssessment,
-               to: Optional[str] = None) -> DialogRequest:
+               to: str | None = None) -> DialogRequest:
         """生成主动对话请求。战甲不自主决定修法（R8 钉死）。
 
         to: "user" / "advisor" — 默认 user
@@ -408,7 +412,7 @@ class Consciousness:
         target = to or ("advisor" if self.advisor else "user")
         q = self._render_question(issue, assessment)
 
-        options: List[Dict[str, str]] = []
+        options: list[dict[str, str]] = []
         if assessment.certainty == "100%":
             # 100% 确定也要问（v3 §3.2 C3 描述: 100% 自主, 但人审一遍更稳）
             options = [
@@ -465,7 +469,7 @@ class Consciousness:
             to=target,
         )
 
-    def _render_question(self, issue: Dict[str, Any],
+    def _render_question(self, issue: dict[str, Any],
                          assessment: CertaintyAssessment) -> str:
         """v3 §3.3 4 类场景的话术模板。"""
         src = issue.get("source", "?")
@@ -491,7 +495,7 @@ class Consciousness:
 
     # ── C5. 学过的错误走档案（v3-2 已实现，这里是便捷封装） ──
 
-    def check_archive(self, issue: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def check_archive(self, issue: dict[str, Any]) -> dict[str, Any] | None:
         """检查错误档案 + 若已批准则尝试 auto_remediate（带 cooldown 检查）。
 
         行为：
@@ -524,7 +528,7 @@ class Consciousness:
 
     # ── §4.5 协作流程主入口 ──
 
-    def handle_issue(self, issue: Dict[str, Any], dry_run: bool = True) -> Dict[str, Any]:
+    def handle_issue(self, issue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
         """§4.5 完整流程：故障信号 -> C1 风格自检条目 -> 路由到 C3/C4/C5.
 
         v3-5 升级：C4 路径真正调用 AdvisorClient（不只是生成话术字符串）。
@@ -596,7 +600,7 @@ class Consciousness:
 
         # 5. 生成 DialogRequest（问用户）
         req = self.dialog(issue, assess)
-        result: Dict[str, Any] = {"path": "C4_dialog", "request": req.to_dict()}
+        result: dict[str, Any] = {"path": "C4_dialog", "request": req.to_dict()}
         if advisor_result:
             result["advisor_attempted"] = True
             result["advisor_verdict"] = (advisor_result.verdict.to_dict()
@@ -606,7 +610,7 @@ class Consciousness:
             result["advisor_attempted"] = False
         return result
 
-    def _pick_scenario(self, issue: Dict[str, Any],
+    def _pick_scenario(self, issue: dict[str, Any],
                        assessment: CertaintyAssessment) -> str:
         """根据 issue 和评估结果选择对话场景 (a/b/c/d)."""
         if assessment.certainty == "unknown":
@@ -617,8 +621,8 @@ class Consciousness:
             return "a"
         return "b"
 
-    def _call_advisor(self, scenario: str, issue: Dict[str, Any],
-                      assessment: CertaintyAssessment) -> Optional[AdvisorResult]:
+    def _call_advisor(self, scenario: str, issue: dict[str, Any],
+                      assessment: CertaintyAssessment) -> AdvisorResult | None:
         """调用 AdvisorClient（封装异常）."""
         if not self._advisor_client:
             return None
@@ -653,13 +657,15 @@ class Consciousness:
         # ── R9 强制读协议 ──
 
     def verify_read_protocol(self, min_correct: int = 8,
-                             force: bool = False) -> Dict[str, Any]:
+                             force: bool = False) -> dict[str, Any]:
         """R9 强制读协议验证：随机抽 10 题考模型，答对 >= min_correct 才放行。
 
         24h 内免重考（cooldown），除非 force=True。
         """
-        import random, yaml as _yaml
+        import random
         from datetime import datetime, timedelta
+
+        import yaml as _yaml
 
         # cooldown 检查
         state_dir = Path.home() / ".local" / "state" / "openclaw" / "mark42" / "read-protocol"
@@ -677,8 +683,8 @@ class Consciousness:
                         "reason": f"24h 内已验证 (score={record.get('score')})，免考",
                         "verified_at": record["verified_at"],
                     }
-            except Exception:
-                pass  # 记录坏了就重考
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
 
         # 加载题池
         questions_file = state_dir / "questions.yaml"
@@ -727,15 +733,15 @@ class Consciousness:
         }
         try:
             state_file.write_text(json.dumps(record, indent=2, ensure_ascii=False))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
         return record
 
 
 # ── 修复执行器（v3-3 占位 · 真实实现由 v3-5 整合 v2 子 Loop 接入） ──
 
-def _remediate_dummy(issue: Dict[str, Any]) -> Dict[str, Any]:
+def _remediate_dummy(issue: dict[str, Any]) -> dict[str, Any]:
     """占位实现 — 真实 fix 在 v3-5 接 v2 auto_remediate。"""
     return {"placeholder": True, "issue": issue.get("category")}
 
@@ -743,7 +749,7 @@ def _remediate_dummy(issue: Dict[str, Any]) -> Dict[str, Any]:
 
 # ── v3-5b 真实修复执行器（替换 _remediate_dummy） ──
 
-def _remediate_context_alert(issue: Dict[str, Any]) -> Dict[str, Any]:
+def _remediate_context_alert(issue: dict[str, Any]) -> dict[str, Any]:
     """上下文告警 -> 调用 armor.compress() 自主救场。
 
     armor_compress 内含平台探测期 + compact 锁，不会与平台 auto-compaction 冲突。
@@ -756,7 +762,7 @@ def _remediate_context_alert(issue: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "action": "armor_compress", "reason": str(e)}
 
 
-def _remediate_process_down(issue: Dict[str, Any]) -> Dict[str, Any]:
+def _remediate_process_down(issue: dict[str, Any]) -> dict[str, Any]:
     """进程挂 -> R12 黑名单：不自动 restart systemd，只诊断 + 提示。"""
     source = issue.get("source", "")
     # 诊断：进程在不在
@@ -776,9 +782,10 @@ def _remediate_process_down(issue: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _remediate_embed_index_missing(issue: Dict[str, Any]) -> Dict[str, Any]:
+def _remediate_embed_index_missing(issue: dict[str, Any]) -> dict[str, Any]:
     """索引缺失 -> 调 embed-sidecar 重建。"""
-    import subprocess, sys
+    import subprocess
+    import sys
     script_path = str(Path(__file__).parent.parent / "memory-embed-index.py")
     venv_python = str(Path.home() / ".local" / "share" / "openclaw-embed-venv311" / "bin" / "python3")
     python_bin = venv_python if Path(venv_python).exists() else sys.executable
@@ -798,7 +805,7 @@ def _remediate_embed_index_missing(issue: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "action": "embed_index_rebuild", "reason": str(e)}
 
 
-def _remediate_loop_not_registered(issue: Dict[str, Any]) -> Dict[str, Any]:
+def _remediate_loop_not_registered(issue: dict[str, Any]) -> dict[str, Any]:
     """Loop 未注册 -> 重新注册。"""
     try:
         template = issue.get("context", {}).get("template", "")
@@ -822,7 +829,7 @@ def _remediate_loop_not_registered(issue: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "action": "loop_register", "reason": str(e)}
 
 
-_REMEDIATION_EXECUTORS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
+_REMEDIATION_EXECUTORS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "context_alert": _remediate_context_alert,
     "process_down": _remediate_process_down,
     "embed_index_missing": _remediate_embed_index_missing,

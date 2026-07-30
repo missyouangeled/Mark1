@@ -11,17 +11,18 @@
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Optional
+
 import importlib
 import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # 注册表：接口名 -> 实例
-_REGISTRY: Dict[str, Any] = {}
+_REGISTRY: dict[str, Any] = {}
 
 # 接口名到默认实现的映射
-_DEFAULTS: Dict[str, str] = {
+_DEFAULTS: dict[str, str] = {
     "compress": "mark42.plugins.builtin_compress:BuiltinCompress",
     "memory": "mark42.plugins.builtin_memory:BuiltinMemory",
     "consciousness": "mark42.plugins.builtin_consciousness:BuiltinConsciousness",
@@ -41,7 +42,7 @@ def register(name: str, impl: Any) -> None:
     logger.info("ArcLock 注册: %s -> %s", name, type(impl).__name__)
 
 
-def get(name: str) -> Optional[Any]:
+def get(name: str) -> Any | None:
     """获取一个实现。优先从注册表取，没有则加载默认。"""
     if name in _REGISTRY:
         return _REGISTRY[name]
@@ -98,7 +99,7 @@ def get_audit() -> Any:
     return get("audit")
 
 
-def list_all() -> Dict[str, Any]:
+def list_all() -> dict[str, Any]:
     """列出所有锁扣的当前实现状态。"""
     result = {}
     for name in _DEFAULTS:

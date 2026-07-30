@@ -1,6 +1,9 @@
 """Mark42 CLI 入口。"""
 
 import argparse
+import logging
+
+logger = logging.getLogger(__name__)
 import sys
 
 from ..output_guard import trim_detail, trim_summary
@@ -8,7 +11,7 @@ from ..output_guard import trim_detail, trim_summary
 
 def _trim_daemon_logs(log_dir):
     """检查 daemon 日志大小：单个文件超限则截尾保留最新部分。"""
-    from ..config import MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+    from ..config import MAX_DAEMON_LOG_LINES, MAX_DAEMON_LOG_MB
     max_bytes = MAX_DAEMON_LOG_MB * 1024 * 1024
     for fpath in sorted(log_dir.glob("*.log")):
         try:
@@ -76,6 +79,7 @@ def _find_mark42_processes() -> dict:
 def assemble_status() -> dict:
     """查看 assemble / armor-guard / engine-daemon 当前状态。"""
     import json
+
     from ..config import ARMOR_STATE
     from ..utils import _load_json
 
@@ -129,6 +133,7 @@ def assemble_stop() -> dict:
     import os
     import signal
     import time
+
     from ..config import ARMOR_STATE
     from ..utils import _load_json
 
@@ -193,6 +198,7 @@ def assemble_restart() -> dict:
     import sys
     import time
     from pathlib import Path
+
     from ..config import LOG_DIR
 
     assemble_stop()
@@ -208,7 +214,7 @@ def assemble_restart() -> dict:
         start_new_session=True,
         cwd=str(Path(__file__).resolve().parent.parent.parent),
     )
-    print(f"🔄 Mark42 assemble 已重启")
+    print("🔄 Mark42 assemble 已重启")
     print(f"   新 PID: {proc.pid}")
     print(f"   日志: {LOG_DIR / 'assemble.log'}")
     return {"pid": proc.pid, "log": str(LOG_DIR / "assemble.log")}
@@ -216,12 +222,16 @@ def assemble_restart() -> dict:
 
 def assemble() -> None:
     """全甲启动入口 — fork 子进程拉起 armor guard + engine daemon。"""
-    import subprocess, sys, time, signal, os
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
     from pathlib import Path
-    from ..utils import _now_iso, _save_json, _load_json
-    from ..config import ARMOR_STATE, mark42_config, mark42_init
-    from ..utils import _now_iso, _save_json
+
     from ..armor import armor_check
+    from ..config import ARMOR_STATE, mark42_config, mark42_init
+    from ..utils import _load_json, _now_iso, _save_json
 
     if not ARMOR_STATE.exists():
         print("❌ 尚未初始化，请先运行: mark42.py --init\n")
@@ -245,7 +255,7 @@ def assemble() -> None:
     # ── Fork 子进程 ──
     script = str(Path(__file__).resolve().parent.parent / "mark42.py")
     children = []
-    from ..config import ARMOR_STATE, LOG_DIR, MAX_DAEMON_LOG_MB, MAX_DAEMON_LOG_LINES
+    from ..config import ARMOR_STATE, LOG_DIR, MAX_DAEMON_LOG_LINES, MAX_DAEMON_LOG_MB
     pid_file = ARMOR_STATE / "assemble.pids"
     log_dir = LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -301,7 +311,7 @@ def assemble() -> None:
     # 校验写入
     verify_data = _load_json(pid_file)
     if not verify_data or not verify_data.get("children"):
-        print(f"\n⚠️ PID 文件写入校验失败，但子进程已在运行")
+        print("\n⚠️ PID 文件写入校验失败，但子进程已在运行")
     else:
         print(f"\n📄 PID 文件: {pid_file} (已验证)")
 
@@ -317,8 +327,8 @@ def assemble() -> None:
             # 关闭父进程持有的日志文件句柄
             try:
                 log_fd.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
         pid_file.unlink(missing_ok=True)
         print("👋 Mark42 战甲已关闭")
         sys.exit(0)
@@ -329,7 +339,7 @@ def assemble() -> None:
     print("\n✅ Mark42 战甲已启动。拆开是刀，拼上是甲。")
     print(f"   📋 日志: {log_dir}")
     print("   按 Ctrl+C 关闭所有守护进程")
-    print(f"   查看状态: python3 scripts/mark42.py status")
+    print("   查看状态: python3 scripts/mark42.py status")
 
     # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
     import signal as _sig
@@ -351,13 +361,14 @@ def assemble() -> None:
                     if name == "engine-daemon" and heartbeat_file.exists():
                         hb = _load_json(heartbeat_file)
                         if hb:
-                            from datetime import datetime as _dt, timezone as _tz
+                            from datetime import datetime as _dt
+                            from datetime import timezone as _tz
                             try:
                                 last_tick = _dt.fromisoformat(hb.get("lastTick", ""))
                                 gap = (_dt.now(_tz.utc) - last_tick).total_seconds()
                                 print(f"   最后一次心跳: {gap:.0f}s 前")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning("ignored error: %s", e)
             if not all_alive:
                 print("🛑 子进程异常退出，assemble 退出")
                 break
@@ -370,14 +381,24 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     """一屏聚合 Armor/Engine/Heavy/Logs 状态。
     json_mode=True 返回 dict，不打印。
     """
-    import json, os
+    import json
+    import os
     from datetime import datetime
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ── Armor ──
     from ..armor import armor_check
-    from ..config import ARMOR_STATE, ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, SCRATCH, THRESHOLD_WARN, THRESHOLD_ALERT, CONFIG_PATH
+    from ..config import (
+        ARMOR_STATE,
+        CONFIG_PATH,
+        ENGINE_STATE,
+        HEAVY_STATE,
+        MARK42_BROKER_EVENTS,
+        SCRATCH,
+        THRESHOLD_ALERT,
+        THRESHOLD_WARN,
+    )
     from ..utils import _load_json
 
     check = armor_check()
@@ -433,13 +454,13 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
         print("  🦾 Mark42 系统状态")
         print("="*56)
         print(f"  检查时间: {now_str}\n")
-        print(f"  🛡️ 上下文铠甲")
+        print("  🛡️ 上下文铠甲")
         print(f"     {status_icon} {usage}% ({trim_summary(check.get('summary', ''), 100)})")
         if idx:
             print(f"     🧠 索引: {strat} ({gen_time[:16] if gen_time else '?'})")
         else:
-            print(f"     🧠 索引: 无")
-        print(f"\n  🔄 循环引擎")
+            print("     🧠 索引: 无")
+        print("\n  🔄 循环引擎")
         print(f"     Loop: {active} 活跃 / {total} 注册")
         if loops:
             for name, loop in sorted(loops.items()):
@@ -450,7 +471,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 print(f"     {icon} {name}: {stat} (cycle {cyc}/{max_c or '∞'})")
                 if verbose and loop.get("task"):
                     print(f"        task: {trim_detail(loop.get('task'), 160)}")
-        print(f"\n  ⚙️ 重型战甲")
+        print("\n  ⚙️ 重型战甲")
         if heavy_tasks:
             for tf in sorted(heavy_tasks):
                 ts = _load_json(tf)
@@ -462,18 +483,18 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 if verbose and ts.get("checkedAt"):
                     print(f"        checkedAt: {ts.get('checkedAt')}")
         else:
-            print(f"     ℹ️ 无活跃任务")
-        print(f"\n  🧹 日志轮替")
+            print("     ℹ️ 无活跃任务")
+        print("\n  🧹 日志轮替")
         print(f"     上次: {last_rot} (累计 {count} 次)")
         if MARK42_BROKER_EVENTS.exists():
             print(f"     Mark42 Broker: {broker_size/1024:.1f}KB ({broker_lines} 行)")
         if SCRATCH.exists():
             print(f"     Scratch: {len(dirs)} 目录 ({kept} 受保护)")
-        print(f"\n  ── 快速操作 ──")
+        print("\n  ── 快速操作 ──")
         if usage >= THRESHOLD_WARN:
-            print(f"     ⚠️ 上下文偏高 → 建议: /compact")
+            print("     ⚠️ 上下文偏高 → 建议: /compact")
         if active == 0:
-            print(f"     💡 引擎空闲 → 注册: engine --start")
+            print("     💡 引擎空闲 → 注册: engine --start")
         print("="*56 + "\n")
 
     # ── 构建 JSON 输出数据 ──
@@ -546,10 +567,11 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
 def _print_metrics() -> None:
     """G11: 输出 Prometheus 格式指标。"""
-    from ..armor import armor_check, armor_llm_stats
-    from ..engine import _load_loops
-    from ..circuit_breaker import CircuitBreaker
     import json as _jm
+
+    from ..armor import armor_check, armor_llm_stats
+    from ..circuit_breaker import CircuitBreaker
+    from ..engine import _load_loops
 
     lines = []
 
@@ -557,7 +579,7 @@ def _print_metrics() -> None:
     try:
         check = armor_check()
         lines.append(f'mark42_context_usage_percent {check.get("usagePercent", 0)}')
-        lines.append(f'mark42_context_severity 1')  # 1=ok, 2=warn, 3=critical
+        lines.append('mark42_context_severity 1')  # 1=ok, 2=warn, 3=critical
         lines.append(f'mark42_context_window_tokens {check.get("contextWindow", 0)}')
         lines.append(f'mark42_context_estimated_tokens {check.get("estimatedTokens", 0)}')
     except Exception as e:
@@ -608,7 +630,7 @@ def _print_audit_report(r: dict) -> None:
     """打印审计报告。"""
     verdict = r.get("verdict", "?")
     emoji = {"pass": "✅", "partial": "⚠️", "fail": "❌", "skip": "⏭️", "error": "💥"}.get(verdict, "?")
-    print(f"🔍 Post-Compact Audit Report")
+    print("🔍 Post-Compact Audit Report")
     print(f"   {emoji} 结论: {verdict} (score={r.get('score', 0)})")
     print(f"   时间: {r.get('timestamp', '')[:19]}")
     if r.get("error"):
@@ -811,7 +833,7 @@ def main() -> None:
 
     if not args.module:
         if args.init:
-            from ..user_config import interactive_init, get_config_path
+            from ..user_config import get_config_path, interactive_init
             if get_config_path().exists():
                 print(f"⚙️ 配置文件已存在: {get_config_path()}")
                 print("  使用 --config 查看，或删除后重新 --init")
@@ -823,7 +845,7 @@ def main() -> None:
             mark42_config()
             return
         if args.tune_compaction:
-            from ..compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
+            from ..compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
             token_aware = getattr(args, 'token_aware', False)
             probe = getattr(args, 'probe', False)
             if token_aware or probe:
@@ -857,11 +879,11 @@ def main() -> None:
         return
 
     if args.module == "armor":
-        from ..armor import armor_check, armor_compress, armor_guard, armor_compress_queue_stats
+        from ..armor import armor_check, armor_compress, armor_compress_queue_stats, armor_guard
         from ..smart_crusher import smartcrush
         if args.check:
             result = armor_check()
-            print(f"🛡️ 上下文铠甲")
+            print("🛡️ 上下文铠甲")
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
@@ -899,7 +921,7 @@ def main() -> None:
             print(f"   深度截断: {cstats.get('depth_truncated', 0)}")
         else:
             result = armor_check()
-            print(f"🛡️ 上下文铠甲")
+            print("🛡️ 上下文铠甲")
             print(f"   状态: {result.get('status', '?').upper()} ({result.get('severity', '?')})")
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
@@ -908,6 +930,7 @@ def main() -> None:
 
     if args.module == "audit":
         import json as _json
+
         from ..config import ARMOR_STATE as _AS
         _audit_dir = _AS / "audit"
 
@@ -957,7 +980,7 @@ def main() -> None:
             return
 
         if args.show:
-            rp = _audit_dir / args.show if not args.show.startswith("/") else Path(args.show)
+            rp = _audit_dir / args.show if not args.show.startswith("/") else __import__("pathlib").Path(args.show)
             if not rp.exists():
                 print(f"❌ 报告不存在: {rp}")
                 return
@@ -974,8 +997,13 @@ def main() -> None:
 
     if args.module == "engine":
         from ..engine import (
-            engine_daemon, engine_kill, engine_list, engine_run_loop,
-            engine_start, engine_templates, engine_watch_task,
+            engine_daemon,
+            engine_kill,
+            engine_list,
+            engine_run_loop,
+            engine_start,
+            engine_templates,
+            engine_watch_task,
         )
         if args.templates:
             engine_templates()
@@ -1002,9 +1030,14 @@ def main() -> None:
 
     if args.module == "heavy":
         from ..heavy import (
-            heavy_cleanup, heavy_execute, heavy_execute_all,
-            heavy_finish, heavy_preflight, heavy_start, heavy_detect_human,
+            heavy_cleanup,
+            heavy_detect_human,
+            heavy_execute,
+            heavy_execute_all,
+            heavy_finish,
+            heavy_preflight,
             heavy_resume,
+            heavy_start,
         )
         path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
@@ -1035,7 +1068,7 @@ def main() -> None:
         elif args.cleanup and task_name:
             heavy_cleanup(task_name)
         elif args.start:
-            print(f"❌ --task-name 不能为空")
+            print("❌ --task-name 不能为空")
         elif args.preflight:
             heavy_preflight(args.preflight)
         else:
@@ -1043,7 +1076,7 @@ def main() -> None:
         return
 
     if args.module == "cost":
-        from ..cost_tracker import cli_cost_today, cli_cost_month, cli_cost_top
+        from ..cost_tracker import cli_cost_month, cli_cost_today, cli_cost_top
         if args.action == "month":
             cli_cost_month()
         elif args.action == "top":
@@ -1053,7 +1086,7 @@ def main() -> None:
         return
 
     if args.module == "compaction":
-        from ..compaction_diag import compaction_diagnose, compaction_apply, print_diagnose, print_apply_result
+        from ..compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
         diag = compaction_diagnose(
             token_aware=getattr(args, 'token_aware', False),
             probe=getattr(args, 'probe', False),
@@ -1114,7 +1147,9 @@ def main() -> None:
     if args.module == "archive":
         # v3-2 错误档案 — 委派给 error_archive 子模块
         from ..error_archive import (
-            ErrorArchive, ALL_STATUSES, _print_entry_row,
+            ALL_STATUSES,
+            ErrorArchive,
+            _print_entry_row,
         )
         arc = ErrorArchive()
         if args.action == "list":
@@ -1145,7 +1180,7 @@ def main() -> None:
         elif args.action == "stats":
             s = arc.stats()
             print(f"\n总条目: {s['total']}")
-            print(f"按状态:")
+            print("按状态:")
             for k, v in s["by_status"].items():
                 print(f"  {k:18s} {v}")
             print(f"已授权自动执行: {s['auto_approved_count']}\n")
@@ -1153,8 +1188,9 @@ def main() -> None:
 
     if args.module == "consciousness":
         # v3-3 战甲意识层 — 委派给 consciousness 子模块
-        from ..consciousness import Consciousness
         import json as _j4
+
+        from ..consciousness import Consciousness
         cs = Consciousness()
         if args.action == "check":
             r = cs.self_check()
@@ -1190,7 +1226,7 @@ def main() -> None:
             print()
             status = cli_advisor_status()
             if status["enabled"]:
-                print(f"  状态: ✅ 已启用")
+                print("  状态: ✅ 已启用")
                 print(f"  模型: {status['model']}")
                 print(f"  端点: {status['base_url']}")
                 print(f"  API Key: {'✅ 有' if status['has_api_key'] else '❌ 无'}")
@@ -1206,7 +1242,7 @@ def main() -> None:
                 else:
                     print(f"  ❌ Ping 失败: {test_result.get('reason', 'unknown')}")
             else:
-                print(f"  状态: ⬜ 未启用")
+                print("  状态: ⬜ 未启用")
                 print()
                 print("启用方法: 编辑 ~/.config/mark42/model.yaml")
                 print("  mark42.advisor.enabled: true")
@@ -1229,8 +1265,9 @@ def main() -> None:
         return
 
     if args.module == "cores":
-        from ..core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
         import json as _j6
+
+        from ..core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
         if args.action == "list":
             r = cli_cores_list()
             print(f"🖥️ 核心位注册表 ({r['summary']['total']} 核)\n")
@@ -1262,8 +1299,9 @@ def main() -> None:
         return
 
     if args.module == "chaos":
-        from ..chaos_engine import ChaosEngine
         import json as _j7
+
+        from ..chaos_engine import ChaosEngine
         ce = ChaosEngine()
         if args.action == "list":
             exps = ce.list_experiments()
@@ -1292,8 +1330,9 @@ def main() -> None:
         return
 
     if args.module == "module":
-        from ..module_health import ModuleHealthMonitor
         import json as _j8
+
+        from ..module_health import ModuleHealthMonitor
         mhm = ModuleHealthMonitor()
         if args.action == "check":
             results = mhm.check_all()
@@ -1305,13 +1344,14 @@ def main() -> None:
                 print(f"  {icon} {h.module_name:<15} {lat:<8} {h.status}{fb}")
         elif args.action == "summary":
             s = mhm.summary()
-            print(f"🔌 模块级协议摘要\n")
+            print("🔌 模块级协议摘要\n")
             print(f"  总计: {s['total']} | 🟢 {s['green']} | 🟡 {s['yellow']} | 🔴 {s['red']}")
         return
 
     if args.module == "cluster":
-        from ..cluster_manager import ClusterManager
         import json as _j9
+
+        from ..cluster_manager import ClusterManager
         cm = ClusterManager()
         if args.action == "list":
             clusters = cm.list_clusters()
@@ -1376,9 +1416,10 @@ def main() -> None:
         return
 
     if args.module == "arclock":
-        from ..interfaces import list_all, configure_from_file, get
-        from ..config import ARCLOCK_CONFIG_PATH
         import json as _j10
+
+        from ..config import ARCLOCK_CONFIG_PATH
+        from ..interfaces import configure_from_file, get, list_all
 
         if args.action == "list":
             print("🔌 ArcLock 电磁锁扣状态\n")
@@ -1442,18 +1483,18 @@ def main() -> None:
                     l = impl.list_loops()
                     print(f"  ✅ list_loops() 返回: {_j10.dumps(l, ensure_ascii=False)[:200]}")
                 else:
-                    print(f"  ✅ 加载成功（无自动化测试，请手动验证）")
+                    print("  ✅ 加载成功（无自动化测试，请手动验证）")
             except Exception as e:
                 print(f"  ❌ 调用失败: {e}")
         return
 
     if args.module == "metrics-server":
         from ..metrics_server import run_server
-        print(f"📊 Mark42 Prometheus 端点")
+        print("📊 Mark42 Prometheus 端点")
         print(f"   监听: {args.host}:{args.port}")
-        print(f"   /metrics - Prometheus 格式指标")
-        print(f"   /health  - 健康检查")
-        print(f"   Ctrl+C 停止")
+        print("   /metrics - Prometheus 格式指标")
+        print("   /health  - 健康检查")
+        print("   Ctrl+C 停止")
         print()
         run_server(port=args.port, host=args.host)
         return

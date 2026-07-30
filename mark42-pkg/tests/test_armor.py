@@ -10,10 +10,7 @@
 """
 
 import json
-import tempfile
 from unittest import mock
-
-import pytest
 
 from mark42.armor import (
     _classify_messages,
@@ -23,7 +20,6 @@ from mark42.armor import (
     armor_compress_async,
     armor_compress_queue_stats,
 )
-
 
 # ── armor_check ──────────────────────────────────────────
 
@@ -492,6 +488,7 @@ class TestArmorCompressAsync:
         with mock.patch.dict("sys.modules", {"mark42.compress_queue": None}):
             # 重新导入以触发 ImportError
             import importlib
+
             import mark42.armor
             importlib.reload(mark42.armor)
 

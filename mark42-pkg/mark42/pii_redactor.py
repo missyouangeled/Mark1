@@ -29,7 +29,6 @@ from typing import Any
 # 【2026-07-13】不能用相对路径, algo_scheduler 从外部 import
 from mark42.utils import safe_call
 
-
 # ============================================================================
 # PII 模式定义 - 按类型分组的正则
 # 设计原则: 宁误报 (假阳性) 不漏报 (假阴性)
@@ -142,25 +141,25 @@ PII_PATTERNS: dict[str, dict[str, Any]] = {
 
 def _luhn_check(card_str: str) -> bool:
     """Luhn 算法: 验证信用卡号是否合法.
-    
+
     Args:
         card_str: 纯数字字符串 (去除空格和横线)
-    
+
     Returns:
         True if valid checksum
     """
     digits = [int(d) for d in card_str if d.isdigit()]
     if len(digits) < 13 or len(digits) > 19:
         return False
-    
+
     # Luhn 校验
     odd_digits = digits[-1::-2]
     even_digits = digits[-2::-2]
-    
+
     total = sum(odd_digits)
     for d in even_digits:
         total += sum(divmod(d * 2, 10))
-    
+
     return total % 10 == 0
 
 
@@ -183,20 +182,20 @@ class PIIRedactor:
             k for k, v in PII_PATTERNS.items() if v.get("enabled", True)
         ]
         self.custom_replacements = custom_replacements or {}
-        
+
         # 编译启用的 patterns
         self.compiled_patterns = {
             pii_type: PII_PATTERNS[pii_type]
             for pii_type in self.enabled_types
             if pii_type in PII_PATTERNS
         }
-    
+
     def redact(self, content: str) -> tuple[str, dict]:
         """对字符串进行 PII 脱敏.
-        
+
         Args:
             content: 原始字符串
-        
+
         Returns:
             (脱敏后字符串, 统计信息)
             统计信息包含: original_bytes, redacted_bytes, redactions_by_type
@@ -207,46 +206,46 @@ class PIIRedactor:
             "redactions_by_type": {pii_type: 0 for pii_type in self.compiled_patterns},
             "total_redactions": 0,
         }
-        
+
         if not content:
             stats["redacted_bytes"] = 0
             return content, stats
-        
+
         redacted = content
-        
+
         for pii_type, pattern_def in self.compiled_patterns.items():
             regex = pattern_def["regex"]
             replacement = self.custom_replacements.get(
                 pii_type, pattern_def["replacement"]
             )
             exclude = pattern_def.get("exclude")
-            
+
             def _do_replace(match):
                 # 排除规则
                 if exclude and exclude(match):
                     return match.group(0)
-                
+
                 # 信用卡需要 Luhn 验证
                 if pattern_def.get("validator") == "_luhn_check":
                     if not _luhn_check(match.group(0)):
                         return match.group(0)
-                
+
                 stats["redactions_by_type"][pii_type] += 1
                 stats["total_redactions"] += 1
                 return replacement
-            
+
             redacted = regex.sub(_do_replace, redacted)
-        
+
         stats["redacted_bytes"] = len(redacted.encode('utf-8'))
         return redacted, stats
-    
+
     def redact_dict_values(self, obj: Any, max_depth: int = 10) -> tuple[Any, dict]:
         """递归对字典/列表的字符串值进行脱敏.
-        
+
         Args:
             obj: 任意 JSON-like 对象
             max_depth: 最大递归深度
-        
+
         Returns:
             (脱敏后对象, 统计信息)
         """
@@ -256,11 +255,11 @@ class PIIRedactor:
             "total_redactions": 0,
             "redactions_by_type": {pii_type: 0 for pii_type in self.compiled_patterns},
         }
-        
+
         def _walk(node, depth):
             if depth > max_depth:
                 return node
-            
+
             if isinstance(node, str):
                 redacted, stats = self.redact(node)
                 total_stats["original_bytes"] += stats["original_bytes"]
@@ -269,15 +268,15 @@ class PIIRedactor:
                 for k, v in stats["redactions_by_type"].items():
                     total_stats["redactions_by_type"][k] += v
                 return redacted
-            
+
             if isinstance(node, dict):
                 return {k: _walk(v, depth + 1) for k, v in node.items()}
-            
+
             if isinstance(node, list):
                 return [_walk(v, depth + 1) for v in node]
-            
+
             return node
-        
+
         result = _walk(obj, 0)
         return result, total_stats
 
@@ -325,71 +324,71 @@ def _run_tests():
     print("=" * 60)
     print("PIIRedactor 单元测试")
     print("=" * 60)
-    
+
     redactor = PIIRedactor()
-    
+
     test_cases = [
         # (name, input, expected_to_contain, expected_not_to_contain)
         ("email",
          "Contact me at user@example.com or admin@test.org",
          ["[REDACTED:email]"],
          ["user@example.com", "admin@test.org"]),
-        
+
         ("phone_cn",
          "我的手机是 13812345678，另一个 15987654321",
          ["[REDACTED:phone_cn]"],
          ["13812345678", "15987654321"]),
-        
+
         ("id_card_cn",
          "身份证: 110101199003078811",
          ["[REDACTED:id_card_cn]"],
          ["110101199003078811"]),
-        
+
         ("api_key_openai",
          "API key: sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCDEF",
          ["[REDACTED:api_key]"],
          ["sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCDEF"]),
-        
+
         ("api_key_github",
          "Token: ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
          ["[REDACTED:api_key]"],
          ["ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD"]),
-        
+
         ("ipv4",
          "Server: 192.168.1.100, Backup: 8.8.8.8",
          ["[REDACTED:ipv4]"],
          ["192.168.1.100", "8.8.8.8"]),
-        
+
         ("sensitive_path",
          "Config in ~/.ssh/id_rsa and /etc/passwd",
          ["[REDACTED:path]"],
          ["/.ssh/id_rsa", "/etc/passwd"]),
-        
+
         ("url_with_token",
          "API URL: https://api.example.com/v1?token=secretkey123456",
          ["[REDACTED:url_with_token]"],
          ["secretkey123456"]),
-        
+
         ("luhn_valid_credit_card",
          "Card: 4532015112830366 (test Visa)",
          ["[REDACTED:credit_card]"],
          ["4532015112830366"]),
-        
+
         ("luhn_invalid_number",
          "Random: 1234567890123456 (not a valid card)",
          [],  # 不应被脱敏
          ["[REDACTED:credit_card]"]),
-        
+
         ("local_ip_not_redacted",
          "Local: 127.0.0.1, broadcast: 0.0.0.0",
          ["127.0.0.1", "0.0.0.0"],  # 应保留
          ["[REDACTED:ipv4]"]),
-        
+
         ("chinese_name_weak_disabled",
          "张老师好，李总再见",
          ["张老师", "李总"],  # 弱匹配默认禁用, 应保留
          ["[REDACTED:name]"]),
-        
+
         ("dict_recursive",
          json.dumps({
              "user": {"email": "a@b.com", "phone": "13812345678"},
@@ -398,7 +397,7 @@ def _run_tests():
          ["[REDACTED:email]", "[REDACTED:phone_cn]"],
          ["a@b.com", "13812345678", "15987654321"]),
     ]
-    
+
     passed = 0
     failed = 0
     for name, inp, must_contain, must_not_contain in test_cases:
@@ -409,7 +408,7 @@ def _run_tests():
                 out = json.dumps(result, ensure_ascii=False)
             else:
                 out, stats = redactor.redact(inp)
-            
+
             ok = True
             for s in must_contain:
                 if s not in out:
@@ -419,7 +418,7 @@ def _run_tests():
                 if s in out:
                     print(f"  ❌ [{name}] 泄漏: {s!r} → 输出: {out!r}")
                     ok = False
-            
+
             if ok:
                 print(f"  ✅ [{name}] redactions={stats['total_redactions']} "
                       f"({stats.get('original_bytes', 0)}→{stats.get('redacted_bytes', out.encode().__len__())} bytes)")
@@ -429,7 +428,7 @@ def _run_tests():
         except Exception as e:
             print(f"  ❌ [{name}] 异常: {e}")
             failed += 1
-    
+
     print()
     print(f"结果: {passed} 通过 / {failed} 失败 / 共 {len(test_cases)} 个")
     return failed == 0

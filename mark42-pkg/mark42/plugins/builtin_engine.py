@@ -1,7 +1,8 @@
 """内置循环引擎锁扣实现：包装 engine.py。"""
 
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any
 
 
 class BuiltinEngine:
@@ -16,7 +17,7 @@ class BuiltinEngine:
         except Exception:
             return False
 
-    def run_loop(self, name: str) -> Dict[str, Any]:
+    def run_loop(self, name: str) -> dict[str, Any]:
         from ..engine import engine_run_loop
         try:
             engine_run_loop(name)
@@ -24,7 +25,7 @@ class BuiltinEngine:
         except Exception as e:
             return {"status": "error", "loop": name, "error": str(e)}
 
-    def list_loops(self) -> Dict[str, Any]:
+    def list_loops(self) -> dict[str, Any]:
         from ..engine import _load_loops
         loops = _load_loops()
         return loops if isinstance(loops, dict) else {"loops": loops}

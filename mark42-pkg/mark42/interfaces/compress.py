@@ -5,7 +5,8 @@
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Protocol, runtime_checkable
+
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -15,14 +16,14 @@ class CompressLock(Protocol):
     实现方可以是 Mark42 armor、Headroom、或任何第三方压缩方案。
     """
 
-    def check(self) -> Dict[str, Any]:
+    def check(self) -> dict[str, Any]:
         """检查当前上下文状态。
 
         返回: {"usagePercent": float, "severity": str, ...}
         """
         ...
 
-    def compress(self, dry_run: bool = True, **kwargs: Any) -> Dict[str, Any]:
+    def compress(self, dry_run: bool = True, **kwargs: Any) -> dict[str, Any]:
         """执行上下文压缩。
 
         dry_run=True: 只分析不执行
@@ -32,6 +33,6 @@ class CompressLock(Protocol):
         """
         ...
 
-    def diagnose(self) -> Dict[str, Any]:
+    def diagnose(self) -> dict[str, Any]:
         """压缩诊断（可选，返回详细分析）。"""
         ...

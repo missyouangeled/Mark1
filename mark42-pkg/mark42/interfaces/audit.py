@@ -8,7 +8,8 @@
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Protocol, runtime_checkable
+
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -17,10 +18,10 @@ class AuditLock(Protocol):
 
     def audit_compact(
         self,
-        pre_compact_snapshot: Dict[str, Any],
-        post_compact_summary: Dict[str, Any],
+        pre_compact_snapshot: dict[str, Any],
+        post_compact_summary: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """对比 compact 前快照与 compact 后摘要，返回核对报告。
 
         Args:
@@ -40,10 +41,10 @@ class AuditLock(Protocol):
 
     def audit_compact_async(
         self,
-        pre_compact_snapshot: Dict[str, Any],
-        post_compact_summary: Dict[str, Any],
+        pre_compact_snapshot: dict[str, Any],
+        post_compact_summary: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """异步版本：入队立即返回，不阻塞 compact 流程。
 
         Returns:

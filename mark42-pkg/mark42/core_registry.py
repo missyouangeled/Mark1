@@ -14,12 +14,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ REGISTRY_DIR = Path.home() / ".local" / "state" / "openclaw" / "mark42" / "core-
 REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
 # 8 个核心位定义（§3.6 + §3.6.2 R13-D）
-CORE_DEFINITIONS: List[Dict[str, Any]] = [
+CORE_DEFINITIONS: list[dict[str, Any]] = [
     {
         "core_id": "core_1_main_consciousness",
         "core_role": "main_consciousness",
@@ -116,14 +115,14 @@ class CoreEntry:
     runtime: str
     base_url: str
     criticality: str  # critical | degradable | optional
-    fallback_chain: List[str] = field(default_factory=list)
+    fallback_chain: list[str] = field(default_factory=list)
     status: str = "unknown"  # unknown | healthy | degraded | down | quarantined
-    last_used_at: Optional[str] = None
+    last_used_at: str | None = None
     total_invocations: int = 0
     total_failures: int = 0
-    last_failure_reason: Optional[str] = None
+    last_failure_reason: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -150,7 +149,7 @@ def _probe_systemd(service: str) -> str:
         return "unknown"
 
 
-def probe_core(core_id: str) -> Dict[str, Any]:
+def probe_core(core_id: str) -> dict[str, Any]:
     """探活单个核心。返回 {status, reason}。"""
     core = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
     if not core:
@@ -251,7 +250,7 @@ class CoreRegistry:
         else:
             self.cores = self._init_defaults()
 
-    def _init_defaults(self) -> Dict[str, CoreEntry]:
+    def _init_defaults(self) -> dict[str, CoreEntry]:
         return {c["core_id"]: CoreEntry(**c) for c in CORE_DEFINITIONS}
 
     def _save(self):
@@ -261,29 +260,29 @@ class CoreRegistry:
         }
         REGISTRY_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def list_cores(self) -> List[Dict[str, Any]]:
+    def list_cores(self) -> list[dict[str, Any]]:
         """列出所有核心。"""
         return [c.to_dict() for c in self.cores.values()]
 
-    def get_core(self, core_id: str) -> Optional[CoreEntry]:
+    def get_core(self, core_id: str) -> CoreEntry | None:
         return self.cores.get(core_id)
 
-    def probe_all(self) -> Dict[str, Any]:
+    def probe_all(self) -> dict[str, Any]:
         """探活所有核心，更新状态。
-        
+
         R13-D: 核心状态变为 down/degraded 时自动生成 FAILURE.md；
         恢复为 healthy 时自动清理 FAILURE.md。
         """
         # 延迟导入避免循环依赖
-        from mark42.failure_contract import create_contract_for_core, write_failure_md, remove_failure_md
-        
+        from mark42.failure_contract import create_contract_for_core, remove_failure_md, write_failure_md
+
         results = {}
         for core_id in self.cores:
             old_status = self.cores[core_id].status
             r = probe_core(core_id)
             new_status = r["status"]
             self.cores[core_id].status = new_status
-            
+
             # R13-D: 状态变化时处理 FAILURE.md
             if new_status in ("down", "degraded") and old_status == "healthy":
                 # 核心降级/故障 → 生成 FAILURE.md
@@ -294,7 +293,7 @@ class CoreRegistry:
             elif new_status == "healthy" and old_status in ("down", "degraded", "quarantined"):
                 # 核心恢复 → 删除 FAILURE.md
                 remove_failure_md(core_id)
-            
+
             if new_status == "healthy":
                 # 更新 model_name（探活时可能从 not_loaded 变为已加载）
                 core_def = next((c for c in CORE_DEFINITIONS if c["core_id"] == core_id), None)
@@ -308,7 +307,7 @@ class CoreRegistry:
 
     def quarantine(self, core_id: str, reason: str = "") -> bool:
         """隔离核心。
-        
+
         R13-D: 隔离时自动生成 FAILURE.md。
         """
         if core_id not in self.cores:
@@ -316,18 +315,18 @@ class CoreRegistry:
         self.cores[core_id].status = "quarantined"
         self.cores[core_id].last_failure_reason = reason
         self._save()
-        
+
         # R13-D: 隔离 → 生成 FAILURE.md
         from mark42.failure_contract import create_contract_for_core, write_failure_md
         criticality = self.cores[core_id].criticality
         contract = create_contract_for_core(core_id, "degraded", criticality, reason)
         write_failure_md(core_id, contract)
-        
+
         return True
 
     def restore(self, core_id: str) -> bool:
         """恢复隔离的核心。
-        
+
         R13-D: 恢复时自动清理 FAILURE.md。
         """
         if core_id not in self.cores:
@@ -337,12 +336,12 @@ class CoreRegistry:
         self.cores[core_id].status = new_status
         self.cores[core_id].last_failure_reason = None
         self._save()
-        
+
         # R13-D: 恢复为 healthy → 删除 FAILURE.md
         if new_status == "healthy":
             from mark42.failure_contract import remove_failure_md
             remove_failure_md(core_id)
-        
+
         return True
 
     def record_invocation(self, core_id: str, success: bool, reason: str = ""):
@@ -357,7 +356,7 @@ class CoreRegistry:
             c.last_failure_reason = reason
         self._save()
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """摘要统计。"""
         statuses = {}
         for c in self.cores.values():
@@ -372,20 +371,20 @@ class CoreRegistry:
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_cores_list() -> Dict[str, Any]:
+def cli_cores_list() -> dict[str, Any]:
     reg = CoreRegistry()
     return {"cores": reg.list_cores(), "summary": reg.summary()}
 
-def cli_cores_probe() -> Dict[str, Any]:
+def cli_cores_probe() -> dict[str, Any]:
     reg = CoreRegistry()
     return reg.probe_all()
 
-def cli_cores_quarantine(core_id: str, reason: str = "") -> Dict[str, Any]:
+def cli_cores_quarantine(core_id: str, reason: str = "") -> dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.quarantine(core_id, reason)
     return {"ok": ok, "core_id": core_id}
 
-def cli_cores_restore(core_id: str) -> Dict[str, Any]:
+def cli_cores_restore(core_id: str) -> dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.restore(core_id)
     return {"ok": ok, "core_id": core_id}

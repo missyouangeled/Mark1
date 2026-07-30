@@ -1,7 +1,8 @@
 """内置熔断器锁扣实现：包装 CircuitBreaker 类。"""
 
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any
 
 
 class BuiltinBreaker:
@@ -20,7 +21,7 @@ class BuiltinBreaker:
     def record_failure(self, key: str, reason: str = "") -> None:
         self._impl.record_failure(key, reason=reason)
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         states = self._impl.list_all()
         return {
             "breakers": states,

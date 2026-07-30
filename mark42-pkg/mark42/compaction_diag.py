@@ -6,8 +6,6 @@ v2.0 (2026-06-16): 升级至病因层——令牌感知、双层阈值、摘要�
 
 import json
 import logging
-import os
-import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -262,7 +260,7 @@ def _check_stat(session_count: int, largest_mb: float, ctx_window: int) -> list[
 def _token_aware_check(cc: dict) -> dict[str, Any]:
     """令牌感知检测：从 session jsonl 读取实际 token 消耗，
     对比文件大小阈值与真实 token 占用是否合理。
-    
+
     返回 token 感知诊断结果，包含实际 token 消耗 vs 配置阈值的对比。
     """
     result = {
@@ -363,7 +361,7 @@ def _token_aware_check(cc: dict) -> dict[str, Any]:
 def _dual_threshold_check(cc: dict, ctx_window: int) -> dict[str, Any] | None:
     """双层阈值检查：主阈值 (maxActiveTranscriptBytes) 与
     memoryFlush.softThresholdTokens 的偏移是否合理。
-    
+
     Hermes 风格：主阈值 50% 窗口 + 安全网 85% 窗口，避免同时触发。
     """
     mf = cc.get("memoryFlush", {})
@@ -407,7 +405,7 @@ def _dual_threshold_check(cc: dict, ctx_window: int) -> dict[str, Any] | None:
 def _probe_quality_check(cc: dict) -> dict[str, Any] | None:
     """摘要质量探针：检测最近一次压缩后，
     用标准化问题评估关键信息留存率 (Factory.ai 风格)。
-    
+
     注意：此函数只在能够访问 LLM 时才有意义（需要 `--probe` 模式），
     默认只返回「探针就绪」状态。
     """
@@ -506,7 +504,7 @@ def _drift_check(cc: dict) -> dict[str, Any] | None:
     """上下文降解检测：检测连续压缩后 tokensBefore 的变化趋势。
     如果连续 N 次压缩后 tokensBefore 没有明显下降（说明压缩无效），
     或者急剧下降（可能丢失了关键信息），触发告警。
-    
+
     这是轻量级检测——不需要 LLM，只靠 token 计数趋势分析。
     """
     today = datetime.now().strftime("%Y-%m-%d")
@@ -583,7 +581,7 @@ def _drift_check(cc: dict) -> dict[str, Any] | None:
 
 def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[str, Any]:
     """诊断 OpenClaw 压缩配置，返回完整诊断报告。
-    
+
     Args:
         token_aware: 启用令牌感知检测（从 session jsonl 读取实际 token 消耗）
         probe: 启用摘要质量探针（检测压缩后关键信息留存率）
@@ -963,7 +961,7 @@ def print_diagnose(diag: dict[str, Any]) -> None:
         # ── 原有逻辑 ──
         if cs == "missing":
             print(f"  {icon} {label}")
-            print(f"     状态: 未启用")
+            print("     状态: 未启用")
             print(f"     建议: {issue.get('advice', '')}")
         elif cs == "ok":
             print(f"  {icon} {label} = {cur} (舒适范围 {issue.get('range', '')})")
@@ -996,14 +994,14 @@ def print_apply_result(result: dict[str, Any]) -> None:
             print(f"     {ch.get('from', '?')} → {ch.get('to', '?')}")
             print(f"     原因: {ch.get('reason', '')}\n")
         print(f"  共 {len(result['changes'])} 项修改，未实际写入。")
-        print(f"  执行 --apply 以应用更改。")
+        print("  执行 --apply 以应用更改。")
     elif status == "applied":
         print("  ✅ 已应用压缩配置优化\n")
         for ch in result.get("changes", []):
             print(f"  ✅ {ch['key']}")
             print(f"     {ch.get('from', '?')} → {ch.get('to', '?')}\n")
         print(f"  备份: {result.get('backupPath', '?')}")
-        print(f"  重启 Gateway 后生效: openclaw gateway restart")
+        print("  重启 Gateway 后生效: openclaw gateway restart")
     elif status == "error":
         logger.error("压缩错误: %s", result.get("summary", ""))
         print(f"  ❌ 错误: {result.get('summary', '')}")

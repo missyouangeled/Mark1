@@ -31,7 +31,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 # Phase 2-2: MARK42_TEXT_USE_LLM 环境变量
 #   true:  text 路由强制走 LLM (summarize 等)
 #   false: 走 rule_based (默认)
@@ -55,13 +54,12 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from smart_crusher import smartcrush
-from pii_redactor import redact_pii
 from code_compressor import codecrush
 from diff_compressor import diff_compress
 from log_deduplicator import logdedup
+from pii_redactor import redact_pii
+from smart_crusher import smartcrush
 from text_compressor import text_compress
-
 
 # ============================================================================
 # Compressor Registry - 注册表模式 (Day ?)
@@ -210,21 +208,21 @@ _compressor_registry.register("text", text_compress, "text", 50)
 @dataclass
 class SchedulerConfig:
     """调度器配置 - 可通过环境变量覆盖"""
-    
+
     # 大小阈值 (bytes)
     skip_below: int = 1024                # < 1KB 跳过
     small_max: int = 10 * 1024            # 1KB-10KB 轻量压缩
     medium_max: int = 100 * 1024          # 10KB-100KB 标准压缩
-    
+
     # 压缩率阈值
     min_useful_ratio: float = 0.05        # < 5% 视为无效 (与 text_compress 内部阈值一致)
     max_safe_ratio: float = 0.95          # 压缩后 > 95% 视为失败 (语意压缩能压 5%+ 即可)
-    
+
     # PII 阈值
     pii_enabled_small: bool = False       # < 10KB 默认不脱敏 (误报成本高)
     pii_enabled_medium: bool = True       # 10KB-100KB 默认脱敏
     pii_enabled_large: bool = True        # > 100KB 强制脱敏
-    
+
     # 标记阈值
     review_threshold_bytes: int = 100 * 1024  # > 100KB 标记需 review
 
@@ -236,7 +234,7 @@ class SchedulerConfig:
 @dataclass
 class ScheduleDecision:
     """调度决策结果"""
-    
+
     action: str                           # "skip" | "compress" | "compress+pii" | "review"
     reason: str
     size_bucket: str                      # "tiny" | "small" | "medium" | "large"
@@ -250,11 +248,11 @@ class ScheduleDecision:
 
 def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecision:
     """根据内容特征做调度决策.
-    
+
     Args:
         content: 待处理内容
         config: 调度配置, None 使用默认
-    
+
     Returns:
         ScheduleDecision - 调度决策
     """
@@ -364,7 +362,7 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             is_json=is_json,
             config=cfg,
         )
-    
+
     if size <= cfg.small_max:
         # small: 1KB-10KB
         return ScheduleDecision(
@@ -376,7 +374,7 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             is_json=is_json,
             config=cfg,
         )
-    
+
     if size <= cfg.medium_max:
         # medium: 10KB-100KB
         return ScheduleDecision(
@@ -388,7 +386,7 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             is_json=is_json,
             config=cfg,
         )
-    
+
     # large: > 100KB
     return ScheduleDecision(
         action="review",
@@ -408,17 +406,17 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
 
 def process(content: str, config: SchedulerConfig | None = None) -> dict[str, Any]:
     """按调度策略处理内容.
-    
+
     完整流程:
     1. decide() 做决策
     2. 如需 PII 脱敏 → 先 redact
     3. 如需压缩 → 再 smartcrush
     4. 验证压缩率, 失败回退原文
-    
+
     Args:
         content: 原始内容
         config: 调度配置
-    
+
     Returns:
         {
             "result": str,              # 最终内容 (可能原文或压缩后)
@@ -431,7 +429,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
     """
     cfg = config or SchedulerConfig()
     decision = decide(content, cfg)
-    
+
     result = {
         "result": content,
         "changed": False,
@@ -440,9 +438,9 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
         "compress_stats": None,
         "fallback_reason": None,
     }
-    
+
     current = content
-    
+
     # 1. PII 脱敏 (如果需要)
     if decision.should_redact_pii:
         redacted, pii_stats = redact_pii(current)
@@ -450,7 +448,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
         if pii_stats["total_redactions"] > 0:
             current = redacted
             result["changed"] = True
-    
+
     # 2. 压缩 (如果需要) - 按 route_algo 选择算法
     if decision.should_compress:
         if decision.route_algo == "code":
@@ -472,12 +470,12 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
             compressed, compress_stats = smartcrush(current)
         result["compress_stats"] = compress_stats
         result["route_algo"] = decision.route_algo
-        
+
         # 压缩率验证
         ratio = compress_stats.get("ratio", 0.0)
         original_size = compress_stats.get("original_bytes", 0)
         crushed_size = compress_stats.get("crushed_bytes", 0)
-        
+
         # 护栏 1: 压缩率太低, 无效
         if ratio < cfg.min_useful_ratio:
             result["fallback_reason"] = (
@@ -485,7 +483,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
                 f"{cfg.min_useful_ratio:.2%}, kept original"
             )
             return result
-        
+
         # 护栏 2: 压缩后体积 > 原文 80%, 视为失败
         if original_size > 0 and crushed_size / original_size > cfg.max_safe_ratio:
             result["fallback_reason"] = (
@@ -494,11 +492,11 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
                 f"kept original"
             )
             return result
-        
+
         # 通过验证, 接受压缩结果
         current = compressed
         result["changed"] = True
-    
+
     result["result"] = current
     return result
 
@@ -512,60 +510,60 @@ def _run_tests():
     print("=" * 60)
     print("Algorithm Scheduler 单元测试")
     print("=" * 60)
-    
+
     test_cases = [
-        # (name, content, expected_action, expected_size_bucket, 
+        # (name, content, expected_action, expected_size_bucket,
         #  expected_compress, expected_pii)
-        
+
         ("tiny_text",
          "hello world",
          "skip", "tiny", False, False),
-        
+
         ("tiny_json",
          '{"a": 1}',
          "skip", "tiny", False, False),
-        
+
         ("small_text",
          "x" * 5000,  # 5KB
          "skip", "small", False, False),  # 非 JSON
-        
+
         ("small_json",
          '{"items": [' + ",".join([
              '{"id": ' + str(i) + ', "name": "user_' + str(i) + '_' + ("x" * 20) + '"}'
              for i in range(100)
          ]) + ']}',  # ~5KB
          "compress", "small", True, False),
-        
+
         ("medium_json_with_pii",
          '{"users": [' + ",".join([
              '{"email": "user' + str(i) + '@example.com", "name": "user_' + str(i) + '"}'
              for i in range(500)
          ]) + ']}',
          "compress+pii", "medium", True, True),
-        
+
         ("large_json",
          '{"data": [' + ",".join(['"x"' for _ in range(50000)]) + ']}',
          "review", "large", True, True),
-        
+
         ("invalid_json",
          "not json at all, just text " * 200,
          "skip", "small", False, False),  # non-JSON small → skip
     ]
-    
+
     passed = 0
     failed = 0
     for name, inp, exp_action, exp_bucket, exp_compress, exp_pii in test_cases:
         try:
             result = process(inp)
             d = result["decision"]
-            
+
             ok = (
                 d.action == exp_action
                 and d.size_bucket == exp_bucket
                 and d.should_compress == exp_compress
                 and d.should_redact_pii == exp_pii
             )
-            
+
             if ok:
                 pii_count = (result["pii_stats"] or {}).get("total_redactions", 0)
                 comp_ratio = (result["compress_stats"] or {}).get("ratio", 0.0)
@@ -581,17 +579,17 @@ def _run_tests():
         except Exception as e:
             print(f"  ❌ [{name}] 异常: {e}")
             failed += 1
-    
+
     # 额外测试: 压缩率护栏
     print()
     print("护栏测试:")
-    
+
     # 测试 1: 太小收益回退
     tiny_json = '{"a": 1, "b": 2}'  # 太小 skip
     r = process(tiny_json)
     assert r["changed"] is False, f"tiny content should not change, got {r['changed']}"
     print(f"  ✅ tiny 不变: changed={r['changed']}")
-    
+
     # 测试 2: 大 JSON 触发压缩 + PII
     big_with_pii = json.dumps({
         "logs": [
@@ -605,7 +603,7 @@ def _run_tests():
     assert r["compress_stats"]["ratio"] > 0
     print(f"  ✅ big+pii: changed=True, pii={r['pii_stats']['total_redactions']}, "
           f"comp={r['compress_stats']['ratio']:.1%}")
-    
+
     # 测试 3: 错误输入 fail-safe
     r = process(None or "")
     assert r["result"] == "", f"empty input should return empty, got {r['result']!r}"
@@ -700,7 +698,7 @@ def _run_tests():
     )
     r = process(diff_with_code)
     assert r["decision"].route_algo == "diff", f"diff should win over code, got {r['decision'].route_algo}"
-    print(f"  ✅ [T6.6 路由优先级] diff 优先于 code (正确)")
+    print("  ✅ [T6.6 路由优先级] diff 优先于 code (正确)")
     passed += 1
 
     # T6.7: 压缩护栏 - 超过 max_safe_ratio 回退

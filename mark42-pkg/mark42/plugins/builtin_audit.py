@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import threading
-from typing import Any, Dict
+import logging
 
-from ..audit import AuditResult
+logger = logging.getLogger(__name__)
+from typing import Any
+
+from ..audit.checker import LLMChecker
+from ..audit.pinning import ConstraintPinner
+from ..audit.report import send_alert, write_report
 from ..audit.snapshot_reader import OpenClawSnapshotReader
 from ..audit.summary_extractor import OpenClawSummaryExtractor
-from ..audit.checker import LLMChecker
-from ..audit.report import write_report, send_alert
-from ..audit.pinning import ConstraintPinner
 
 
 class BuiltinAudit:
@@ -31,10 +33,10 @@ class BuiltinAudit:
 
     def audit_compact(
         self,
-        pre_compact_snapshot: Dict[str, Any],
-        post_compact_summary: Dict[str, Any],
+        pre_compact_snapshot: dict[str, Any],
+        post_compact_summary: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """同步审计：对比 compact 前后 + 约束重注入。"""
         try:
             # 1. 读快照关键信息
@@ -103,10 +105,10 @@ class BuiltinAudit:
 
     def audit_compact_async(
         self,
-        pre_compact_snapshot: Dict[str, Any],
-        post_compact_summary: Dict[str, Any],
+        pre_compact_snapshot: dict[str, Any],
+        post_compact_summary: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """异步审计：入队立即返回，不阻塞 compact。"""
         thread = threading.Thread(
             target=self._async_run,
@@ -117,7 +119,7 @@ class BuiltinAudit:
 
         return {"queued": True, "taskId": f"audit-{thread.ident}"}
 
-    def _async_run(self, pre: Dict[str, Any], post: Dict[str, Any]) -> None:
+    def _async_run(self, pre: dict[str, Any], post: dict[str, Any]) -> None:
         """异步执行审计（异常写入 broker，不影响主流程）。"""
         try:
             self.audit_compact(pre, post)
@@ -133,5 +135,5 @@ class BuiltinAudit:
                     str(e),
                     {"error": str(e), "timestamp": _now_iso()},
                 )
-            except Exception:
-                pass  # broker 也失败了，只能吞掉
+            except Exception as e:
+                logger.warning("ignored error: %s", e)

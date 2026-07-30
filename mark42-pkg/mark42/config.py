@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,11 @@ def _conf_save_json(path: Path, data: dict) -> None:
 
 WORKSPACE = Path(__file__).resolve().parent.parent.parent
 SCRIPTS = WORKSPACE / "scripts"
+
+# OpenClaw 可执行文件路径（动态查找，不硬编码）
+import shutil as _shutil
+
+OPENCLAW_BIN = _shutil.which("openclaw") or str(Path.home() / ".npm-global" / "bin" / "openclaw")
 
 XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
@@ -218,8 +223,8 @@ def get_model_config(config_key: str) -> dict[str, Any] | None:
                 if isinstance(entry, str):
                     return dict(MARK42_MODEL_TABLE.get(config_key, {}), model=entry)
                 return dict(MARK42_MODEL_TABLE.get(config_key, {}), **entry)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
     # 回退到代码默认值
     return MARK42_MODEL_TABLE.get(config_key)
 
@@ -231,11 +236,11 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
     model_entry = get_model_config(config_key)
     if not model_entry:
         return None
-    
+
     provider_key = model_entry.get("provider", "")
     api_key = ""
     base_url = model_entry.get("baseUrlFallback", "")
-    
+
     # 从 openclaw.json 取 API key 和 baseUrl
     openclaw_path = Path.home() / ".openclaw" / "openclaw.json"
     if openclaw_path.exists():
@@ -245,12 +250,12 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
             api_key = provider.get("apiKey", "")
             if provider.get("baseUrl"):
                 base_url = provider["baseUrl"]
-        except Exception:
-            pass
-    
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
+
     if not api_key:
         return None
-    
+
     return {
         "model": model_entry.get("model", ""),
         "apiKey": api_key,
@@ -303,7 +308,7 @@ def mark42_init() -> None:
     print(f"   配置: {CONFIG_PATH}")
     print(f"   状态: {MARK42_STATE}")
     print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
-    print(f"   使用 'python3 scripts/mark42.py --config' 查看/修改")
+    print("   使用 'python3 scripts/mark42.py --config' 查看/修改")
 
 def mark42_config() -> None:
     if not CONFIG_PATH.exists():
@@ -315,22 +320,22 @@ def mark42_config() -> None:
     print(f"   初始化于: {cfg.get('initializedAt', '?')}")
     print(f"   上下文窗口: {cfg.get('contextWindow', 0)/1000:.0f}K")
     print(f"   字节/KToken: {cfg.get('bytesPerKtoken', '?')}")
-    print(f"\n   阈值:")
+    print("\n   阈值:")
     t = cfg.get("thresholds", {})
     print(f"     WARN: {t.get('warn', '?')}%  |  ALERT: {t.get('alert', '?')}%  |  CRIT: {t.get('crit', '?')}%")
-    print(f"\n   模型配置表:")
+    print("\n   模型配置表:")
     m = cfg.get("models", {})
     for key, entry in m.items():
         if isinstance(entry, dict):
             print(f"     {key}: {entry.get('model', '?')}  (provider: {entry.get('provider', '?')})")
         elif isinstance(entry, str):
             print(f"     {key}: {entry}  (旧格式)")
-    print(f"\n   守护模式:")
+    print("\n   守护模式:")
     d = cfg.get("daemon", {})
     print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
     print(f"     自动压缩: {d.get('autoArmorCompress', '?')}")
     print(f"     自动监控: {d.get('autoTaskWatch', '?')}")
     h = cfg.get("heavy", {})
-    print(f"\n   重型战甲:")
+    print("\n   重型战甲:")
     print(f"     大工程检测: {'启用' if h.get('autoDetectEnabled') else '关闭'}")
     print(f"     检测模式: {h.get('autoDetect', 'ask')} (ask=询问/semi=半自动30s/full=全自动)")

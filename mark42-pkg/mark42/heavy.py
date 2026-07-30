@@ -5,16 +5,14 @@
 import json
 import logging
 import os
-import select
 import shutil
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
-from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
-from .utils import _append_broker, _load_json, _now_iso, _save_json, _list_project_files
 from .armor import armor_check
+from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
+from .utils import _append_broker, _list_project_files, _load_json, _now_iso, _save_json
 
 logger = logging.getLogger(__name__)
 from .interfaces import get_compress
@@ -36,11 +34,11 @@ def heavy_preflight(path_str: str) -> None:
     remaining = 100 - usage
     print(f"🧠 上下文余量: {remaining:.0f}% (当前 {usage}%)")
     if remaining < 20:
-        print(f"   ⚠️ 不足 — 强烈建议后台执行")
+        print("   ⚠️ 不足 — 强烈建议后台执行")
     elif remaining < 50:
-        print(f"   💡 偏紧 — 建议后台执行")
+        print("   💡 偏紧 — 建议后台执行")
     else:
-        print(f"   ✅ 充足 — 可前台启动")
+        print("   ✅ 充足 — 可前台启动")
     mem = os.popen("free -h | grep Mem | awk '{print $2}'").read().strip()
     print(f"🖥️ 内存: {mem}")
     for mp in ["/", "/mnt/data"]:
@@ -139,7 +137,7 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
     """
     r = heavy_detect(path_str)
     if not r["exists"]:
-        logger.error("路径不存在: %s", r["path"]); print(f"❌ 路径不存在: {r["path"]}")
+        logger.error("路径不存在: %s", r["path"]); print(f"❌ 路径不存在: {r['path']}")
         return
     m = r["metrics"]
     print(f"🔍 大工程检测: {r['path']}")
@@ -149,7 +147,7 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
         print(f"\n✅ {r['advice']}")
         return
 
-    print(f"\n⚠️ 已达到大工程标准：")
+    print("\n⚠️ 已达到大工程标准：")
     for reason in r["reasons"]:
         print(f"   • {reason}")
     print(f"\n💡 {r['advice']}")
@@ -166,11 +164,11 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
         import time
         task_name = _auto_task_name(path_str)
         print(f"\n⏳ 半自动模式：30 秒后自动开工 → {task_name}")
-        print(f"   拒绝：输入 'n' 或 Ctrl+C")
-        print(f"   立即开工：输入 'y' 或按回车跳过等待")
+        print("   拒绝：输入 'n' 或 Ctrl+C")
+        print("   立即开工：输入 'y' 或按回车跳过等待")
         try:
             import select
-            print(f"   ", end="", flush=True)
+            print("   ", end="", flush=True)
             for i in range(30, 0, -1):
                 print(f"\r   ⏳ {i}s... ", end="", flush=True)
                 # 用 select 非阻塞检查 stdin 是否有输入
@@ -178,25 +176,25 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
                 if rlist:
                     line = sys.stdin.readline().strip().lower()
                     if line in ("n", "no", "不", "拒绝"):
-                        print(f"\n❌ 已取消。手动开工:")
+                        print("\n❌ 已取消。手动开工:")
                         print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
                         return
                     elif line in ("y", "yes", "是", "好", "开", ""):
-                        print(f"\n✅ 立即开工")
+                        print("\n✅ 立即开工")
                         heavy_start(path_str, task_name)
                         return
                 time.sleep(1)
             # 倒计时结束，自动开工
-            print(f"\n✅ 倒计时结束，自动开工")
+            print("\n✅ 倒计时结束，自动开工")
             heavy_start(path_str, task_name)
         except (KeyboardInterrupt, EOFError):
-            print(f"\n❌ 已取消。手动开工:")
+            print("\n❌ 已取消。手动开工:")
             print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
         return
 
     # "ask" 模式：只提示
     task_name = _auto_task_name(path_str)
-    print(f"\n💡 手动开工命令:")
+    print("\n💡 手动开工命令:")
     print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
 
 
@@ -217,10 +215,10 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     print(f"   🧠 上下文: {usage}%")
     if context_aware:
         if usage >= THRESHOLD_ALERT:
-            print(f"   ⚠️ 上下文偏高，自动触发压缩...")
+            print("   ⚠️ 上下文偏高，自动触发压缩...")
             get_compress().compress()
         elif usage >= THRESHOLD_WARN:
-            print(f"   💡 建议后台执行（上下文偏紧）")
+            print("   💡 建议后台执行（上下文偏紧）")
     files = _list_project_files(target)
     total_files = len(files)
     total_size = sum(f.stat().st_size for f in files)
@@ -280,10 +278,10 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     _append_broker("tasks", "heavy.task.started", f"大工程开工: {task_name}", "ok",
                    f"{total_files} 文件 | {num_batches} 批次 | {total_size_mb:.1f}MB",
                    {"taskName": task_name, "totalFiles": total_files, "batches": num_batches})
-    print(f"\n   📋 批次清单:")
+    print("\n   📋 批次清单:")
     for b in batches:
         print(f"      {b['id']}: {b['count']} 文件 ({b['sizeMB']:.1f}MB)")
-    print(f"\n✅ 已开工。使用以下命令监控：")
+    print("\n✅ 已开工。使用以下命令监控：")
     print(f"   python3 scripts/mark42.py engine --watch-task {task_name}")
     print(f"   完工后: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
 
@@ -304,7 +302,7 @@ def heavy_finish(task_name: str) -> None:
     print(f"🏁 大工程收工: {task_name}")
     print(f"   结果: ✅ {done}/{total} 成功  |  ❌ {failed} 失败  |  ⏳ {pending} 未完成")
     if failed > 0 or pending > 0:
-        print(f"   ⚠️ 不建议收工，请先处理失败/未完成子任务")
+        print("   ⚠️ 不建议收工，请先处理失败/未完成子任务")
         return
     heavy_status = HEAVY_STATE / f"{task_name}.json"
     hs = _load_json(heavy_status)
@@ -363,15 +361,15 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
                 break
         if not target_id:
             if retry:
-                print(f"✅ 无 pending/failed 子任务需要处理")
+                print("✅ 无 pending/failed 子任务需要处理")
             else:
-                print(f"✅ 所有批次已完成，无 pending 子任务")
+                print("✅ 所有批次已完成，无 pending 子任务")
             return
     batch = subtasks[target_id]
     files = batch.get("files", [])
     target_path = Path(st.get("targetPath", str(task_dir.parent)))
     print(f"⚙️ 执行 {target_id}: {batch['count']} 文件 ({batch['sizeMB']:.2f}MB)")
-    print(f"   文件列表:")
+    print("   文件列表:")
     for f in files[:5]:
         print(f"      {f}")
     if len(files) > 5:
@@ -466,8 +464,8 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
         print(f"   📤 已入队: {queue_file}")
         print(f"   执行脚本: {script_path}")
         if not command:
-            print(f"   ⚠️ 未传 --command，脚本仅 echo 列出文件（默认 no-op）")
-        print(f"   💡 仅入队，未启动。需 --execute-now 才真跑")
+            print("   ⚠️ 未传 --command，脚本仅 echo 列出文件（默认 no-op）")
+        print("   💡 仅入队，未启动。需 --execute-now 才真跑")
     return result
 
 
@@ -487,7 +485,7 @@ def heavy_execute_all(task_name: str, command: str | None = None,
     search_statuses = ("pending", "failed") if retry else ("pending",)
     pending = [bid for bid, bt in subtasks.items() if bt.get("status") in search_statuses]
     if not pending:
-        print(f"✅ 无待处理子任务")
+        print("✅ 无待处理子任务")
         return []
     label = "pending/failed" if retry else "pending"
     print(f"⚙️ 处理全部 {len(pending)} 个 {label} 批次: {', '.join(pending)}")
@@ -557,7 +555,7 @@ def heavy_resume(task_name: str, command: str | None = None,
                    f"断点续传: {task_name}", "ok" if failed == 0 else "warn",
                    f"重试 {len(retryable)} 批 | 成功 {done} | 失败 {failed} | 剩余 {remaining}",
                    {"taskName": task_name, **{k: v for k, v in summary.items() if k != "details"}})
-    print(f"📊 续传统计:")
+    print("📊 续传统计:")
     print(f"   重试: {len(retryable)} | 成功: {done} | 失败: {failed} | 剩余: {remaining}")
     return summary
 

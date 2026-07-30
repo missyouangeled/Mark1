@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 try:
     import yaml  # PyYAML
@@ -41,7 +41,7 @@ CONFIG_PATHS = [
 ]
 
 # 默认配置（用户不配就用这个）
-DEFAULT_CONFIG: Dict[str, Any] = {
+DEFAULT_CONFIG: dict[str, Any] = {
     "mark42": {
         "consciousness": {
             "runtime": "stub",          # 可换: ollama | api | stub
@@ -71,7 +71,7 @@ class ChatMessage:
     role: str   # system | user | assistant
     content: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {"role": self.role, "content": self.content}
 
 
@@ -80,8 +80,8 @@ class ChatResponse:
     """统一响应结构（不论哪个 runtime 都返回这个）。"""
     content: str
     model: str = ""
-    usage: Dict[str, int] = field(default_factory=dict)
-    raw: Optional[Dict[str, Any]] = None
+    usage: dict[str, int] = field(default_factory=dict)
+    raw: dict[str, Any] | None = None
 
     @property
     def ok(self) -> bool:
@@ -100,7 +100,7 @@ class LLMProvider(Protocol):
     runtime: str
     model: str
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse: ...
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse: ...
 
 
 class LLMProviderError(Exception):
@@ -109,7 +109,7 @@ class LLMProviderError(Exception):
 
 # ── 配置加载 ─────────────────────────────────────────
 
-def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_config(path: Path | None = None) -> dict[str, Any]:
     """加载 model.yaml；找不到或解析失败 → 返回默认配置（不崩）。
 
     行为契约：
@@ -140,16 +140,16 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
     return cfg
 
 
-def get_consciousness_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_consciousness_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
     """从配置里取 consciousness 段；缺则补默认。"""
     return cfg.get("mark42", {}).get("consciousness", DEFAULT_CONFIG["mark42"]["consciousness"])
 
 
-def get_advisor_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_advisor_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
     return cfg.get("mark42", {}).get("advisor", DEFAULT_CONFIG["mark42"]["advisor"])
 
 
-def get_fallback_chain(cfg: Dict[str, Any]) -> List[str]:
+def get_fallback_chain(cfg: dict[str, Any]) -> list[str]:
     return cfg.get("mark42", {}).get("fallback_chain", ["stub"])
 
 
@@ -169,7 +169,7 @@ class OllamaRuntime:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         url = f"{self.base_url}/v1/chat/completions"
         body = {
             "model": self.model,
@@ -205,7 +205,7 @@ class APIRuntime:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         url = f"{self.base_url}/chat/completions"
         body = {
             "model": self.model,
@@ -233,7 +233,7 @@ class StubRuntime:
     def __init__(self, model: str = "stub-model", **kwargs: Any):
         self.model = model
 
-    def chat(self, messages: List[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         # 取最后一条用户消息作为 echo 内容（能让上层验证调用是否真过了）
         # R4 确定性：None / 缺字段 不崩
         last_user = next((m.content for m in reversed(messages) if m.role == "user"), "") or ""
@@ -241,7 +241,7 @@ class StubRuntime:
         prompt_tokens = sum(len(str(m.content or "")) for m in messages) // 2
         completion_tokens = len(content) // 2
         total_tokens = prompt_tokens + completion_tokens
-        
+
         # R15: 旁路记录成本（失败不阻塞主流程）
         try:
             from .cost_tracker import record_cost
@@ -251,9 +251,9 @@ class StubRuntime:
                 completion_tokens=completion_tokens,
                 caller_module="llm_provider_stub",
             )
-        except Exception:
-            pass  # 成本记录失败不影响主流程
-        
+        except Exception as e:
+            logger.warning("ignored error: %s", e)  # 成本记录失败不影响主流程
+
         return ChatResponse(
             content=content,
             model=self.model,
@@ -266,7 +266,7 @@ class StubRuntime:
 
 # ── HTTP 工具（避免每个 runtime 都重复 try/except） ────
 
-def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
+def _http_post_json(url: str, body: dict[str, Any], api_key: str,
                     timeout_seconds: int, max_retries: int,
                     extra_log: str = "") -> ChatResponse:
     """POST JSON 到 OpenAI 兼容接口，统一错误处理。"""
@@ -275,7 +275,7 @@ def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for attempt in range(1 + max_retries):
         req = urllib.request.Request(url, data=data, method="POST")
         for k, v in headers.items():
@@ -289,7 +289,7 @@ def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
             content = choices[0].get("message", {}).get("content", "")
             model = resp_body.get("model", "")
             usage = resp_body.get("usage", {}) or {}
-            
+
             # R15: 旁路记录成本（失败不阻塞主流程）
             try:
                 from .cost_tracker import record_cost
@@ -302,9 +302,9 @@ def _http_post_json(url: str, body: Dict[str, Any], api_key: str,
                         completion_tokens=completion_tokens,
                         caller_module="llm_provider_api",
                     )
-            except Exception:
-                pass  # 成本记录失败不影响主流程
-            
+            except Exception as e:
+                logger.warning("ignored error: %s", e)
+
             return ChatResponse(
                 content=content,
                 model=model,
@@ -330,7 +330,7 @@ _RUNTIME_REGISTRY = {
 }
 
 
-def build_provider(cfg_section: Dict[str, Any]) -> LLMProvider:
+def build_provider(cfg_section: dict[str, Any]) -> LLMProvider:
     """根据配置段构造 Provider。未知 runtime → 降级 StubRuntime（不崩）。"""
     runtime_name = (cfg_section.get("runtime") or "stub").lower()
     cls = _RUNTIME_REGISTRY.get(runtime_name)
@@ -352,14 +352,14 @@ def build_provider(cfg_section: Dict[str, Any]) -> LLMProvider:
         return StubRuntime(model=cfg_section.get("model", "stub-model"))
 
 
-def build_consciousness(cfg: Optional[Dict[str, Any]] = None) -> LLMProvider:
+def build_consciousness(cfg: dict[str, Any] | None = None) -> LLMProvider:
     """构造战甲意识层 Provider（主用）。"""
     if cfg is None:
         cfg = load_config()
     return build_provider(get_consciousness_cfg(cfg))
 
 
-def build_advisor(cfg: Optional[Dict[str, Any]] = None) -> Optional[LLMProvider]:
+def build_advisor(cfg: dict[str, Any] | None = None) -> LLMProvider | None:
     """构造外部 advisor Provider；未启用 → 返回 None。"""
     if cfg is None:
         cfg = load_config()
@@ -371,8 +371,8 @@ def build_advisor(cfg: Optional[Dict[str, Any]] = None) -> Optional[LLMProvider]
 
 # ── 顶层 chat 封装（带 fallback 链）────────────────────
 
-def chat_with_fallback(messages: List[ChatMessage],
-                       cfg: Optional[Dict[str, Any]] = None,
+def chat_with_fallback(messages: list[ChatMessage],
+                       cfg: dict[str, Any] | None = None,
                        **kwargs: Any) -> ChatResponse:
     """按 fallback_chain 依次尝试，直到一个成功为止。全失败 → 返回 stub 回声。"""
     if cfg is None:
@@ -390,7 +390,7 @@ def chat_with_fallback(messages: List[ChatMessage],
         except Exception as e:
             logger.warning("构造 fallback %s 失败: %s", runtime_name, e)
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for p in providers_to_try:
         try:
             return p.chat(messages, **kwargs)

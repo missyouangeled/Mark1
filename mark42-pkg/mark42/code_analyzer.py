@@ -19,7 +19,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # 复用 v3-1 的 LLM Provider
 from .llm_provider import ChatMessage, LLMProvider, build_consciousness, load_config
@@ -62,14 +62,14 @@ class CodeBug:
 @dataclass
 class AnalysisResult:
     """代码分析结果。"""
-    bugs: List[CodeBug] = field(default_factory=list)
+    bugs: list[CodeBug] = field(default_factory=list)
     quality_score: int = 0
     summary: str = ""
-    suggestions: List[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
     elapsed_ms: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bugs": [asdict(b) for b in self.bugs],
             "quality_score": self.quality_score,
@@ -93,7 +93,7 @@ class CodeAnalyzer:
     支持多种分析模式：bug 检测 / 代码审查 / 语义理解。
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """初始化。
 
         Args:
@@ -101,7 +101,7 @@ class CodeAnalyzer:
                     默认用 consciousness 的 LLM provider（跟核心 2 共享）。
         """
         self.config = config or load_config()
-        self.llm: Optional[LLMProvider] = build_consciousness(self.config)
+        self.llm: LLMProvider | None = build_consciousness(self.config)
 
     def analyze(self, code: str, language: str = "python") -> AnalysisResult:
         """分析代码片段。
@@ -201,13 +201,13 @@ class CodeAnalyzer:
 
 # ── CLI 接口 ────────────────────────────────────────
 
-def cli_analyze_code(code: str, language: str = "python") -> Dict[str, Any]:
+def cli_analyze_code(code: str, language: str = "python") -> dict[str, Any]:
     """CLI: 分析代码片段。"""
     analyzer = CodeAnalyzer()
     result = analyzer.analyze(code, language)
     return result.to_dict()
 
-def cli_analyze_file(file_path: str, language: str = "") -> Dict[str, Any]:
+def cli_analyze_file(file_path: str, language: str = "") -> dict[str, Any]:
     """CLI: 分析文件。"""
     analyzer = CodeAnalyzer()
     result = analyzer.analyze_file(file_path, language)

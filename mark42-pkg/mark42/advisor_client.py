@@ -26,10 +26,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-import urllib.error
-import urllib.request
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
 
 try:
     import yaml
@@ -88,8 +86,8 @@ class AdvisorVerdict:
     verdict: str           # "approve" | "reject" | "modify"
     confidence: float      # 0.0 - 1.0
     reasoning: str         # 推理过程
-    modified_plan: Optional[Dict[str, Any]] = None   # verdict=modify 时才有
-    raw_response: Optional[str] = None               # 原始返回（调试用）
+    modified_plan: dict[str, Any] | None = None   # verdict=modify 时才有
+    raw_response: str | None = None               # 原始返回（调试用）
     elapsed_ms: int = 0   # 耗时
 
     @property
@@ -114,7 +112,7 @@ class AdvisorVerdict:
         """
         return self.confidence >= DEFAULT_CONFIDENCE_THRESHOLD and self.verdict in ("approve", "reject", "modify")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {
             "verdict": self.verdict,
             "confidence": self.confidence,
@@ -129,8 +127,8 @@ class AdvisorVerdict:
 class AdvisorResult:
     """一次 advisor 调用的完整结果（含降级信息）。"""
     success: bool                         # advisor 是否成功返回
-    verdict: Optional[AdvisorVerdict] = None
-    fallback_reason: Optional[str] = None  # success=False 时的原因
+    verdict: AdvisorVerdict | None = None
+    fallback_reason: str | None = None  # success=False 时的原因
     fallback_action: str = "ask_user"     # 降级行为: "ask_user" | "execute_anyway"
 
     @property
@@ -150,7 +148,7 @@ class AdvisorResult:
 
 # ── 场景 prompt 构造器（§3.3 四类场景）────────────────
 
-def build_scenario_a_prompt(issue: Dict[str, Any], assessment: Dict[str, Any]) -> str:
+def build_scenario_a_prompt(issue: dict[str, Any], assessment: dict[str, Any]) -> str:
     """场景 A: 自检后不确定是不是真问题。"""
     return (
         f"我在自检时发现了一个信号，但不确定它是不是真问题。\n\n"
@@ -162,7 +160,7 @@ def build_scenario_a_prompt(issue: Dict[str, Any], assessment: Dict[str, Any]) -
     )
 
 
-def build_scenario_b_prompt(issue: Dict[str, Any], plan: Dict[str, Any]) -> str:
+def build_scenario_b_prompt(issue: dict[str, Any], plan: dict[str, Any]) -> str:
     """场景 B: 知道坏了但修法不确定。"""
     steps = plan.get("steps", [])
     steps_str = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(steps))
@@ -178,7 +176,7 @@ def build_scenario_b_prompt(issue: Dict[str, Any], plan: Dict[str, Any]) -> str:
     )
 
 
-def build_scenario_c_prompt(issue: Dict[str, Any]) -> str:
+def build_scenario_c_prompt(issue: dict[str, Any]) -> str:
     """场景 C: 新类型异常（第一次见）。"""
     return (
         f"我发现了一种新类型的异常，我的规则表里没有见过。\n\n"
@@ -189,7 +187,7 @@ def build_scenario_c_prompt(issue: Dict[str, Any]) -> str:
     )
 
 
-def build_scenario_d_prompt(archive_entry: Dict[str, Any]) -> str:
+def build_scenario_d_prompt(archive_entry: dict[str, Any]) -> str:
     """场景 D: 学过的错误走档案。"""
     return (
         f"这条异常和我在错误档案里见过的一条很像。\n\n"
@@ -220,14 +218,14 @@ class AdvisorClient:
             # 按 advisor 的 verdict 走
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """初始化 advisor client。
 
         Args:
             config: 配置字典（model.yaml 格式）。None -> 从文件读。
         """
         self.config = config or load_config()
-        self.provider: Optional[LLMProvider] = build_advisor(self.config)
+        self.provider: LLMProvider | None = build_advisor(self.config)
         self.advisor_cfg = self.config.get("mark42", {}).get("advisor", {})
         self.enabled = self.advisor_cfg.get("enabled", False)
         self.timeout = self.advisor_cfg.get("timeout_seconds", DEFAULT_TIMEOUT)
@@ -313,19 +311,19 @@ class AdvisorClient:
 
     # ── 场景便捷方法 ──
 
-    def ask_about_uncertain_issue(self, issue: Dict[str, Any], assessment: Dict[str, Any]) -> AdvisorResult:
+    def ask_about_uncertain_issue(self, issue: dict[str, Any], assessment: dict[str, Any]) -> AdvisorResult:
         """场景 A: 自检后不确定是不是真问题。"""
         return self.ask("a", issue=issue, assessment=assessment)
 
-    def ask_about_remediation_plan(self, issue: Dict[str, Any], plan: Dict[str, Any]) -> AdvisorResult:
+    def ask_about_remediation_plan(self, issue: dict[str, Any], plan: dict[str, Any]) -> AdvisorResult:
         """场景 B: 知道坏了但修法不确定。"""
         return self.ask("b", issue=issue, plan=plan)
 
-    def ask_about_new_anomaly(self, issue: Dict[str, Any]) -> AdvisorResult:
+    def ask_about_new_anomaly(self, issue: dict[str, Any]) -> AdvisorResult:
         """场景 C: 新类型异常。"""
         return self.ask("c", issue=issue)
 
-    def ask_about_archive_reuse(self, archive_entry: Dict[str, Any]) -> AdvisorResult:
+    def ask_about_archive_reuse(self, archive_entry: dict[str, Any]) -> AdvisorResult:
         """场景 D: 学过的错误走档案。"""
         return self.ask("d", archive_entry=archive_entry)
 
@@ -344,7 +342,7 @@ class AdvisorClient:
         else:
             raise ValueError(f"未知场景: {scenario}（只支持 a/b/c/d）")
 
-    def _parse_response(self, raw: Any, elapsed_ms: int) -> Optional[AdvisorVerdict]:
+    def _parse_response(self, raw: Any, elapsed_ms: int) -> AdvisorVerdict | None:
         """解析 advisor 返回的 JSON 响应。
 
         支持两种输入格式:
@@ -409,7 +407,7 @@ class AdvisorClient:
 
     # ── 健康检查 ──
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """检查 advisor 状态（不真正调用 API）。
 
         Returns:
@@ -469,13 +467,13 @@ class AdvisorClient:
 
 # ── CLI 接口（供 mark42.py consciousness advisor 调用）────────
 
-def cli_advisor_status(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def cli_advisor_status(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """CLI: 查看 advisor 配置状态。"""
     client = AdvisorClient(config)
     return client.health_check()
 
 
-def cli_advisor_test(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def cli_advisor_test(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """CLI: advisor 烟测 ping。
 
     返回:
@@ -483,7 +481,7 @@ def cli_advisor_test(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     client = AdvisorClient(config)
     result = client.ping()
-    d: Dict[str, Any] = {
+    d: dict[str, Any] = {
         "success": result.success,
         "elapsed_ms": result.verdict.elapsed_ms if result.verdict else 0,
     }
@@ -496,10 +494,10 @@ def cli_advisor_test(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 def cli_advisor_ask(
     scenario: str,
-    issue: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
+    issue: dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """CLI: 发起一次 advisor 对话（调试用）。
 
     Args:
@@ -522,7 +520,7 @@ def cli_advisor_ask(
     else:
         return {"error": f"未知场景: {scenario}"}
 
-    d: Dict[str, Any] = {
+    d: dict[str, Any] = {
         "success": result.success,
         "should_ask_user": result.should_ask_user,
     }

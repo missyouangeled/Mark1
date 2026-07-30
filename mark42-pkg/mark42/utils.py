@@ -1,11 +1,14 @@
 """Mark42 工具函数模块。"""
 
 import functools
+import logging
+
+logger = logging.getLogger(__name__)
 import json
 import os
 import time
 import traceback
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,14 +20,16 @@ LOCK_MAX_AGE = 120
 # - BROKER_DIRTY: 仅 config.py 定义, utils import 后无人调 (所有 broker 事件都走 BROKER_DIR/events.jsonl)
 # - MAX_BROKER_EVENTS_MB: 仅 logs.py 调, utils import 后无人调
 from .config import (
-    ARMOR_STATE, BROKER_DIR, BROKER_SOURCE, BYTES_PER_KTOKEN,
-    CONFIG_PATH, DEFAULT_CONTEXT_WINDOW, ERRORS_FILE, HEAVY_STATE, MARK42_STATE,
-    MARK42_BROKER_EVENTS, MAX_ACTIONS_LINES, MAX_ERRORS_LINES, MAX_HISTORY_FILES,
-    MAX_LOG_AGE_DAYS, SCRATCH, THRESHOLD_ALERT, THRESHOLD_CRIT,
-    THRESHOLD_WARN, WORKSPACE, XDG_STATE,
+    BROKER_DIR,
+    BROKER_SOURCE,
+    BYTES_PER_KTOKEN,
+    CONFIG_PATH,
+    DEFAULT_CONTEXT_WINDOW,
+    ERRORS_FILE,
+    MARK42_BROKER_EVENTS,
+    MAX_ERRORS_LINES,
 )
 from .output_guard import trim_detail, trim_summary
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 【2026-07-13 新增】safe_call 统一错误处理装饰器
@@ -164,8 +169,8 @@ def _append_broker(source_view: str, event_type: str, label: str, level: str,
             f.flush()
         try:
             _fcntl.flock(lock_fh.fileno(), _fcntl.LOCK_UN)
-        except:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
 def _safe_mtime(path: Path) -> float:
     try:
@@ -175,7 +180,7 @@ def _safe_mtime(path: Path) -> float:
 
 def _find_active_session() -> Path | None:
     """找当前活跃 session：优先用 .lock 文件，按 mtime 取最新。
-    
+
     选择策略：
     1. 找所有 .jsonl.lock 文件，按修改时间排序
     2. 过滤掉 LOCK_MAX_AGE 秒内未更新的死 session
@@ -410,8 +415,8 @@ def _get_context_window() -> int:
     if oc_path.exists():
         try:
             oc = json.loads(oc_path.read_text())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
 
     # 策略 1: 从 session jsonl 找当前实际运行的模型
     # 读取文件开头和末尾，找最后的 model_change 事件
@@ -445,8 +450,8 @@ def _get_context_window() -> int:
                     cw = _lookup_context_window(oc, actual_provider, actual_model)
                     if cw:
                         return cw
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("ignored error: %s", e)
 
     # 策略 2: openclaw.json agents.defaults.model.primary
     primary_model = None
@@ -458,8 +463,8 @@ def _get_context_window() -> int:
         # primary 格式: "minimax/MiniMax-M3" 或 "deepseek/deepseek-v4-pro"
         if '/' in primary:
             primary_provider, primary_model = primary.split('/', 1)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("ignored error: %s", e)
 
     if primary_model and primary_provider:
         cw = _lookup_context_window(oc, primary_provider, primary_model)
@@ -473,8 +478,8 @@ def _get_context_window() -> int:
                 cw = m.get('contextWindow')
                 if isinstance(cw, int) and cw > 0:
                     return cw
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("ignored error: %s", e)
 
     # 策略 3: config.json
     try:
@@ -482,8 +487,8 @@ def _get_context_window() -> int:
         cw = cfg.get("contextWindow", DEFAULT_CONTEXT_WINDOW)
         if isinstance(cw, int) and cw > 0:
             return cw
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("ignored error: %s", e)
     return DEFAULT_CONTEXT_WINDOW
 
 

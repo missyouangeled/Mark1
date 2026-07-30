@@ -36,7 +36,7 @@ class AuditResult:
     """核对结果。"""
     verdict: str       # pass | partial | fail
     score: float       # 0.0 ~ 1.0
-    findings: List[Finding] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)
     recommendation: str = ""
     timestamp: str = ""
     error: str = ""    # 审计自身失败时的错误信息

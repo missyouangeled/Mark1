@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .config import OPENCLAW_BIN
 from .output_guard import trim_detail, trim_json_short
 from .utils import _now_iso
 
@@ -64,7 +65,7 @@ SESSION_MAINTENANCE_BASELINE = {
 def _load_openclaw_config() -> dict[str, Any]:
     if not OPENCLAW_CONFIG.exists():
         raise FileNotFoundError(f"缺少配置文件: {OPENCLAW_CONFIG}")
-    with open(OPENCLAW_CONFIG, "r", encoding="utf-8") as f:
+    with open(OPENCLAW_CONFIG, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -92,7 +93,7 @@ def _backup_openclaw_config() -> Path:
 
 def _run_openclaw_validate() -> tuple[bool, str]:
     proc = subprocess.run(
-        ["/home/missyouangeled/.npm-global/bin/openclaw", "config", "validate"],
+        [OPENCLAW_BIN, "config", "validate"],
         capture_output=True,
         text=True,
         check=False,
@@ -113,7 +114,7 @@ def _get_current_session_override() -> dict[str, Any]:
     if not SESSIONS_STORE.exists():
         return {}
     try:
-        with open(SESSIONS_STORE, "r", encoding="utf-8") as f:
+        with open(SESSIONS_STORE, encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}

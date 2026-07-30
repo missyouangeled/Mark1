@@ -4,7 +4,6 @@ Loop 注册/执行/终止 + daemon 守护 + 模板路由。
 
 import json
 import logging
-import os
 import subprocess
 import sys
 import time
@@ -21,16 +20,28 @@ except ImportError:
     yaml = None
 
 from .config import (
-    ENGINE_STATE, HEAVY_STATE, MARK42_BROKER_EVENTS, BROKER_EVENTS, BROKER_DIR, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN, WORKSPACE,
-    LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH,
-)
-from .utils import (
-    _append_broker, _load_json, _now_iso, _now_ts, _save_json,
+    BROKER_DIR,
+    BROKER_EVENTS,
+    ENGINE_STATE,
+    HEAVY_STATE,
+    LOOP_TEMPLATES_PATH,
+    MARK42_BROKER_EVENTS,
+    SCRATCH,
+    THRESHOLD_ALERT,
+    THRESHOLD_WARN,
+    USER_LOOP_TEMPLATES_PATH,
+    WORKSPACE,
 )
 from .interfaces import get_compress
-
-from .output_guard import trim_detail, trim_summary
 from .logs import log_rotate
+from .output_guard import trim_detail, trim_summary
+from .utils import (
+    _append_broker,
+    _load_json,
+    _now_iso,
+    _now_ts,
+    _save_json,
+)
 
 ENGINE_LOOPS = ENGINE_STATE / "loops.json"
 
@@ -47,18 +58,18 @@ _BUILTIN_TEMPLATES = {
 
 def _load_templates() -> dict[str, Any]:
     """加载 Loop 模板配置。
-    
+
     优先级：
     1. 用户自定义模板（WORKSPACE/loop_templates.yaml）- 覆盖同名内置模板
     2. 内置模板配置文件（SCRIPTS/mark42/loop_templates.yaml）
     3. 代码硬编码兜底模板
     """
     templates = dict(_BUILTIN_TEMPLATES)
-    
+
     # 加载内置配置文件
     if yaml and LOOP_TEMPLATES_PATH.exists():
         try:
-            with open(LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+            with open(LOOP_TEMPLATES_PATH, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if data and isinstance(data, dict) and "templates" in data:
                     for name, cfg in data["templates"].items():
@@ -67,13 +78,13 @@ def _load_templates() -> dict[str, Any]:
                                 "period": cfg.get("period", 300),
                                 "description": cfg.get("description", ""),
                             }
-        except Exception:
-            pass
-    
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
+
     # 加载用户自定义配置（覆盖同名）
     if yaml and USER_LOOP_TEMPLATES_PATH.exists():
         try:
-            with open(USER_LOOP_TEMPLATES_PATH, "r", encoding="utf-8") as f:
+            with open(USER_LOOP_TEMPLATES_PATH, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if data and isinstance(data, dict) and "templates" in data:
                     for name, cfg in data["templates"].items():
@@ -82,9 +93,9 @@ def _load_templates() -> dict[str, Any]:
                                 "period": cfg.get("period", 300),
                                 "description": cfg.get("description", ""),
                             }
-        except Exception:
-            pass
-    
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
+
     return templates
 
 
@@ -346,7 +357,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
             print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，预警，等平台处理")
             loop["lastResult"] = {"action": "monitor", "usage": usage}
         else:
-            print(f"   ✅ Decide: 未达阈值，继续监控")
+            print("   ✅ Decide: 未达阈值，继续监控")
             loop["lastResult"] = {"action": "monitor", "usage": usage}
     elif template_name == "task-watch":
         heavy_tasks = list(HEAVY_STATE.glob("*.json"))
@@ -423,7 +434,8 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
         scanned = 0
         new_anchors = []
         if memory_dir.exists():
-            from datetime import datetime as _dt, timedelta as _td
+            from datetime import datetime as _dt
+            from datetime import timedelta as _td
             # 用日期比较而非时间戳比较，避免 00:00:00 < 当前时刻导致跳过当天
             today = _dt.now().date()
             cutoff_date = today - _td(days=7)
@@ -442,8 +454,8 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                         anchor = f"- [{date_str}] {topic.strip()}"
                         if anchor not in new_anchors:
                             new_anchors.append(anchor)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("ignored error: %s", e)
             # 更新 INDEX.md
             if new_anchors:
                 existing = index_path.read_text() if index_path.exists() else "# 记忆索引\n"
@@ -476,7 +488,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
             else:
                 loop["lastResult"] = {"action": "executed", "note": "通用任务"}
-    
+
     # ── C 项：Loop 执行完成 → emit 标准化事件 ──
     _append_broker("engine", "mark42.engine.loop.completed",
                    f"Loop '{name}' 执行完成",
@@ -502,7 +514,7 @@ def engine_daemon(interval_s: int = 30) -> None:
     """守护进程：扫描 broker 事件 + 执行 Loop。"""
     print("🔄 循环引擎守护模式启动")
     print(f"   扫描间隔: {interval_s}s")
-    print(f"   按 Ctrl+C 退出\n")
+    print("   按 Ctrl+C 退出\n")
     cursor_file = ENGINE_STATE / "daemon-cursor.json"
     cursor = _load_json(cursor_file) if cursor_file.exists() else {}
     rotation_check_count = 0
@@ -517,7 +529,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                 try:
                     file_key = str(event_file)
                     cursor_offset = cursor.get(file_key, 0)
-                    with open(event_file, "r", encoding="utf-8", errors="replace") as f:
+                    with open(event_file, encoding="utf-8", errors="replace") as f:
                         f.seek(cursor_offset)
                         new_lines = f.readlines()
                         cursor[file_key] = f.tell()
@@ -537,7 +549,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                         strategy = metadata.get("strategy", "?")
                         print(trim_summary(f"[{ts}] 🧠 检测到铠甲压缩完成 (策略: {strategy}, 使用率: {usage}%)", 120))
                         _append_broker("engine", "mark42.engine.bridge.armor_compress_seen",
-                                       f"Engine 已收到压缩完成信号", "ok",
+                                       "Engine 已收到压缩完成信号", "ok",
                                        trim_detail(f"策略: {strategy} | 使用率: {usage}%", 160),
                                        {"bridgeEvent": "armor.compress.done", "usagePercent": usage})
                     # ── 压缩联动：上下文危险 → 建议 /compact ──
@@ -566,7 +578,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                     if "model.fallback" in source_evt or "engine.model.fallback" in source_evt:
                         summary = event.get("summary", "")
                         print(trim_summary(f"[{ts}] ⚠️ 检测到模型故障信号: {summary}", 140))
-                        print(f"      OpenClaw 内置 failover 将自动切换备用模型")
+                        print("      OpenClaw 内置 failover 将自动切换备用模型")
                         _append_broker("health", "engine.model.fallback.detected",
                                        trim_summary(f"模型故障: {summary}", 120), "warn",
                                        trim_detail("已记录，failover 由 OpenClaw 接管", 160),
@@ -580,13 +592,15 @@ def engine_daemon(interval_s: int = 30) -> None:
                         if task_file.exists():
                             td = _load_json(task_file)
                             td_ts = td.get("startedAt") or td.get("checkedAt", "")
-                            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                            from datetime import datetime as _dt
+                            from datetime import timedelta as _td
+                            from datetime import timezone as _tz
                             try:
                                 started_dt = _dt.fromisoformat(td_ts)
                                 if _dt.now(_tz.utc) - started_dt < _td(hours=24):
                                     task_valid = True
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning("ignored error: %s", e)
                         if not task_valid:
                             print(trim_summary(f"[{ts}] ℹ️ Heavy 开工信号但任务文件无效/过期 ({task_name})，跳过创建 watch", 140))
                             continue
@@ -597,7 +611,7 @@ def engine_daemon(interval_s: int = 30) -> None:
                             engine_start(task=f"监控大工程: {task_name}", interval_s=30,
                                          template="task-watch")
                         _append_broker("engine", "mark42.engine.bridge.heavy_started",
-                                       f"Engine 已为 Heavy 任务创建监控 Loop", "ok",
+                                       "Engine 已为 Heavy 任务创建监控 Loop", "ok",
                                        trim_detail(f"任务: {task_name}", 160),
                                        {"taskName": task_name})
             # ── 2. 重新加载 loops（处理 broker 事件中可能新增的） ──
@@ -614,8 +628,8 @@ def engine_daemon(interval_s: int = 30) -> None:
                         last_ts = datetime.fromisoformat(last_run).timestamp()
                         if _now_ts() - last_ts < loop.get("interval", 300):
                             continue
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("ignored error: %s", e)
                 # 每个 Loop 执行前重新加载最新状态（避免多 Loop 同 tick 竞态）
                 fresh_loops = _load_loops()
                 if name in fresh_loops:
@@ -656,8 +670,8 @@ def engine_daemon(interval_s: int = 30) -> None:
                             "heavy": status_json["heavy"],
                             "actions": status_json["actions"],
                         })
-                except Exception:
-                    pass  # 守护模式下静默失败
+                except Exception as e:
+                    logger.warning("ignored error: %s", e)
             # ── 写入心跳文件 ──
             heartbeat_file = ENGINE_STATE / "daemon-heartbeat.json"
             _save_json(heartbeat_file, {"lastTick": _now_iso(), "cycle": rotation_check_count, "loops": len(loops)})

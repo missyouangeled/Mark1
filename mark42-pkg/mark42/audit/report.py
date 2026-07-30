@@ -6,15 +6,12 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from ..config import ARMOR_STATE
 from ..utils import _append_broker, _now_iso, _save_json
 from . import AuditResult
-
 
 # ── 报告目录 ──────────────────────────────────────────
 
@@ -23,8 +20,8 @@ AUDIT_DIR = ARMOR_STATE / "audit"
 
 def write_report(
     result: AuditResult,
-    pre_snapshot: Dict[str, Any],
-    post_summary: Dict[str, Any],
+    pre_snapshot: dict[str, Any],
+    post_summary: dict[str, Any],
 ) -> str:
     """将审计结果写入报告文件。
 

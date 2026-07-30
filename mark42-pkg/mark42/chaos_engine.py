@@ -18,17 +18,16 @@ Mark42 v3 R11 混沌工程引擎
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 import json
-import os
 import shutil
 import subprocess
-import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
 
 from .config import MARK42_STATE
 from .log_setup import get_logger
@@ -335,7 +334,7 @@ class ChaosEngine:
         """检查 engine 服务状态。"""
         result = self._check_systemd_service("mark42-engine-daemon.service")
         if not result["active"]:
-            raise RuntimeError(f"engine 未运行，无法测试")
+            raise RuntimeError("engine 未运行，无法测试")
         return {"service_before": result}
 
     def _execute_kill_engine(self, dry_run: bool = True) -> dict:
@@ -548,7 +547,7 @@ class ChaosEngine:
         """验证 stub 降级生效：用被破坏的配置实际调用，检查是否回退到 stub。"""
         if dry_run:
             return True
-        from .llm_provider import chat_with_fallback, load_config, ChatMessage
+        from .llm_provider import ChatMessage, chat_with_fallback, load_config
 
         cfg = load_config()
         # 用被 monkeypatch 的配置实际调用
