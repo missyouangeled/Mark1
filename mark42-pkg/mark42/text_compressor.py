@@ -22,7 +22,7 @@ import re
 from typing import Any
 
 # 【2026-07-13】不能用相对路径, algo_scheduler 从外部 import
-from mark42_modules.utils import safe_call
+from mark42.utils import safe_call
 
 
 # 冗余水话清单 (中文 + 英文)

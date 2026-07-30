@@ -181,7 +181,7 @@ class AnomalyDetector:
         try:
             import sys
             sys.path.insert(0, str(Path(__file__).parent.parent))
-            from mark42_modules.armor import armor_check
+            from mark42.armor import armor_check
             r = armor_check()
             metrics["context_usage_pct"] = r.get("usagePercent", 0)
         except Exception:

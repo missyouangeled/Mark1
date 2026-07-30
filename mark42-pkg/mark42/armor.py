@@ -1194,7 +1194,7 @@ def armor_compress_async(dry_run: bool = False, wait: bool = False,
     """
     try:
         # P1.2 修复: 顶局 import 便于 mock (原函数体 import 难测)
-        from mark42_modules.compress_queue import CompressRequest, get_compress_queue
+        from mark42.compress_queue import CompressRequest, get_compress_queue
     except ImportError as e:
         return {"status": "error", "reason": f"queue module not available: {e}"}
 
@@ -1244,7 +1244,7 @@ def armor_compress_queue_stats() -> dict[str, Any]:
     """查看压缩队列统计"""
     try:
         # P1.2 修复: 顶局 import 便于 mock
-        from mark42_modules.compress_queue import get_compress_queue
+        from mark42.compress_queue import get_compress_queue
         return get_compress_queue().stats
     except ImportError as e:
         return {"error": f"queue module not available: {e}"}

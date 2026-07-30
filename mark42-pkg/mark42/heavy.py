@@ -14,6 +14,7 @@ from typing import Any
 
 from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
 from .utils import _append_broker, _load_json, _now_iso, _save_json, _list_project_files
+from .armor import armor_check
 
 logger = logging.getLogger(__name__)
 from .interfaces import get_compress
@@ -30,7 +31,7 @@ def heavy_preflight(path_str: str) -> None:
     total_size = sum(f.stat().st_size for f in files)
     print(f"📂 文件数: {len(files)}")
     print(f"💾 总大小: {total_size / (1024*1024):.1f} MB")
-    check = get_compress().check()
+    check = armor_check()
     usage = check.get("usagePercent", 0)
     remaining = 100 - usage
     print(f"🧠 上下文余量: {remaining:.0f}% (当前 {usage}%)")
@@ -90,7 +91,7 @@ def heavy_detect(path_str: str) -> dict[str, Any]:
     }
 
     # 检查上下文
-    check = get_compress().check()
+    check = armor_check()
     usage = check.get("usagePercent", 0)
     result["metrics"]["contextUsage"] = usage
 
@@ -208,7 +209,7 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     task_dir = SCRATCH / task_name
     task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / ".keep").write_text("keep\n", encoding="utf-8")
-    check = get_compress().check()
+    check = armor_check()
     usage = check.get("usagePercent", 0)
     print(f"⚙️ 重型战甲开工: {task_name}")
     print(f"   目标: {target}")

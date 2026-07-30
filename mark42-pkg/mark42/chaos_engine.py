@@ -9,7 +9,7 @@ Mark42 v3 R11 混沌工程引擎
   - cleanup 必须可靠（即使 verify 失败也要 cleanup）
 
 使用：
-  from mark42_modules.chaos_engine import ChaosEngine
+  from mark42.chaos_engine import ChaosEngine
   ce = ChaosEngine()
   ce.run_suite(dry_run=True)  # 预览
   ce.run_suite(dry_run=False)  # 真实执行

@@ -50,7 +50,7 @@ def _load_templates() -> dict[str, Any]:
     
     优先级：
     1. 用户自定义模板（WORKSPACE/loop_templates.yaml）- 覆盖同名内置模板
-    2. 内置模板配置文件（SCRIPTS/mark42_modules/loop_templates.yaml）
+    2. 内置模板配置文件（SCRIPTS/mark42/loop_templates.yaml）
     3. 代码硬编码兜底模板
     """
     templates = dict(_BUILTIN_TEMPLATES)

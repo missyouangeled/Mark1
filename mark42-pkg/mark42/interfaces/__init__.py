@@ -22,16 +22,16 @@ _REGISTRY: Dict[str, Any] = {}
 
 # 接口名到默认实现的映射
 _DEFAULTS: Dict[str, str] = {
-    "compress": "mark42_modules.plugins.builtin_compress:BuiltinCompress",
-    "memory": "mark42_modules.plugins.builtin_memory:BuiltinMemory",
-    "consciousness": "mark42_modules.plugins.builtin_consciousness:BuiltinConsciousness",
-    "archive": "mark42_modules.plugins.builtin_archive:BuiltinArchive",
-    "breaker": "mark42_modules.plugins.builtin_breaker:BuiltinBreaker",
-    "health": "mark42_modules.plugins.builtin_health:BuiltinHealth",
-    "engine": "mark42_modules.plugins.builtin_engine:BuiltinEngine",
-    "chaos": "mark42_modules.plugins.builtin_chaos:BuiltinChaos",
-    "heavy": "mark42_modules.plugins.builtin_heavy:BuiltinHeavy",
-    "audit": "mark42_modules.plugins.builtin_audit:BuiltinAudit",
+    "compress": "mark42.plugins.builtin_compress:BuiltinCompress",
+    "memory": "mark42.plugins.builtin_memory:BuiltinMemory",
+    "consciousness": "mark42.plugins.builtin_consciousness:BuiltinConsciousness",
+    "archive": "mark42.plugins.builtin_archive:BuiltinArchive",
+    "breaker": "mark42.plugins.builtin_breaker:BuiltinBreaker",
+    "health": "mark42.plugins.builtin_health:BuiltinHealth",
+    "engine": "mark42.plugins.builtin_engine:BuiltinEngine",
+    "chaos": "mark42.plugins.builtin_chaos:BuiltinChaos",
+    "heavy": "mark42.plugins.builtin_heavy:BuiltinHeavy",
+    "audit": "mark42.plugins.builtin_audit:BuiltinAudit",
 }
 
 

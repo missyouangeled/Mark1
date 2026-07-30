@@ -34,7 +34,7 @@ def test_heavy_preflight_nonexistent_path(caplog):
         assert any("路径不存在" in record.message for record in caplog.records)
 
 
-def test_heavy_preflight_with_valid_path(tmp_path, caplog):
+def test_heavy_preflight_with_valid_path(tmp_path, capsys):
     """Test heavy_preflight with valid path."""
     # Create some test files
     test_file = tmp_path / "test.py"
@@ -54,11 +54,11 @@ def test_heavy_preflight_with_valid_path(tmp_path, caplog):
 
         heavy_preflight(str(tmp_path))
 
-        messages = [record.message for record in caplog.records]
+        output = capsys.readouterr().out
         assert (
-            any("文件数" in msg for msg in messages)
-            or any("总大小" in msg for msg in messages)
-            or any("上下文余量" in msg for msg in messages)
+            "文件数" in output
+            or "总大小" in output
+            or "上下文余量" in output
         )
 
 
@@ -384,12 +384,12 @@ def test_heavy_detect_human_nonexistent(tmp_path, caplog):
     assert any("路径不存在" in record.message for record in caplog.records)
 
 
-def test_heavy_detect_human_small_project(tmp_path, caplog):
+def test_heavy_detect_human_small_project(tmp_path, capsys):
     """Test heavy_detect_human with small project (not heavy)."""
     (tmp_path / "test.py").write_text("print('hi')")
 
     with patch("mark42.heavy.armor_check") as mock_check:
         mock_check.return_value = {"usagePercent": 50}
         heavy_detect_human(str(tmp_path))
-        messages = [record.message for record in caplog.records]
-        assert any("未達大工程标准" in msg for msg in messages) or any("未达大工程标准" in msg for msg in messages)
+        output = capsys.readouterr().out
+        assert "未達大工程标准" in output or "未达大工程标准" in output

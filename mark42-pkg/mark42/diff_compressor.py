@@ -18,7 +18,7 @@
 import re
 from typing import Any
 
-from mark42_modules.utils import safe_call
+from mark42.utils import safe_call
 
 
 class DiffCompressor:

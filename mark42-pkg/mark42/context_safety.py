@@ -71,7 +71,8 @@ def _load_openclaw_config() -> dict[str, Any]:
 def _save_openclaw_config(data: dict[str, Any]) -> None:
     """安全写入 openclaw.json（先备份，写入失败自动回滚）。"""
     bak = Path(str(OPENCLAW_CONFIG) + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
-    shutil.copy2(OPENCLAW_CONFIG, bak)
+    if OPENCLAW_CONFIG.exists():
+        shutil.copy2(OPENCLAW_CONFIG, bak)
     try:
         with open(OPENCLAW_CONFIG, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
