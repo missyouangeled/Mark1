@@ -11,11 +11,34 @@ module_health.py 单元测试
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
 # 导入待测试模块
 from mark42.module_health import (
     ModuleHealth,
     ModuleHealthMonitor,
 )
+
+
+@pytest.fixture(autouse=True)
+def _restore_sys_modules():
+    """防止本文件向 sys.modules 注入的 mock 模块污染其他测试。
+
+    本文件多处用 sys.modules['mark42.xxx'] = MagicMock() 来隔离被测模块，
+    若不恢复，全量跑测试时会导致后续测试 import 到 mock 而非真模块。
+    这里在每个用例前快照相关模块，用例后恢复。
+    """
+    _watched = [
+        "mark42.armor", "mark42.engine", "mark42.consciousness",
+        "mark42.advisor_client", "mark42.error_archive",
+    ]
+    _saved = {name: sys.modules.get(name) for name in _watched}
+    yield
+    for name, mod in _saved.items():
+        if mod is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = mod
 
 
 class TestModuleHealth:

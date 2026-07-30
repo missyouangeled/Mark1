@@ -7,7 +7,7 @@ P2-6 目标：
 - 默认不触发真实 LLM 外部调用，确保本地可稳定复现
 
 运行：
-    python3 scripts/mark42/perf_bench.py
+    python3 -m mark42.perf_bench
 """
 
 from __future__ import annotations

@@ -247,8 +247,8 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
         if engine_templates.__doc__:
             template_help = f" — {engine_templates.__doc__.split(chr(10))[0].strip()}"
         print(f"   模板: {template}{template_help}")
-        print(f"   执行: python3 scripts/mark42.py engine --run {name}")
-        print(f"   监控: python3 scripts/mark42.py engine --watch-task {name}")
+        print(f"   执行: mark42 engine --run {name}")
+        print(f"   监控: mark42 engine --watch-task {name}")
 
 
 def engine_kill(name: str) -> None:
@@ -300,7 +300,7 @@ def engine_watch_task(task_name: str, interval_s: int = 30) -> None:
                 print(f"\n🎉 任务 '{task_name}' 所有子任务已完成！")
                 if failed == 0:
                     print(f"   ✅ 全部成功 ({total}/{total})")
-                    print(f"   建议运行: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
+                    print(f"   建议运行: mark42 heavy --finish --task-name {task_name}")
                 else:
                     print(f"   ⚠️ {failed}/{total} 失败，需人工检查")
                 _append_broker("tasks", "heavy.task.completed",

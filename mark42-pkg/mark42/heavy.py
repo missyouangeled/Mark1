@@ -179,7 +179,7 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
                     line = sys.stdin.readline().strip().lower()
                     if line in ("n", "no", "不", "拒绝"):
                         print("\n❌ 已取消。手动开工:")
-                        print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+                        print(f"   mark42 heavy --start {path_str} --task-name {task_name}")
                         return
                     elif line in ("y", "yes", "是", "好", "开", ""):
                         print("\n✅ 立即开工")
@@ -191,13 +191,13 @@ def heavy_detect_human(path_str: str, auto_mode: str = "ask") -> None:
             heavy_start(path_str, task_name)
         except (KeyboardInterrupt, EOFError):
             print("\n❌ 已取消。手动开工:")
-            print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+            print(f"   mark42 heavy --start {path_str} --task-name {task_name}")
         return
 
     # "ask" 模式：只提示
     task_name = _auto_task_name(path_str)
     print("\n💡 手动开工命令:")
-    print(f"   python3 scripts/mark42.py heavy --start {path_str} --task-name {task_name}")
+    print(f"   mark42 heavy --start {path_str} --task-name {task_name}")
 
 
 def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> None:
@@ -285,8 +285,8 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     for b in batches:
         print(f"      {b['id']}: {b['count']} 文件 ({b['sizeMB']:.1f}MB)")
     print("\n✅ 已开工。使用以下命令监控：")
-    print(f"   python3 scripts/mark42.py engine --watch-task {task_name}")
-    print(f"   完工后: python3 scripts/mark42.py heavy --finish --task-name {task_name}")
+    print(f"   mark42 engine --watch-task {task_name}")
+    print(f"   完工后: mark42 heavy --finish --task-name {task_name}")
 
 
 def heavy_finish(task_name: str) -> None:

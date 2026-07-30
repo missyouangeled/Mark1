@@ -337,7 +337,7 @@ def assemble() -> None:
     print("\n✅ Mark42 战甲已启动。拆开是刀，拼上是甲。")
     print(f"   📋 日志: {log_dir}")
     print("   按 Ctrl+C 关闭所有守护进程")
-    print("   查看状态: python3 scripts/mark42.py status")
+    print("   查看状态: mark42 status")
 
     # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
     engine_state = ARMOR_STATE.parent / "engine"
@@ -1092,8 +1092,8 @@ def main() -> None:
                 if d.get("severity") != "ok":
                     print(f"  🔍 降解检测: {d.get('status')} — {d.get('advice', '')}")
         if diag["actionable"]:
-            print("  💡 如需自动调优: python3 scripts/mark42.py --tune-compaction")
-            print("     直接应用: python3 scripts/mark42.py --tune-compaction --apply")
+            print("  💡 如需自动调优: mark42 --tune-compaction")
+            print("     直接应用: mark42 --tune-compaction --apply")
         return
 
     if args.module == "assemble":

@@ -315,7 +315,7 @@ def mark42_init() -> None:
     print(f"   配置: {CONFIG_PATH}")
     print(f"   状态: {MARK42_STATE}")
     print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
-    print("   使用 'python3 scripts/mark42.py --config' 查看/修改")
+    print("   使用 'mark42 --config' 查看/修改")
 
 def mark42_config() -> None:
     if not CONFIG_PATH.exists():
