@@ -668,11 +668,23 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                 os.O_CREAT | os.O_EXCL | os.O_WRONLY,
                 0o644,
             )
-            os.write(fd, json.dumps({
-                "acquiredAt": _now_iso(),
-                "pid": os.getpid(),
-            }, ensure_ascii=False).encode())
-            os.close(fd)
+            # 防御：若拿到 0/1/2（标准流被上层关闭时可能发生，如 pytest fd 捕获模式），
+            # 用 F_DUPFD 重定位到 >=3 的 fd；并把低位 slot 重新指向 /dev/null，
+            # 保证标准输入/输出/错误流始终有效，不会因后续 close 而损坏。
+            if fd < 3:
+                import fcntl as _fcntl
+                _high = _fcntl.fcntl(fd, _fcntl.F_DUPFD, 3)
+                _devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(_devnull, fd)
+                os.close(_devnull)
+                fd = _high
+            try:
+                os.write(fd, json.dumps({
+                    "acquiredAt": _now_iso(),
+                    "pid": os.getpid(),
+                }, ensure_ascii=False).encode())
+            finally:
+                os.close(fd)
             return True
         except OSError as e:
             if e.errno != _errno.EEXIST:

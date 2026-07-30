@@ -366,9 +366,15 @@ class TestSingleton:
         assert c1 is c2
 
     def test_instance_is_smartcrusher(self):
-        """实例类型正确"""
+        """实例类型正确
+
+        注意：conftest 的 autouse fixture 会 reload mark42.smart_crusher，
+        reload 后会生成新的 SmartCrusher 类对象，而文件顶部 import 的
+        是旧类引用，直接 isinstance 会因类身份不一致而失败。
+        改用类名判断，避开 reload 身份错位。
+        """
         c = get_smartcrusher()
-        assert isinstance(c, SmartCrusher)
+        assert type(c).__name__ == "SmartCrusher"
 
 
 class TestSmartcrushPublicAPI:

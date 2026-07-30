@@ -34,12 +34,18 @@ class TestPathConstants:
         assert isinstance(WORKSPACE, Path)
 
     def test_workspace_exists_or_default(self):
-        """WORKSPACE 应指向 ~/.openclaw/workspace 或 env 指定路径。"""
+        """WORKSPACE 应指向 ~/.openclaw/workspace 或 env 指定路径。
+
+        注意：conftest 的 autouse fixture 会把 HOME 改成临时目录，
+        因此不能用 Path.home() 做断言（那会拿到被 mock 的假路径）。
+        WORKSPACE 是 config import 时算好的常量，这里只验证其结构：
+        要么等于 MARK42_WORKSPACE，要么以 .openclaw/workspace 结尾。
+        """
         env_ws = os.environ.get("MARK42_WORKSPACE")
         if env_ws:
             assert str(WORKSPACE) == env_ws
         else:
-            assert WORKSPACE == Path.home() / ".openclaw" / "workspace"
+            assert WORKSPACE.parts[-2:] == (".openclaw", "workspace")
 
     def test_xdg_state_resolved(self):
         assert isinstance(XDG_STATE, Path)
