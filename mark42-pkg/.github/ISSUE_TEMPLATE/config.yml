@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问答
+    url: https://github.com/missyouangeled/Mark1/discussions/categories/q-a
+    about: 关于如何使用 Mark42 的问题，请在 Discussions 中提问
+  - name: 功能想法讨论
+    url: https://github.com/missyouangeled/Mark1/discussions/categories/ideas
+    about: 大型功能建议或想法，请先在 Discussions 中讨论
+  - name: 社区交流
+    url: https://github.com/missyouangeled/Mark1/discussions
+    about: 一般讨论、分享、展示你的使用案例

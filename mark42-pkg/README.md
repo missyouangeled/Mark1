@@ -2,11 +2,21 @@
 
 模块化智能铠甲系统 - 为 [OpenClaw](https://github.com/openclaw/openclaw) 提供上下文守护与循环引擎。
 
+[![CI](https://github.com/missyouangeled/Mark1/actions/workflows/ci.yml/badge.svg)](https://github.com/missyouangeled/Mark1/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.8.1-orange)
+![Tests](https://img.shields.io/badge/tests-1318%20passed-brightgreen)
+
 版本：`v2.8.1`
 
 | 快速开始 | 完整教程 | 配置说明 | 架构设计 |
 |----------|----------|----------|----------|
 | [QUICKSTART.md](QUICKSTART.md) | [TUTORIAL.md](TUTORIAL.md) | [CONFIG-GUIDE.md](docs/CONFIG-GUIDE.md) | [ARCHITECTURE.md](ARCHITECTURE.md) |
+
+| 故障排查 | 版本迁移 | 路线图 | 贡献指南 |
+|----------|----------|--------|----------|
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | [MIGRATION.md](MIGRATION.md) | [ROADMAP.md](ROADMAP.md) | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 **3 步跑起来：**
 ```bash

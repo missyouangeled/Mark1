@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .armor import armor_check
-from .config import HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
+from .config import DATA_MOUNT, HEAVY_STATE, SCRATCH, THRESHOLD_ALERT, THRESHOLD_WARN
 from .utils import _append_broker, _list_project_files, _load_json, _now_iso, _save_json
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def heavy_preflight(path_str: str) -> None:
         print("   ✅ 充足 — 可前台启动")
     mem = os.popen("free -h | grep Mem | awk '{print $2}'").read().strip()  # noqa: S605 (硬编码系统命令，无用户输入)
     print(f"🖥️ 内存: {mem}")
-    for mp in ["/", "/mnt/data"]:
+    for mp in ["/", str(DATA_MOUNT)]:
         out = os.popen(f"df -h {mp} | tail -1 | awk '{{print $4\"/\"$2}}'").read().strip()  # noqa: S605 (硬编码系统命令，无用户输入)
         print(f"💽 {mp}: 剩余 {out}" if out else "")
 

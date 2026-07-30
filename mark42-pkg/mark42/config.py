@@ -42,16 +42,23 @@ XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "
 MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
 
 # SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
-# 优先级：MARK42_SCRATCH env > /mnt/data/openclaw/scratch > XDG_STATE fallback
-# 避免非点点机器 /mnt/data 不存在时 hard-fail
-SCRATCH = Path(os.environ.get("MARK42_SCRATCH", "/mnt/data/openclaw/scratch"))
+# 优先级：MARK42_SCRATCH env > $MARK42_DATA_MOUNT/openclaw/scratch > XDG_STATE fallback
+# 避免非点点机器数据盘不存在时 hard-fail
+# 数据盘挂载点：可用 MARK42_DATA_MOUNT env 覆盖（默认 /mnt/data）
+DATA_MOUNT = Path(os.environ.get("MARK42_DATA_MOUNT", "/mnt/data"))
+SCRATCH = Path(os.environ.get("MARK42_SCRATCH", str(DATA_MOUNT / "openclaw" / "scratch")))
 if not SCRATCH.parent.parent.exists():
     SCRATCH = XDG_STATE / "openclaw" / "scratch"
 
-# 数据盘路径（优先 /mnt/data，回退 ~/.local/state）
-DATA_ROOT = Path("/mnt/data/openclaw/mark42")
+# 数据盘路径（优先 DATA_MOUNT，回退 ~/.local/state）
+DATA_ROOT = DATA_MOUNT / "openclaw" / "mark42"
 if not DATA_ROOT.parent.parent.exists():
     DATA_ROOT = XDG_STATE / "openclaw" / "mark42"
+
+# 会话快照根目录（数据盘，回退 XDG_STATE）
+SESSION_BACKUP_ROOT = DATA_MOUNT / "openclaw" / "session-backup"
+if not SESSION_BACKUP_ROOT.parent.parent.exists():
+    SESSION_BACKUP_ROOT = XDG_STATE / "openclaw" / "session-backup"
 
 ARMOR_STATE = MARK42_STATE / "armor"
 ENGINE_STATE = MARK42_STATE / "engine"

@@ -1,6 +1,6 @@
 """快照读取器：从数据盘读 compact 前的快照，提取关键信息。
 
-OpenClaw 实现：从 /mnt/data/openclaw/session-backup/ 读最新快照。
+OpenClaw 实现：从数据盘 session-backup 目录读最新快照（路径由 config.SESSION_BACKUP_ROOT 推导，可用 MARK42_DATA_MOUNT 覆盖）。
 其他平台：实现 SnapshotReader 接口即可。
 
 抽取的信息分 5 类：
@@ -20,7 +20,11 @@ from typing import Any, Protocol, runtime_checkable
 
 # ── 数据盘快照根目录 ──────────────────────────────────
 
-_SNAPSHOT_ROOT = Path("/mnt/data/openclaw/session-backup")
+# ── 数据盘快照根目录（从 config 推导，支持 MARK42_DATA_MOUNT 覆盖 + XDG_STATE 回退）──
+try:
+    from ..config import SESSION_BACKUP_ROOT as _SNAPSHOT_ROOT
+except ImportError:
+    _SNAPSHOT_ROOT = Path.home() / ".local" / "state" / "openclaw" / "session-backup"
 
 
 # ── 接口 ──────────────────────────────────────────────

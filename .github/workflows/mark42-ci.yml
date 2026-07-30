@@ -126,13 +126,14 @@ jobs:
       
       - name: 检查硬编码路径
         run: |
-          result=$(grep -rn "/mnt/data" mark42-pkg/mark42/ --include="*.py" | grep -v "#" | grep -v '"""' || true)
+          # 允许 config.py 里带 env 覆盖的单一数据盘挂载点定义（MARK42_DATA_MOUNT）
+          result=$(grep -rn "/mnt/data" mark42-pkg/mark42/ --include="*.py" | grep -v "#" | grep -v '"""' | grep -v "MARK42_DATA_MOUNT" || true)
           if [ -n "$result" ]; then
-            echo "❌ 发现 /mnt/data 硬编码:"
+            echo "❌ 发现 /mnt/data 硬编码（应通过 config.DATA_MOUNT 派生）:"
             echo "$result"
             exit 1
           else
-            echo "✅ 无 /mnt/data 硬编码"
+            echo "✅ 无 /mnt/data 硬编码（仅 config.py 单一 env 覆盖点）"
           fi
       
       - name: 检查硬编码 API key

@@ -22,6 +22,7 @@ except ImportError:
 from .config import (
     BROKER_DIR,
     BROKER_EVENTS,
+    DATA_MOUNT,
     ENGINE_STATE,
     HEAVY_STATE,
     LOOP_TEMPLATES_PATH,
@@ -388,7 +389,7 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
             root_usage = shutil.disk_usage("/")
             disk_root_gb = root_usage.free / (1024**3)
             disk_root = f"{disk_root_gb:.1f}G"
-            data_usage = shutil.disk_usage("/mnt/data") if Path("/mnt/data").exists() else None
+            data_usage = shutil.disk_usage(str(DATA_MOUNT)) if DATA_MOUNT.exists() else None
             disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
             with open("/proc/meminfo") as f:
                 meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}

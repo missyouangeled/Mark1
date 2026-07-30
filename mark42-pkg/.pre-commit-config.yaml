@@ -1,0 +1,25 @@
+# Mark42 pre-commit 配置
+# 安装： pip install pre-commit && pre-commit install
+# 手动全量运行： pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      # 代码检查（自动修复）
+      - id: ruff
+        args: [--fix]
+        files: ^mark42-pkg/
+      # 代码格式化
+      - id: ruff-format
+        files: ^mark42-pkg/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: detect-private-key
