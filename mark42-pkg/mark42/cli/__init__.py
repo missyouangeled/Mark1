@@ -225,7 +225,6 @@ def assemble() -> None:
     import subprocess
     import sys
     import time
-    from pathlib import Path
 
     from ..armor import armor_check
     from ..config import ARMOR_STATE, mark42_init
@@ -251,7 +250,8 @@ def assemble() -> None:
     print(f"📊 启动时上下文: {check.get('usagePercent', 0)}% — {trim_summary(check.get('summary', ''), 100)}\n")
 
     # ── Fork 子进程 ──
-    script = str(Path(__file__).resolve().parent.parent / "mark42.py")
+    # 使用 python3 -m mark42 代替老路径 scripts/mark42.py（已删除）
+    script_base = [sys.executable, "-m", "mark42"]
     children = []
     from ..config import ARMOR_STATE, LOG_DIR
     pid_file = ARMOR_STATE / "assemble.pids"
@@ -265,7 +265,7 @@ def assemble() -> None:
     print("🛡️ 启动上下文铠甲守护...")
     armor_log = open(str(log_dir / "armor-guard.log"), "a")
     armor_proc = subprocess.Popen(
-        [sys.executable, "-u", script, "armor", "--guard", "--interval", "300"],
+        [*script_base, "armor", "--guard", "--interval", "300"],
         stdout=armor_log, stderr=subprocess.STDOUT,
         start_new_session=True,
     )
@@ -276,7 +276,7 @@ def assemble() -> None:
     print("🔄 启动循环引擎 daemon...")
     engine_log = open(str(log_dir / "engine-daemon.log"), "a")
     engine_proc = subprocess.Popen(
-        [sys.executable, "-u", script, "engine", "--daemon", "--interval", "30"],
+        [*script_base, "engine", "--daemon", "--interval", "30"],
         stdout=engine_log, stderr=subprocess.STDOUT,
         start_new_session=True,
     )
