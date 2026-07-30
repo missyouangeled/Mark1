@@ -367,23 +367,15 @@ python3 -m pytest --cov=mark42 --cov-report=html
 
 ### 测试统计 (v2.8.1)
 
-| 测试类型 | 数量 |
+| 指标 | 数值 |
 |---|---|
-| Audit 单元测试 | 73 |
-| 其他单元测试 | 163 |
-| 集成测试 | 12 |
-| **总计** | **248** |
+| 通过 | **1318** |
+| 跳过 | 28 |
+| 失败 / 错误 | 0 |
+| 通过率（非 skip） | **100%** |
 
-| 模块 | 覆盖率 |
-|---|---|
-| checker | 87% |
-| snapshot_reader | 93% |
-| summary_extractor | 80%+ |
-| report | 90% |
-| pinning | 91% |
-| builtin_audit | 87% |
-
-**新增测试**: 5 个 SQLite Fallback 测试（正常返回/无 compaction/CLI 错误/超时/命令不存在）
+> 运行 `pytest tests/ -q` 查看最新结果，`pytest --cov=mark42 --cov-report=term-missing` 查看覆盖率。
+> CI 门禁：`ruff check mark42/ tests/` + 全量 pytest + pip-audit + 安全扫描。
 
 ### 手动测试
 

@@ -5,6 +5,37 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+- 🧪 **测试全线崩溃修复**：conftest.py 残留 27 处旧导入路径 `mark42_modules`，
+  收集阶段崩溃导致全部用例 ERROR。统一改为 `mark42`，恢复 1318 passed。
+- 🔒 **armor compact 锁 fd 健壮性**：`_try_acquire_compact_lock` 的 `os.open`
+  在标准流被上层关闭时（如 pytest fd 捕获）会拿到 fd 0/1/2 并误关。
+  改用 `fcntl.F_DUPFD` 重定位到 >=3 + `/dev/null` 补位低位 slot。
+- 🐛 **逻辑修复**：
+  - armor.py 删除「连续压缩无效检测」里的死代码空循环（读 actions_log 后 `pass` 不做事）
+  - consciousness.py 的 `assessment` 结果纳入返回值（原先计算后丢弃）
+
+### 变更
+- 🧹 **全量 lint 清零**：mark42/ 91 个 + tests/ 674 个 ruff 问题全部清理，
+  CI 门禁 `ruff check mark42/ tests/` 首次真正转绿。
+  - 清 21 个未用 import、12 个未用变量、拆 13 处分号多语句
+  - 重命名歧义变量、lambda 改 def
+  - 安全告警逐处 noqa 注明理由（LLM API urllib / 硬编码系统命令 / 测试数据 / 生成脚本）
+  - B023 循环闭包假阳性（同迭代内被 pattern.sub 消费）配置忽略
+- 🌍 **`/mnt/data` 路径可移植化**：引入 `config.DATA_MOUNT`
+  （`MARK42_DATA_MOUNT` env 覆盖 + XDG_STATE 回退），
+  snapshot_reader/engine/heavy 不再写死数据盘路径。Mark42 现可移植到任意机器。
+
+### 新增
+- 📋 **商品化文件补齐**：
+  - `.github/ISSUE_TEMPLATE/`（bug_report / feature_request / config.yml）
+  - `.github/PULL_REQUEST_TEMPLATE.md`
+  - `ROADMAP.md` / `TROUBLESHOOTING.md` / `MIGRATION.md`
+  - `.pre-commit-config.yaml`
+  - README 加 badge（CI / Python / License / Version / Tests）+ 文档导航扩展
+
 ## [2.8.1] - 2026-07-29
 
 ### 新增
