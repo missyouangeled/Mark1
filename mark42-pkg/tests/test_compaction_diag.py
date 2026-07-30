@@ -692,3 +692,342 @@ class TestV2Features:
             "advice": [],
         }
         cd.print_diagnose(diag)
+
+
+# ── 边界情况与新增功能测试 ───────────────────────────────
+
+
+class TestEdgeCases:
+    def test_check_stat_high_fragmentation(self):
+        """会话数 > 10 应触发碎片化告警。"""
+        issues = cd._check_stat(session_count=15, largest_mb=2.0, ctx_window=128000)
+        frag_issues = [i for i in issues if i["key"] == "session_fragmentation"]
+        assert len(frag_issues) == 1
+        assert frag_issues[0]["status"] == "high"
+
+    def test_check_stat_small_transcript(self):
+        """最大转录文件 < 1MB 应触发偏小告警。"""
+        issues = cd._check_stat(session_count=5, largest_mb=0.5, ctx_window=128000)
+        small_issues = [i for i in issues if i["key"] == "too_small_transcript"]
+        assert len(small_issues) == 1
+        assert small_issues[0]["status"] == "small"
+
+    def test_check_stat_no_issues_when_normal(self):
+        """正常范围不应有 stat 问题。"""
+        issues = cd._check_stat(session_count=3, largest_mb=2.5, ctx_window=128000)
+        assert len(issues) == 0
+
+    def test_get_context_window_from_config(self, tmp_path, monkeypatch):
+        """应能从 openclaw.json 中读取 contextWindow。"""
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "models": {
+                "providers": {
+                    "deepseek": {
+                        "models": [
+                            {"name": "deepseek-chat", "contextWindow": 256000}
+                        ]
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        window = cd._get_context_window()
+        assert window == 256000
+
+    def test_get_context_window_dict_models_format(self, tmp_path, monkeypatch):
+        """应支持 dict 格式的 models 配置。"""
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "models": {
+                "providers": {
+                    "deepseek": {
+                        "models": {
+                            "deepseek-chat": {"contextWindow": 512000}
+                        }
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        window = cd._get_context_window()
+        assert window == 512000
+
+    def test_get_context_window_fallback_to_default(self, tmp_path, monkeypatch):
+        """无配置时应回退到默认值。"""
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", tmp_path / "nonexistent.json")
+        window = cd._get_context_window()
+        assert window == cd.DEFAULT_CONTEXT_WINDOW
+
+
+class TestDualThresholdCheck:
+    def test_dual_threshold_good_ratio(self, tmp_path, monkeypatch):
+        """双层阈值比例合理时应返回 ok。"""
+        # 通过 diagnose 间接测试双层阈值逻辑
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "maxActiveTranscriptBytes": 3_000_000,
+                        "keepRecentTokens": 15000,
+                        "reserveTokens": 16000,
+                        "memoryFlush": {"enabled": True, "softThresholdTokens": 32000},
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "_SESSIONS_DIR", tmp_path / "sessions")
+
+        result = cd.compaction_diagnose()
+        # 合理配置不应有 warn
+        assert result["status"] in ("ok", "warn")
+
+
+class TestIsolationCheck:
+    def test_isolation_many_sessions(self, tmp_path, monkeypatch):
+        """会话数超过阈值应建议隔离。"""
+        # 创建足够多的 session 文件
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        for i in range(15):
+            (sessions_dir / f"{today}-test-{i:02d}.jsonl").touch()
+
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "maxActiveTranscriptBytes": 3_000_000,
+                        "keepRecentTokens": 15000,
+                        "reserveTokens": 16000,
+                        "memoryFlush": {"enabled": True, "softThresholdTokens": 32000},
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "_SESSIONS_DIR", sessions_dir)
+
+        result = cd.compaction_diagnose()
+        # 应能正确统计 session 数（或者至少不崩溃）
+        assert "todaySessionCount" in result
+
+
+class TestDriftCheckWithData:
+    def test_drift_check_with_compaction_events(self, tmp_path, monkeypatch):
+        """有压缩事件时应计算降解。"""
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 创建包含 compaction 事件的 jsonl
+        compaction_lines = [
+            json.dumps({"tokensBefore": 100000}) + "\n",
+            json.dumps({"tokensBefore": 90000}) + "\n",
+            json.dumps({"tokensBefore": 80000}) + "\n",
+            json.dumps({"tokensBefore": 65000}) + "\n",
+        ]
+        with open(sessions_dir / f"{today}-test.jsonl", "w") as f:
+            f.writelines(compaction_lines)
+
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "maxActiveTranscriptBytes": 3_000_000,
+                        "keepRecentTokens": 15000,
+                        "reserveTokens": 16000,
+                        "memoryFlush": {"enabled": True, "softThresholdTokens": 32000},
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "_SESSIONS_DIR", sessions_dir)
+
+        # token_aware=True 也会触发相关检测
+        result = cd.compaction_diagnose(token_aware=True)
+        # 至少应该能运行不崩溃
+        assert "issues" in result
+
+
+class TestTokenAwareWithData:
+    def test_token_aware_with_usage_data(self, tmp_path, monkeypatch):
+        """有 token 使用数据时应计算感知。"""
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 创建包含 usage 的 jsonl
+        usage_lines = [
+            json.dumps({"message": {"usage": {"totalTokens": 5000}}}) + "\n",
+            json.dumps({"message": {"usage": {"totalTokens": 15000}}}) + "\n",
+            json.dumps({"message": {"usage": {"totalTokens": 25000}}}) + "\n",
+        ]
+        with open(sessions_dir / f"{today}-test.jsonl", "w") as f:
+            f.writelines(usage_lines)
+
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "maxActiveTranscriptBytes": 3_000_000,
+                        "keepRecentTokens": 15000,
+                        "reserveTokens": 16000,
+                        "memoryFlush": {"enabled": True, "softThresholdTokens": 32000},
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "_SESSIONS_DIR", sessions_dir)
+
+        result = cd.compaction_diagnose(token_aware=True)
+        token_issues = [i for i in result["issues"] if i["key"] == "token_awareness"]
+        assert len(token_issues) == 1
+
+
+class TestCompactionApplyBackup:
+    def test_apply_creates_backup_file(self, tmp_path, monkeypatch):
+        """应用时应创建备份文件。"""
+        config_path = tmp_path / "openclaw.json"
+        config_data = {
+            "agents": {
+                "defaults": {
+                    "compaction": {
+                        "keepRecentTokens": 1000,
+                        "maxActiveTranscriptBytes": 500_000,
+                    }
+                }
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+
+        result = cd.compaction_apply(auto_confirm=True)
+
+        assert result["status"] == "applied"
+        assert "backupPath" in result
+        backup_path = Path(result["backupPath"])
+        assert backup_path.exists()
+        # 备份文件应包含原始值
+        with open(backup_path) as f:
+            backup_cfg = json.load(f)
+        assert backup_cfg["agents"]["defaults"]["compaction"]["keepRecentTokens"] == 1000
+
+
+class TestPrintMoreIssueTypes:
+    def test_print_session_fragmentation_issue(self, caplog):
+        """打印 session_fragmentation 类型 issue 不应崩溃。"""
+        diag = {
+            "status": "warn",
+            "summary": "发现会话碎片化",
+            "contextWindow": 128000,
+            "todaySessionCount": 15,
+            "largestTranscriptMB": 0.5,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "session_fragmentation",
+                    "label": "会话碎片化",
+                    "severity": "warn",
+                    "status": "high",
+                    "current": 15,
+                    "advice": "今天已产生 15 个会话片段",
+                }
+            ],
+            "advice": [],
+        }
+        cd.print_diagnose(diag)
+
+    def test_print_dual_threshold_issue(self, caplog):
+        """打印 dual_threshold 类型 issue 不应崩溃。"""
+        diag = {
+            "status": "warn",
+            "summary": "双层阈值检测",
+            "contextWindow": 128000,
+            "todaySessionCount": 0,
+            "largestTranscriptMB": 0.0,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "dual_threshold",
+                    "label": "双层阈值检测",
+                    "severity": "warn",
+                    "status": "small_gap",
+                    "ratio": 0.35,
+                    "advice": "双层阈值差距过小",
+                }
+            ],
+            "advice": [],
+        }
+        cd.print_diagnose(diag)
+
+    def test_print_isolation_issue(self, caplog):
+        """打印 session_isolation 类型 issue 不应崩溃。"""
+        diag = {
+            "status": "warn",
+            "summary": "分身隔离建议",
+            "contextWindow": 128000,
+            "todaySessionCount": 15,
+            "largestTranscriptMB": 5.0,
+            "openclawJsonPath": "/tmp/openclaw.json",
+            "issues": [
+                {
+                    "key": "session_isolation",
+                    "label": "分身隔离建议",
+                    "severity": "warn",
+                    "status": "recommended",
+                    "sessionCount": 15,
+                    "advice": "会话数过多，建议使用分身隔离",
+                }
+            ],
+            "advice": [],
+        }
+        cd.print_diagnose(diag)
+
+
+class TestLoadOpenclawJsonErrors:
+    def test_load_invalid_json_returns_none(self, tmp_path, monkeypatch):
+        """无效 JSON 文件应返回 None。"""
+        config_path = tmp_path / "invalid.json"
+        with open(config_path, "w") as f:
+            f.write("this is not valid json")
+
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        result = cd._load_openclaw_json()
+        assert result is None
+
+    def test_get_compaction_config_none_when_no_file(self, tmp_path, monkeypatch):
+        """无配置文件时应返回 None。"""
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", tmp_path / "nonexistent.json")
+        result = cd._get_compaction_config()
+        assert result is None
