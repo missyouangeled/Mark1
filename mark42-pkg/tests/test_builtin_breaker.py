@@ -1,7 +1,5 @@
 """测试 builtin_breaker.py 插件模块。"""
 
-import pytest
-from typing import Any, Dict
 
 
 class TestBuiltinBreaker:
@@ -16,7 +14,7 @@ class TestBuiltinBreaker:
         """测试实现了 BreakerLock 接口。"""
         from mark42.interfaces.circuit_breaker import BreakerLock
         from mark42.plugins.builtin_breaker import BuiltinBreaker
-        
+
         instance = BuiltinBreaker.__new__(BuiltinBreaker)
         assert isinstance(instance, BreakerLock)
 
@@ -26,10 +24,10 @@ class TestBuiltinBreaker:
             'mark42.circuit_breaker.CircuitBreaker'
         )
         mock_instance = mock_breaker_class.return_value
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         mock_breaker_class.assert_called_once()
         assert breaker._impl == mock_instance
 
@@ -40,12 +38,12 @@ class TestBuiltinBreaker:
         )
         mock_impl = mock_breaker_class.return_value
         mock_impl.can_call.return_value = True
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         result = breaker.can_call("test-key")
-        
+
         mock_impl.can_call.assert_called_once_with("test-key")
         assert result is True
 
@@ -56,10 +54,10 @@ class TestBuiltinBreaker:
         )
         mock_impl = mock_breaker_class.return_value
         mock_impl.can_call.return_value = False
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         result = breaker.can_call("blocked-key")
         assert result is False
 
@@ -69,12 +67,12 @@ class TestBuiltinBreaker:
             'mark42.circuit_breaker.CircuitBreaker'
         )
         mock_impl = mock_breaker_class.return_value
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         breaker.record_success("test-key")
-        
+
         mock_impl.record_success.assert_called_once_with("test-key")
 
     def test_record_failure_forwards_to_impl_with_reason(self, mocker):
@@ -83,12 +81,12 @@ class TestBuiltinBreaker:
             'mark42.circuit_breaker.CircuitBreaker'
         )
         mock_impl = mock_breaker_class.return_value
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         breaker.record_failure("test-key", reason="network error")
-        
+
         mock_impl.record_failure.assert_called_once_with("test-key", reason="network error")
 
     def test_record_failure_forwards_to_impl_without_reason(self, mocker):
@@ -97,12 +95,12 @@ class TestBuiltinBreaker:
             'mark42.circuit_breaker.CircuitBreaker'
         )
         mock_impl = mock_breaker_class.return_value
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         breaker.record_failure("test-key")
-        
+
         mock_impl.record_failure.assert_called_once_with("test-key", reason="")
 
     def test_status_returns_breakers_and_total(self, mocker):
@@ -111,18 +109,18 @@ class TestBuiltinBreaker:
             'mark42.circuit_breaker.CircuitBreaker'
         )
         mock_impl = mock_breaker_class.return_value
-        
+
         mock_states = [
             {"key": "api1", "state": "closed", "failures": 0},
             {"key": "api2", "state": "open", "failures": 5},
         ]
         mock_impl.list_all.return_value = mock_states
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         result = breaker.status()
-        
+
         mock_impl.list_all.assert_called_once()
         assert result["breakers"] == mock_states
         assert result["total"] == 2
@@ -134,12 +132,12 @@ class TestBuiltinBreaker:
         )
         mock_impl = mock_breaker_class.return_value
         mock_impl.list_all.return_value = []
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         result = breaker.status()
-        
+
         assert result["breakers"] == []
         assert result["total"] == 0
 
@@ -150,12 +148,12 @@ class TestBuiltinBreaker:
         )
         mock_impl = mock_breaker_class.return_value
         mock_impl.list_all.return_value = [{"key": "test"}]
-        
+
         from mark42.plugins.builtin_breaker import BuiltinBreaker
         breaker = BuiltinBreaker()
-        
+
         result = breaker.status()
-        
+
         assert "breakers" in result
         assert "total" in result
         assert isinstance(result["breakers"], list)

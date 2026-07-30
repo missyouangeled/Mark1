@@ -381,7 +381,7 @@ def _run_tests():
 
         ("local_ip_not_redacted",
          "Local: 127.0.0.1, broadcast: 0.0.0.0",
-         ["127.0.0.1", "0.0.0.0"],  # 应保留
+         ["127.0.0.1", "0.0.0.0"],  # 应保留  # noqa: S104 (测试数据字符串)
          ["[REDACTED:ipv4]"]),
 
         ("chinese_name_weak_disabled",

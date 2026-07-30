@@ -11,10 +11,7 @@
 """
 
 import json
-from unittest.mock import patch, MagicMock
-
-import pytest
-
+from unittest.mock import MagicMock, patch
 
 # ── AdvisorVerdict 数据类测试 ───────────────────────────
 
@@ -155,7 +152,7 @@ class TestAdvisorClientInit:
         from mark42.advisor_client import AdvisorClient
 
         with patch("mark42.advisor_client.build_advisor", return_value=MagicMock()):
-            client = AdvisorClient()
+            AdvisorClient()
             # 不抛异常就是通过
 
     def test_init_with_custom_config(self):

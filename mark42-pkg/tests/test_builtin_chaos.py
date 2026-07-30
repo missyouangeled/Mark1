@@ -1,6 +1,5 @@
 """测试 builtin_chaos.py 插件模块。"""
 
-import pytest
 from typing import Any, Dict, List
 
 
@@ -16,7 +15,7 @@ class TestBuiltinChaos:
         """测试实现了 ChaosLock 接口。"""
         from mark42.interfaces.chaos import ChaosLock
         from mark42.plugins.builtin_chaos import BuiltinChaos
-        
+
         instance = BuiltinChaos.__new__(BuiltinChaos)
         assert isinstance(instance, ChaosLock)
 
@@ -26,10 +25,10 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_instance = mock_engine_class.return_value
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         mock_engine_class.assert_called_once()
         assert chaos._impl == mock_instance
 
@@ -39,18 +38,18 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         mock_experiments: List[Dict[str, Any]] = [
             {"name": "latency-injection", "description": "Inject network latency"},
             {"name": "cpu-hog", "description": "Consume CPU resources"},
         ]
         mock_impl.list_experiments.return_value = mock_experiments
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.list_experiments()
-        
+
         mock_impl.list_experiments.assert_called_once()
         assert result == mock_experiments
 
@@ -61,10 +60,10 @@ class TestBuiltinChaos:
         )
         mock_impl = mock_engine_class.return_value
         mock_impl.list_experiments.return_value = []
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.list_experiments()
         assert result == []
 
@@ -74,15 +73,15 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         mock_result = {"status": "simulated", "changes": 0}
         mock_impl.run_experiment.return_value = mock_result
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp")
-        
+
         mock_impl.run_experiment.assert_called_once_with("test-exp", dry_run=True)
         assert result == mock_result
 
@@ -92,15 +91,15 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         mock_result = {"status": "executed", "changes": 5}
         mock_impl.run_experiment.return_value = mock_result
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp", dry_run=False)
-        
+
         mock_impl.run_experiment.assert_called_once_with("test-exp", dry_run=False)
         assert result == mock_result
 
@@ -110,16 +109,16 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         mock_result_obj = mocker.MagicMock()
         mock_result_obj.to_dict.return_value = {"from_to_dict": True, "data": "test"}
         mock_impl.run_experiment.return_value = mock_result_obj
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp")
-        
+
         mock_result_obj.to_dict.assert_called_once()
         assert result == {"from_to_dict": True, "data": "test"}
 
@@ -129,13 +128,13 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         mock_dict_result = {"raw": True, "value": 42}
         mock_impl.run_experiment.return_value = mock_dict_result
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp")
         assert result == mock_dict_result
 
@@ -145,13 +144,13 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         # 返回字符串而非字典
         mock_impl.run_experiment.return_value = "success-string"
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp")
         assert result == {"result": "success-string"}
 
@@ -161,16 +160,16 @@ class TestBuiltinChaos:
             'mark42.chaos_engine.ChaosEngine'
         )
         mock_impl = mock_engine_class.return_value
-        
+
         # 返回一个普通对象，没有 to_dict 方法
         class PlainObj:
             def __str__(self):
                 return "plain-object"
-        
+
         mock_impl.run_experiment.return_value = PlainObj()
-        
+
         from mark42.plugins.builtin_chaos import BuiltinChaos
         chaos = BuiltinChaos()
-        
+
         result = chaos.run_experiment("test-exp")
         assert result == {"result": "plain-object"}

@@ -1,7 +1,4 @@
 """installer.py 单元测试"""
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 from mark42.installer import install_systemd, uninstall_systemd
 

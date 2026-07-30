@@ -171,7 +171,7 @@ class LLMChecker:
 
         preserved = sum(1 for f in findings if f.status == "preserved")
         degraded = sum(1 for f in findings if f.status == "degraded")
-        lost = sum(1 for f in findings if f.status == "lost")
+        # lost 项不参与 score 加权（权重=0），verdict 通过下方分类判定，无需单独计数
 
         total = len(findings)
         score = (preserved + 0.5 * degraded) / total if total > 0 else 1.0

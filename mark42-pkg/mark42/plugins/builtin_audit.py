@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import threading
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 from typing import Any

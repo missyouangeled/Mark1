@@ -1,10 +1,6 @@
 """G10/G11 测试：LLM 统计 + metrics 输出。"""
 
 import json
-from unittest.mock import MagicMock, patch, mock_open
-from pathlib import Path
-
-import pytest
 
 
 class TestArmorLLMStats:

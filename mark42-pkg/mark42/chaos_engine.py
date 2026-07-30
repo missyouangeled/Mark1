@@ -405,7 +405,7 @@ class ChaosEngine:
 
     def _execute_fill_disk(self, dry_run: bool = True) -> dict:
         """创建临时大文件。"""
-        tmp_file = Path("/tmp/mark42_chaos_fill_test")
+        tmp_file = Path("/tmp/mark42_chaos_fill_test")  # noqa: S108 (混沌测试专用临时文件)
         if dry_run:
             logger.info("[DRY-RUN] 将创建 1G 临时文件 %s", tmp_file)
             return {"action": "fill (dry_run)", "file": str(tmp_file)}
@@ -425,7 +425,7 @@ class ChaosEngine:
 
     def _cleanup_fill_disk(self, dry_run: bool = True) -> None:
         """删除临时文件。"""
-        tmp_file = Path("/tmp/mark42_chaos_fill_test")
+        tmp_file = Path("/tmp/mark42_chaos_fill_test")  # noqa: S108 (混沌测试专用临时文件)
         if tmp_file.exists():
             tmp_file.unlink()
 

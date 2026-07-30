@@ -9,13 +9,13 @@ Headroom ArcLock 适配器单元测试。
 - P5: HeadroomMemory 同样符合 MemoryLock Protocol
 """
 
-import sys
 import os
+import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
+
 pytestmark = pytest.mark.skip(reason="requires examples module")
 
 # 确保 examples 目录在 PYTHONPATH 中
@@ -98,8 +98,9 @@ class TestHeadroomRegistration:
 
     def test_register_headroom_compress(self):
         """注册 HeadroomCompress 后，get_compress() 应该返回它。"""
-        from mark42.interfaces import register, get_compress
         from examples.arclock_headroom.headroom_compress import HeadroomCompress
+
+        from mark42.interfaces import get_compress, register
 
         # 注册前先清理注册表（通过重新 import 重置，但注册会覆盖）
         headroom = HeadroomCompress(api_key="test-key")
@@ -113,8 +114,9 @@ class TestHeadroomRegistration:
 
     def test_headroom_compress_called_via_registry(self):
         """通过注册器调用 get_compress().check() 应该正常工作。"""
-        from mark42.interfaces import register, get_compress
         from examples.arclock_headroom.headroom_compress import HeadroomCompress
+
+        from mark42.interfaces import get_compress, register
 
         register("compress", HeadroomCompress())
         compress = get_compress()
@@ -125,8 +127,9 @@ class TestHeadroomRegistration:
 
     def test_register_headroom_memory(self):
         """注册 HeadroomMemory 后，get_memory() 应该返回它。"""
-        from mark42.interfaces import register, get_memory
         from examples.arclock_headroom.headroom_memory import HeadroomMemory
+
+        from mark42.interfaces import get_memory, register
 
         headroom = HeadroomMemory(api_key="test-key", index_name="test-index")
         register("memory", headroom)
@@ -145,8 +148,9 @@ class TestHeadroomProtocolCompliance:
 
     def test_headroom_compress_is_compress_lock(self):
         """HeadroomCompress 实例应该是 CompressLock 的实例（鸭子类型）。"""
-        from mark42.interfaces.compress import CompressLock
         from examples.arclock_headroom.headroom_compress import HeadroomCompress
+
+        from mark42.interfaces.compress import CompressLock
 
         headroom = HeadroomCompress()
         assert isinstance(headroom, CompressLock), \
@@ -154,8 +158,9 @@ class TestHeadroomProtocolCompliance:
 
     def test_headroom_memory_is_memory_lock(self):
         """HeadroomMemory 实例应该是 MemoryLock 的实例（鸭子类型）。"""
-        from mark42.interfaces.memory import MemoryLock
         from examples.arclock_headroom.headroom_memory import HeadroomMemory
+
+        from mark42.interfaces.memory import MemoryLock
 
         headroom = HeadroomMemory()
         assert isinstance(headroom, MemoryLock), \
@@ -339,9 +344,10 @@ class TestHeadroomHotSwap:
 
     def test_hot_swap_compress_at_runtime(self):
         """运行时可以随时替换 compress 实现，不需要重启。"""
-        from mark42.interfaces import register, get_compress
-        from mark42.plugins.builtin_compress import BuiltinCompress
         from examples.arclock_headroom.headroom_compress import HeadroomCompress
+
+        from mark42.interfaces import get_compress, register
+        from mark42.plugins.builtin_compress import BuiltinCompress
 
         # 先用默认实现
         register("compress", BuiltinCompress())
@@ -360,9 +366,10 @@ class TestHeadroomHotSwap:
 
     def test_hot_swap_does_not_break_existing_code(self):
         """热替换后，现有代码不需要任何修改就能继续工作。"""
-        from mark42.interfaces import register, get_compress
-        from mark42.plugins.builtin_compress import BuiltinCompress
         from examples.arclock_headroom.headroom_compress import HeadroomCompress
+
+        from mark42.interfaces import get_compress, register
+        from mark42.plugins.builtin_compress import BuiltinCompress
 
         # 这段代码是"业务代码"，它不知道具体实现是什么
         def business_logic():

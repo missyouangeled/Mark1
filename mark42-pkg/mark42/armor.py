@@ -265,12 +265,12 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
             "temperature": temperature,
             "response_format": {"type": "json_object"},
         }).encode()
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310 (LLM API urllib，url 来自受信配置)
             f"{base_url}{endpoint}",
             data=body,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         )
-        resp = urllib.request.urlopen(req, timeout=timeout)
+        resp = urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 (LLM API urllib，url 来自受信配置)
         data = json.loads(resp.read())
         content = data["choices"][0]["message"]["content"]
         content = content.strip()
@@ -986,24 +986,10 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
         f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
 
     # ── P0 补充: 连续压缩无效升级报 ──
-    # 读 actions.jsonl 最近 5 条, 如果全部 compressionEffective=False 且本次也是 False,
+    # 若 history 最近 ≥3 次压缩全部 compressionEffective=False 且本次也是 False,
     # 说明 sessions.compact 调用一直不能压下 session, 可能是配置文件不一致、LLM 失败、
     # 或上下文估计偏差。则发升级事件到 broker, 提醒人工干预。
     try:
-        recent_ineffective = 0
-        if actions_log.exists():
-            with open(actions_log) as f:
-                recent_lines = f.readlines()[-10:]  # 最近 10 条
-            # 检查最近 5 条非 dry-run 中是否有 compressionEffective=False
-            for line in recent_lines[-5:]:
-                try:
-                    entry = json.loads(line.strip())
-                    if entry.get("action") == "compress":
-                        # 检查本次压缩是否有效 (粗略依据: 读 memory-index.json)
-                        # 精确方式要查 history/*，但简单点：只看本次
-                        pass
-                except Exception:
-                    continue
         # 本次判断: index 里是否有 compressionEffective=False 且已生成
         if index.get("compressionEffective") is False:
             # 查 history 里最近 5 次 compressionEffective 字段
@@ -1017,7 +1003,7 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                         total_count += 1
                         if h["compressionEffective"] is False:
                             ineffective_count += 1
-                except Exception:
+                except Exception:  # noqa: S112 (跳过损坏行，继续解析)
                     continue
             if total_count >= 3 and ineffective_count == total_count:
                 # 连续 ≥3 次压缩全部无效, 升级 broker
@@ -1319,7 +1305,7 @@ def armor_llm_stats(window: int = 50) -> dict[str, Any]:
                 errors += 1
             else:
                 other += 1
-        except Exception:
+        except Exception:  # noqa: S112 (跳过损坏行，继续解析)
             continue
 
     effective_total = llm_success + fallback

@@ -71,7 +71,7 @@ class ConstraintPinner:
                 if extracted and total_chars + len(extracted) <= MAX_TOTAL_CHARS:
                     sections.append(extracted)
                     total_chars += len(extracted)
-            except Exception:
+            except Exception:  # noqa: S112 (跳过损坏行，继续解析)
                 continue
 
         if not sections:

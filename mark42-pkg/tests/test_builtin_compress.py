@@ -1,7 +1,8 @@
 """测试 builtin_compress.py 插件模块。"""
 
-import pytest
 from typing import Any, Dict
+
+import pytest
 
 
 class TestBuiltinCompress:
@@ -16,7 +17,7 @@ class TestBuiltinCompress:
         """测试实现了 CompressLock 接口。"""
         from mark42.interfaces.compress import CompressLock
         from mark42.plugins.builtin_compress import BuiltinCompress
-        
+
         instance = BuiltinCompress.__new__(BuiltinCompress)
         assert isinstance(instance, CompressLock)
 
@@ -31,12 +32,12 @@ class TestBuiltinCompress:
             "totalTokens": 1000,
         }
         mock_armor_check.return_value = mock_result
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         result = compress.check()
-        
+
         mock_armor_check.assert_called_once()
         assert result == mock_result
 
@@ -46,10 +47,10 @@ class TestBuiltinCompress:
             'mark42.armor.armor_check'
         )
         mock_armor_check.side_effect = Exception("armor error")
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         # 如果 armor_check 抛出异常，应该向上传递
         with pytest.raises(Exception, match="armor error"):
             compress.check()
@@ -66,12 +67,12 @@ class TestBuiltinCompress:
             "savings": 0,
         }
         mock_armor_compress.return_value = mock_result
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         result = compress.compress()
-        
+
         mock_armor_compress.assert_called_once_with(dry_run=True)
         assert result == mock_result
 
@@ -87,12 +88,12 @@ class TestBuiltinCompress:
             "savings": 400,
         }
         mock_armor_compress.return_value = mock_result
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         result = compress.compress(dry_run=False)
-        
+
         mock_armor_compress.assert_called_once_with(dry_run=False)
         assert result == mock_result
 
@@ -103,13 +104,13 @@ class TestBuiltinCompress:
         )
         mock_result: Dict[str, Any] = {"action": "test"}
         mock_armor_compress.return_value = mock_result
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         # 传入额外的 kwargs，但 armor_compress 只会收到 dry_run
         result = compress.compress(dry_run=True, extra_param="ignored", another=42)
-        
+
         mock_armor_compress.assert_called_once_with(dry_run=True)
         assert result == mock_result
 
@@ -119,10 +120,10 @@ class TestBuiltinCompress:
             'mark42.armor.armor_compress'
         )
         mock_armor_compress.side_effect = RuntimeError("compression failed")
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         with pytest.raises(RuntimeError, match="compression failed"):
             compress.compress()
 
@@ -137,12 +138,12 @@ class TestBuiltinCompress:
             "recommendations": ["remove_old_context", "merge_similar"],
         }
         mock_compaction_diagnose.return_value = mock_result
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         result = compress.diagnose()
-        
+
         mock_compaction_diagnose.assert_called_once()
         assert result == mock_result
 
@@ -152,35 +153,35 @@ class TestBuiltinCompress:
             'mark42.compaction_diag.compaction_diagnose'
         )
         mock_compaction_diagnose.side_effect = ValueError("diagnose error")
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         with pytest.raises(ValueError, match="diagnose error"):
             compress.diagnose()
 
     def test_all_methods_return_dict(self, mocker):
         """测试所有方法都返回字典。"""
-        mock_armor_check = mocker.patch(
+        mocker.patch(
             'mark42.armor.armor_check',
             return_value={"test": "check"}
         )
-        mock_armor_compress = mocker.patch(
+        mocker.patch(
             'mark42.armor.armor_compress',
             return_value={"test": "compress"}
         )
-        mock_compaction_diagnose = mocker.patch(
+        mocker.patch(
             'mark42.compaction_diag.compaction_diagnose',
             return_value={"test": "diagnose"}
         )
-        
+
         from mark42.plugins.builtin_compress import BuiltinCompress
         compress = BuiltinCompress()
-        
+
         result_check = compress.check()
         result_compress = compress.compress()
         result_diagnose = compress.diagnose()
-        
+
         assert isinstance(result_check, dict)
         assert isinstance(result_compress, dict)
         assert isinstance(result_diagnose, dict)

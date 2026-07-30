@@ -10,29 +10,29 @@ llm_provider.py 单元测试
 """
 
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
+
+import pytest
 
 # 导入待测试模块
 from mark42.llm_provider import (
+    DEFAULT_CONFIG,
+    APIRuntime,
     ChatMessage,
     ChatResponse,
     LLMProviderError,
-    load_config,
-    get_consciousness_cfg,
-    get_advisor_cfg,
-    get_fallback_chain,
     OllamaRuntime,
-    APIRuntime,
     StubRuntime,
-    build_provider,
-    build_consciousness,
-    build_advisor,
-    chat_with_fallback,
     _http_post_json,
-    DEFAULT_CONFIG,
-    CONFIG_PATHS,
+    build_advisor,
+    build_consciousness,
+    build_provider,
+    chat_with_fallback,
+    get_advisor_cfg,
+    get_consciousness_cfg,
+    get_fallback_chain,
+    load_config,
 )
 
 
@@ -78,7 +78,7 @@ class TestLoadConfig:
         """测试没有配置文件时返回默认配置"""
         mocker.patch("mark42.llm_provider._HAS_YAML", True)
         mocker.patch("pathlib.Path.exists", return_value=False)
-        
+
         cfg = load_config()
         assert cfg == DEFAULT_CONFIG
 
@@ -89,7 +89,7 @@ class TestLoadConfig:
         mocker.patch("pathlib.Path.exists", return_value=True)
         mocker.patch("pathlib.Path.read_text", return_value="test yaml")
         mocker.patch("yaml.safe_load", return_value=test_cfg)
-        
+
         cfg = load_config(Path("/test/path.yaml"))
         assert cfg == test_cfg
 
@@ -98,7 +98,7 @@ class TestLoadConfig:
         mocker.patch("mark42.llm_provider._HAS_YAML", False)
         mocker.patch("pathlib.Path.exists", return_value=True)
         mocker.patch("pathlib.Path.read_text", return_value="test yaml")
-        
+
         cfg = load_config(Path("/test/path.yaml"))
         assert cfg == DEFAULT_CONFIG
 
@@ -109,7 +109,7 @@ class TestLoadConfig:
         mocker.patch("pathlib.Path.exists", return_value=True)
         mocker.patch("pathlib.Path.read_text", return_value="invalid yaml")
         mocker.patch("yaml.safe_load", side_effect=yaml.YAMLError("parse error"))
-        
+
         cfg = load_config(Path("/test/path.yaml"))
         assert cfg == DEFAULT_CONFIG
 
@@ -174,9 +174,9 @@ class TestStubRuntime:
         """测试 chat 方法返回 echo 格式内容"""
         runtime = StubRuntime(model="test-model")
         messages = [ChatMessage(role="user", content="Hello world")]
-        
+
         result = runtime.chat(messages)
-        
+
         assert isinstance(result, ChatResponse)
         assert result.model == "test-model"
         assert "收到 1 条消息" in result.content
@@ -192,9 +192,9 @@ class TestStubRuntime:
             ChatMessage(role="assistant", content="回复一"),
             ChatMessage(role="user", content="第二条"),
         ]
-        
+
         result = runtime.chat(messages)
-        
+
         assert "收到 4 条消息" in result.content
         assert "第二条" in result.content
         assert "第一条" not in result.content  # 只取最后一条
@@ -203,9 +203,9 @@ class TestStubRuntime:
         """测试 usage 字段计算"""
         runtime = StubRuntime()
         messages = [ChatMessage(role="user", content="Hello")]
-        
+
         result = runtime.chat(messages)
-        
+
         assert "prompt_tokens" in result.usage
         assert "completion_tokens" in result.usage
         assert "total_tokens" in result.usage
@@ -245,12 +245,12 @@ class TestOllamaRuntime:
         """测试 chat 方法调用 _http_post_json"""
         mock_http = mocker.patch("mark42.llm_provider._http_post_json")
         mock_http.return_value = ChatResponse(content="test response", model="llama3")
-        
+
         runtime = OllamaRuntime(model="llama3")
         messages = [ChatMessage(role="user", content="test")]
-        
+
         result = runtime.chat(messages, temperature=0.7)
-        
+
         mock_http.assert_called_once()
         assert result.content == "test response"
 
@@ -288,16 +288,16 @@ class TestAPIRuntime:
         """测试 chat 方法调用 _http_post_json"""
         mock_http = mocker.patch("mark42.llm_provider._http_post_json")
         mock_http.return_value = ChatResponse(content="test response", model="test-model")
-        
+
         runtime = APIRuntime(
             model="test-model",
             base_url="https://api.example.com/v1",
             api_key="sk-123"
         )
         messages = [ChatMessage(role="user", content="test")]
-        
+
         result = runtime.chat(messages, max_tokens=100)
-        
+
         mock_http.assert_called_once()
         assert result.content == "test response"
 
@@ -313,10 +313,10 @@ class TestHttpPostJson:
             "model": "test-model",
             "usage": {"total_tokens": 10}
         }).encode()
-        
+
         mock_urlopen = mocker.patch("urllib.request.urlopen")
         mock_urlopen.return_value.__enter__.return_value = mock_response
-        
+
         result = _http_post_json(
             url="https://api.example.com",
             body={"prompt": "test"},
@@ -324,7 +324,7 @@ class TestHttpPostJson:
             timeout_seconds=60,
             max_retries=0,
         )
-        
+
         assert result.content == "Hello!"
         assert result.model == "test-model"
 
@@ -334,10 +334,10 @@ class TestHttpPostJson:
         mock_response.read.return_value = json.dumps({
             "model": "test-model",
         }).encode()
-        
+
         mock_urlopen = mocker.patch("urllib.request.urlopen")
         mock_urlopen.return_value.__enter__.return_value = mock_response
-        
+
         with pytest.raises(LLMProviderError) as exc:
             _http_post_json(
                 url="https://api.example.com",
@@ -353,7 +353,7 @@ class TestHttpPostJson:
         import urllib.error
         mock_urlopen = mocker.patch("urllib.request.urlopen")
         mock_urlopen.side_effect = urllib.error.URLError("connection failed")
-        
+
         with pytest.raises(LLMProviderError) as exc:
             _http_post_json(
                 url="https://api.example.com",
@@ -362,7 +362,7 @@ class TestHttpPostJson:
                 timeout_seconds=60,
                 max_retries=2,  # 重试 2 次 = 总共 3 次尝试
             )
-        
+
         # 验证尝试了 3 次
         assert mock_urlopen.call_count == 3
         assert "重试 2 次仍失败" in str(exc.value)
@@ -372,7 +372,7 @@ class TestHttpPostJson:
         import urllib.error
         mock_urlopen = mocker.patch("urllib.request.urlopen")
         mock_urlopen.side_effect = urllib.error.URLError("timed out")
-        
+
         with pytest.raises(LLMProviderError):
             _http_post_json(
                 url="https://api.example.com",
@@ -447,7 +447,7 @@ class TestBuildConsciousness:
         """测试不带配置参数时自动加载"""
         mock_load = mocker.patch("mark42.llm_provider.load_config")
         mock_load.return_value = DEFAULT_CONFIG
-        provider = build_consciousness()
+        build_consciousness()
         mock_load.assert_called_once()
 
 
@@ -479,7 +479,7 @@ class TestBuildAdvisor:
         """测试不带配置参数时自动加载"""
         mock_load = mocker.patch("mark42.llm_provider.load_config")
         mock_load.return_value = DEFAULT_CONFIG
-        provider = build_advisor()
+        build_advisor()
         mock_load.assert_called_once()
 
 
@@ -491,10 +491,10 @@ class TestChatWithFallback:
         mock_consciousness = MagicMock()
         mock_consciousness.chat.return_value = ChatResponse(content="success", model="primary")
         mocker.patch("mark42.llm_provider.build_consciousness", return_value=mock_consciousness)
-        
+
         messages = [ChatMessage(role="user", content="test")]
         result = chat_with_fallback(messages)
-        
+
         mock_consciousness.chat.assert_called_once()
         assert result.content == "success"
 
@@ -504,18 +504,18 @@ class TestChatWithFallback:
         mock_primary = MagicMock()
         mock_primary.chat.side_effect = LLMProviderError("primary failed")
         mock_primary.runtime = "api"
-        
+
         # fallback 成功
         mock_fallback = MagicMock()
         mock_fallback.chat.return_value = ChatResponse(content="fallback success", model="stub")
         mock_fallback.runtime = "stub"
-        
+
         mocker.patch("mark42.llm_provider.build_consciousness", return_value=mock_primary)
         mocker.patch("mark42.llm_provider.build_provider", return_value=mock_fallback)
-        
+
         messages = [ChatMessage(role="user", content="test")]
         result = chat_with_fallback(messages, cfg={"mark42": {"fallback_chain": ["stub"]}})
-        
+
         assert result.content == "fallback success"
 
     def test_chat_with_fallback_all_failed_emergency_stub(self, mocker):
@@ -523,13 +523,13 @@ class TestChatWithFallback:
         mock_primary = MagicMock()
         mock_primary.chat.side_effect = LLMProviderError("primary failed")
         mock_primary.runtime = "api"
-        
+
         mocker.patch("mark42.llm_provider.build_consciousness", return_value=mock_primary)
         mock_log = mocker.patch("mark42.llm_provider.logger.error")
-        
+
         messages = [ChatMessage(role="user", content="test")]
         result = chat_with_fallback(messages, cfg={"mark42": {"fallback_chain": []}})
-        
+
         # 绝不抛异常，总能返回结果
         assert result.content is not None
         assert "emergency-stub" in result.model

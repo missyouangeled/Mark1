@@ -238,7 +238,7 @@ class OpenClawSnapshotReader:
                             item = line[2:][:80]
                             if item not in items:
                                 items.append(item)
-                except Exception:
+                except Exception:  # noqa: S112 (跳过损坏行，继续解析)
                     continue
 
         return items[:30]  # 限制数量避免过长

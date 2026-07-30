@@ -11,7 +11,7 @@ log_setup.py 单元测试
 
 import logging
 import os
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -67,7 +67,7 @@ class TestGetLogger:
 
     def test_get_logger_init_only_once(self):
         """测试初始化只执行一次。"""
-        from mark42.log_setup import get_logger, _init_logging, _LEVEL_MAP
+        from mark42.log_setup import get_logger
 
         # 第一次调用
         with patch('mark42.log_setup.logging.getLogger') as mock_get_logger:
@@ -75,14 +75,14 @@ class TestGetLogger:
             mock_root.handlers = []
             mock_get_logger.return_value = mock_root
 
-            logger1 = get_logger("test1")
+            get_logger("test1")
 
             # handlers 应该被添加
             assert mock_root.addHandler.called
             add_handler_call_count = mock_root.addHandler.call_count
 
             # 第二次调用
-            logger2 = get_logger("test2")
+            get_logger("test2")
 
             # addHandler 不应该再被调用（因为 _initialized 已经是 True）
             assert mock_root.addHandler.call_count == add_handler_call_count
@@ -90,9 +90,9 @@ class TestGetLogger:
     @patch.dict(os.environ, {"MARK42_LOG_LEVEL": "DEBUG"})
     def test_get_logger_custom_level_from_env(self):
         """测试从环境变量读取日志级别。"""
-        from mark42.log_setup import get_logger, _LEVEL_MAP
-        logger = get_logger("test_debug")
-        root_logger = logging.getLogger("mark42")
+        from mark42.log_setup import get_logger
+        get_logger("test_debug")
+        logging.getLogger("mark42")
         # 级别应该是 DEBUG（但被转换了）
         # 注意：实际级别可能会被系统调整
 
@@ -100,14 +100,14 @@ class TestGetLogger:
     def test_get_logger_warning_level(self):
         """测试 WARNING 级别。"""
         from mark42.log_setup import get_logger
-        logger = get_logger("test_warn")
+        get_logger("test_warn")
         # 不抛出异常即可
 
     @patch.dict(os.environ, {"MARK42_LOG_LEVEL": "INVALID_LEVEL"})
     def test_get_logger_invalid_level_defaults_to_info(self):
         """测试无效级别默认使用 INFO。"""
         from mark42.log_setup import get_logger
-        logger = get_logger("test_invalid")
+        get_logger("test_invalid")
         # 不抛出异常即可
 
     def test_init_logging_existing_handlers_returns(self):
@@ -124,7 +124,7 @@ class TestGetLogger:
     def test_logger_propagate_false(self):
         """测试 logger 不向上传播（避免重复输出）。"""
         from mark42.log_setup import get_logger
-        logger = get_logger("test")
+        get_logger("test")
         root_logger = logging.getLogger("mark42")
         assert root_logger.propagate is False
 
@@ -199,7 +199,7 @@ class TestLogFunctions:
 
     def test_log_functions_with_no_args(self):
         """测试无参数调用。"""
-        from mark42.log_setup import log_info, log_warn, log_error, log_debug
+        from mark42.log_setup import log_debug, log_error, log_info, log_warn
 
         with patch('mark42.log_setup.get_logger') as mock_get_logger:
             mock_logger = MagicMock()

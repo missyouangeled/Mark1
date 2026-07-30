@@ -393,7 +393,7 @@ def test_replace_resets_restart_count(cm, temp_state_dir):
 
 def test_replace_updates_status(cm, temp_state_dir):
     """测试：替换更新 status.json。"""
-    result = cm.replace("cluster-text-compress")
+    cm.replace("cluster-text-compress")
     status_file = temp_state_dir / "clusters" / "cluster-text-compress" / "status.json"
     data = json.loads(status_file.read_text(encoding="utf-8"))
     assert "last_replace" in data
@@ -451,7 +451,7 @@ def test_reset_restart_count_unknown_cluster(cm, temp_state_dir):
 def test_full_restart_replace_flow(cm, temp_state_dir):
     """测试：完整流程 - 多次重启失败后触发替换。"""
     cluster_name = "cluster-text-compress"
-    cluster_dir = temp_state_dir / "clusters" / cluster_name
+    temp_state_dir / "clusters" / cluster_name
 
     # 初始状态
     assert cm.get_failure_count(cluster_name) == 0

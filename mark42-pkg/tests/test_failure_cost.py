@@ -9,18 +9,10 @@ FAILURE.md 降级契约落地测试 + 成本追踪测试
 """
 
 import json
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-from dataclasses import field
+from unittest.mock import patch
 
-import pytest
-
-import mark42.cost_tracker as ct
 from mark42.cost_tracker import (
     MODEL_PRICING,
-    COST_DIR,
-    COSTS_FILE,
     CostRecord,
     CostTracker,
     record_cost,

@@ -111,8 +111,8 @@ class ModuleHealthMonitor:
             elif check == "engine_status":
                 from .engine import _load_loops
                 loops = _load_loops()
-                active = sum(1 for l in loops.values()
-                             if l.get("status") in ("registered", "running"))
+                active = sum(1 for lp in loops.values()
+                             if lp.get("status") in ("registered", "running"))
                 total = len(loops)
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
                 health.traffic_per_min = active
@@ -159,7 +159,7 @@ class ModuleHealthMonitor:
             elif check == "archive_list":
                 from .error_archive import ErrorArchive
                 ea = ErrorArchive()
-                entries = ea.list_entries()
+                ea.list_entries()  # 63a26d4b526f4f5c7528Ff1a9a8c8bc1 error_archive 53ef7528
                 health.status = "green"
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
 

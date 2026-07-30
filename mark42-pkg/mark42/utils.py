@@ -441,7 +441,7 @@ def _get_context_window() -> int:
                 if '"type":"model_change"' in _line or '"type": "model_change"' in _line:
                     try:
                         _last_model = json.loads(_line)
-                    except Exception:
+                    except Exception:  # noqa: S112 (跳过损坏行，继续解析)
                         continue
             if _last_model:
                 actual_provider = _last_model.get("provider", "")
@@ -473,7 +473,7 @@ def _get_context_window() -> int:
 
     # 策略 2: 遍历 openclaw.json 所有 provider/models，取第一个有 contextWindow 的
     try:
-        for pkey, pcfg in oc.get('models', {}).get('providers', {}).items():
+        for _pkey, pcfg in oc.get('models', {}).get('providers', {}).items():
             for m in pcfg.get('models', []):
                 cw = m.get('contextWindow')
                 if isinstance(cw, int) and cw > 0:

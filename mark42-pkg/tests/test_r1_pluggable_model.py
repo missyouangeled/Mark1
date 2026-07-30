@@ -9,15 +9,9 @@ R1 验收测试 · 可插拔模型层
 - 接入外部大模型 -> 改 1 行配置 advisor.enabled: true，战甲获得主动交流能力
 """
 
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 import mark42.llm_provider as lp
-
 
 # ── 辅助函数 ──
 

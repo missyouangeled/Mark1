@@ -415,7 +415,7 @@ class TestArmorCompress:
                 "contextWindow": 100000,
             }
 
-            result = armor_compress(dry_run=True)
+            armor_compress(dry_run=True)
 
         # subprocess 不应被调用（因为 dry_run=True）
         mock_subproc.assert_not_called()

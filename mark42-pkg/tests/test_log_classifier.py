@@ -7,19 +7,16 @@ log_classifier.py 单元测试
 """
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
-
-import pytest
+from unittest.mock import patch
 
 from mark42.log_classifier import (
-    SOURCE_RULES,
     LEVEL_RULES,
+    SOURCE_RULES,
     ClassificationResult,
     LogClassifier,
-    cli_classify_test,
-    cli_classify_stats,
     cli_classify_recent,
+    cli_classify_stats,
+    cli_classify_test,
 )
 
 

@@ -15,18 +15,14 @@ R11 混沌工程引擎单元测试
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-import mark42.chaos_engine as ce
 from mark42.chaos_engine import (
-    CHAOS_DIR,
     ChaosEngine,
     ChaosResult,
-    RESULTS_FILE,
 )
-
 
 # ── 辅助 ──
 
@@ -79,7 +75,7 @@ class TestChaosEngineInit:
     def test_init_creates_dir(self, tmp_path):
         """初始化时创建 chaos 目录。"""
         chaos_dir = tmp_path / "chaos"
-        engine = ChaosEngine(chaos_dir=chaos_dir)
+        ChaosEngine(chaos_dir=chaos_dir)
         assert chaos_dir.exists()
 
     def test_results_file_path(self, tmp_path):

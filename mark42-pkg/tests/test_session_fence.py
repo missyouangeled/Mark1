@@ -3,12 +3,10 @@
 import time
 from pathlib import Path
 
-import pytest
-
 from mark42.session_fence import (
-    fence_verify,
-    fence_record_pre,
     fence_record_post,
+    fence_record_pre,
+    fence_verify,
 )
 
 
@@ -114,7 +112,7 @@ class TestFenceRecordPost:
     def test_post_record_stat_exception_handled(self, tmp_path, mocker):
         """【session_fence.py】post_record 中 stat 异常时返回 size=0。"""
         mocker.patch("mark42.session_fence.FENCE_STATE", tmp_path / "fence.json")
-        
+
         # mock Path.stat 抛出异常
         fake_session = tmp_path / "session.jsonl"
         mocker.patch.object(fake_session.__class__, "stat", side_effect=OSError("io error"))
@@ -145,7 +143,7 @@ class TestFenceVerifyMissingPaths:
         """【session_fence.py】session_path=None 时调用 _find_active_session。"""
         # _find_active_session 返回 None
         mocker.patch("mark42.session_fence._find_active_session", return_value=None)
-        
+
         result = fence_verify(None)
         assert result["ok"] is False
         assert result["reason"] == "no-active-session"
@@ -154,7 +152,7 @@ class TestFenceVerifyMissingPaths:
         """【session_fence.py】文件 > 2GB 时返回 file-too-large。"""
         fake_session = tmp_path / "huge.jsonl"
         fake_session.write_text("a")
-        
+
         # mock stat 返回非常大的 size (>2GB)
         class FakeStat:
             st_size = 3 * 1024 * 1024 * 1024  # 3GB
@@ -169,7 +167,7 @@ class TestFenceVerifyMissingPaths:
         """【session_fence.py】stat 异常时 fail-open（ok=True）。"""
         fake_session = tmp_path / "session.jsonl"
         fake_session.write_text("test")
-        
+
         mocker.patch.object(fake_session.__class__, "stat", side_effect=OSError("disk error"))
 
         result = fence_verify(fake_session)
@@ -188,7 +186,7 @@ class TestFenceRecordPreMissingPaths:
         class FakePath:
             def __str__(self):
                 return "fake/path"
-        
+
         mocker.patch("mark42.session_fence.FENCE_STATE", tmp_path / "fence.json")
 
         record = fence_record_pre(FakePath())

@@ -14,7 +14,7 @@ Mark42 v3 §3.6.3 R14 · 集群管理器单元测试
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -24,13 +24,10 @@ from mark42.cluster_manager import (
     ClusterConfig,
     ClusterManager,
     HealthCheckResult,
-    _check_contract_passed,
     _check_port_accessible,
     _check_process_running,
     _record_action,
-    _write_failure_md,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -396,7 +393,7 @@ def test_replace_resets_restart_count(cm, temp_state_dir):
 
 def test_replace_updates_status(cm, temp_state_dir):
     """测试：替换更新 status.json。"""
-    result = cm.replace("cluster-text-compress")
+    cm.replace("cluster-text-compress")
     status_file = temp_state_dir / "clusters" / "cluster-text-compress" / "status.json"
     data = json.loads(status_file.read_text(encoding="utf-8"))
     assert "last_replace" in data
@@ -454,7 +451,7 @@ def test_reset_restart_count_unknown_cluster(cm, temp_state_dir):
 def test_full_restart_replace_flow(cm, temp_state_dir):
     """测试：完整流程 - 多次重启失败后触发替换。"""
     cluster_name = "cluster-text-compress"
-    cluster_dir = temp_state_dir / "clusters" / cluster_name
+    temp_state_dir / "clusters" / cluster_name
 
     # 初始状态
     assert cm.get_failure_count(cluster_name) == 0

@@ -8,13 +8,8 @@
 """
 
 import sys
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
-
 
 # ── P1: Protocol 接口测试 ──
 
@@ -129,7 +124,7 @@ class TestRegistry:
     """测试 ArcLock 注册器。"""
 
     def test_register_and_get(self):
-        from mark42.interfaces import register, get, _REGISTRY
+        from mark42.interfaces import _REGISTRY, get, register
 
         # 清理可能的残留
         _REGISTRY.pop("_test_custom", None)
@@ -152,7 +147,7 @@ class TestRegistry:
         assert result is None
 
     def test_register_overrides(self):
-        from mark42.interfaces import register, get, _REGISTRY
+        from mark42.interfaces import _REGISTRY, get, register
 
         _REGISTRY.pop("_test_override", None)
 
@@ -283,6 +278,7 @@ class TestModuleIntegration:
     def test_engine_imports_from_interfaces(self):
         """engine.py 应该从 interfaces 导入 get_compress，而不是直接从 armor 导入。"""
         import inspect
+
         from mark42 import engine
 
         source = inspect.getsource(engine)
@@ -294,6 +290,7 @@ class TestModuleIntegration:
     def test_heavy_imports_from_interfaces(self):
         """heavy.py 应该从 interfaces 导入 get_compress。"""
         import inspect
+
         from mark42 import heavy
 
         source = inspect.getsource(heavy)
@@ -304,6 +301,7 @@ class TestModuleIntegration:
     def test_consciousness_uses_get_compress(self):
         """consciousness.py 应该通过 get_compress() 调用压缩。"""
         import inspect
+
         from mark42 import consciousness
 
         source = inspect.getsource(consciousness)
@@ -326,7 +324,7 @@ class TestArcLockConfig:
 
     def test_empty_yaml(self, tmp_path):
         """空配置文件 -> 全部用默认。"""
-        from mark42.interfaces import configure_from_file, _REGISTRY
+        from mark42.interfaces import _REGISTRY, configure_from_file
 
         # 写一个空配置
         cfg = tmp_path / "empty.yaml"
@@ -364,14 +362,14 @@ class CustomCompress:
         sys.path.insert(0, str(tmp_path))
         try:
             cfg = tmp_path / "arclock.yaml"
-            cfg.write_text(f'''\
+            cfg.write_text('''\
 arclock:
   compress:
     module: "custom_compress"
     class: "CustomCompress"
 ''')
 
-            from mark42.interfaces import configure_from_file, get, _REGISTRY
+            from mark42.interfaces import _REGISTRY, configure_from_file, get
 
             # 清理
             saved = dict(_REGISTRY)

@@ -14,12 +14,11 @@ cli.py 补充测试 - Phase 3 候选模块
 """
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from mark42 import cli
-
 
 # ── 辅助 ──
 
@@ -98,7 +97,7 @@ class TestArchiveCli:
         mock_instance = mock_arc.return_value
         mock_instance.approve_for_auto.return_value = {"ok": True, "reason": "OK"}
         _set_argv("archive", "approve", "ERR-001")
-        result = cli.main()
+        cli.main()
         mock_instance.approve_for_auto.assert_called_once()
 
     def test_archive_reject(self, mocker):
@@ -107,7 +106,7 @@ class TestArchiveCli:
         mock_instance = mock_arc.return_value
         mock_instance.reject.return_value = {"ok": True, "reason": "rejected"}
         _set_argv("archive", "reject", "ERR-001", "--notes", "test")
-        result = cli.main()
+        cli.main()
         mock_instance.reject.assert_called_once()
 
     def test_archive_stats(self, mocker, capsys):

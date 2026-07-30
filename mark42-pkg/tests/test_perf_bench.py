@@ -21,11 +21,7 @@
 
 from __future__ import annotations
 
-import math
 import re
-import io
-import sys
-import types
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -35,7 +31,6 @@ import pytest
 # pytest-cov 把它计入 coverage 统计 (裸名 import 不会让 sys.modules 看到
 # `mark42.perf_bench` 这个全限定名).
 from mark42 import perf_bench as pb  # noqa: E402
-
 
 # ──────────────── helpers ────────────────
 

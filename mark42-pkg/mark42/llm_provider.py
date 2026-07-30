@@ -277,11 +277,11 @@ def _http_post_json(url: str, body: dict[str, Any], api_key: str,
 
     last_err: Exception | None = None
     for attempt in range(1 + max_retries):
-        req = urllib.request.Request(url, data=data, method="POST")
+        req = urllib.request.Request(url, data=data, method="POST")  # noqa: S310 (LLM API urllib，url 来自受信配置)
         for k, v in headers.items():
             req.add_header(k, v)
         try:
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as r:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as r:  # noqa: S310 (LLM API urllib，url 来自受信配置)
                 resp_body = json.loads(r.read().decode("utf-8"))
             choices = resp_body.get("choices") or []
             if not choices:

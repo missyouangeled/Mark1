@@ -78,7 +78,6 @@ def _find_mark42_processes() -> dict:
 
 def assemble_status() -> dict:
     """查看 assemble / armor-guard / engine-daemon 当前状态。"""
-    import json
 
     from ..config import ARMOR_STATE
     from ..utils import _load_json
@@ -193,7 +192,6 @@ def assemble_stop() -> dict:
 
 def assemble_restart() -> dict:
     """重启 assemble：先停旧进程，再后台拉起新 assemble。"""
-    import os
     import subprocess
     import sys
     import time
@@ -230,7 +228,7 @@ def assemble() -> None:
     from pathlib import Path
 
     from ..armor import armor_check
-    from ..config import ARMOR_STATE, mark42_config, mark42_init
+    from ..config import ARMOR_STATE, mark42_init
     from ..utils import _load_json, _now_iso, _save_json
 
     if not ARMOR_STATE.exists():
@@ -255,7 +253,7 @@ def assemble() -> None:
     # ── Fork 子进程 ──
     script = str(Path(__file__).resolve().parent.parent / "mark42.py")
     children = []
-    from ..config import ARMOR_STATE, LOG_DIR, MAX_DAEMON_LOG_LINES, MAX_DAEMON_LOG_MB
+    from ..config import ARMOR_STATE, LOG_DIR
     pid_file = ARMOR_STATE / "assemble.pids"
     log_dir = LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -342,10 +340,8 @@ def assemble() -> None:
     print("   查看状态: python3 scripts/mark42.py status")
 
     # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
-    import signal as _sig
     engine_state = ARMOR_STATE.parent / "engine"
     heartbeat_file = engine_state / "daemon-heartbeat.json"
-    heartbeat_timeout = 120  # 超过 120s 无心跳视为僵死
     print("\n👁️ assemble 监护中（30s 轮询）...")
     try:
         while True:
@@ -381,8 +377,6 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     """一屏聚合 Armor/Engine/Heavy/Logs 状态。
     json_mode=True 返回 dict，不打印。
     """
-    import json
-    import os
     from datetime import datetime
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -422,7 +416,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
     # ── Engine ──
     loops = _load_json(ENGINE_STATE / "loops.json")
-    active = sum(1 for l in loops.values() if l.get("status") in ("registered", "running"))
+    active = sum(1 for lp in loops.values() if lp.get("status") in ("registered", "running"))
     total = len(loops)
 
     # ── Heavy ──
@@ -567,7 +561,6 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
 def _print_metrics() -> None:
     """G11: 输出 Prometheus 格式指标。"""
-    import json as _jm
 
     from ..armor import armor_check, armor_llm_stats
     from ..circuit_breaker import CircuitBreaker
@@ -602,7 +595,7 @@ def _print_metrics() -> None:
     # Loop 状态
     try:
         loops = _load_loops()
-        active = sum(1 for l in loops.values() if l.get("status") == "registered")
+        active = sum(1 for lp in loops.values() if lp.get("status") == "registered")
         total = len(loops)
         lines.append(f'mark42_engine_loops_active {active}')
         lines.append(f'mark42_engine_loops_total {total}')
@@ -1039,7 +1032,6 @@ def main() -> None:
             heavy_resume,
             heavy_start,
         )
-        path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
         if args.detect:
             auto_mode = getattr(args, 'auto', 'ask') or 'ask'
@@ -1147,14 +1139,12 @@ def main() -> None:
     if args.module == "archive":
         # v3-2 错误档案 — 委派给 error_archive 子模块
         from ..error_archive import (
-            ALL_STATUSES,
             ErrorArchive,
             _print_entry_row,
         )
         arc = ErrorArchive()
         if args.action == "list":
             entries = arc.list_entries(status=args.status, category=args.category)[:args.limit]
-            import json as _j2
             print(f"\n{'ID':32s} | {'CATEGORY':32s} | {'CNT':3s} | {'STATUS':15s} | LAST_SEEN")
             print("-" * 100)
             for e in entries:
@@ -1265,7 +1255,6 @@ def main() -> None:
         return
 
     if args.module == "cores":
-        import json as _j6
 
         from ..core_registry import cli_cores_list, cli_cores_probe, cli_cores_quarantine, cli_cores_restore
         if args.action == "list":
@@ -1299,7 +1288,6 @@ def main() -> None:
         return
 
     if args.module == "chaos":
-        import json as _j7
 
         from ..chaos_engine import ChaosEngine
         ce = ChaosEngine()
@@ -1330,7 +1318,6 @@ def main() -> None:
         return
 
     if args.module == "module":
-        import json as _j8
 
         from ..module_health import ModuleHealthMonitor
         mhm = ModuleHealthMonitor()
@@ -1349,7 +1336,6 @@ def main() -> None:
         return
 
     if args.module == "cluster":
-        import json as _j9
 
         from ..cluster_manager import ClusterManager
         cm = ClusterManager()
@@ -1480,8 +1466,8 @@ def main() -> None:
                     h = impl.check_health()
                     print(f"  ✅ check_health() 返回: {_j10.dumps(h, ensure_ascii=False)[:200]}")
                 elif target == "engine":
-                    l = impl.list_loops()
-                    print(f"  ✅ list_loops() 返回: {_j10.dumps(l, ensure_ascii=False)[:200]}")
+                    loops_result = impl.list_loops()
+                    print(f"  ✅ list_loops() 返回: {_j10.dumps(loops_result, ensure_ascii=False)[:200]}")
                 else:
                     print("  ✅ 加载成功（无自动化测试，请手动验证）")
             except Exception as e:

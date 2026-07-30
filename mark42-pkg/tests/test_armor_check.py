@@ -14,16 +14,16 @@
   - context_window 默认 131072，生产可能读 config 变成 1000000
 """
 
-import subprocess
-import os
 import json
+import os
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from mark42 import armor
-from mark42.config import THRESHOLD_WARN, THRESHOLD_ALERT, THRESHOLD_CRIT
+from mark42.config import THRESHOLD_ALERT, THRESHOLD_CRIT, THRESHOLD_WARN
 
 
 def _patch_du(mocker, size_kb: int):

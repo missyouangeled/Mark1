@@ -68,10 +68,11 @@ ignore = [
     "S607",   # partial path executable
     "E402",   # module-import-not-at-top (工程代码中函数内导入是常见模式)
     "B008",   # function call in default argument
+    "B023",   # loop-var closure: 本项目闭包均在同一迭代内被 pattern.sub/立即调用消费，非延迟绑定（假阳性）
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "B", "UP", "F403", "F405", "E712"]
+"tests/*" = ["S", "B", "UP", "F403", "F405", "E712", "E702", "E741", "I001", "F841"]
 
 [tool.ruff.format]
 quote-style = "double"

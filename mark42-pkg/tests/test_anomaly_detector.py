@@ -9,18 +9,14 @@ anomaly_detector.py 单元测试
 - CLI 函数
 """
 
-import json
-import math
-from unittest.mock import MagicMock, patch, mock_open
-
-import pytest
+from unittest.mock import MagicMock, mock_open, patch
 
 from mark42.anomaly_detector import (
     AnomalyAlert,
+    AnomalyDetector,
     MetricSample,
     ThresholdDetector,
     ZScoreDetector,
-    AnomalyDetector,
     cli_anomaly_check,
     cli_anomaly_history,
     cli_anomaly_stats,

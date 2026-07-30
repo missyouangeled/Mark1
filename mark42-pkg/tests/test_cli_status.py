@@ -1,6 +1,4 @@
 """cli/status.py 单元测试"""
-import pytest
-from unittest.mock import patch, MagicMock
 
 from mark42.cli.status import status_dashboard
 

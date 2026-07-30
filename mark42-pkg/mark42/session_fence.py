@@ -94,7 +94,6 @@ def fence_record_post(session_path: Path, pre_record: dict[str, Any]) -> dict[st
     except (OSError, TypeError, AttributeError):
         post_size, post_mtime = 0, 0
     pre_size = pre_record.get("size", 0)
-    pre_mtime = pre_record.get("mtime", 0)
 
     # 检测外部篡改：只在显著增长时报告（>10% 增长才可能是外部写入）
     # 小幅增长可能是 LLM 压缩后输出比原文件略大，属于正常情况

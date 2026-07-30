@@ -341,7 +341,6 @@ def assemble() -> None:
     # 挂起主进程，非阻塞轮询子进程存活 + 心跳超时检测
     engine_state = ARMOR_STATE.parent / "engine"
     heartbeat_file = engine_state / "daemon-heartbeat.json"
-    heartbeat_timeout = 120  # 超过 120s 无心跳视为僵死
     print("\n👁️ assemble 监护中（30s 轮询）...")
     try:
         while True:
@@ -416,7 +415,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
     # ── Engine ──
     loops = _load_json(ENGINE_STATE / "loops.json")
-    active = sum(1 for l in loops.values() if l.get("status") in ("registered", "running"))
+    active = sum(1 for lp in loops.values() if lp.get("status") in ("registered", "running"))
     total = len(loops)
 
     # ── Heavy ──
@@ -857,7 +856,6 @@ def main() -> None:
             heavy_preflight,
             heavy_start,
         )
-        path = args.path or args.detect or args.preflight or args.start or ""
         task_name = args.task_name or ""
         if args.detect:
             auto_mode = getattr(args, 'auto', 'ask') or 'ask'

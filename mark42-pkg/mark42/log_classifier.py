@@ -231,7 +231,7 @@ def cli_classify_recent(limit: int = 20) -> list[dict[str, Any]]:
     for line in lines[-limit:]:
         try:
             events.append(json.loads(line.strip()))
-        except Exception:
+        except Exception:  # noqa: S112 (跳过损坏行，继续解析)
             continue
 
     clf = LogClassifier()

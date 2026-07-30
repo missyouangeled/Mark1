@@ -53,7 +53,7 @@ def _collect_metrics() -> str:
     # ── Loop 状态 ──
     try:
         loops = _load_loops()
-        active = sum(1 for l in loops.values() if l.get("status") == "registered")
+        active = sum(1 for lp in loops.values() if lp.get("status") == "registered")
         total = len(loops)
         lines.append("# HELP mark42_engine_loops_active Active engine loops.")
         lines.append("# TYPE mark42_engine_loops_active gauge")

@@ -1,6 +1,5 @@
 """测试 builtin_archive.py 插件模块。"""
 
-import pytest
 from typing import Any, Dict
 
 
@@ -16,7 +15,7 @@ class TestBuiltinArchive:
         """测试实现了 ArchiveLock 接口。"""
         from mark42.interfaces.error_archive import ArchiveLock
         from mark42.plugins.builtin_archive import BuiltinArchive
-        
+
         instance = BuiltinArchive.__new__(BuiltinArchive)
         assert isinstance(instance, ArchiveLock)
 
@@ -26,10 +25,10 @@ class TestBuiltinArchive:
             'mark42.error_archive.ErrorArchive'
         )
         mock_instance = mock_error_archive_class.return_value
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         mock_error_archive_class.assert_called_once()
         assert archive._impl == mock_instance
 
@@ -39,17 +38,17 @@ class TestBuiltinArchive:
             'mark42.error_archive.ErrorArchive'
         )
         mock_impl = mock_error_archive_class.return_value
-        
+
         # 创建一个模拟的 entry 对象
         mock_entry = mocker.MagicMock()
         mock_entry.to_dict.return_value = {"id": "123", "signature": "test-err"}
         mock_impl.lookup.return_value = mock_entry
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.lookup("test-sig", category="test-category")
-        
+
         mock_impl.lookup.assert_called_once_with("test-sig", category="test-category")
         mock_entry.to_dict.assert_called_once()
         assert result == {"id": "123", "signature": "test-err"}
@@ -60,16 +59,16 @@ class TestBuiltinArchive:
             'mark42.error_archive.ErrorArchive'
         )
         mock_impl = mock_error_archive_class.return_value
-        
+
         mock_entry = mocker.MagicMock()
         mock_entry.to_dict.return_value = {"id": "456"}
         mock_impl.lookup.return_value = mock_entry
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.lookup("test-sig")
-        
+
         mock_impl.lookup.assert_called_once_with("test-sig", category="")
         assert result == {"id": "456"}
 
@@ -80,10 +79,10 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.lookup.return_value = None
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.lookup("non-existent")
         assert result is None
 
@@ -93,14 +92,14 @@ class TestBuiltinArchive:
             'mark42.error_archive.ErrorArchive'
         )
         mock_impl = mock_error_archive_class.return_value
-        
+
         # 返回一个普通字典而非有 to_dict 方法的对象
         raw_entry = {"id": "789", "raw": True}
         mock_impl.lookup.return_value = raw_entry
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.lookup("test-sig")
         assert result == raw_entry
 
@@ -111,10 +110,10 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.record.return_value = "entry-id-123"
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         test_entry: Dict[str, Any] = {
             "category": "test-cat",
             "signature": "test-sig",
@@ -122,9 +121,9 @@ class TestBuiltinArchive:
             "root_cause": "bug",
             "fix": "applied patch",
         }
-        
+
         result = archive.add(test_entry)
-        
+
         mock_impl.record.assert_called_once_with(
             category="test-cat",
             signature="test-sig",
@@ -141,13 +140,13 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.record.return_value = {"entry_id": "dict-entry-id"}
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         test_entry: Dict[str, Any] = {"signature": "test"}
         result = archive.add(test_entry)
-        
+
         assert result == "dict-entry-id"
 
     def test_add_uses_default_values_for_missing_fields(self, mocker):
@@ -157,14 +156,14 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.record.return_value = "id"
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         # 空的 entry 字典
         test_entry: Dict[str, Any] = {}
         archive.add(test_entry)
-        
+
         mock_impl.record.assert_called_once_with(
             category="",
             signature="",
@@ -180,12 +179,12 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.approve_for_auto.return_value = True
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.approve("entry-123")
-        
+
         mock_impl.approve_for_auto.assert_called_once_with("entry-123")
         assert result is True
 
@@ -196,10 +195,10 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.approve_for_auto.return_value = {"status": "ok"}
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.approve("entry-123")
         assert result is True
 
@@ -210,10 +209,10 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.approve_for_auto.return_value = {"status": "approved"}
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.approve("entry-123")
         assert result is True
 
@@ -224,9 +223,9 @@ class TestBuiltinArchive:
         )
         mock_impl = mock_error_archive_class.return_value
         mock_impl.approve_for_auto.return_value = {"status": "rejected"}
-        
+
         from mark42.plugins.builtin_archive import BuiltinArchive
         archive = BuiltinArchive()
-        
+
         result = archive.approve("entry-123")
         assert result is False

@@ -8,15 +8,12 @@ code_analyzer.py 单元测试
 """
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from mark42.code_analyzer import (
-    CodeBug,
     AnalysisResult,
     CodeAnalyzer,
+    CodeBug,
     cli_analyze_code,
     cli_analyze_file,
 )

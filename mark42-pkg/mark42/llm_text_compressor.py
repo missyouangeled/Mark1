@@ -249,7 +249,7 @@ class LLMTextCompressor:
             "temperature": temperature,
         }).encode("utf-8")
 
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310 (LLM API urllib，url 来自受信配置)
             f"{base_url}{endpoint}",
             data=body,
             headers={
@@ -257,14 +257,13 @@ class LLMTextCompressor:
                 "Content-Type": "application/json",
             },
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (LLM API urllib，url 来自受信配置)
             data = json.loads(resp.read().decode("utf-8"))
         choices = data.get("choices") or []
         if not choices:
             raise RuntimeError("LLM returned no choices")
         content = choices[0].get("message", {}).get("content", "")
         # 顺便记 token 用量
-        usage = data.get("usage", {})
         # 借用 stats 的字段, 但 stats 在上层, 这里通过闭包不可见
         # 用返回值没法传, 改为 LLM 调完后调用方从 data 抓 (但 _call_llm 简单返回 content)
         return content

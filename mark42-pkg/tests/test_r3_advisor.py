@@ -11,22 +11,18 @@ R3 验收测试 · 战甲主动交流意识
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from mark42.advisor_client import (
     AdvisorClient,
-    AdvisorResult,
-    AdvisorVerdict,
     build_scenario_a_prompt,
     build_scenario_b_prompt,
     build_scenario_c_prompt,
     build_scenario_d_prompt,
-    ADVISOR_SYSTEM_PROMPT,
 )
-from mark42.llm_provider import ChatMessage, ChatResponse
-
+from mark42.llm_provider import ChatResponse
 
 # ── 辅助函数 ──
 

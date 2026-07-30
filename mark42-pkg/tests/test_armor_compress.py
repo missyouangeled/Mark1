@@ -15,12 +15,9 @@
 """
 
 import json
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from mark42 import armor
-
 
 # ── helper ────────────────────────────────────────────────
 
@@ -808,7 +805,7 @@ class TestArmorCompressAsync:
         fake_session.name = "urgent.jsonl"
         mocker.patch.object(armor, "_find_active_session", return_value=fake_session)
         mocker.patch.object(armor, "_read_session_tail", return_value=[])
-        mock_queue = self._mock_queue(mocker)
+        self._mock_queue(mocker)
 
         for prio in [0, 1, 2, 9]:
             result = armor.armor_compress_async(wait=False, priority=prio)

@@ -1,11 +1,13 @@
 """user_config.py 单元测试"""
-import json
-import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from mark42.user_config import (
-    load_config, get, get_section, get_config_path, get_default_config_path, reload,
+    get,
+    get_config_path,
+    get_default_config_path,
+    get_section,
+    load_config,
+    reload,
 )
 
 
@@ -15,7 +17,7 @@ class TestLoadConfig:
         assert isinstance(result, dict)
 
     def test_force_reload(self):
-        result1 = load_config()
+        load_config()
         result2 = load_config(force_reload=True)
         assert isinstance(result2, dict)
 

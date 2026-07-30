@@ -138,7 +138,8 @@ class CompressorRegistry:
                     func = None
 
         if func is None or not callable(func):
-            func = lambda x: (x, {"ratio": 0.0})
+            def func(x):
+                return (x, {"ratio": 0.0})
 
         return name, func
 

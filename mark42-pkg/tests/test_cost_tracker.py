@@ -10,17 +10,14 @@ cost_tracker.py 单元测试
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock
 
 # 导入待测试模块
 from mark42.cost_tracker import (
+    MODEL_PRICING,
     CostRecord,
     CostTracker,
     record_cost,
-    MODEL_PRICING,
-    COSTS_FILE,
 )
 
 
@@ -98,7 +95,7 @@ class TestCostTracker:
         """测试 doubao 模型成本计算正确"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         # doubao: 输入 0.004/千tokens, 输出 0.012/千tokens
         # 1000 输入 = 0.004, 500 输出 = 0.006, 总计 0.01
         record = tracker.record(
@@ -107,7 +104,7 @@ class TestCostTracker:
             completion_tokens=500,
             caller_module="test",
         )
-        
+
         assert record.total_tokens == 1500
         assert abs(record.cost_cny - 0.01) < 0.0001  # 浮点数比较
 
@@ -115,7 +112,7 @@ class TestCostTracker:
         """测试 glm 模型成本计算正确"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         # glm: 输入 0.002/千tokens, 输出 0.006/千tokens
         # 1000 输入 = 0.002, 500 输出 = 0.003, 总计 0.005
         record = tracker.record(
@@ -123,20 +120,20 @@ class TestCostTracker:
             prompt_tokens=1000,
             completion_tokens=500,
         )
-        
+
         assert abs(record.cost_cny - 0.005) < 0.0001
 
     def test_record_uses_default_pricing_for_unknown_model(self, tmp_path):
         """测试未知模型使用默认定价"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         record = tracker.record(
             model="unknown-model-xyz",
             prompt_tokens=1000,
             completion_tokens=500,
         )
-        
+
         # 默认 = doubao 价格 = 0.01
         assert abs(record.cost_cny - 0.01) < 0.0001
 
@@ -144,14 +141,14 @@ class TestCostTracker:
         """测试记录写入文件"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         tracker.record(
             model="test-model",
             prompt_tokens=100,
             completion_tokens=50,
             caller_module="test",
         )
-        
+
         # 验证文件内容
         content = test_file.read_text()
         lines = content.strip().split("\n")
@@ -164,11 +161,11 @@ class TestCostTracker:
         """测试多条记录都被写入"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         tracker.record("model-a", 100, 50)
         tracker.record("model-b", 200, 100)
         tracker.record("model-c", 300, 150)
-        
+
         content = test_file.read_text()
         lines = content.strip().split("\n")
         assert len(lines) == 3
@@ -177,7 +174,7 @@ class TestCostTracker:
         """测试空文件时返回空列表"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         result = tracker._load_all()
         assert result == []
 
@@ -185,7 +182,7 @@ class TestCostTracker:
         """测试文件不存在时返回空列表"""
         test_file = tmp_path / "nonexistent.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         result = tracker._load_all()
         assert result == []
 
@@ -193,10 +190,10 @@ class TestCostTracker:
         """测试加载已有数据"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         tracker.record("test-model", 100, 50)
         tracker.record("test-model", 200, 100)
-        
+
         records = tracker._load_all()
         assert len(records) == 2
         assert records[0]["prompt_tokens"] == 100
@@ -211,10 +208,10 @@ class TestCostTracker:
             'invalid json line\n'
             '{"model":"valid2","prompt_tokens":200,"completion_tokens":100,"total_tokens":300,"cost_cny":0.002,"timestamp":"2026-07-29"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         records = tracker._load_all()
-        
+
         # 只加载有效的 2 条
         assert len(records) == 2
 
@@ -222,9 +219,9 @@ class TestCostTracker:
         """测试无数据时的日报"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         summary = tracker.get_daily_summary("2026-07-29")
-        
+
         assert summary["total_calls"] == 0
         assert summary["total_tokens"] == 0
         assert summary["total_cost"] == 0
@@ -234,18 +231,18 @@ class TestCostTracker:
         """测试有数据时的日报"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         # 同一天的两条记录
         tracker.record("model-a", 100, 50)  # 同一天
         tracker.record("model-b", 200, 100)  # 同一天
-        
+
         # 获取今天的汇总（用 timestamp 中的日期）
         # 先读取实际的日期
         records = tracker._load_all()
         today = records[0]["timestamp"][:10]
-        
+
         summary = tracker.get_daily_summary(today)
-        
+
         assert summary["total_calls"] == 2
         assert summary["total_tokens"] == 450  # 150 + 300
         assert summary["total_cost"] > 0
@@ -254,17 +251,17 @@ class TestCostTracker:
     def test_get_daily_summary_filters_by_date(self, tmp_path):
         """测试日报只统计指定日期的数据"""
         test_file = tmp_path / "costs.jsonl"
-        
+
         # 直接写入不同日期的记录
         test_file.write_text(
             '{"model":"a","prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"cost_cny":0.001,"timestamp":"2026-07-28T10:00:00"}\n'
             '{"model":"b","prompt_tokens":200,"completion_tokens":100,"total_tokens":300,"cost_cny":0.002,"timestamp":"2026-07-29T10:00:00"}\n'
             '{"model":"c","prompt_tokens":300,"completion_tokens":150,"total_tokens":450,"cost_cny":0.003,"timestamp":"2026-07-29T11:00:00"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         summary = tracker.get_daily_summary("2026-07-29")
-        
+
         assert summary["total_calls"] == 2  # 只算 29 号的
         assert summary["total_tokens"] == 750  # 300 + 450
 
@@ -272,9 +269,9 @@ class TestCostTracker:
         """测试无数据时的月报"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         summary = tracker.get_monthly_summary("2026-07")
-        
+
         assert summary["total_calls"] == 0
         assert summary["total_tokens"] == 0
         assert summary["total_cost"] == 0
@@ -289,10 +286,10 @@ class TestCostTracker:
             '{"model":"c","prompt_tokens":300,"completion_tokens":150,"total_tokens":450,"cost_cny":0.003,"timestamp":"2026-07-15T11:00:00"}\n'
             '{"model":"d","prompt_tokens":400,"completion_tokens":200,"total_tokens":600,"cost_cny":0.004,"timestamp":"2026-08-01T10:00:00"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         summary = tracker.get_monthly_summary("2026-07")
-        
+
         assert summary["total_calls"] == 3  # 7 月有 3 条
         assert summary["total_tokens"] == 900  # 150 + 300 + 450
         assert len(summary["by_day"]) == 2  # 1号和15号两天
@@ -301,7 +298,7 @@ class TestCostTracker:
         """测试无数据时的调用方排名"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         result = tracker.get_top_callers()
         assert result == []
 
@@ -313,10 +310,10 @@ class TestCostTracker:
             '{"model":"b","prompt_tokens":200,"completion_tokens":100,"total_tokens":300,"cost_cny":0.02,"timestamp":"2026-07-29T10:00:00","caller_module":"module-a"}\n'
             '{"model":"c","prompt_tokens":300,"completion_tokens":150,"total_tokens":450,"cost_cny":0.05,"timestamp":"2026-07-29T10:00:00","caller_module":"module-b"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         top = tracker.get_top_callers()
-        
+
         assert len(top) == 2
         # module-b 成本更高 (0.05)，应该排第一
         assert top[0]["module"] == "module-b"
@@ -334,10 +331,10 @@ class TestCostTracker:
         for i in range(5):
             lines.append(f'{{"model":"a","prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"cost_cny":0.0{i+1},"timestamp":"2026-07-29T10:00:00","caller_module":"module-{i}"}}')
         test_file.write_text("\n".join(lines) + "\n")
-        
+
         tracker = CostTracker(costs_file=test_file)
         top = tracker.get_top_callers(n=3)
-        
+
         assert len(top) == 3
 
     def test_get_top_callers_handles_unknown_module(self, tmp_path):
@@ -346,10 +343,10 @@ class TestCostTracker:
         test_file.write_text(
             '{"model":"a","prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"cost_cny":0.01,"timestamp":"2026-07-29T10:00:00"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         top = tracker.get_top_callers()
-        
+
         assert len(top) == 1
         assert top[0]["module"] == "unknown"
 
@@ -361,11 +358,11 @@ class TestCostTracker:
             '{"model":"b","prompt_tokens":200,"completion_tokens":100,"total_tokens":300,"cost_cny":0.002,"timestamp":"2026-07-25T10:00:00","caller_module":"mod2"}\n'
             '{"model":"c","prompt_tokens":300,"completion_tokens":150,"total_tokens":450,"cost_cny":0.003,"timestamp":"2026-07-30T10:00:00","caller_module":"mod3"}\n'
         )
-        
+
         tracker = CostTracker(costs_file=test_file)
         output_path = tmp_path / "export.csv"
         count = tracker.export_csv("2026-07-20", "2026-07-25", str(output_path))
-        
+
         assert count == 2  # 范围内有 2 条
         assert output_path.exists()
         content = output_path.read_text()
@@ -377,15 +374,15 @@ class TestCostTracker:
         """测试 _summarize 辅助函数"""
         test_file = tmp_path / "costs.jsonl"
         tracker = CostTracker(costs_file=test_file)
-        
+
         records = [
             {"model": "a", "total_tokens": 100, "cost_cny": 0.01},
             {"model": "b", "total_tokens": 200, "cost_cny": 0.02},
             {"model": "a", "total_tokens": 150, "cost_cny": 0.015},
         ]
-        
+
         summary = tracker._summarize(records, "test")
-        
+
         assert summary["label"] == "test"
         assert summary["total_calls"] == 3
         assert summary["total_tokens"] == 450
@@ -399,12 +396,12 @@ class TestCostTracker:
         """测试写入失败时记录日志，不抛异常"""
         mock_log = mocker.patch("mark42.cost_tracker.logger.warning")
         test_file = tmp_path / "costs.jsonl"
-        
+
         # mock open 来模拟写入失败
         mocker.patch("builtins.open", side_effect=OSError("disk full"))
-        
+
         tracker = CostTracker(costs_file=test_file)
-        
+
         # 不应抛异常
         record = tracker.record("test-model", 100, 50)
         assert record is not None  # 仍返回记录对象
@@ -424,9 +421,9 @@ class TestRecordCostFunction:
             total_tokens=150, cost_cny=0.001
         )
         mock_tracker_class.return_value = mock_instance
-        
+
         result = record_cost("test-model", 100, 50, "test-module")
-        
+
         mock_tracker_class.assert_called_once()
         mock_instance.record.assert_called_once_with(
             model="test-model",

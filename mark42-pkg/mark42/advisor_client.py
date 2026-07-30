@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 
 try:
-    import yaml
+    import yaml  # noqa: F401 (63a26d4b53ef75286027)
     _HAS_YAML = True
 except ImportError:
     _HAS_YAML = False

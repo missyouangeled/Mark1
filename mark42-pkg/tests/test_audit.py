@@ -12,9 +12,6 @@
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 # 让 import 能找到 mark42
 TESTS_DIR = Path(__file__).resolve().parent
@@ -22,14 +19,16 @@ SCRIPTS_DIR = TESTS_DIR.parent.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from mark42.audit import (
-    AuditResult, Finding, AUDIT_CATEGORIES,
-    VERDICT_PASS_THRESHOLD, VERDICT_FAIL_CATEGORIES,
+    AUDIT_CATEGORIES,
+    VERDICT_FAIL_CATEGORIES,
+    VERDICT_PASS_THRESHOLD,
+    AuditResult,
+    Finding,
 )
+from mark42.audit.checker import LLMChecker, RuleChecker
+from mark42.audit.report import send_alert, write_report
 from mark42.audit.snapshot_reader import OpenClawSnapshotReader
 from mark42.audit.summary_extractor import OpenClawSummaryExtractor
-from mark42.audit.checker import LLMChecker, RuleChecker
-from mark42.audit.report import write_report, send_alert, AUDIT_DIR
-
 
 # ═════════════════════════════════════════════════════
 # 1. 数据模型测试
@@ -437,10 +436,10 @@ class TestBuiltinAudit:
 
     def test_audit_compact_success(self, mocker, tmp_path):
         """完整审计流程。"""
-        from mark42.plugins.builtin_audit import BuiltinAudit
+        from mark42.audit.checker import LLMChecker
         from mark42.audit.snapshot_reader import OpenClawSnapshotReader
         from mark42.audit.summary_extractor import OpenClawSummaryExtractor
-        from mark42.audit.checker import LLMChecker
+        from mark42.plugins.builtin_audit import BuiltinAudit
 
         audit = BuiltinAudit()
         mocker.patch("mark42.audit.report.AUDIT_DIR", tmp_path / "audit")
@@ -1019,8 +1018,8 @@ class TestReportFull:
 
     def test_send_alert_counts_all_status_types(self, mocker):
         """【report.py 行 75-77】send_alert 统计 lost/degraded/preserved 数量。"""
-        from mark42.audit.report import send_alert
         from mark42.audit import AuditResult, Finding
+        from mark42.audit.report import send_alert
 
         mock_broker = mocker.patch("mark42.audit.report._append_broker")
 
@@ -1058,7 +1057,7 @@ class TestBuiltinAuditFull:
         from mark42.plugins.builtin_audit import BuiltinAudit
 
         mocker.patch("mark42.audit.report.AUDIT_DIR", tmp_path / "audit")
-        
+
         mock_result = AuditResult(
             verdict="pass",
             score=1.0,
@@ -1219,7 +1218,7 @@ class TestConstraintPinner:
 
     def test_max_total_chars_limit(self, tmp_path):
         """总字符数超过 MAX_TOTAL_CHARS 时截断。"""
-        from mark42.audit.pinning import ConstraintPinner, MAX_TOTAL_CHARS
+        from mark42.audit.pinning import MAX_TOTAL_CHARS, ConstraintPinner
 
         # 写一个超大文件
         (tmp_path / "SOUL.md").write_text("中文 " * 5000, encoding="utf-8")
@@ -1276,14 +1275,14 @@ class TestConstraintPinner:
 
     def test_extract_essential_lines_max_lines_boundary(self, tmp_path):
         """【pinning.py 行 77-78】MAX_LINES_PER_FILE 边界，超过后截断。"""
-        from mark42.audit.pinning import ConstraintPinner, MAX_LINES_PER_FILE
+        from mark42.audit.pinning import MAX_LINES_PER_FILE, ConstraintPinner
 
         pinner = ConstraintPinner(workspace=tmp_path)
-        
+
         # 创建超过 MAX_LINES_PER_FILE 行数的 AGENTS.md
         extra_lines = "\n".join([f"- 规则 {i}" for i in range(MAX_LINES_PER_FILE + 5)])
         (tmp_path / "AGENTS.md").write_text(extra_lines, encoding="utf-8")
-        
+
         result = pinner.extract_pinned_constraints()
         # 应该被截断到 MAX_LINES_PER_FILE 行
         # 每一行以 "- 规则" 开头，计数不应该超过 MAX_LINES_PER_FILE
@@ -1295,7 +1294,7 @@ class TestConstraintPinner:
         from mark42.audit.pinning import ConstraintPinner
 
         pinner = ConstraintPinner(workspace=tmp_path)
-        
+
         # 文件有内容但没有匹配到任何关键模式
         # 注意：不能包含 "中文" "English" "语言" 等关键词
         (tmp_path / "SOUL.md").write_text(
@@ -1304,7 +1303,7 @@ class TestConstraintPinner:
             "Another plain line without bold markers\n",
             encoding="utf-8",
         )
-        
+
         result = pinner.extract_pinned_constraints()
         # 空内容不会生成 header，直接返回空
         assert result == ""
@@ -1314,7 +1313,7 @@ class TestConstraintPinner:
         from mark42.audit.pinning import ConstraintPinner
 
         (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
-        
+
         # mock _append_broker 抛出异常
         mocker.patch("mark42.utils._append_broker", side_effect=Exception("broker down"))
 
@@ -1328,7 +1327,7 @@ class TestConstraintPinner:
         from mark42.audit.pinning import ConstraintPinner
 
         (tmp_path / "SOUL.md").write_text("**中文回复**\n", encoding="utf-8")
-        
+
         # mock Path.write_text 抛出异常（通过 mock ARMOR_STATE 为不可写路径）
         mocker.patch("mark42.config.ARMOR_STATE", tmp_path)
         # 直接让 mkdir 失败
@@ -1393,8 +1392,9 @@ class TestSummaryExtractorSQLite:
 
     def test_sqlite_fallback_timeout_returns_empty(self, mocker):
         """SQLite fallback -- subprocess 超时。"""
-        from mark42.audit.summary_extractor import OpenClawSummaryExtractor
         import subprocess as _sp
+
+        from mark42.audit.summary_extractor import OpenClawSummaryExtractor
 
         ext = OpenClawSummaryExtractor()
 

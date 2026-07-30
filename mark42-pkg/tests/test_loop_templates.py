@@ -8,15 +8,10 @@
   - yaml 不存在/解析失败时的降级行为
 """
 
-import json
-from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
 
 from mark42 import engine
-from mark42.config import LOOP_TEMPLATES_PATH, USER_LOOP_TEMPLATES_PATH
-
+from mark42.config import LOOP_TEMPLATES_PATH
 
 # ── helper ────────────────────────────────────────────────
 
@@ -96,14 +91,14 @@ templates:
         # 创建临时用户 yaml 文件
         user_yaml_path = tmp_path / "user_templates.yaml"
         user_yaml_path.write_text(user_yaml_content, encoding="utf-8")
-        
+
         # patch USER_LOOP_TEMPLATES_PATH 指向临时文件
         mocker.patch("mark42.config.USER_LOOP_TEMPLATES_PATH", user_yaml_path)
-        
+
         # 重新加载 module 级别的引用
         import importlib
         importlib.reload(engine)
-        
+
         templates = engine._load_templates()
         assert "custom-template" in templates
         assert templates["custom-template"]["period"] == 120
@@ -118,12 +113,12 @@ templates:
 """
         user_yaml_path = tmp_path / "user_templates.yaml"
         user_yaml_path.write_text(user_yaml_content, encoding="utf-8")
-        
+
         mocker.patch("mark42.config.USER_LOOP_TEMPLATES_PATH", user_yaml_path)
-        
+
         import importlib
         importlib.reload(engine)
-        
+
         templates = engine._load_templates()
         # 应该被覆盖
         assert templates["context-guard"]["period"] == 60
@@ -134,12 +129,12 @@ templates:
         bad_yaml = "invalid: yaml: ["
         user_yaml_path = tmp_path / "user_templates.yaml"
         user_yaml_path.write_text(bad_yaml, encoding="utf-8")
-        
+
         mocker.patch("mark42.config.USER_LOOP_TEMPLATES_PATH", user_yaml_path)
-        
+
         import importlib
         importlib.reload(engine)
-        
+
         templates = engine._load_templates()
         # 应该至少能拿到内置模板
         assert "context-guard" in templates
@@ -149,12 +144,12 @@ templates:
         no_templates_yaml = "other_key: value"
         user_yaml_path = tmp_path / "user_templates.yaml"
         user_yaml_path.write_text(no_templates_yaml, encoding="utf-8")
-        
+
         mocker.patch("mark42.config.USER_LOOP_TEMPLATES_PATH", user_yaml_path)
-        
+
         import importlib
         importlib.reload(engine)
-        
+
         templates = engine._load_templates()
         assert "context-guard" in templates
 
@@ -194,12 +189,12 @@ templates:
 """
         user_yaml_path = tmp_path / "user_templates.yaml"
         user_yaml_path.write_text(user_yaml_content, encoding="utf-8")
-        
+
         mocker.patch("mark42.config.USER_LOOP_TEMPLATES_PATH", user_yaml_path)
-        
+
         import importlib
         importlib.reload(engine)
-        
+
         assert engine._template_exists("my-custom") is True
 
 
@@ -276,7 +271,7 @@ class TestEngineRunLoopGeneric:
         """用户自定义模板应走 generic 路径。"""
         loops = _make_loop(name="my-custom-loop", template="custom-template", task="自定义任务")
         mocker.patch.object(engine, "_load_loops", return_value=loops)
-        mock_save = mocker.patch.object(engine, "_save_loops")
+        mocker.patch.object(engine, "_save_loops")
         mocker.patch("mark42.engine._append_broker")
 
         engine.engine_run_loop("my-custom-loop", persist=False, _loops=loops)

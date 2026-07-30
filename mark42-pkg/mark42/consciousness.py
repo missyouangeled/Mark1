@@ -516,13 +516,14 @@ class Consciousness:
                     "reason": "cooldown 触发，需要重新确认",
                     "cooldown_count": chk.get("count", 0)}
 
-        # 跑 auto_remediate（dry-run 默认）
+        # 跑 auto_remediate（dry-run 默认）前先做确定性评估
         assessment = self.assess_certainty(issue)
         return {
             "archive_id": entry.id,
             "auto_approved": True,
             "count": chk.get("count", 0),
             "warnings": chk.get("warnings", []),
+            "assessment": assessment,
             "next": "dry_run" if not chk.get("warnings") else "dry_run_with_warning",
         }
 

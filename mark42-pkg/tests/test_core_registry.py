@@ -8,12 +8,7 @@
   - mock HTTP 请求和 systemd
 """
 
-import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
-
+from unittest.mock import MagicMock, patch
 
 # ── CORE_DEFINITIONS 常量测试 ────────────────────────────
 
@@ -113,7 +108,6 @@ class TestCoreRegistryInit:
     """测试 CoreRegistry 初始化。"""
 
     def test_init_creates_default_cores(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,7 +123,6 @@ class TestCoreRegistryInit:
                 assert "core_3_memory_vector_engine" in core_ids
 
     def test_get_core_returns_entry(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -142,7 +135,6 @@ class TestCoreRegistryInit:
                 assert core.core_id == "core_1_main_consciousness"
 
     def test_get_core_nonexistent_returns_none(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -194,7 +186,6 @@ class TestCoreRegistryQuarantine:
     """测试 CoreRegistry.quarantine() 和 restore() 方法。"""
 
     def test_quarantine_nonexistent_returns_false(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -206,7 +197,6 @@ class TestCoreRegistryQuarantine:
                 assert ok is False
 
     def test_restore_nonexistent_returns_false(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -225,7 +215,6 @@ class TestCoreRegistryRecordInvocation:
 
     def test_record_invocation_nonexistent_no_crash(self, tmp_path):
         """不存在的核心调用 record_invocation 不崩溃。"""
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -243,7 +232,6 @@ class TestCoreRegistrySummary:
     """测试 CoreRegistry.summary() 方法。"""
 
     def test_summary_returns_total(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -258,7 +246,6 @@ class TestCliCores:
     """测试 cli_cores_* CLI 接口。"""
 
     def test_cli_cores_list(self, tmp_path):
-        from mark42 import core_registry
         reg_dir = tmp_path / "core-registry"
         reg_dir.mkdir(parents=True, exist_ok=True)
 
