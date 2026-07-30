@@ -740,15 +740,7 @@ class Consciousness:
         return record
 
 
-# ── 修复执行器（v3-3 占位 · 真实实现由 v3-5 整合 v2 子 Loop 接入） ──
-
-def _remediate_dummy(issue: dict[str, Any]) -> dict[str, Any]:
-    """占位实现 — 真实 fix 在 v3-5 接 v2 auto_remediate。"""
-    return {"placeholder": True, "issue": issue.get("category")}
-
-
-
-# ── v3-5b 真实修复执行器（替换 _remediate_dummy） ──
+# ── v3-5b 真实修复执行器
 
 def _remediate_context_alert(issue: dict[str, Any]) -> dict[str, Any]:
     """上下文告警 -> 调用 armor.compress() 自主救场。

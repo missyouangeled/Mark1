@@ -10,7 +10,7 @@
 4. 数字单位化 (1234567 → 1.2M, 1024 → 1.0K)
 5. 同义词替换 (小型词典)
 
-可选 mode="llm": 占位接口, 调 LiteLLM 语义压缩 (实际调用留给上层)
+可选 method="llm": 接 llm_text_compressor 做语义压缩（模块不可用时自动回退原文）
 
 接口风格: 与其他算法一致
   class TextCompressor + get_text_compressor() 单例 + text_compress(content) -> tuple[str, dict]
@@ -288,7 +288,7 @@ class TextCompressor:
 
         """
         Args:
-            method: "rule_based" (默认) 或 "llm" (占位, 不真调)
+            method: "rule_based" (默认) 或 "llm" (接 llm_text_compressor 真调 LLM)
             min_text_size: 低于此字节数直接 passthrough
             min_useful_ratio: 压缩率 < 此值视为无效, 回退原文
             enable_synonyms: 是否启用同义词替换

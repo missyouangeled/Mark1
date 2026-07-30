@@ -12,7 +12,6 @@ from mark42.consciousness import (
     Consciousness,
     SelfCheckResult,
     _remediate_context_alert,
-    _remediate_dummy,
     _remediate_embed_index_missing,
     _remediate_loop_not_registered,
     _remediate_process_down,
@@ -170,14 +169,7 @@ def test_auto_remediate_dry_run():
     )
 
 
-# ── 测试 9: 修复函数 _remediate_dummy ──
-def test_remediate_dummy():
-    result = _remediate_dummy({"source": "test"})
-    check("9.1 返回 dict", isinstance(result, dict))
-    check("9.2 有 placeholder", "placeholder" in result or "ok" in result or "status" in result)
-
-
-# ── 测试 10: 修复函数 _remediate_context_alert ──
+# ── 测试 9: 修复函数 _remediate_context_alert ──
 def test_remediate_context_alert():
     issue = {"source": "armor", "value": 90, "msg": "上下文 90%"}
     result = _remediate_context_alert(issue)
@@ -232,7 +224,6 @@ def run_tests():
     test_assess_certainty_archive_not_approved()
     test_assess_certainty_no_match()
     test_auto_remediate_dry_run()
-    test_remediate_dummy()
     test_remediate_context_alert()
     test_remediate_process_down()
     test_remediate_embed_index_missing()
