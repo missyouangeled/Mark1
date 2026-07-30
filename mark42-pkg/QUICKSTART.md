@@ -26,7 +26,7 @@ pip install -e . --break-system-packages
 
 ```bash
 mark42 --version
-# 预期输出: Mark42 v2.7.0
+# 预期输出: Mark42 v2.8.1
 ```
 
 ## 第 2 步：初始化配置（1 分钟）
@@ -55,7 +55,7 @@ mark42 --config
 
 ```
 ⚙️ Mark42 配置
-  版本: 2.7.0
+  版本: 2.8.1
   上下文窗口: 128K
   阈值: warn=70% alert=85% crit=95%
   模型: doubao-seed-2.0-pro

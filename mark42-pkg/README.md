@@ -355,7 +355,7 @@ python3 -m pytest tests/integration/ -v
 python3 -m pytest --cov=mark42 --cov-report=html
 ```
 
-### 测试统计 (v2.8.0)
+### 测试统计 (v2.8.1)
 
 | 测试类型 | 数量 |
 |---|---|

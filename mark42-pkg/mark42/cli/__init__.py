@@ -655,7 +655,7 @@ def main() -> None:
   mark42.py assemble
         """,
     )
-    parser.add_argument("--version", action="version", version="Mark42 v2.7.0", help="显示版本号")
+    parser.add_argument("--version", action="version", version="Mark42 v2.8.1", help="显示版本号")
     parser.add_argument("--init", action="store_true", help="初始化 Mark42 配置")
     parser.add_argument("--config", action="store_true", help="查看当前配置")
     parser.add_argument("--tune-compaction", action="store_true", help="诊断并调优 OpenClaw 压缩配置")

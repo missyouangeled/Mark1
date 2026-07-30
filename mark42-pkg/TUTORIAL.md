@@ -79,7 +79,7 @@ pip install -e . --break-system-packages
 
 ```bash
 mark42 --version
-# Mark42 v2.7.0
+# Mark42 v2.8.1
 
 python3 -c "import mark42; print('OK')"
 # OK
