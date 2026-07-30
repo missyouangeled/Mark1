@@ -39,7 +39,7 @@ jobs:
           python -m pytest tests/ --cov=mark42 --cov-report=xml --cov-report=term-missing --tb=short -q --no-header
         working-directory: mark42-pkg
       
-      - name: 覆盖率门禁 (≥ 50%)
+      - name: 覆盖率门禁 (≥ 65%)
         run: |
           python -c "
           import xml.etree.ElementTree as ET
@@ -48,14 +48,13 @@ jobs:
           rate = float(root.attrib.get('line-rate', '0'))
           pct = rate * 100
           print(f'覆盖率: {pct:.1f}%')
-          if pct < 50:
-              print(f'❌ 覆盖率 {pct:.1f}% 低于门禁 50%')
+          if pct < 65:
+              print(f'❌ 覆盖率 {pct:.1f}% 低于门禁 65%')
               exit(1)
           else:
-              print(f'✅ 覆盖率 {pct:.1f}% 通过门禁 50%')
+              print(f'✅ 覆盖率 {pct:.1f}% 通过门禁 65%')
           "
         working-directory: mark42-pkg
-        continue-on-error: true
 
   lint:
     name: 代码检查
@@ -72,8 +71,7 @@ jobs:
         run: pip install ruff
       
       - name: Ruff 检查
-        run: ruff check mark42-pkg/mark42/
-        continue-on-error: true
+        run: ruff check mark42-pkg/mark42/ mark42-pkg/tests/
       
       - name: 检查裸 except
         run: |
