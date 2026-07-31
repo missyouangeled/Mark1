@@ -25,11 +25,11 @@ from typing import Any
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 SCRIPTS = WORKSPACE / "scripts"
-VENV_PYTHON = str(Path.home() / ".local" / "share" / "openclaw-voice-venv311" / "bin" / "python3")
+VENV_PYTHON = str(Path.home() / ".local" / "share" / "openclaw-embed-venv311" / "bin" / "python3")
 STATE_DIR = Path(
     os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
 ) / "openclaw" / "lifecycle-maintainer"
-EMBED_PYTHON = Path.home() / ".local/share/openclaw-voice-venv311/bin/python3"
+EMBED_PYTHON = Path.home() / ".local/share/openclaw-embed-venv311/bin/python3"
 COUNTER_PATH = STATE_DIR / "run-counter.json"
 REPORT_PATH = STATE_DIR / "last-report.json"
 LOG_PATH = STATE_DIR / "maintainer.log"
