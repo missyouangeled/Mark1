@@ -51,7 +51,9 @@ COMPACTION_BASELINE = {
 
 MEMORY_FLUSH_BASELINE = {
     "enabled": True,
-    "softThresholdTokens": 15000,
+    # 【2026-07-31 P2 调优】从 15000 提到 32000（compaction 调优建议，舒适范围 16000-64000）
+    # 原因：15000 偏低会导致 memory flush 过早触发
+    "softThresholdTokens": 32000,
     "model": "litellm/agnes-2.0-flash",
 }
 
