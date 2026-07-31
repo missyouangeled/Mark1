@@ -88,8 +88,6 @@ else
   XDG_STATE_HOME="$(dirname "$(dirname "$STATE_DIR")")"
 fi
 
-# Mark42 CLI 调用方式：从已删的 scripts/mark42.py 改为 python -m mark42（pip 安装的包）
-MARK42_CLI="-m mark42"
 LOG_DIR="$STATE_DIR/logs"
 BOOTSTRAP_SERVICE_SRC="$WORKSPACE/tools/mark42-bootstrap/mark42-bootstrap.service"
 ARMOR_SERVICE_SRC="$WORKSPACE/tools/mark42-armor-guard/mark42-armor-guard.service"
@@ -146,7 +144,6 @@ render_template() {
   local dest="$2"
   sed \
     -e "s#__MARK42_WORKSPACE__#$WORKSPACE#g" \
-    -e "s#__MARK42_CLI__#$MARK42_CLI#g" \
     -e "s#__MARK42_PYTHON__#$PYTHON_BIN#g" \
     -e "s#__XDG_STATE_HOME__#$XDG_STATE_HOME#g" \
     -e "s#__MARK42_STATE_DIR__#$STATE_DIR#g" \
@@ -211,8 +208,35 @@ install -m 0644 "$TMP_DIR/mark42-engine-daemon.service" "$USER_UNIT_DIR/mark42-e
 install -m 0644 "$TMP_DIR/mark42-watchdog.service" "$USER_UNIT_DIR/mark42-watchdog.service"
 install -m 0644 "$TMP_DIR/mark42-watchdog.timer" "$USER_UNIT_DIR/mark42-watchdog.timer"
 
+# 【2026-07-31 P1 加固】写入后立刻 verify 单元文件语法
+# systemd-analyze verify 能在 daemon-reload 之前发现语法错误
+# （防止 Environment 含空格、缺 [Unit]/[Service] 段、依赖死锁等问题）
+echo "验证 unit 文件语法..."
+VERIFY_FAILED=0
+for unit in mark42-bootstrap.service mark42-armor-guard.service mark42-engine-daemon.service mark42-watchdog.service mark42-watchdog.timer; do
+  if ! systemd-analyze verify "$USER_UNIT_DIR/$unit" 2>&1; then
+    echo "❌ $unit 语法验证失败" >&2
+    VERIFY_FAILED=1
+  fi
+done
+if [ "$VERIFY_FAILED" -ne 0 ]; then
+  echo "❌ 单元文件语法验证失败，已回滚（请检查模板）" >&2
+  # 尝试从最近备份恢复
+  if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+    echo "正在从备份恢复: $BACKUP_DIR" >&2
+    for unit in "${UNIT_FILES[@]}" mark42-watchdog.timer; do
+      [ -f "$BACKUP_DIR/$unit" ] && cp "$BACKUP_DIR/$unit" "$USER_UNIT_DIR/$unit"
+    done
+    systemctl --user daemon-reload
+  fi
+  exit 1
+fi
+echo "✅ 所有 unit 文件语法验证通过"
+
 systemctl --user daemon-reload
-systemctl --user enable mark42-watchdog.timer >/dev/null
+# 【2026-07-31 P1 加固】用 enable --now 同时启用并启动
+# 之前只用 enable，手动 start 容易被 RefuseManualStop 拒绝
+systemctl --user enable --now mark42-watchdog.timer >/dev/null
 
 echo "已写入: $USER_UNIT_DIR"
 if [ "$BACKUP_COUNT" -gt 0 ]; then
