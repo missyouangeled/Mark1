@@ -578,18 +578,46 @@ def send_trigger_event(score, features):
                 "timestamp": datetime.now().isoformat(),
                 "error": f"write_pending_failed: {e}"
             }, ensure_ascii=False) + "\n")
-    # 2. 发送系统事件唤醒主会话
+    # 2. 发送系统事件唤醒主会话（主通道）
+    # 超时从 30s 加到 60s，避免网络慢时误判失败
+    event_ok = False
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["openclaw", "system", "event", "--mode", "now", "--text", message],
-            capture_output=True, timeout=30
+            capture_output=True, timeout=60
         )
+        event_ok = result.returncode == 0
+        if not event_ok:
+            stderr = result.stderr.decode(errors="replace")[:200] if result.stderr else ""
+            with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "timestamp": datetime.now().isoformat(),
+                    "error": f"event_nonzero_exit: code={result.returncode}, stderr={stderr}"
+                }, ensure_ascii=False) + "\n")
+    except subprocess.TimeoutExpired:
+        with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "timestamp": datetime.now().isoformat(),
+                "error": "event_send_timeout_60s"
+            }, ensure_ascii=False) + "\n")
     except Exception as e:
         with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "timestamp": datetime.now().isoformat(),
                 "error": f"event_send_failed: {e}"
             }, ensure_ascii=False) + "\n")
+
+    # 3. 兜底通道：如果 system event 失败，用 cron wake 唤醒下一次心跳
+    if not event_ok:
+        try:
+            subprocess.run(
+                ["openclaw", "cron", "wake", "--text", "自主决策器触发，pending_trigger.txt 已写入，请心跳时读取处理", "--mode", "next-heartbeat"],
+                capture_output=True, timeout=15
+            )
+        except Exception:
+            # 兜底也失败了，只能等下一次 5 分钟心跳自然来
+            # pending_trigger.txt 还在，心跳来了会读到
+            pass
 
 
 # ============================================================
