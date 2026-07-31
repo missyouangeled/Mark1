@@ -1,13 +1,22 @@
 # TEMPLATE FILE — 需先渲染 __MARK42_* 占位符，再安装到 ~/.config/systemd/user/
 [Unit]
 Description=Mark42 Bootstrap — 开机自动挂载四个守护 Loop
+# 【2026-07-31 P1 加固】BindsTo 让 bootstrap 跟 openclaw-gateway 绑定
+# gateway 启动时 bootstrap 必运行（挂载 Loop 配置）
+BindsTo=openclaw-gateway.service
 After=openclaw-gateway.service
 Wants=openclaw-gateway.service
+# 【2026-07-31 P1 加固】PartOf 让 stop gateway 时 bootstrap 一起停
+PartOf=openclaw-gateway.service
+# 【2026-07-31 P1 加固】RefuseManualStop 拒绝手动 stop
+RefuseManualStop=yes
+# 【2026-07-31 P1 加固】限制重启频率：oneshot 一次执行但失败时重试
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=oneshot
 Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
-Environment=MARK42_CLI=__MARK42_CLI__
 Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
 Environment=XDG_STATE_HOME=__XDG_STATE_HOME__
 Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
@@ -20,3 +29,4 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=default.target
+WantedBy=openclaw-gateway.service

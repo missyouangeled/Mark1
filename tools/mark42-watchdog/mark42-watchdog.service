@@ -2,12 +2,20 @@
 [Unit]
 Description=Mark42 Watchdog — 检查 daemon 存活并自动重启
 After=openclaw-gateway.service mark42-engine-daemon.service mark42-armor-guard.service
+# 【2026-07-31 P1 加固】BindsTo 让 watchdog 跟 openclaw-gateway 绑定
+# gateway 停时 watchdog 也停（避免在 gateway 缺席时误判）
+BindsTo=openclaw-gateway.service
+# 【2026-07-31 P1 加固】RefuseManualStop 拒绝手动 stop
+# 防止 reload 链式 stop 时 watchdog 一起被停（CASE-20260731-008 教训）
+RefuseManualStop=yes
+# 【2026-07-31 P1 加固】限制重启频率
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=oneshot
 Environment=PYTHONUNBUFFERED=1
 Environment=MARK42_WORKSPACE=__MARK42_WORKSPACE__
-Environment=MARK42_CLI=__MARK42_CLI__
 Environment=MARK42_PYTHON_BIN=__MARK42_PYTHON__
 Environment=XDG_STATE_HOME=__XDG_STATE_HOME__
 Environment=MARK42_STATE_DIR=__MARK42_STATE_DIR__
@@ -19,3 +27,4 @@ StandardError=append:__MARK42_STATE_DIR__/watchdog.log
 
 [Install]
 WantedBy=default.target
+WantedBy=openclaw-gateway.service
