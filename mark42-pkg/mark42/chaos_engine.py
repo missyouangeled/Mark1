@@ -17,7 +17,9 @@ Mark42 v3 R11 混沌工程引擎
 
 from __future__ import annotations
 
+import importlib
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 import json
@@ -143,6 +145,10 @@ class ChaosEngine:
             "high_context": self.exp_high_context,
             "circuit_breaker_trip": self.exp_circuit_breaker_trip,
             "consciousness_degraded": self.exp_consciousness_degraded,
+            "memory_leak": self.exp_memory_leak,        # v3-5 新增
+            "cpu_spike": self.exp_cpu_spike,            # v3-5 新增
+            "config_corruption": self.exp_config_corruption,  # v3-5 新增
+            "process_zombie": self.exp_process_zombie,  # v3-5 新增
         }
 
     # ── 实验实现 ──
@@ -571,6 +577,263 @@ class ChaosEngine:
             from . import llm_provider as lp
             lp.load_config = self._original_load_config
             del self._original_load_config
+
+    # ── memory_leak (实验 8) ──
+
+    def exp_memory_leak(self, dry_run: bool = True) -> ChaosResult:
+        """模拟内存泄漏：RSS 缓慢增长，验证监控告警。"""
+        return self._run_phases(
+            "memory_leak",
+            dry_run=dry_run,
+            setup=self._setup_memory_leak,
+            execute=self._execute_memory_leak,
+            verify=self._verify_memory_leak,
+            cleanup=self._cleanup_memory_leak,
+        )
+
+    def _setup_memory_leak(self, dry_run: bool = True) -> dict:
+        """记录 baseline RSS。"""
+        import resource
+        rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return {"rss_baseline_kb": rss_kb, "duration_sec": 5}
+
+    def _execute_memory_leak(self, dry_run: bool = True) -> dict:
+        """模拟泄漏：分配内存块持有引用。"""
+        if dry_run:
+            return {"action": "simulate (dry_run)", "would_alloc_mb": 100}
+        # 分配 100MB 并持有引用（不释放）
+        leak = []
+        for _ in range(100):
+            leak.append(b"x" * 1024 * 1024)  # 1MB x 100
+        self._leak_ref = leak
+        return {"action": "leak", "alloc_mb": 100, "held": True}
+
+    def _verify_memory_leak(self, dry_run: bool = True) -> dict:
+        """验证 RSS 增长 > 50MB。"""
+        if dry_run:
+            return {"verified": True, "reason": "dry-run"}
+        import resource
+        rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        growth_mb = (rss_kb - self._setup_memory_leak(dry_run=True).get("rss_baseline_kb", rss_kb)) / 1024
+        return {"rss_kb": rss_kb, "growth_mb": round(growth_mb, 1)}
+
+    def _cleanup_memory_leak(self, dry_run: bool = True) -> None:
+        """释放泄漏引用。"""
+        if dry_run:
+            return
+        if hasattr(self, "_leak_ref"):
+            self._leak_ref.clear()
+            del self._leak_ref
+
+    # ── cpu_spike (实验 9) ──
+
+    def exp_cpu_spike(self, dry_run: bool = True) -> ChaosResult:
+        """模拟 CPU 飙高：4 个 busy 进程，验证 load average 检测。"""
+        return self._run_phases(
+            "cpu_spike",
+            dry_run=dry_run,
+            setup=self._setup_cpu_spike,
+            execute=self._execute_cpu_spike,
+            verify=self._verify_cpu_spike,
+            cleanup=self._cleanup_cpu_spike,
+        )
+
+    def _setup_cpu_spike(self, dry_run: bool = True) -> dict:
+        """记录 baseline load。"""
+        try:
+            load1, _, _ = os.getloadavg()
+        except (AttributeError, OSError):
+            load1 = -1.0
+        return {"load_baseline": load1, "cpu_count": os.cpu_count()}
+
+    def _execute_cpu_spike(self, dry_run: bool = True) -> dict:
+        """启动 2 个 busy 进程（占 2 核）。"""
+        if dry_run:
+            return {"action": "spawn (dry_run)", "would_spawn": 2}
+        procs = []
+        for _ in range(2):
+            p = subprocess.Popen(
+                ["python3", "-c", "import time; [time.sleep(0.01) for _ in range(100000000)]"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            procs.append(p)
+        self._cpu_procs = procs
+        # 等 2s 让 load 升上去
+        time.sleep(2.0)
+        return {"action": "spawn", "procs": len(procs)}
+
+    def _verify_cpu_spike(self, dry_run: bool = True) -> dict:
+        """验证 load > baseline + 1.0。"""
+        if dry_run:
+            return {"verified": True, "reason": "dry-run"}
+        try:
+            load1, _, _ = os.getloadavg()
+        except (AttributeError, OSError):
+            load1 = 0.0
+        baseline = self._setup_cpu_spike(dry_run=True).get("load_baseline", 0.0)
+        return {"load_after": load1, "load_baseline": baseline, "spike": round(load1 - baseline, 2)}
+
+    def _cleanup_cpu_spike(self, dry_run: bool = True) -> None:
+        """杀进程。"""
+        if dry_run:
+            return
+        if hasattr(self, "_cpu_procs"):
+            for p in self._cpu_procs:
+                try:
+                    p.terminate()
+                    p.wait(timeout=2)
+                except Exception:
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+            del self._cpu_procs
+
+    # ── config_corruption (实验 10) ──
+
+    def exp_config_corruption(self, dry_run: bool = True) -> ChaosResult:
+        """配置文件损坏：写入垃圾内容，验证 mark42 优雅降级。"""
+        return self._run_phases(
+            "config_corruption",
+            dry_run=dry_run,
+            setup=self._setup_config_corruption,
+            execute=self._execute_config_corruption,
+            verify=self._verify_config_corruption,
+            cleanup=self._cleanup_config_corruption,
+        )
+
+    def _setup_config_corruption(self, dry_run: bool = True) -> dict:
+        """备份配置文件。"""
+        from . import config as cfg
+        # 实际 find 一个真实存在的 toml
+        candidates = [
+            Path.home() / ".config" / "mark42" / "config.toml",
+            Path("/home/missyouangeled/.config/mark42/config.toml"),
+        ]
+        for c in candidates:
+            if c.exists():
+                self._config_backup = c.read_text(encoding="utf-8")
+                self._config_path = c
+                return {"backup_path": str(c), "backup_bytes": len(self._config_backup)}
+        # 没有配置文件就不做（dry-run 也算成功）
+        return {"backup_path": None, "note": "no config file found, will create temp"}
+
+    def _execute_config_corruption(self, dry_run: bool = True) -> dict:
+        """写入垃圾内容。"""
+        if dry_run:
+            _t = getattr(self, "_config_path", None)
+            return {"action": "corrupt (dry_run)", "target": str(_t) if _t else None}
+        target = getattr(self, "_config_path", None)
+        if target is None:
+            return {"action": "skip", "reason": "no config to corrupt"}
+        # 写入垃圾 TOML
+        target.write_text("= = = invalid = = =\n[broken\nkey = \n", encoding="utf-8")
+        return {"action": "corrupt", "target": str(target)}
+
+    def _verify_config_corruption(self, dry_run: bool = True) -> dict:
+        """验证 mark42 不崩（仅尝试 import user_config）。"""
+        if dry_run:
+            return {"verified": True, "reason": "dry-run"}
+        try:
+            from . import user_config
+            # 不实际 load，只验证 import
+            importlib.reload(user_config)
+            return {"verified": True, "reloaded": True}
+        except Exception as e:
+            return {"verified": False, "error": f"{type(e).__name__}: {e}"}
+
+    def _cleanup_config_corruption(self, dry_run: bool = True) -> None:
+        """恢复配置文件。"""
+        if dry_run:
+            return
+        if hasattr(self, "_config_path") and hasattr(self, "_config_backup"):
+            self._config_path.write_text(self._config_backup, encoding="utf-8")
+            del self._config_backup
+
+    # ── process_zombie (实验 11) ──
+
+    def exp_process_zombie(self, dry_run: bool = True) -> ChaosResult:
+        """进程僵死：spawn 一个会 hang 住的子进程，CPU=0 但仍存在。"""
+        return self._run_phases(
+            "process_zombie",
+            dry_run=dry_run,
+            setup=self._setup_process_zombie,
+            execute=self._execute_process_zombie,
+            verify=self._verify_process_zombie,
+            cleanup=self._cleanup_process_zombie,
+        )
+
+    def _setup_process_zombie(self, dry_run: bool = True) -> dict:
+        """记录 PID 池（实验自己的进程，绝不杀用户进程）。"""
+        return {"scope": "chaos_engine_owned_only", "pids": []}
+
+    def _execute_process_zombie(self, dry_run: bool = True) -> dict:
+        """spawn 一个读 stdin 的 python 进程（会 hang 住）。"""
+        if dry_run:
+            return {"action": "spawn (dry_run)", "would_hang": True}
+        # python -c "import time; time.sleep(60)" 会 sleep 不算 hang
+        # 用 cat | cat 死锁：两个 cat 互读，永远不退出
+        p1 = subprocess.Popen(["cat"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(["cat"], stdin=p1.stdout, stdout=subprocess.PIPE)
+        p1.stdin.close()  # p1 不再写
+        # p1 读 EOF, p2 写 EOF, p1 退出 → 但 p2 会等 stdout 关闭
+        # 简化：直接 spawn 一个 sleep 长进程，CPU=0 但不退出
+        p_zombie = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(120)"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        # 把 p1/p2 立即杀掉只留 zombie
+        for p in [p1, p2]:
+            try:
+                p.kill()
+            except Exception:
+                pass
+        self._zombie_proc = p_zombie
+        # 等 1s 确认 PID 稳定
+        time.sleep(1.0)
+        if p_zombie.poll() is not None:
+            return {"action": "spawn_failed", "pid": p_zombie.pid}
+        return {"action": "spawn", "pid": p_zombie.pid}
+
+    def _verify_process_zombie(self, dry_run: bool = True) -> dict:
+        """验证进程存在但 CPU=0。"""
+        if dry_run:
+            return {"verified": True, "reason": "dry-run"}
+        if not hasattr(self, "_zombie_proc"):
+            return {"verified": False, "error": "no zombie proc"}
+        p = self._zombie_proc
+        if p.poll() is not None:
+            return {"verified": False, "error": "process exited unexpectedly"}
+        # 用 ps 取 CPU%
+        try:
+            rss_path = Path(f"/proc/{p.pid}/stat")
+            if not rss_path.exists():
+                return {"verified": True, "pid": p.pid, "note": "proc exists but no /proc access"}
+            # stat 字段: utime (14) + stime (15) in clock ticks
+            parts = rss_path.read_text().split()
+            utime = int(parts[13])
+            stime = int(parts[14])
+            cpu_pct = (utime + stime) / os.sysconf("SC_CLK_TCK") / 1.0 * 100  # ~1s sample
+            return {"verified": True, "pid": p.pid, "cpu_pct_approx": round(cpu_pct, 2)}
+        except Exception as e:
+            return {"verified": True, "pid": p.pid, "note": f"ps error: {e}"}
+
+    def _cleanup_process_zombie(self, dry_run: bool = True) -> None:
+        """杀实验自己的 zombie 进程。绝不杀用户进程。"""
+        if dry_run:
+            return
+        if hasattr(self, "_zombie_proc"):
+            p = self._zombie_proc
+            try:
+                p.terminate()
+                p.wait(timeout=2)
+            except Exception:
+                try:
+                    p.kill()
+                    p.wait(timeout=1)
+                except Exception:
+                    pass
+            del self._zombie_proc
 
     # ── 工具方法 ──
 

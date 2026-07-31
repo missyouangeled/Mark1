@@ -378,3 +378,88 @@ class TestRecordResult:
             engine._record_result(r)
         lines = engine._results_file.read_text().strip().splitlines()
         assert len(lines) == 5
+
+
+class TestNewExperiments:
+    """v3-5 新增 4 个实验（2026-07-31）。"""
+
+    def test_list_includes_new_experiments(self, tmp_path):
+        """list_experiments 应包含 4 个新实验名。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        names = {e["name"] for e in engine.list_experiments()}
+        assert "memory_leak" in names
+        assert "cpu_spike" in names
+        assert "config_corruption" in names
+        assert "process_zombie" in names
+
+    def test_memory_leak_dry_run(self, tmp_path):
+        """memory_leak dry-run 应返回 passed 状态。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        r = engine.exp_memory_leak(dry_run=True)
+        assert r.status == "passed"
+        assert r.experiment == "memory_leak"
+
+    def test_cpu_spike_dry_run(self, tmp_path):
+        """cpu_spike dry-run 应返回 passed 状态。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        r = engine.exp_cpu_spike(dry_run=True)
+        assert r.status == "passed"
+        assert r.experiment == "cpu_spike"
+
+    def test_config_corruption_dry_run(self, tmp_path):
+        """config_corruption dry-run 应返回 passed 状态。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        r = engine.exp_config_corruption(dry_run=True)
+        assert r.status == "passed"
+        assert r.experiment == "config_corruption"
+
+    def test_process_zombie_dry_run(self, tmp_path):
+        """process_zombie dry-run 应返回 passed 状态。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        r = engine.exp_process_zombie(dry_run=True)
+        assert r.status == "passed"
+        assert r.experiment == "process_zombie"
+
+    def test_run_suite_total_count(self, tmp_path):
+        """run_suite 应跑 11 个实验（原来 7 + 新 4）。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        results = engine.run_suite(dry_run=True)
+        assert len(results) == 11
+
+    def test_process_zombie_real_exec(self, tmp_path):
+        """真执行 process_zombie 验证 PID 正确 spawn 和 cleanup。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        r = engine.exp_process_zombie(dry_run=False)
+        # 可能 pass（spawn 成功 + verify 成功）也可能 fail，但绝不能 raise
+        assert r.experiment == "process_zombie"
+        assert r.status in ("passed", "failed", "error")
+        # 进程应该被清理了
+        if hasattr(engine, "_zombie_proc"):
+            assert engine._zombie_proc.poll() is not None  # 已退出
+
+    def test_config_corruption_backup_restore(self, tmp_path):
+        """config_corruption 真执行时 backup + restore 必须配对。"""
+        from mark42.chaos_engine import ChaosEngine
+        engine = ChaosEngine(chaos_dir=tmp_path)
+        # setup -> execute -> verify -> cleanup 跑一遍
+        setup = engine._setup_config_corruption(dry_run=False)
+        target = engine._config_path
+        if target is None:
+            # 没有真实配置文件，跳过
+            return
+        original = target.read_text(encoding="utf-8")
+        try:
+            engine._execute_config_corruption(dry_run=False)
+            engine._cleanup_config_corruption(dry_run=False)
+            # 恢复后内容应一致
+            assert target.read_text(encoding="utf-8") == original
+        finally:
+            # 兜底：万一 cleanup 失败
+            target.write_text(original, encoding="utf-8")

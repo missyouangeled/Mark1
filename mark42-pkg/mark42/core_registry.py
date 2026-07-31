@@ -387,3 +387,22 @@ def cli_cores_restore(core_id: str) -> dict[str, Any]:
     reg = CoreRegistry()
     ok = reg.restore(core_id)
     return {"ok": ok, "core_id": core_id}
+
+
+# ── 核心位附加说明（v3-5 补充，2026-07-31） ──
+# 不存入 CoreEntry（避免破坏 dataclass 形状）
+# 设计文档: docs/design/mark42-跨编码器接入方案-20260731.md
+CORE_NOTES: dict[str, dict[str, Any]] = {
+    "core_3_memory_vector_engine": {
+        "search_modes": ["off", "auto", "on"],
+        "default_search_mode": "auto",  # MARK42_QMD_VECTOR 环境变量默认值
+        "runtime_status": "degraded_bm25_only",  # rerank 模型下载中（2026-07-31 状态）
+        "design_doc": "docs/design/mark42-跨编码器接入方案-20260731.md",
+        "actual_state_source": "consciousness.self_check().raw['qmd_state']",
+    },
+}
+
+
+def get_core_notes(core_id: str) -> dict[str, Any]:
+    """获取核心位附加说明（不存 CoreEntry，避免形状变化）。"""
+    return CORE_NOTES.get(core_id, {})

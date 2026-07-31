@@ -56,3 +56,6 @@ openclaw-workspace-state.json
 # Backup directories (pre-upgrade systemd unit backups, etc.)
 docs/backup/
 media/Seedream-Images/
+
+# Mark42 dev portal (生成器 + 产物，不入库)
+mark42-pkg/docs/devportal/

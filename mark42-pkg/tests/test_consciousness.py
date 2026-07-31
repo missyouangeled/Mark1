@@ -242,3 +242,113 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
     sys.exit(0 if run_tests() else 1)
+
+
+class TestConsciousnessQmdState:
+    """测试 self_check 中 QMD 三态报告（cross-encoder 接入方案）。"""
+
+    def _patch_qmd_state(self, mocker, **overrides):
+        """统一 mock builtin_memory 模块的状态。"""
+        from mark42.plugins import builtin_memory
+        defaults = {
+            "QMD_BIN": "/usr/bin/qmd",
+            "QMD_INDEX": "/home/x/.cache/qmd/index.sqlite",
+            "QMD_VECTOR_MODE": "auto",
+            "_model_complete": lambda f: True,
+            "_vector_available": lambda: True,
+            "_rerank_available": lambda: True,
+        }
+        defaults.update(overrides)
+        for k, v in defaults.items():
+            mocker.patch.object(builtin_memory, k, v)
+        mocker.patch("os.path.isfile", return_value=True)
+
+    def test_qmd_state_included_in_raw(self, mocker):
+        """self_check 的 raw 应包含 qmd_state 字段。"""
+        self._patch_qmd_state(mocker)
+        from mark42.consciousness import Consciousness
+        c = Consciousness()
+        result = c.self_check()
+        assert "qmd_state" in result.raw
+        st = result.raw["qmd_state"]
+        assert "qmd_bin" in st
+        assert "embedding_model" in st
+        assert "rerank_model" in st
+        assert "vector_available" in st
+        assert "rerank_available" in st
+        assert "search_mode" in st
+        assert "degraded_reason" in st
+
+    def test_qmd_state_all_ok(self, mocker):
+        """qmd + embedding + rerank 全部就绪时，degraded_reason 应为 None。"""
+        self._patch_qmd_state(mocker)
+        from mark42.consciousness import Consciousness
+        c = Consciousness()
+        result = c.self_check()
+        st = result.raw["qmd_state"]
+        assert st["qmd_bin"] == "ok"
+        assert st["qmd_index"] == "ok"
+        assert st["embedding_model"] == "ok"
+        assert st["rerank_model"] == "ok"
+        assert st["vector_available"] is True
+        assert st["rerank_available"] is True
+        assert st["degraded_reason"] is None
+
+    def test_qmd_state_rerank_missing(self, mocker):
+        """rerank 模型缺失时，degraded_reason 应标注。"""
+        self._patch_qmd_state(
+            mocker,
+            _rerank_available=lambda: False,
+        )
+        # mock embedding 模型完整，rerank 缺失
+        from mark42.plugins import builtin_memory
+        def model_complete(name):
+            return "embeddinggemma" in name
+        mocker.patch.object(builtin_memory, "_model_complete", side_effect=model_complete)
+
+        from mark42.consciousness import Consciousness
+        c = Consciousness()
+        result = c.self_check()
+        st = result.raw["qmd_state"]
+        assert st["rerank_model"] == "missing_or_downloading"
+        assert st["rerank_available"] is False
+        # vector 仍可用，但 rerank 不可用
+        assert st["vector_available"] is True
+        # auto 模式下只是 info 级
+        info_issues = [i for i in result.issues if "vector" in i.get("msg", "").lower() or "rerank" in i.get("msg", "").lower()]
+        # 至少有一条 rerank 相关 issue
+        assert any("rerank" in i.get("msg", "").lower() or "vector" in i.get("msg", "").lower() for i in result.issues)
+
+    def test_qmd_state_on_mode_but_models_incomplete(self, mocker):
+        """on 模式但模型未就绪时，应是 warning 级 issue。"""
+        self._patch_qmd_state(
+            mocker,
+            QMD_VECTOR_MODE="on",
+            _vector_available=lambda: False,
+            _model_complete=lambda f: False,
+        )
+        from mark42.consciousness import Consciousness
+        c = Consciousness()
+        result = c.self_check()
+        # 应有降级警告
+        warning_issues = [i for i in result.issues if i.get("severity") == "warning"]
+        assert any("on" in i.get("msg", "") for i in warning_issues)
+        st = result.raw["qmd_state"]
+        assert st["degraded_reason"] == "on_mode_but_models_incomplete"
+
+    def test_qmd_state_qmd_binary_missing(self, mocker):
+        """qmd 二进制缺失时，degraded_reason 应标注。"""
+        self._patch_qmd_state(
+            mocker,
+            QMD_BIN="",
+        )
+        mocker.patch("os.path.isfile", return_value=False)
+        from mark42.consciousness import Consciousness
+        c = Consciousness()
+        result = c.self_check()
+        st = result.raw["qmd_state"]
+        assert st["qmd_bin"] == "missing"
+        assert st["degraded_reason"] == "qmd_binary_or_index_missing"
+        # 应有 process_down 类 issue
+        cats = [i.get("category") for i in result.issues]
+        assert "process_down" in cats

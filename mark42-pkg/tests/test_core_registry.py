@@ -299,3 +299,19 @@ class TestHelperFunctions:
 
 class TestFileIsolation:
     """测试注册表文件操作隔离。"""
+
+
+class TestCoreRegistryNotes:
+    """测试 CORE_NOTES（v3-5 补充信息，2026-07-31）。"""
+
+    def test_get_core_notes_for_memory_vector(self):
+        from mark42.core_registry import get_core_notes
+        notes = get_core_notes("core_3_memory_vector_engine")
+        assert notes["search_modes"] == ["off", "auto", "on"]
+        assert notes["default_search_mode"] == "auto"
+        assert notes["runtime_status"] == "degraded_bm25_only"
+        assert "design_doc" in notes
+
+    def test_get_core_notes_for_unknown_returns_empty(self):
+        from mark42.core_registry import get_core_notes
+        assert get_core_notes("nonexistent") == {}

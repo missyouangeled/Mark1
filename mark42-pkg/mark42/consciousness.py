@@ -262,23 +262,84 @@ class Consciousness:
         except Exception as e:
             logger.warning("C1 loops 检查失败: %s", e)
 
-        # 4) QMD 向量引擎健康（检查 qmd 命令 + 索引）
+        # 4) QMD 向量引擎健康（v3-5 升级：三态报告）
+        # 之前: 二值（健康/不健康）
+        # 现在: embedding / rerank 状态分开报告，支持 cross-encoder 接入方案
+        qmd_state: dict[str, Any] = {
+            "qmd_bin": "missing",
+            "qmd_index": "missing",
+            "embedding_model": "missing",
+            "rerank_model": "missing",
+            "vector_available": False,
+            "rerank_available": False,
+            "search_mode": "off",
+            "degraded_reason": None,
+        }
         try:
-            import shutil
-            qmd_bin = shutil.which("qmd") or os.path.expanduser("~/.npm-global/bin/qmd")
-            index_path = os.path.expanduser("~/.cache/qmd/index.sqlite")
-            if not (os.path.isfile(qmd_bin) and os.path.isfile(index_path)):
+            from mark42.plugins.builtin_memory import (
+                QMD_BIN,
+                QMD_INDEX,
+                _model_complete,
+                _vector_available,
+                _rerank_available,
+                QMD_VECTOR_MODE,
+            )
+            import os as _os
+            qmd_state["qmd_bin"] = "ok" if QMD_BIN else "missing"
+            qmd_state["qmd_index"] = "ok" if _os.path.isfile(QMD_INDEX) else "missing"
+            qmd_state["embedding_model"] = (
+                "ok" if _model_complete("hf_ggml-org_embeddinggemma-300M-Q8_0.gguf")
+                else "missing_or_downloading"
+            )
+            qmd_state["rerank_model"] = (
+                "ok" if _model_complete("hf_tobil_qmd-query-expansion-1.7B-q4_k_m.gguf")
+                else "missing_or_downloading"
+            )
+            qmd_state["vector_available"] = _vector_available()
+            qmd_state["rerank_available"] = _rerank_available()
+            qmd_state["search_mode"] = QMD_VECTOR_MODE
+            # 严重度判断
+            if not QMD_BIN or not _os.path.isfile(QMD_INDEX):
+                # 完全是丢的
                 issues.append({
                     "source": "sidecar", "category": "process_down",
                     "severity": "warning",
                     "msg": "qmd 命令或索引不可用",
                 })
+                qmd_state["degraded_reason"] = "qmd_binary_or_index_missing"
+            elif not _vector_available() and QMD_VECTOR_MODE == "on":
+                # 调了 on 但模型下不完，是严重问题
+                issues.append({
+                    "source": "sidecar", "category": "embed_index_missing",
+                    "severity": "warning",
+                    "msg": "QMD 强制 vector 模式（on）但模型未就绪，已降级到 BM25",
+                })
+                qmd_state["degraded_reason"] = "on_mode_but_models_incomplete"
+            elif not _vector_available() and QMD_VECTOR_MODE == "auto":
+                # auto 模式但 vector 模型未就绪，-- 轻微警告
+                issues.append({
+                    "source": "sidecar", "category": "embed_index_missing",
+                    "severity": "info",
+                    "msg": "QMD vector 模型未就绪，当前仅 BM25 关键词搜索",
+                })
+                qmd_state["degraded_reason"] = "auto_mode_vector_models_incomplete"
+            elif _vector_available() and not _rerank_available() and QMD_VECTOR_MODE in ("on", "auto"):
+                # embedding 完整但 rerank 缺失，-- 警告（cross-encoder 不可用）
+                issues.append({
+                    "source": "sidecar", "category": "embed_index_missing",
+                    "severity": "info",
+                    "msg": "QMD rerank 模型未就绪，cross-encoder 重排序不可用",
+                })
+                qmd_state["degraded_reason"] = "rerank_model_incomplete"
         except Exception as e:
             issues.append({
                 "source": "sidecar", "category": "process_down",
                 "severity": "warning",
                 "msg": f"qmd 检查失败: {type(e).__name__}",
             })
+            qmd_state["degraded_reason"] = f"check_exception:{type(e).__name__}"
+        # 将三态信息挂到 raw 上，供输出使用
+        raw["qmd_state"] = qmd_state
 
         return SelfCheckResult(
             checked_at=now,
