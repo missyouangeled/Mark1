@@ -16,13 +16,13 @@ def _collect_status_data() -> dict[str, Any]:
     from ..armor import armor_check
     from ..config import (
         ARMOR_STATE,
-        CONFIG_PATH,
         ENGINE_STATE,
         HEAVY_STATE,
         MARK42_BROKER_EVENTS,
         SCRATCH,
         THRESHOLD_ALERT,
         THRESHOLD_WARN,
+        get_version,
     )
     from ..utils import _load_json
 
@@ -31,9 +31,9 @@ def _collect_status_data() -> dict[str, Any]:
     usage = check.get("usagePercent", 0)
     status_icon = "🟢" if usage < THRESHOLD_WARN else ("🟠" if usage < THRESHOLD_ALERT else "🔴")
 
-    version = "?"
-    if CONFIG_PATH.exists():
-        version = _load_json(CONFIG_PATH).get("version", "?")
+    # 【2026-08-03 修复】不再从运行时 config.json 读版本。
+    # 旧逻辑读的是初始化时写死的值，导致安装 2.8.1 的机器 status 长期显示 2.3.0。
+    version = get_version()
 
     index_path = ARMOR_STATE / "memory-index.json"
     idx = None
@@ -68,6 +68,14 @@ def _collect_status_data() -> dict[str, Any]:
         dirs = [d for d in SCRATCH.iterdir() if d.is_dir()]
         kept = sum(1 for d in dirs if (d / ".keep").exists())
 
+    # 【2026-08-03 新增】可观测性状态（未启用时也能安全读取）
+    try:
+        from ..telemetry import telemetry_status
+
+        telemetry = telemetry_status()
+    except Exception:
+        telemetry = {}
+
     return {
         "now_str": now_str,
         "check": check,
@@ -87,6 +95,7 @@ def _collect_status_data() -> dict[str, Any]:
         "broker_size": broker_size,
         "dirs": dirs,
         "kept": kept,
+        "telemetry": telemetry,
     }
 
 
@@ -213,6 +222,7 @@ def _build_status_json(d: dict[str, Any]) -> dict[str, Any]:
             "totalDirs": len(d["dirs"]) if SCRATCH.exists() else 0,
             "keptDirs": d["kept"] if SCRATCH.exists() else 0,
         },
+        "telemetry": d.get("telemetry", {}),
         "actions": [],
     }
     if d["usage"] >= THRESHOLD_WARN:
