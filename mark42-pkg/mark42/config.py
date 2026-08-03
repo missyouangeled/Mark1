@@ -9,6 +9,40 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# ── 版本单一来源 ────────────────────────────────────────
+# 【2026-08-03 修复】此前 __init__.py / pyproject.toml / CLI --version / mark42_init()
+# 四处各自硬编码版本号，导致 mark42_init() 写入 2.3.0 而实际安装版本是 2.8.1，
+# status 面板长期显示错误版本。现统一由 get_version() 提供，禁止再新增硬编码常量。
+
+
+def get_version() -> str:
+    """返回 Mark42 当前版本号（唯一权威来源）。
+
+    优先读已安装包的元数据（importlib.metadata），保证与 pyproject.toml 一致；
+    源码开发态（未安装）回退到 mark42.__version__。
+    """
+    try:
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as _pkg_version
+
+        try:
+            return _pkg_version("mark42")
+        except PackageNotFoundError:
+            logger.debug("mark42 包元数据未找到，回退到 __version__")
+    except Exception as e:  # pragma: no cover - importlib.metadata 缺失属极端环境
+        logger.debug("读取包元数据失败，回退到 __version__: %s", e)
+    try:
+        from . import __version__
+
+        return str(__version__)
+    except Exception as e:  # pragma: no cover
+        logger.debug("读取 __version__ 失败: %s", e)
+        return "unknown"
+
+
+# 运行时配置 schema 版本。与程序版本无关，仅用于判断是否需要迁移旧配置。
+CONFIG_SCHEMA_VERSION = 2
+
 # ── 本地基础工具（不依赖 utils，避免循环导入） ──
 
 def _conf_now_iso() -> str:
@@ -24,13 +58,51 @@ def _conf_load_json(path: Path) -> dict:
         return {}
 
 def _conf_save_json(path: Path, data: dict) -> None:
+    """原子写入 JSON。
+
+    【2026-08-03 修复】原实现直接 open(path, "w") 截断后再 json.dump()，
+    进程在写入过程中被 kill/OOM/断电会留下半截文件，下次读取直接 JSONDecodeError，
+    状态静默丢失。现改为同目录临时文件 + fsync + os.replace() 原子替换：
+    要么是完整旧内容，要么是完整新内容，不存在中间态。
+    """
+    import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    tmp_name = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        # 保留原文件权限，避免原子替换后权限被 mkstemp 的 0600 覆盖
+        if path.exists():
+            try:
+                os.chmod(tmp_name, path.stat().st_mode & 0o7777)
+            except OSError:
+                pass
+        os.replace(tmp_name, path)
+        tmp_name = None
+    finally:
+        if tmp_name is not None:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
 
 # ── 常量 ──────────────────────────────────────────────
 
-WORKSPACE = Path(__file__).resolve().parent.parent.parent
+# 【2026-08-03 修复】MARK42_WORKSPACE / MARK42_STATE_DIR / MARK42_LOG_DIR 三个环境变量
+# 文档和 systemd unit 都声明了，installer.py / watchdog.py 也在用，
+# 但 config.py 之前完全不读，导致 unit 里的 Environment= 完全无效，
+# 用户以为做了路径隔离实际上没有。现统一优先级：环境变量 > 平台默认。
+WORKSPACE = Path(
+    os.environ.get("MARK42_WORKSPACE")
+    or str(Path(__file__).resolve().parent.parent.parent)
+).expanduser()
 SCRIPTS = WORKSPACE / "scripts"
 
 # OpenClaw 可执行文件路径（动态查找，不硬编码）
@@ -39,7 +111,10 @@ import shutil as _shutil
 OPENCLAW_BIN = _shutil.which("openclaw") or str(Path.home() / ".npm-global" / "bin" / "openclaw")
 
 XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
-MARK42_STATE = XDG_STATE / "openclaw" / "mark42"
+# MARK42_STATE_DIR 可直接指定状态目录，优先于 XDG 推导
+MARK42_STATE = Path(
+    os.environ.get("MARK42_STATE_DIR") or str(XDG_STATE / "openclaw" / "mark42")
+).expanduser()
 
 # SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
 # 优先级：MARK42_SCRATCH env > $MARK42_DATA_MOUNT/openclaw/scratch > XDG_STATE fallback
@@ -67,8 +142,10 @@ HEAVY_STATE = MARK42_STATE / "heavy"
 # ArcLock 配置文件路径
 ARCLOCK_CONFIG_PATH = MARK42_STATE / "arclock.yaml"
 
-# 日志统一放到数据盘
-LOG_DIR = DATA_ROOT / "logs"
+# 日志统一放到数据盘（MARK42_LOG_DIR 可覆盖）
+LOG_DIR = Path(
+    os.environ.get("MARK42_LOG_DIR") or str(DATA_ROOT / "logs")
+).expanduser()
 
 BROKER_DIR = XDG_STATE / "openclaw" / "broker"
 BROKER_EVENTS = BROKER_DIR / "events.jsonl"
@@ -147,7 +224,8 @@ MAX_BROKER_EVENTS_MB = 10
 MAX_HISTORY_FILES = 50
 MAX_ACTIONS_LINES = 500
 MAX_DAEMON_LOG_MB = 50  # 单个 daemon 日志最大 50MB，超额截尾
-MAX_DAEMON_LOG_LINES = 10000  # 单文件最大 10000 行
+# 【2026-08-03 修复】文档声明了 MARK42_MAX_DAEMON_LOG_LINES 但代码硬编码，现支持覆盖
+MAX_DAEMON_LOG_LINES = int(os.environ.get("MARK42_MAX_DAEMON_LOG_LINES", "10000"))
 
 # ── 压缩算法配置 (阶段 1, 借鉴 Headroom) ──────────
 # 2026-06-24 新增: 详见 docs/design/mark42-压缩方案-阶段1实施计划-20260624.md
@@ -275,23 +353,66 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
 
 # ── 配置系统 ────────────────────────────────────────────
 
-def _load_config() -> dict[str, any]:  # noqa
+def _load_config() -> dict[str, Any]:
     if CONFIG_PATH.exists():
         return _conf_load_json(CONFIG_PATH)
     return {}
 
-def _save_config(cfg: dict[str, any]) -> None:  # noqa
+def _save_config(cfg: dict[str, Any]) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     _conf_save_json(CONFIG_PATH, cfg)
 
+
+def _migrate_config_if_needed(cfg: dict[str, Any]) -> dict[str, Any]:
+    """把旧版运行时配置迁移到新 schema。
+
+    【2026-08-03 新增】旧配置里的 "version" 字段被误当成程序版本使用，
+    导致 status 面板长期显示初始化时写死的 2.3.0。迁移策略是保守的：
+    - 只改 schema 相关字段，不动用户自定义的阈值/模型/daemon 配置；
+    - 迁移前生成一次 .bak 备份，便于回滚；
+    - 旧 "version" 值挪到 legacyVersion 留痕，不直接丢弃。
+    """
+    if not isinstance(cfg, dict) or not cfg:
+        return cfg
+    if cfg.get("configSchemaVersion") == CONFIG_SCHEMA_VERSION:
+        return cfg
+
+    migrated = dict(cfg)
+    legacy_version = migrated.pop("version", None)
+    migrated["configSchemaVersion"] = CONFIG_SCHEMA_VERSION
+    if legacy_version is not None:
+        migrated.setdefault("legacyVersion", legacy_version)
+    migrated["migratedAt"] = _conf_now_iso()
+    migrated["migratedByVersion"] = get_version()
+
+    try:
+        if CONFIG_PATH.exists():
+            backup = CONFIG_PATH.with_name(
+                f"{CONFIG_PATH.name}.pre-schema{CONFIG_SCHEMA_VERSION}.bak"
+            )
+            if not backup.exists():
+                backup.write_text(
+                    json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+        _save_config(migrated)
+        logger.info(
+            "配置已迁移到 schema v%s（旧 version=%s）",
+            CONFIG_SCHEMA_VERSION,
+            legacy_version,
+        )
+    except OSError as e:
+        logger.warning("配置迁移写入失败，继续使用内存中的迁移结果: %s", e)
+    return migrated
+
 def mark42_init() -> None:
     if CONFIG_PATH.exists():
-        cfg = _load_config()
-        print(f"⚙️ Mark42 已初始化（版本: {cfg.get('version', '?')})，使用 --config 修改")
+        cfg = _migrate_config_if_needed(_load_config())
+        print(f"⚙️ Mark42 已初始化（版本: {get_version()}），使用 --config 修改")
         return
     cfg = {
-        "version": "2.3.0",
+        "configSchemaVersion": CONFIG_SCHEMA_VERSION,
         "initializedAt": _conf_now_iso(),
+        "initializedWithVersion": get_version(),
         "thresholds": {"warn": THRESHOLD_WARN, "alert": THRESHOLD_ALERT, "crit": THRESHOLD_CRIT},
         "contextWindow": DEFAULT_CONTEXT_WINDOW,
         "bytesPerKtoken": BYTES_PER_KTOKEN,
@@ -312,6 +433,7 @@ def mark42_init() -> None:
         d.mkdir(parents=True, exist_ok=True)
     (ARMOR_STATE / "history").mkdir(parents=True, exist_ok=True)
     print("✅ Mark42 已初始化")
+    print(f"   版本: {get_version()}")
     print(f"   配置: {CONFIG_PATH}")
     print(f"   状态: {MARK42_STATE}")
     print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
@@ -323,7 +445,8 @@ def mark42_config() -> None:
         return
     cfg = _load_config()
     print("⚙️ Mark42 配置:\n")
-    print(f"   版本: {cfg.get('version', '?')}")
+    print(f"   版本: {get_version()}")
+    print(f"   配置 schema: v{cfg.get('configSchemaVersion', 1)}")
     print(f"   初始化于: {cfg.get('initializedAt', '?')}")
     print(f"   上下文窗口: {cfg.get('contextWindow', 0)/1000:.0f}K")
     print(f"   字节/KToken: {cfg.get('bytesPerKtoken', '?')}")

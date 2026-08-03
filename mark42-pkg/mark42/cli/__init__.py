@@ -9,6 +9,13 @@ import sys
 from ..output_guard import trim_detail, trim_summary
 
 
+def _get_version() -> str:
+    """取 Mark42 版本号（单一权威来源，避免 CLI 里再硬编码）。"""
+    from ..config import get_version
+
+    return get_version()
+
+
 def _trim_daemon_logs(log_dir):
     """检查 daemon 日志大小：单个文件超限则截尾保留最新部分。"""
     from ..config import MAX_DAEMON_LOG_LINES, MAX_DAEMON_LOG_MB
@@ -385,7 +392,6 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     from ..armor import armor_check
     from ..config import (
         ARMOR_STATE,
-        CONFIG_PATH,
         ENGINE_STATE,
         HEAVY_STATE,
         MARK42_BROKER_EVENTS,
@@ -400,9 +406,8 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
     status_icon = "🟢" if usage < THRESHOLD_WARN else ("🟠" if usage < THRESHOLD_ALERT else "🔴")
 
     # 版本号
-    version = "?"
-    if CONFIG_PATH.exists():
-        version = _load_json(CONFIG_PATH).get("version", "?")
+    # 【2026-08-03 修复】统一走 get_version()，不再读运行时 config.json 里的陈旧值
+    version = _get_version()
 
     # 记忆索引
     index_path = ARMOR_STATE / "memory-index.json"
@@ -670,7 +675,12 @@ def main() -> None:
   mark42.py assemble
         """,
     )
-    parser.add_argument("--version", action="version", version="Mark42 v2.8.1", help="显示版本号")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"Mark42 v{_get_version()}",
+        help="显示版本号",
+    )
     parser.add_argument("--init", action="store_true", help="初始化 Mark42 配置")
     parser.add_argument("--config", action="store_true", help="查看当前配置")
     parser.add_argument("--tune-compaction", action="store_true", help="诊断并调优 OpenClaw 压缩配置")
