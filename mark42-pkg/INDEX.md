@@ -109,7 +109,8 @@ mark42-pkg/
 ├── INDEX.md             # 本文件（导航）
 ├── CHANGELOG.md         # 更新日志
 ├── ARCHITECTURE.md      # 架构设计
-├── CONFIG-GUIDE.md      # 配置详解
+├── docs/
+│   └── CONFIG-GUIDE.md  # 配置详解
 ├── install.sh           # 一键安装脚本
 ├── pyproject.toml        # Python 包配置
 └── mark42/              # 源代码

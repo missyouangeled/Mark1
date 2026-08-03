@@ -8,14 +8,43 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 ## [Unreleased]
 
 ### 修复
+- 🛡️ **JSON 状态写入改为原子操作（数据完整性，P0）**：`utils._save_json()` 和
+  `config._conf_save_json()` 原本直接 `open(path, "w")` 截断旧文件再写，进程在写入
+  途中被 kill -9 / OOM / 断电会在磁盘上留下半截 JSON，下次读取直接解析失败并
+  静默返回空字典，Armor/Engine/Heavy 的所有状态都有丢失风险。现改为
+  临时文件 + `fsync` + `os.replace()` 原子替换，并保留原文件权限。
+  已用真实 `SIGKILL` 故障注入和四进程并发写入验证。
+- 🔢 **版本号统一为单一来源（P0）**：新增 `config.get_version()`，优先读
+  `importlib.metadata`，源码态回退 `__version__`。修正 `mark42_init()` 硬编码
+  `"version": "2.3.0"` 导致 `mark42 status` 在安装 2.8.1 的机器上长期显示 2.3.0 的问题；
+  CLI `--version`、status 面板、`mark42 --config` 全部改走统一入口。
+- 🔄 **旧配置自动迁移**：新增 `CONFIG_SCHEMA_VERSION` 和 `_migrate_config_if_needed()`。
+  旧配置的 `version` 字段挭到 `legacyVersion` 留痕，迁移前自动备份 `.bak`，
+  用户自定义的阈值、模型和 daemon 配置一律不动。
+- 🌍 **MARK42_* 环境变量真正生效（P1）**：`MARK42_WORKSPACE`、`MARK42_STATE_DIR`、
+  `MARK42_LOG_DIR`、`MARK42_MAX_DAEMON_LOG_LINES` 文档和 systemd unit 都声明了，
+  但 `config.py` 之前完全不读，导致 unit 里的 `Environment=` 形同虚设。
+  现统一优先级：环境变量 > 平台默认。
+- 🐍 **Python 3.14 兼容**：`code_compressor.py` 移除已弃用的 `ast.Str`，
+  改用 `ast.Constant` + 值类型判定。
+- 🧹 **Ruff 零告警**：清理 3 处静默 `except/pass`（改为 `logger.debug` 留痕）、
+  2 处未使用 import、2 处 import 排序。
 - 🧪 **测试全线崩溃修复**：conftest.py 残留 27 处旧导入路径 `mark42_modules`，
-  收集阶段崩溃导致全部用例 ERROR。统一改为 `mark42`，恢复 1318 passed。
+  收集阶段崩溃导致全部用例 ERROR。统一改为 `mark42`。
 - 🔒 **armor compact 锁 fd 健壮性**：`_try_acquire_compact_lock` 的 `os.open`
   在标准流被上层关闭时（如 pytest fd 捕获）会拿到 fd 0/1/2 并误关。
   改用 `fcntl.F_DUPFD` 重定位到 >=3 + `/dev/null` 补位低位 slot。
 - 🐛 **逻辑修复**：
   - armor.py 删除「连续压缩无效检测」里的死代码空循环（读 actions_log 后 `pass` 不做事）
   - consciousness.py 的 `assessment` 结果纳入返回值（原先计算后丢弃）
+
+### 新增
+- ✅ **CI 补齐**：`mark42-ci.yml` 测试矩阵增加 Python 3.13；新增「版本一致性检查」
+  （防止版本号再次漂移回 2.3.0）；新增 `build` job 做 wheel/sdist 构建 +
+  干净 venv 安装冒烟测试。修正 README 的 CI badge 指向（原指向不存在的 `ci.yml`）。
+- 🧪 **25 项回归测试**：`tests/test_atomic_write_and_version.py` 覆盖原子写入、
+  序列化失败不损坏旧文件、权限保留、SIGKILL 故障注入、多进程并发、
+  版本一致性防回归、配置迁移和环境变量覆盖。测试总数 1712 → 1737。
 
 ### 变更
 - 🧹 **全量 lint 清零**：mark42/ 91 个 + tests/ 674 个 ruff 问题全部清理，
@@ -43,7 +72,7 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
   - 新增 audit/ interfaces/ plugins/ 三个子包
   - pyproject.toml 添加 loop_templates.yaml 到 package-data
   - CLI 添加 `--version` 参数
-  - `pip install -e .` 验证成功, `mark42 --version` -> v2.7.0
+  - `pip install -e .` 验证成功, `mark42 --version` -> Mark42 v2.8.1
 - 🧙 **交互式配置向导**：`user_config.py` 新增 `interactive_init()` 函数
   - 5 步引导: 路径 -> 阈值 -> 模型 -> 守护进程 -> 日志
   - CLI `--init` 接入向导，已有配置时提示不覆盖
@@ -120,11 +149,9 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 
 ### 重构
 - 🏗️ **algo_scheduler 解耦**：用注册表模式替代硬 import 6 个压缩器，新增 `register_compressor()` / `unregister_compressor()` API
-- 🏗️ **cli.py 拆分为 cli/ 包**（1426行 -> 4 个文件）：
-  - `cli/__init__.py`：包入口 + re-export
-  - `cli/assemble.py`（394行）：assemble 进程管理
-  - `cli/status.py`（236行）：状态面板
-  - `cli/parser.py`（798行）：argparse + 命令分发
+- 🏗️ **cli.py 拆分为 cli/ 包**（1426行 -> 2 个文件）：
+  - `cli/__init__.py`：包入口 + re-export + argparse + 命令分发
+  - `cli/status.py`：状态面板
 
 ### 新增
 - 📝 补全 `__main__.py` / `utils.py` / `cli/__init__.py` docstring
@@ -191,7 +218,7 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 ### 修复
 - 🔧 `install.sh`：`pip install` 改用 venv/pipx 方案，解决 `externally-managed-environment`
 - 🔧 修复 15 个失败测试（config 模型断言更新 + CLI dispatch + engine 日期过期 + integration 参数适配）
-- 🔒 `shell=True` 3 处清零（governance.py + cli.py）
+- 🔒 `shell=True` 3 处清零（chaos_engine.py + cli.py）
 - 🔒 `mark42-pkg` 中 `/mnt/data` 硬编码清零（config/installer/engine）
 
 ### 变更

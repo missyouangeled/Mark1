@@ -2,11 +2,11 @@
 
 模块化智能铠甲系统 - 为 [OpenClaw](https://github.com/openclaw/openclaw) 提供上下文守护与循环引擎。
 
-[![CI](https://github.com/missyouangeled/Mark1/actions/workflows/ci.yml/badge.svg)](https://github.com/missyouangeled/Mark1/actions/workflows/ci.yml)
+[![CI](https://github.com/missyouangeled/Mark1/actions/workflows/mark42-ci.yml/badge.svg)](https://github.com/missyouangeled/Mark1/actions/workflows/mark42-ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Version](https://img.shields.io/badge/version-2.8.1-orange)
-![Tests](https://img.shields.io/badge/tests-1318%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1737%20passed-brightgreen)
 
 版本：`v2.8.1`
 
@@ -29,7 +29,7 @@ mark42 armor --check               # 检查
 
 ## ✨ 功能概览
 
-Mark42 由 10 大核心模块组成，通过 broker 事件总线联动：
+Mark42 由 12 大核心模块组成，通过 broker 事件总线联动：
 
 | 模块 | 说明 | 核心能力 |
 |---|---|---|
@@ -42,7 +42,7 @@ Mark42 由 10 大核心模块组成，通过 broker 事件总线联动：
 | **🌪️ ChaosEngine 混沌工程** | 主动注入故障测试 | 延迟注入 / 错误模拟 / 资源耗尽 |
 | **📋 CoreRegistry 核心注册** | 模块注册与发现 | 动态加载 / 依赖检查 / 版本管理 |
 | **🤖 AdvisorClient 顾问客户端** | 与 OpenClaw Advisor 通信 | 指标上报 / 建议获取 / 决策执行 |
-| **🔌 ArcLock 电磁锁扣** | 通用适配层，支持第三方替换 | 9 大扩展点，零配置开箱即用 |
+| **🔌 ArcLock 电磁锁扣** | 通用适配层，支持第三方替换 | 10 大扩展点，零配置开箱即用 |
 | **🔍 Audit 审计系统** | 压缩前后上下文完整性审计 | 6 类核对 / Constraint Pinning / Artifact Trail |
 | **🔒 ConstraintPinner** | 治理衰减防护 | compact 后自动重新注入关键约束规则 |
 
@@ -107,7 +107,7 @@ mark42 status
 
 ArcLock 是 Mark42 的通用适配层，设计理念：**"不配即用，按需扩展"**。
 
-### 9 大锁扣
+### 10 大锁扣
 
 | 锁扣 | Protocol 接口 | 可替换为 | 用途 |
 |---|---|---|---|
@@ -120,6 +120,7 @@ ArcLock 是 Mark42 的通用适配层，设计理念：**"不配即用，按需�
 | **EngineLock** | `schedule(task, interval) -> str` | Celery Beat / APScheduler | 替换循环调度器 |
 | **ChaosLock** | `inject(fault) -> None` | Chaos Mesh / LitmusChaos | 替换混沌工程引擎 |
 | **HeavyLock** | `submit(job) -> JobStatus` | Temporal / Airflow / Prefect | 替换重型任务调度 |
+| **AuditLock** | `audit(snapshot) -> AuditReport` | 自定义审计实现 | 替换压缩后审计逻辑 |
 
 ### 如何自定义
 
@@ -213,10 +214,9 @@ arclock:
 
 | 命令 | 说明 |
 |---|---|
-| `mark42 arclock --list` | 列出已配置的锁扣 |
-| `mark42 arclock --status` | 查看各锁扣当前实现 |
-| `mark42 arclock --reload` | 重新加载配置 |
-| `mark42 arclock --test <lock-name>` | 测试锁扣功能 |
+| `mark42 arclock list` | 列出已配置的锁扣 |
+| `mark42 arclock reload` | 重新加载配置 |
+| `mark42 arclock test --target <lock-name>` | 测试指定锁扣功能 |
 
 ### CircuitBreaker 熔断器
 
@@ -296,7 +296,7 @@ arclock:
 |---|---|---|
 | `~/.openclaw/openclaw.json` | OpenClaw 主配置 | 模型 providers、API key、基础路径 |
 | `~/.config/mark42/config.toml` | Mark42 配置 | 阈值、路径、模型路由、daemon 配置 |
-| `~/.local/state/openclaw/mark42/arclock.yaml` | ArcLock 配置 | 9 大锁扣自定义实现 |
+| `~/.local/state/openclaw/mark42/arclock.yaml` | ArcLock 配置 | 10 大锁扣自定义实现 |
 | `~/.local/state/openclaw/mark42/` | 状态目录 | PID 文件、运行状态、压缩历史 |
 | `~/.local/state/openclaw/mark42/logs/` | 日志目录 | 各守护进程日志 |
 | `~/.local/state/openclaw/scratch/` | 临时目录 | 大工程分批数据、中间文件 |
@@ -337,10 +337,12 @@ journalctl --user -u mark42-armor-guard.service -f
 | `MARK42_WORKSPACE` | Mark42 工作目录 | `~/.openclaw/workspace` |
 | `MARK42_STATE_DIR` | 状态文件目录 | `~/.local/state/openclaw/mark42` |
 | `MARK42_LOG_DIR` | 日志目录 | `$MARK42_STATE_DIR/logs` |
-| `MARK42_SCRATCH` | 临时目录 | `/mnt/data/openclaw/scratch` |
+| `MARK42_SCRATCH` | 临时目录 | `/mnt/data/openclaw/scratch`（`/mnt/data` 不存在时回退到 XDG_STATE/openclaw/scratch） |
 | `MARK42_CTX_WARN_PCT` | 预警阈值百分比 | `70` |
 | `MARK42_CTX_ALERT_PCT` | 告警阈值百分比 | `85` |
 | `MARK42_CTX_CRIT_PCT` | 紧急阈值百分比 | `95` |
+
+> **优先级**：环境变量 > 平台默认值。设置环境变量后会覆盖配置文件中的对应项。
 
 ---
 
@@ -369,7 +371,7 @@ python3 -m pytest --cov=mark42 --cov-report=html
 
 | 指标 | 数值 |
 |---|---|
-| 通过 | **1318** |
+| 通过 | **1737** |
 | 跳过 | 28 |
 | 失败 / 错误 | 0 |
 | 通过率（非 skip） | **100%** |

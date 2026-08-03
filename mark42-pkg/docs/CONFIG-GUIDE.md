@@ -370,13 +370,13 @@ timeout = 120
 
 位置：`~/.local/state/openclaw/mark42/arclock.yaml`
 
-ArcLock 是 Mark42 的通用适配层，允许你用第三方实现替换 9 大核心锁扣。
+ArcLock 是 Mark42 的通用适配层，允许你用第三方实现替换 10 大核心锁扣。
 
 ### 3.1 设计理念
 
 - **不配即用**：不配置任何锁扣时，全部使用 Mark42 默认实现
 - **按需替换**：只配置你想替换的锁扣，其余保持默认
-- **动态加载**：配置修改后调用 `mark42 arclock --reload` 生效
+- **动态加载**：配置修改后调用 `mark42 arclock reload` 生效
 - **协议优先**：所有自定义实现必须符合对应 Protocol 接口
 
 ### 3.2 完整配置示例
@@ -1047,6 +1047,8 @@ OpenClaw 触发 compact
 
 Mark42 支持通过环境变量覆盖配置。
 
+> **优先级**：环境变量 > 平台默认值。设置环境变量后会覆盖配置文件中的对应项。
+
 ### 5.1 路径配置
 
 | 变量名 | 说明 | 默认值 |
@@ -1054,7 +1056,7 @@ Mark42 支持通过环境变量覆盖配置。
 | `MARK42_WORKSPACE` | Mark42 工作目录 | `~/.openclaw/workspace` |
 | `MARK42_STATE_DIR` | 状态文件目录 | `~/.local/state/openclaw/mark42` |
 | `MARK42_LOG_DIR` | 日志目录 | `$MARK42_STATE_DIR/logs` |
-| `MARK42_SCRATCH` | 临时目录 | `/mnt/data/openclaw/scratch` |
+| `MARK42_SCRATCH` | 临时目录 | `/mnt/data/openclaw/scratch`（`/mnt/data` 不存在时回退到 XDG_STATE/openclaw/scratch） |
 
 ```bash
 # 示例：使用自定义数据盘

@@ -52,7 +52,7 @@ Mark42 的核心设计原则只有一句话：
 
 ## 3. L1: 上下文铠甲 Armor
 
-**模块文件**: `armor.py` (1016 行)
+**模块文件**: `armor.py`（核心模块，约 1.3k 行）
 **CLI**: `mark42 armor --check / --compress / --guard / --queue-stats`
 
 ### 职责
@@ -138,7 +138,7 @@ Armor 不自己做压缩，而是委托给 `algo_scheduler`（见 §6）。压�
 
 ### Constraint Pinning（约束保护）(v2.8.0)
 
-**模块文件**: `scripts/mark42_modules/audit/pinning.py` (202 行)
+**模块文件**: `scripts/mark42_modules/audit/pinning.py`（约束保护模块）
 
 每次 compact 后自动从关键文档中提取约束规则，通过双通道重新注入，防止治理衰减（Governance Decay）。
 
@@ -170,12 +170,12 @@ Audit 系统负责在压缩前后审计上下文完整性，现在支持 6 类�
 
 | 类别 | 说明 |
 |------|------|
-| `metadata` | 会话元数据完整性检查 |
-| `summary` | 内容摘要一致性检查 |
-| `constraints` | 约束规则完整性检查 |
-| `entities` | 实体提取完整性检查 |
-| `actions` | 待办事项追踪检查 |
-| `artifacts` | **新增** 修改文件路径追踪 (v2.8.0) |
+| `identity` | 会话身份完整性检查 |
+| `preferences` | 用户偏好一致性检查 |
+| `projects` | 项目信息完整性检查 |
+| `decisions` | 决策记录追踪检查 |
+| `recent_topics` | 近期话题连续性检查 |
+| `artifacts` | 修改文件路径追踪 |
 
 **Artifact Trail 特性**：
 - `_extract_artifacts()`: 从 context-summary 提取修改的文件路径
@@ -186,7 +186,7 @@ Audit 系统负责在压缩前后审计上下文完整性，现在支持 6 类�
 
 ## 4. L2: 循环引擎 Engine
 
-**模块文件**: `engine.py` (596 行)
+**模块文件**: `engine.py`（核心模块，约 1.2k 行）
 **CLI**: `mark42 engine --list / --start / --kill / --daemon / --templates`
 
 ### 职责
@@ -229,7 +229,7 @@ engine_daemon()  ──→  30s 轮询
 
 ## 5. L3: 重型战甲 Heavy
 
-**模块文件**: `heavy.py` (548 行)
+**模块文件**: `heavy.py`（约 550 行）
 **CLI**: `mark42 heavy --detect / --preflight / --start / --execute / --finish / --cleanup`
 
 ### 职责
@@ -268,7 +268,7 @@ heavy_cleanup()    ──→  清理 scratch 工作区
 
 ## 6. algo_scheduler: 压缩器调度器
 
-**模块文件**: `algo_scheduler.py` (370 行)
+**模块文件**: `algo_scheduler.py`（调度器，约 700 行）
 
 ### 职责
 
@@ -323,7 +323,7 @@ entry = get_compressor("my_algo")  # CompressorEntry(name="my_algo", func=...)
 
 ## 7. L4: 意识层 Consciousness
 
-**模块文件**: `consciousness.py` (924 行)
+**模块文件**: `consciousness.py`（约 900 行）
 **CLI**: `mark42 consciousness check / eval / handle / advisor / revalidate`
 
 > ⚠️ **状态: 设计先行** - 代码完整但未经长期生产验证。
@@ -362,15 +362,21 @@ issue → assess_certainty()
 
 ---
 
-## 8. L5: 治理层 Governance
+## 8. L5: 治理层
 
-**模块文件**: `governance.py` (451 行) + `circuit_breaker.py` + `core_registry.py`
+**模块文件**: `chaos_engine.py` + `module_health.py` + `cluster_manager.py` + `circuit_breaker.py` + `core_registry.py`
 
 > ⚠️ **状态: 设计先行** - 代码完整但未经生产验证。
 
 ### 职责
 
-面向"多模型、多核心"场景的集群治理能力。
+面向"多模型、多核心"场景的集群治理能力。L5 治理功能分散在以下独立文件中：
+
+- `chaos_engine.py`：混沌工程引擎，注入故障测试
+- `module_health.py`：模块健康检查
+- `cluster_manager.py`：集群管理与多模型协调
+- `circuit_breaker.py`：熔断器，防止级联故障
+- `core_registry.py`：核心模块注册与发现
 
 ### 子模块
 
@@ -552,16 +558,16 @@ mark42/
 ├── __init__.py          # 版本号
 ├── __main__.py          # python -m mark42 入口
 ├── cli/                 # CLI 包（v2.6.0 拆分）
-│   ├── __init__.py      # 包入口 + re-export
-│   ├── assemble.py      # assemble 进程管理 (394行)
-│   ├── status.py        # 状态面板 (236行)
-│   └── parser.py        # argparse + 命令分发 (798行)
+│   ├── __init__.py      # 包入口 + argparse + 命令分发
+│   └── status.py       # 状态面板
 ├── config.py            # 路径、阈值、环境变量
 ├── armor.py             # L1: 上下文铠甲
 ├── engine.py            # L2: 循环引擎
 ├── heavy.py             # L3: 重型战甲
 ├── consciousness.py     # L4: 意识层
-├── governance.py        # L5: 混沌/模块健康/集群
+├── chaos_engine.py     # L5: 混沌工程
+├── module_health.py    # L5: 模块健康检查
+├── cluster_manager.py  # L5: 集群管理
 ├── circuit_breaker.py   # L5: 熔断器
 ├── core_registry.py     # L5: 核心位注册表
 ├── algo_scheduler.py    # 压缩器调度器（注册表模式）
@@ -593,7 +599,7 @@ mark42/
 │   └── mark42_modules/
 │       └── audit/
 │           ├── __init__.py          # 6 类审计分类定义
-│           ├── pinning.py           # Constraint Pinning (202行)
+│           ├── pinning.py           # Constraint Pinning
 │           ├── builtin_audit.py     # 内置审计逻辑
 │           ├── snapshot_reader.py   # 快照读取 + artifact 提取
 │           └── summary_extractor.py # 摘要提取器
@@ -625,7 +631,7 @@ register_compressor("my_algo", my_compressor)
 
 ### 添加混沌测试场景
 
-在 `governance.py` 的 `ChaosTester.__init__()` 中添加场景定义，实现注入和验证逻辑。
+在 `chaos_engine.py` 的 `ChaosTester.__init__()` 中添加场景定义，实现注入和验证逻辑。
 
 ---
 

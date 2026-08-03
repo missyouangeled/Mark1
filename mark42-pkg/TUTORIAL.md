@@ -252,12 +252,19 @@ mark42 engine --daemon
 mark42 engine --kill loop-name
 ```
 
-### 5.2 ArcLock（上下文锁定）
+### 5.2 ArcLock（锁扣管理）
 
-防止关键对话被压缩：
+查看和管理已配置的锁扣：
 
 ```bash
-mark42 arclock --lock "重要决策讨论"
+# 列出所有锁扣
+mark42 arclock list
+
+# 重新加载配置
+mark42 arclock reload
+
+# 测试指定锁扣
+mark42 arclock test --target compress
 ```
 
 ### 5.3 日志轮替
