@@ -843,10 +843,15 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
         bak = Path(str(_OPENCLAW_JSON) + ".bak." + datetime.now().strftime("%Y%m%d"))
         shutil.copy2(_OPENCLAW_JSON, bak)
 
-        # 写入（带异常保护）
+        # 【2026-08-03 修复 P0-3】改为原子写入 + 跳进程锁。
+        # 原实现直接 open(path, "w") 截断，写一半崩溃会让 openclaw.json 变成
+        # 半截 JSON，Gateway 起不来（CASE-20260616-002，High）；
+        # 且与 context_safety 并发时会基于旧快照整份覆盖，静默吃掉用户改动。
         try:
-            with open(_OPENCLAW_JSON, "w") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            from .openclaw_config import _atomic_write_json, _exclusive_lock
+
+            with _exclusive_lock():
+                _atomic_write_json(_OPENCLAW_JSON, cfg)
         except Exception as e:
             logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
             shutil.copy2(bak, _OPENCLAW_JSON)

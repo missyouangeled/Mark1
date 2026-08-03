@@ -72,17 +72,25 @@ def _load_openclaw_config() -> dict[str, Any]:
 
 
 def _save_openclaw_config(data: dict[str, Any]) -> None:
-    """安全写入 openclaw.json（先备份，写入失败自动回滚）。"""
+    """安全写入 openclaw.json。
+
+    【2026-08-03 修复 P0-3】原实现直接 open(path, "w") 截断后再 dump，
+    写到一半崩溃会把 openclaw.json 变成半截 JSON → Gateway 直接起不来
+    （参考 CASE-20260616-002，High）。现改为原子写入 + 跳进程锁：
+    临时文件 → fsync → os.replace()，要么完整旧内容要么完整新内容。
+    """
+    from .openclaw_config import _atomic_write_json, _exclusive_lock
+
     bak = Path(str(OPENCLAW_CONFIG) + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
     if OPENCLAW_CONFIG.exists():
         shutil.copy2(OPENCLAW_CONFIG, bak)
     try:
-        with open(OPENCLAW_CONFIG, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
+        with _exclusive_lock():
+            _atomic_write_json(OPENCLAW_CONFIG, data)
     except Exception as e:
         logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
-        shutil.copy2(bak, OPENCLAW_CONFIG)
+        if bak.exists():
+            shutil.copy2(bak, OPENCLAW_CONFIG)
         raise
 
 
