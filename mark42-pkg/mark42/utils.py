@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 import json
 import os
+import tempfile
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -133,9 +134,42 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 @safe_call(default=None, label="save_json")
 def _save_json(path: Path, data: dict[str, Any]) -> None:
+    """原子写入 JSON 状态文件。
+
+    【2026-08-03 修复】原实现直接 open(path, "w") 会立即截断旧文件，
+    json.dump() 写到一半时进程被 kill -9 / OOM / 断电，磁盘上就只剩半截 JSON，
+    下次 _load_json 直接 JSONDecodeError → 返回空字典 → 状态静默丢失。
+    Armor/Engine/Heavy 的所有状态持久化都走这里，影面很大。
+
+    现改为：同目录临时文件 → 写入 → flush → fsync → os.replace() 原子替换。
+    os.replace() 在同一文件系统上是原子操作，读者要么看到完整旧内容，
+    要么看到完整新内容，不会看到中间态。异常时清理临时文件，原文件不动。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    tmp_name = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        # 保留原文件权限（mkstemp 默认 0600，直接替换会改变可见性）
+        if path.exists():
+            try:
+                os.chmod(tmp_name, path.stat().st_mode & 0o7777)
+            except OSError:
+                pass
+        os.replace(tmp_name, path)
+        tmp_name = None
+    finally:
+        if tmp_name is not None:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
 
 @safe_call(default=None, label="append_broker")
 def _append_broker(source_view: str, event_type: str, label: str, level: str,
