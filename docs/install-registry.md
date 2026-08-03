@@ -606,3 +606,18 @@
 - **安装方式**: `cd mark42-pkg && pip install -e . --break-system-packages`
 - **验证**: mark42 --version -> v2.7.0, 80 测试全过, openclaw.json 未变
 - **状态**: 已安装, 已推送 master
+
+## 2026-08-03（补充）
+
+### ✅ 安装：opentelemetry-api / opentelemetry-sdk / opentelemetry-exporter-otlp-proto-http / prometheus-client
+- **时间**：2026-08-03 11:21 CST
+- **触发**：Mark42 接入可观测性（OpenTelemetry + Prometheus）
+- **来源**：PyPI（清华镜像源）
+- **安装命令**：`pip install --user --break-system-packages opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-http prometheus-client`
+- **版本**：opentelemetry 1.44.0 / prometheus-client 0.26.0 / protobuf 7.35.1
+- **安装路径**：`~/.local/lib/python3.12/site-packages/`
+- **是否成功**：✅ 已验证，Prometheus 指标在 :9471/metrics 正常暴露
+- **备注**：
+  - Mark42 核心仍为零第三方依赖，这些是可选依赖（pyproject.toml optional-dependencies）
+  - 未安装时 telemetry 模块自动降级为空操作，不影响运行
+  - 启用方式：`MARK42_METRICS_ENABLED=1` / `MARK42_TRACING_ENABLED=1`
