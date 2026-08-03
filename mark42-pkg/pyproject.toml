@@ -28,7 +28,28 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    # Mark42 仅依赖 Python 标准库，无第三方依赖
+    # Mark42 核心仅依赖 Python 标准库，无强制第三方依赖
+]
+
+# 【2026-08-03 新增】可选依赖。核心依然零依赖，
+# 可观测性未安装时 mark42.telemetry 自动降级为空操作。
+[project.optional-dependencies]
+otel = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
+]
+metrics = [
+    "prometheus-client>=0.19",
+]
+observability = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
+    "prometheus-client>=0.19",
+]
+sbom = [
+    "cyclonedx-bom>=4.0",
 ]
 
 [project.urls]
