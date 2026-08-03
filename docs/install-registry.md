@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-08-03
+
+### ✅ 安装：cyclonedx-bom (SBOM 生成工具)
+- **时间**：2026-08-03 11:15 CST
+- **触发**：Mark42 接入 SBOM（软件物料清单）生成能力
+- **来源**：PyPI (`pip install cyclonedx-bom`)
+- **安装命令**：`pip3 install --break-system-packages cyclonedx-bom`
+- **版本**：7.3.1（cyclonedx-python-lib 11.11.0）
+- **安装路径**：`~/.local/lib/python3.12/site-packages/`（用户安装）
+- **依赖**：cyclonedx-python-lib, packageurl-python, pip-requirements-parser, jsonschema, lxml, license-expression 等
+- **是否成功**：✅ 已验证，SBOM 生成成功（147 个组件，CycloneDX 1.6 JSON）
+- **备注**：
+  - CLI 命令为 `cyclonedx-py`，子命令式语法（environment / requirements / pipenv / poetry）
+  - 安装时 lxml 下载较大（5.2MB），首次 OOM 被杀，第二次成功
+  - 已创建 `mark42-pkg/scripts/generate-sbom.sh` 生成脚本
+  - 已在 `.github/workflows/mark42-ci.yml` 新增 `sbom` job（continue-on-error: true, 保留 30 天）
+  - 已写说明文档 `mark42-pkg/docs/SBOM.md`
+
 ## 2026-07-29
 
 ### ✅ 升级：火山方舟 Agent Plan Medium -> Large

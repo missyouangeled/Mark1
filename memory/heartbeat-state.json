@@ -1,0 +1,24 @@
+{
+  "last_check": "2026-08-03T12:03:00+08:00",
+  "status": "ok",
+  "notifications": 0,
+  "git_changes_pending": true,
+  "pending_changes": [
+    "scripts/autonomy/decisions.jsonl",
+    "scripts/autonomy/state.json",
+    "AGENTS.md",
+    "COGNITION.md",
+    "INNER_WORLD.md",
+    "docs/install-registry.md"
+  ],
+  "today_highlights": [
+    "周末无活动",
+    "系统全部正常",
+    "7个timer运行中"
+  ],
+  "system": {
+    "load": "0.30/0.52/0.80",
+    "mem": "3.9G/7.7G",
+    "disk": "70%"
+  }
+}

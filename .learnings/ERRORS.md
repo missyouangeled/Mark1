@@ -26470,3 +26470,40 @@ Confirm the failure is real and recurring, then either resolve it or downgrade i
 - See Also: none
 
 ---
+
+## [ERR-20260803-001] cron-chaos-test-config-error
+
+**Logged**: 2026-08-03T02:00:00.000Z
+**Priority**: medium
+**Status**: pending
+**Area**: mark42
+
+### Summary
+Mark42 weekly chaos test cron job 配置了不存在的场景名 `random-kill`，且使用了旧的模块路径 `mark42_modules`。
+
+### Error
+```text
+Cron job "mark42-chaos-weekly" 执行失败：
+1. 模块路径错误：`python3 -m mark42_modules.cli` -> ModuleNotFoundError（旧路径已迁移到 mark42-pkg/mark42/）
+2. 场景名错误：`--scenario random-kill` -> "未知实验: random-kill"
+   可用场景：kill_engine, kill_armor, fill_disk, network_latency, high_context,
+   circuit_breaker_trip, consciousness_degraded, memory_leak, cpu_spike,
+   config_corruption, process_zombie
+
+### 补充执行结果
+- 替换为 `kill_engine` 场景：失败（engine 未运行，无法测试）
+- 替换为 `config_corruption` 场景：✅ 通过（setup/execute/verify/cleanup 全 OK）
+```
+
+### Context
+- 触发源：cron job `mark42-chaos-weekly`
+- 根因：cron 创建时使用了旧模块路径和不存在的场景名
+
+### Suggested Fix
+1. 更新 cron job 配置：模块路径改为 `cd mark42-pkg && python3 -c "from mark42.cli import main; main()"`
+2. 场景名改为可用值，或新增 `random-kill` 场景（随机选一个 kill 类实验执行）
+3. 考虑 engine 未运行时的 fallback 逻辑
+
+### Metadata
+- Reproducible: yes
+- Related Files: mark42-pkg/mark42/chaos_engine.py, mark42-pkg/mark42/cli/__init__.py
