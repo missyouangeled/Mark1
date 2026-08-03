@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +34,19 @@ jobs:
           pip install -e .
         working-directory: mark42-pkg
       
+      - name: 版本一致性检查
+        # 防回归：get_version() 与包元数据必须一致，且不能退回历史硬编码值 2.3.0
+        run: |
+          python -c "
+          from importlib.metadata import version
+          from mark42.config import get_version
+          v_api, v_meta = get_version(), version('mark42')
+          assert v_api == v_meta, f'版本不一致: get_version()={v_api} metadata={v_meta}'
+          assert v_api != '2.3.0', '版本回归到了历史硬编码值 2.3.0'
+          print('✅ 版本一致:', v_api)
+          "
+        working-directory: mark42-pkg
+
       - name: 运行测试
         run: |
           python -m pytest tests/ --cov=mark42 --cov-report=xml --cov-report=term-missing --tb=short -q --no-header
@@ -105,6 +118,40 @@ jobs:
             echo "✅ 无 shell=True"
           fi
 
+  build:
+    name: 构建 + 安装冒烟测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装构建工具
+        run: python -m pip install --upgrade pip build
+
+      - name: 构建 wheel + sdist
+        run: python -m build
+        working-directory: mark42-pkg
+
+      - name: 干净 venv 安装并冒烟测试
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install mark42-pkg/dist/*.whl
+          /tmp/smoke/bin/mark42 --version
+          /tmp/smoke/bin/mark42 --help > /dev/null
+          echo "✅ wheel 可安装且 CLI 可执行"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark42-dist
+          path: mark42-pkg/dist/*
+          retention-days: 7
+
   security:
     name: 安全扫描
     runs-on: ubuntu-latest
@@ -144,3 +191,45 @@ jobs:
           else
             echo "✅ 无硬编码 API key"
           fi
+
+  sbom:
+    name: SBOM 生成
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 cyclonedx-bom
+        run: pip install cyclonedx-bom
+
+      - name: 安装项目依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+        working-directory: mark42-pkg
+
+      - name: 生成 SBOM
+        run: |
+          mkdir -p dist/sbom
+          cyclonedx-py environment --pyproject pyproject.toml --of JSON -o dist/sbom/mark42-sbom.json
+          echo "✅ SBOM 生成成功"
+          # 打印组件数量
+          python -c "
+          import json
+          with open('dist/sbom/mark42-sbom.json') as f:
+              bom = json.load(f)
+          print(f'组件数量: {len(bom.get("components", []))}')
+          "
+        working-directory: mark42-pkg
+
+      - name: 上传 SBOM 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark42-sbom
+          path: mark42-pkg/dist/sbom/mark42-sbom.json
+          retention-days: 30

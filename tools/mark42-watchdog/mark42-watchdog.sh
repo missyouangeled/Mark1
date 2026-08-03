@@ -189,10 +189,52 @@ else
 fi
 
 # ── 3. 处置 ──
+# 【2026-08-03 修复】RefuseManualStop=yes 会让 `systemctl restart` 被直接拒绝
+# （报 "Operation refused ... configured to refuse manual start/stop"），
+# 这正是 CASE-20260731-008 里守护全停 8 分钟、watchdog 却拉不起来的根因：
+# watchdog 每次都在喊重启，但每次都被 systemd 拒绝，自愈能力形同虚设。
+#
+# 正确做法：改用 `try-restart` + 失败后回落到 `start`（RefuseManualStop 不拦
+# 依赖触发和 Restart=always 自动重启，但会拦手动 stop/restart）。
+# 若仍失败，则通过 kill 让 Restart=always 自己把进程拉起来。
+#
+# DRYRUN=1 时只打印将要执行的动作，不真的动 systemd（CASE-20260710-006 教训：
+# 涉及 systemctl 的脚本必须有隔离开关）。
+restart_unit() {
+    local unit="$1"
+    if [ "${DRYRUN:-0}" = "1" ]; then
+        log "   [DRYRUN] would have restarted $unit"
+        return 0
+    fi
+
+    # 路径 1：try-restart（仅在 unit 已激活时重启）
+    if systemctl --user try-restart "$unit" 2>/dev/null; then
+        log "   $unit try-restart 成功"
+        return 0
+    fi
+
+    # 路径 2：unit 未激活时直接 start
+    if systemctl --user start "$unit" 2>/dev/null; then
+        log "   $unit start 成功"
+        return 0
+    fi
+
+    # 路径 3：被 RefuseManualStop 拦住时，杀进程让 Restart=always 兜底拉起
+    local mainpid
+    mainpid=$(systemctl --user show "$unit" -p MainPID --value 2>/dev/null || echo 0)
+    if [ -n "$mainpid" ] && [ "$mainpid" != "0" ]; then
+        log "   $unit 手动重启被拒 → kill $mainpid 交给 Restart=always"
+        kill -TERM "$mainpid" 2>/dev/null && return 0
+    fi
+
+    log "   ❌ $unit 三条重启路径均失败，需人工介入"
+    return 1
+}
+
 if [ -n "$need_restart" ]; then
     log "⚠️ 检测到异常: $reason → 重启 service"
-    run_and_log systemctl --user restart mark42-engine-daemon.service || log "   engine-daemon 重启失败"
-    run_and_log systemctl --user restart mark42-armor-guard.service || log "   armor-guard 重启失败"
+    restart_unit mark42-engine-daemon.service || log "   engine-daemon 重启失败"
+    restart_unit mark42-armor-guard.service || log "   armor-guard 重启失败"
     sleep 5
     new_engine=$(pgrep -f "mark42 engine --daemon" | head -1 || echo "")
     new_armor=$(pgrep -f "mark42 armor --guard" | head -1 || echo "")
