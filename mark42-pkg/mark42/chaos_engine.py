@@ -685,8 +685,8 @@ class ChaosEngine:
                 except Exception:
                     try:
                         p.kill()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("CPU 压力进程 %s 强杀失败（可能已退出）: %s", p.pid, e)
             del self._cpu_procs
 
     # ── config_corruption (实验 10) ──
@@ -704,7 +704,6 @@ class ChaosEngine:
 
     def _setup_config_corruption(self, dry_run: bool = True) -> dict:
         """备份配置文件。"""
-        from . import config as cfg
         # 实际 find 一个真实存在的 toml
         candidates = [
             Path.home() / ".config" / "mark42" / "config.toml",
@@ -786,8 +785,8 @@ class ChaosEngine:
         for p in [p1, p2]:
             try:
                 p.kill()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("辅助进程 %s 强杀失败（可能已退出）: %s", p.pid, e)
         self._zombie_proc = p_zombie
         # 等 1s 确认 PID 稳定
         time.sleep(1.0)
@@ -831,8 +830,8 @@ class ChaosEngine:
                 try:
                     p.kill()
                     p.wait(timeout=1)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("zombie 进程 %s 清理失败（可能已回收）: %s", p.pid, e)
             del self._zombie_proc
 
     # ── 工具方法 ──

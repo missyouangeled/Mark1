@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -276,15 +275,16 @@ class Consciousness:
             "degraded_reason": None,
         }
         try:
+            import os as _os
+
             from mark42.plugins.builtin_memory import (
                 QMD_BIN,
                 QMD_INDEX,
-                _model_complete,
-                _vector_available,
-                _rerank_available,
                 QMD_VECTOR_MODE,
+                _model_complete,
+                _rerank_available,
+                _vector_available,
             )
-            import os as _os
             qmd_state["qmd_bin"] = "ok" if QMD_BIN else "missing"
             qmd_state["qmd_index"] = "ok" if _os.path.isfile(QMD_INDEX) else "missing"
             qmd_state["embedding_model"] = (

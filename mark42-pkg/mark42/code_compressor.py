@@ -170,7 +170,8 @@ class CodeCompressor:
         # docstring
         if (self.remove_docstrings and node.body
                 and isinstance(node.body[0], ast.Expr)
-                and isinstance(node.body[0].value, (ast.Constant, ast.Str))):
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)):
             stats["removed_docstrings"] += 1
             body = node.body[1:]
         else:
@@ -210,7 +211,8 @@ class CodeCompressor:
         body = node.body
         if (self.remove_docstrings and body
                 and isinstance(body[0], ast.Expr)
-                and isinstance(body[0].value, (ast.Constant, ast.Str))):
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)):
             stats["removed_docstrings"] += 1
             body = body[1:]
         # 类体: 简单展开 (不递归处理方法)

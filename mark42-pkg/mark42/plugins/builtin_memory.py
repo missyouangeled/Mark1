@@ -21,7 +21,6 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-
 # ── 模式配置 ──
 QMD_VECTOR_MODE = os.environ.get("MARK42_QMD_VECTOR", "auto").lower()
 if QMD_VECTOR_MODE not in ("off", "on", "auto"):
