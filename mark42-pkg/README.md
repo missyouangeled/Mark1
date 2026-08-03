@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Version](https://img.shields.io/badge/version-2.8.1-orange)
-![Tests](https://img.shields.io/badge/tests-1737%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1796%20passed-brightgreen)
 
 版本：`v2.8.1`
 
@@ -371,7 +371,7 @@ python3 -m pytest --cov=mark42 --cov-report=html
 
 | 指标 | 数值 |
 |---|---|
-| 通过 | **1737** |
+| 通过 | **1796** |
 | 跳过 | 28 |
 | 失败 / 错误 | 0 |
 | 通过率（非 skip） | **100%** |

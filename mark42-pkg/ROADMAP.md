@@ -27,7 +27,7 @@
   - `cluster_manager` 集群思维（R14）
   - `compaction_diag` OpenClaw 压缩配置诊断
   - `chaos` 混沌工程、`breaker` 熔断器、`arclock` 通用适配层
-- [x] 1737 个单元测试 100% 通过（28 skip）
+- [x] 1796 个单元测试 100% 通过（28 skip）
 - [x] CI 门禁转绿（ruff check + pytest + pip-audit + 安全扫描）
 - [x] `/mnt/data` 路径可移植化（`MARK42_DATA_MOUNT` env 覆盖 + XDG_STATE 回退）
 - [x] 完整中文文档体系（README / QUICKSTART / TUTORIAL / ARCHITECTURE / CONFIG-GUIDE）
