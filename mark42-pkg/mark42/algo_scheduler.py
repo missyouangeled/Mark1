@@ -247,6 +247,30 @@ class ScheduleDecision:
     config: SchedulerConfig = field(default_factory=SchedulerConfig)
 
 
+def _size_bucket(size: int, cfg: SchedulerConfig) -> str:
+    """尺寸分层的单一来源。"""
+    if size < cfg.skip_below:
+        return "tiny"
+    if size <= cfg.small_max:
+        return "small"
+    if size <= cfg.medium_max:
+        return "medium"
+    return "large"
+
+
+def _safety_policy(bucket: str, cfg: SchedulerConfig) -> tuple[bool, bool]:
+    """根据尺寸桶返回 (should_redact_pii, needs_review)。
+
+    安全不变量：安全策略只由尺寸桶决定，
+    绝不得被内容类型（code/diff/log/text）分支降级或绕过。
+    """
+    if bucket == "large":
+        return cfg.pii_enabled_large, True
+    if bucket == "medium":
+        return cfg.pii_enabled_medium, False
+    return cfg.pii_enabled_small, False
+
+
 def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecision:
     """根据内容特征做调度决策.
 
@@ -271,16 +295,21 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             is_json = False
 
     if not is_json and content and content.strip():
+        # 先算尺寸桶与安全策略，再选 route_algo，
+        # 避免内容类型分支绕过 large 桶的 PII/review 策略。
+        bucket = _size_bucket(size, cfg)
+        redact_pii, needs_review = _safety_policy(bucket, cfg)
+
         # diff: 必须有 @@ hunk header
         import re as _re
         if _re.search(r"^@@\s+-\d+", content, _re.MULTILINE):
-            bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
             return ScheduleDecision(
                 action="compress",
                 reason="diff detected (hunk header found)",
                 size_bucket=bucket,
                 should_compress=True,
-                should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                should_redact_pii=redact_pii,
+                needs_review=needs_review,
                 is_json=False,
                 route_algo="diff",
                 config=cfg,
@@ -290,13 +319,13 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             "def ", "class ", "import ", "function ", "var ", "const ",
             "return ", "=>", "#!/", "</"
         ]):
-            bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
             return ScheduleDecision(
                 action="compress",
                 reason="code detected",
                 size_bucket=bucket,
                 should_compress=True,
-                should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                should_redact_pii=redact_pii,
+                needs_review=needs_review,
                 is_json=False,
                 route_algo="code",
                 config=cfg,
@@ -321,13 +350,13 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             max_repeats = max(line_counts.values()) if line_counts else 0
             # 双重门: 重复多 + 至少 30% 行是日志格式
             if max_repeats >= max(3, len(lines) // 5) and log_score >= 0.30:
-                bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
                 return ScheduleDecision(
                     action="compress",
                     reason=f"log-like detected (max repeat {max_repeats}/{len(lines)} lines, log_score={log_score:.0%})",
                     size_bucket=bucket,
                     should_compress=True,
-                    should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                    should_redact_pii=redact_pii,
+                    needs_review=needs_review,
                     is_json=False,
                     route_algo="log",
                     config=cfg,
@@ -341,13 +370,13 @@ def decide(content: str, config: SchedulerConfig | None = None) -> ScheduleDecis
             avg_line_len = size / max(1, len(lines))
             min_line_len = 1 if _TEXT_USE_LLM == "true" else 30
             if avg_line_len >= min_line_len:
-                bucket = "small" if size <= cfg.small_max else ("medium" if size <= cfg.medium_max else "large")
                 return ScheduleDecision(
                     action="compress",
                     reason=f"text fallback (size {size}, lines={len(lines)}, avg_len={avg_line_len:.0f})",
                     size_bucket=bucket,
                     should_compress=True,
-                    should_redact_pii=cfg.pii_enabled_medium if size > cfg.small_max else cfg.pii_enabled_small,
+                    should_redact_pii=redact_pii,
+                    needs_review=needs_review,
                     is_json=False,
                     route_algo="text",
                     config=cfg,
