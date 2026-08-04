@@ -284,6 +284,57 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
         print(f"   监控: mark42 engine --watch-task {name}")
 
 
+def engine_register_all(interval_override: int = 0) -> dict[str, Any]:
+    """幂等注册所有内置/用户 Loop 模板（开机 bootstrap 用）。
+
+    行为：
+      - 已存在且非 killed 的 Loop 保留原状（不重置 cycle/lastRun）
+      - 不存在或已 killed 的模板重新注册为 registered
+      - 全程在同一把锁内完成，避免与 daemon 并发丢更新
+
+    历史问题：bootstrap unit 调用的 `engine register --all` 从未存在，
+    导致 oneshot 启动即 argparse 失败，而 armor/engine 又 Requires 它。
+    """
+    templates = _get_templates_cached()
+    if not templates:
+        print("⚠️ 未找到任何 Loop 模板，无需注册")
+        return {"registered": [], "kept": [], "total": 0}
+
+    def _mutate(loops: dict[str, Any]) -> dict[str, list[str]]:
+        registered: list[str] = []
+        kept: list[str] = []
+        for name, tmpl in sorted(templates.items()):
+            existing = loops.get(name)
+            if existing and existing.get("status") not in ("killed",):
+                kept.append(name)
+                continue
+            interval = interval_override or int(tmpl.get("interval", 300) or 300)
+            loops[name] = {
+                "task": tmpl.get("task") or tmpl.get("description") or name,
+                "interval": interval,
+                "maxCycles": None,
+                "template": name,
+                "status": "registered",
+                "cycle": 0,
+                "lastRun": None,
+                "lastResult": None,
+                "createdAt": _now_iso(),
+            }
+            registered.append(name)
+        return {"registered": registered, "kept": kept}
+
+    outcome = _locked_update_loops(_mutate)
+    registered = outcome["registered"]
+    kept = outcome["kept"]
+
+    print(f"🔄 Loop 模板注册完成（共 {len(templates)} 个模板）")
+    if registered:
+        print(f"   ✅ 新注册: {', '.join(registered)}")
+    if kept:
+        print(f"   ℹ️ 保留现有: {', '.join(kept)}")
+    return {"registered": registered, "kept": kept, "total": len(templates)}
+
+
 def engine_kill(name: str) -> None:
     """终止一个 Loop。"""
     def _mutate(loops: dict[str, Any]) -> str | None:

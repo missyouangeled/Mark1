@@ -56,15 +56,16 @@ def isolated_systemd(tmp_path, monkeypatch):
 
 
 class TestInstallSystemd:
-    def test_install_returns_none_or_true(self, isolated_systemd, tmp_path):
+    def test_install_returns_zero_on_success(self, isolated_systemd, tmp_path):
+        """安装全部步骤成功时必须返回 0。"""
         _, calls = isolated_systemd
         result = install_systemd(str(tmp_path / "ws"))
-        assert result is None or result is True
+        assert result == 0
 
     def test_install_with_empty_workspace(self, isolated_systemd):
         _, calls = isolated_systemd
         result = install_systemd("")
-        assert result is None or result is True
+        assert result == 0
 
     def test_install_does_not_touch_real_systemd(self, isolated_systemd, tmp_path):
         """回归防护：install 不得在真实 HOME 下创建任何文件。"""
@@ -77,10 +78,11 @@ class TestInstallSystemd:
 
 
 class TestUninstallSystemd:
-    def test_uninstall_returns_none_or_true(self, isolated_systemd):
+    def test_uninstall_returns_zero_on_success(self, isolated_systemd):
+        """卸载成功时必须返回 0。"""
         _, calls = isolated_systemd
         result = uninstall_systemd()
-        assert result is None or result is True
+        assert result == 0
 
     def test_uninstall_never_executes_real_systemctl(self, isolated_systemd):
         """核心回归防护：subprocess 必须被 mock 拦下，一条真命令都不许出去。
@@ -119,13 +121,76 @@ class TestUninstallSystemd:
         fake_home, _ = isolated_systemd
         unit_dir = fake_home / ".config" / "systemd" / "user"
         for svc in SERVICES:
-            (unit_dir / svc).write_text("[Unit]\n", encoding="utf-8")
+            (unit_dir / svc).write_text("[Unit]\nDescription=Mark42 test\n", encoding="utf-8")
 
         uninstall_systemd()
 
-        # 隔离目录里的假文件被删掉了，说明删除逻辑作用于 fake_home
+        # 隔离目录里的假 unit 被删掉了，说明删除逻辑作用于 fake_home
         remaining = [s for s in SERVICES if (unit_dir / s).exists()]
         assert not remaining, f"隔离目录内未清理: {remaining}"
+
+    def test_uninstall_skips_foreign_unit_with_same_name(self, isolated_systemd, capsys):
+        """同名但非 Mark42 的 unit 不得被静默删除。"""
+        import mark42.installer as inst
+
+        fake_home, _ = isolated_systemd
+        unit_dir = fake_home / ".config" / "systemd" / "user"
+        foreign = unit_dir / "mark42-bootstrap.service"
+        foreign.write_text("[Unit]\nDescription=someone else\n", encoding="utf-8")
+
+        # 强制所有权判定为“非 Mark42”（模拟第三方接管了这个名字）
+        original = inst._is_mark42_unit
+        inst._is_mark42_unit = lambda p: False
+        try:
+            uninstall_systemd()
+        finally:
+            inst._is_mark42_unit = original
+
+        assert foreign.exists(), "不属于 Mark42 的同名 unit 被误删"
+        assert "跳过" in capsys.readouterr().out
+
+    def test_install_backs_up_existing_unit(self, isolated_systemd, tmp_path):
+        """覆写已存在 unit 前必须先备份。"""
+        fake_home, _ = isolated_systemd
+        unit_dir = fake_home / ".config" / "systemd" / "user"
+        unit_dir.mkdir(parents=True, exist_ok=True)
+        existing = unit_dir / "mark42-bootstrap.service"
+        existing.write_text("[Unit]\nDescription=old custom\n", encoding="utf-8")
+
+        install_systemd(str(tmp_path / "ws"))
+
+        backups = list(unit_dir.glob("mark42-bootstrap.service.bak-*"))
+        assert backups, "覆写前未生成备份"
+        assert "old custom" in backups[0].read_text(encoding="utf-8")
+
+    def test_install_reports_failure_on_systemctl_error(self, isolated_systemd, tmp_path,
+                                                        capsys):
+        """systemctl 失败时不得宣告安装完成，且必须返回非零。
+
+        注意：不可用 monkeypatch.setattr(inst.subprocess, "run", ...)，
+        因为 inst.subprocess 就是全局 subprocess 模块，
+        那样会把整个测试进程的 subprocess.run 污染掉。
+        这里只临时接管 isolated_systemd 已经安装的桩，用完立即恢复。
+        """
+        import mark42.installer as inst
+
+        class FailedResult:
+            returncode = 1
+            stdout = ""
+            stderr = "Failed to connect to bus"
+
+        original_run = inst.subprocess.run
+        inst.subprocess.run = lambda *a, **k: FailedResult()
+        try:
+            rc = install_systemd(str(tmp_path / "ws"))
+        finally:
+            inst.subprocess.run = original_run
+
+        out = capsys.readouterr().out
+
+        assert rc != 0
+        assert "安装完成" not in out
+        assert "Failed to connect to bus" in out
 
 
 class TestProductionSafety:

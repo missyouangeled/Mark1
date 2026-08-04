@@ -415,3 +415,131 @@ def test_watchdog_check_logs_restart(tmp_path):
         assert log_file.exists()
         log_content = log_file.read_text()
         assert "检测到异常" in log_content or "重启" in log_content
+
+
+# ── 回归测试：watchdog 健康判定与退出码真实性 ─────────────
+
+
+def _wd_env(tmp_path, hb_content=None):
+    """构造隔离的 watchdog 环境变量。"""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    hb = state_dir / "daemon-heartbeat.json"
+    if hb_content is not None:
+        hb.write_text(json.dumps(hb_content))
+    return {
+        "XDG_STATE_HOME": str(state_dir),
+        "MARK42_STATE_DIR": str(state_dir / "mark42"),
+        "MARK42_LOG_DIR": str(log_dir),
+        "HEARTBEAT": str(hb),
+    }
+
+
+def test_stale_heartbeat_with_live_pids_still_restarts(tmp_path):
+    """回归测试：心跳超时但进程仍存活时必须重启，且不得谎报成功。
+
+    历史 bug：need_restart 由心跳决定，但实际重启条件只看进程是否存在。
+    两个进程都活着时一个 service 都不会重启，随后只复查 PID，
+    于是记录 "✅ 重启成功" —— daemon 已卡死却被判为健康。
+    """
+    from mark42.watchdog import watchdog_check
+
+    env = _wd_env(tmp_path, {"lastTick": "2020-01-01T00:00:00+00:00"})
+    logged = []
+
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env.get(k, d)),
+        patch("mark42.watchdog._check_process", return_value=True),
+        patch("mark42.watchdog._restart_service", return_value=True) as mock_restart,
+        patch("mark42.watchdog._log", side_effect=lambda m, lf: logged.append(m)),
+        patch("mark42.watchdog.time.sleep"),
+    ):
+        rc = watchdog_check()
+
+    assert mock_restart.call_count >= 1, "心跳超时必须触发重启"
+    assert rc != 0, "心跳未恢复必须以非零退出"
+    assert not any("重启成功" in m for m in logged), "心跳仍异常时不得记录重启成功"
+
+
+def test_restart_success_requires_heartbeat_recovery(tmp_path):
+    """重启后心跳恢复才算成功。"""
+    from mark42.watchdog import watchdog_check
+
+    env = _wd_env(tmp_path)
+    logged = []
+    calls = {"n": 0}
+
+    def hb_side_effect(path, threshold=300):
+        calls["n"] += 1
+        return (False, "心跳超时") if calls["n"] == 1 else (True, "")
+
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env.get(k, d)),
+        patch("mark42.watchdog._check_heartbeat", side_effect=hb_side_effect),
+        patch("mark42.watchdog._check_process", return_value=True),
+        patch("mark42.watchdog._restart_service", return_value=True),
+        patch("mark42.watchdog._log", side_effect=lambda m, lf: logged.append(m)),
+        patch("mark42.watchdog.time.sleep"),
+    ):
+        rc = watchdog_check()
+
+    assert rc == 0
+    assert any("重启成功" in m for m in logged)
+
+
+def test_systemctl_restart_failure_returns_nonzero(tmp_path):
+    """回归测试：systemctl 重启失败必须以非零退出。
+
+    历史 bug：_restart_service() 不返回结果，watchdog_check() 恒返回 None，
+    模块入口也没有 sys.exit，因此恢复失败仍被 systemd 记作成功。
+    """
+    from mark42.watchdog import watchdog_check
+
+    env = _wd_env(tmp_path)
+
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env.get(k, d)),
+        patch("mark42.watchdog._check_heartbeat", return_value=(True, "")),
+        patch("mark42.watchdog._check_process", return_value=False),
+        patch("mark42.watchdog._restart_service", return_value=False),
+        patch("mark42.watchdog.time.sleep"),
+    ):
+        rc = watchdog_check()
+
+    assert rc != 0
+
+
+def test_restart_service_reports_failure_status(tmp_path):
+    """_restart_service 必须把 systemctl 返回码转成布尔结果。"""
+    from mark42.watchdog import _restart_service
+
+    logfile = tmp_path / "wd.log"
+
+    ok_result = Mock(returncode=0, stdout="", stderr="")
+    with patch("mark42.watchdog.subprocess.run", return_value=ok_result):
+        assert _restart_service("svc", logfile) is True
+
+    bad_result = Mock(returncode=1, stdout="", stderr="unit not found")
+    with patch("mark42.watchdog.subprocess.run", return_value=bad_result):
+        assert _restart_service("svc", logfile) is False
+
+
+def test_all_healthy_returns_zero_and_stays_silent(tmp_path):
+    """一切正常时静默且返回 0。"""
+    from mark42.watchdog import watchdog_check
+
+    env = _wd_env(tmp_path)
+    logged = []
+
+    with (
+        patch("mark42.watchdog.os.environ.get", side_effect=lambda k, d="": env.get(k, d)),
+        patch("mark42.watchdog._check_heartbeat", return_value=(True, "")),
+        patch("mark42.watchdog._check_process", return_value=True),
+        patch("mark42.watchdog._log", side_effect=lambda m, lf: logged.append(m)),
+    ):
+        rc = watchdog_check()
+
+    assert rc == 0
+    assert logged == []

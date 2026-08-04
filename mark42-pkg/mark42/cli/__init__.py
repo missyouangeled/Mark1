@@ -722,6 +722,8 @@ def main() -> None:
     engine_p.add_argument("--kill", type=str, help="终止 Loop")
     engine_p.add_argument("--daemon", action="store_true", help="守护进程模式")
     engine_p.add_argument("--watch-task", type=str, help="监控大工程")
+    engine_p.add_argument("--register-all", action="store_true",
+                          help="幂等注册所有 Loop 模板（开机 bootstrap 用）")
 
     # ── Heavy ──
     heavy_p = sub.add_parser("heavy", help="⚙️ 重型战甲")
@@ -831,6 +833,16 @@ def main() -> None:
     ms_p = sub.add_parser("metrics-server", help="📊 Prometheus HTTP 端点（/metrics + /health）")
     ms_p.add_argument("--port", type=int, default=9100, help="监听端口（默认 9100）")
     ms_p.add_argument("--host", type=str, default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
+
+    # ── Watchdog（systemd timer 调用） ──
+    wd_p = sub.add_parser("watchdog", help="🐕 守护检查（心跳 + 进程存活）")
+    wd_p.add_argument("--check", action="store_true", help="执行一次检查并必要时自愈")
+
+    # ── Installer（systemd 安装/卸载） ──
+    inst_p = sub.add_parser("install", help="📦 安装 systemd 用户服务")
+    inst_p.add_argument("--workspace", type=str, default="", help="指定 workspace 路径")
+
+    sub.add_parser("uninstall", help="🗑️ 卸载 systemd 用户服务")
 
     args = parser.parse_args()
 
@@ -1003,6 +1015,7 @@ def main() -> None:
             engine_daemon,
             engine_kill,
             engine_list,
+            engine_register_all,
             engine_run_loop,
             engine_start,
             engine_templates,
@@ -1010,6 +1023,8 @@ def main() -> None:
         )
         if args.templates:
             engine_templates()
+        elif getattr(args, "register_all", False):
+            engine_register_all()
         elif args.list:
             engine_list()
         elif args.start:
@@ -1504,6 +1519,19 @@ def main() -> None:
         run_server(port=args.port, host=args.host)
         return
 
+    if args.module == "watchdog":
+        from ..watchdog import watchdog_check
+        # 自愈失败必须以非零退出，供 systemd 判定 oneshot 失败
+        return watchdog_check()
+
+    if args.module == "install":
+        from ..installer import install_systemd
+        return install_systemd(workspace=getattr(args, "workspace", "") or "")
+
+    if args.module == "uninstall":
+        from ..installer import uninstall_systemd
+        return uninstall_systemd()
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

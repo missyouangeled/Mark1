@@ -72,21 +72,35 @@ def _check_process(pattern: str) -> bool:
         return False
 
 
-def _restart_service(svc_name: str, logfile: str | Path) -> None:
-    """重启 systemd 用户服务。"""
+def _restart_service(svc_name: str, logfile: str | Path) -> bool:
+    """重启 systemd 用户服务。返回是否成功。
+
+    历史 bug：原实现只写日志不返回结果，
+    调用方无法得知 systemctl 是否真的成功。
+    """
     _log(f"  重启 {svc_name} ...", logfile)
-    result = subprocess.run(
-        ["systemctl", "--user", "restart", svc_name],
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "restart", svc_name],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except Exception as e:
+        _log(f"  {svc_name} 重启异常: {type(e).__name__}: {e}", logfile)
+        return False
     if result.returncode != 0:
         _log(f"  {svc_name} 重启失败: {result.stderr.strip()[:200]}", logfile)
+        return False
+    return True
 
 
-def watchdog_check() -> None:
-    """执行一次 watchdog 检查。"""
+def watchdog_check() -> int:
+    """执行一次 watchdog 检查。
+
+    Returns:
+        0 = 一切正常或已成功恢复；非 0 = 自愈失败（供 systemd 判定 oneshot 失败）。
+    """
     # 路径
     xdg_state = _get_env("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
     state_dir = _get_env("MARK42_STATE_DIR", f"{xdg_state}/openclaw/mark42")
@@ -110,45 +124,61 @@ def watchdog_check() -> None:
     armor_alive = _check_process("mark42.*armor --guard")
 
     # ── 3. 处置 ──
-    need_restart = False
     reasons = []
-
     if not hb_ok:
-        need_restart = True
         reasons.append(reason)
-
     if not engine_alive:
-        need_restart = True
         reasons.append("engine-daemon 进程不在")
-
     if not armor_alive:
-        need_restart = True
         reasons.append("armor-guard 进程不在")
 
-    if need_restart:
-        msg = f"⚠️ 检测到异常: {'; '.join(reasons)} -> 重启 service"
-        _log(msg, logfile)
+    if not reasons:
+        # 正常情况静默退出（避免日志爆量）
+        return 0
 
-        if not engine_alive:
-            _restart_service("mark42-engine-daemon.service", logfile)
-        if not armor_alive:
-            _restart_service("mark42-armor-guard.service", logfile)
+    _log(f"⚠️ 检测到异常: {'; '.join(reasons)} -> 重启 service", logfile)
 
-        # 等待 5 秒后验证
-        time.sleep(5)
+    # 健康判定不只看 PID：心跳超时意味着 daemon 已卡死，
+    # 即使进程还在也必须重启，否则会“不重启却记录重启成功”。
+    restart_targets = []
+    if not engine_alive or not hb_ok:
+        restart_targets.append(("mark42-engine-daemon.service", "engine"))
+    if not armor_alive:
+        restart_targets.append(("mark42-armor-guard.service", "armor"))
 
-        new_engine = _check_process("mark42.*engine --daemon")
-        new_armor = _check_process("mark42.*armor --guard")
+    restart_failures = [
+        svc for svc, _label in restart_targets
+        if not _restart_service(svc, logfile)
+    ]
 
-        if new_engine and new_armor:
-            _log("✅ 重启成功", logfile)
-        else:
-            _log(
-                f"❌ 重启后仍有进程缺失: engine={'✅' if new_engine else '❌'}, armor={'✅' if new_armor else '❌'}",
-                logfile,
-            )
-    # 正常情况静默退出（避免日志爆量）
+    # 等待 5 秒后验证
+    time.sleep(5)
+
+    new_engine = _check_process("mark42.*engine --daemon")
+    new_armor = _check_process("mark42.*armor --guard")
+    # 重启后必须重新校验心跳，而不是只看进程是否存在
+    new_hb_ok, new_hb_reason = _check_heartbeat(heartbeat, warn_threshold)
+
+    problems = []
+    if not new_engine:
+        problems.append("engine 进程仍缺失")
+    if not new_armor:
+        problems.append("armor 进程仍缺失")
+    if not new_hb_ok:
+        problems.append(f"心跳仍异常: {new_hb_reason}")
+    if restart_failures:
+        problems.append(f"systemctl 重启失败: {', '.join(restart_failures)}")
+
+    if not problems:
+        _log("✅ 重启成功（进程存活且心跳已恢复）", logfile)
+        return 0
+
+    _log(f"❌ 自愈未完成: {'; '.join(problems)}", logfile)
+    return 1
 
 
 if __name__ == "__main__":
-    watchdog_check()
+    import sys
+
+    # 自愈失败必须以非零退出，否则 systemd 会把本次 oneshot 记作成功
+    sys.exit(watchdog_check())
