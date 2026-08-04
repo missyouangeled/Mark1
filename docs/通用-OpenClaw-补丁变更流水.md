@@ -2133,3 +2133,17 @@
 - `skills/trae-agent-engineering/SKILL.md`（新文件）
 - `docs/install-registry.md`（修改）
 - `memory/INDEX.md`（自动索引更新）
+
+## 2026-08-04 16:51:45 CST (+08:00) — Mark42 v2.8.2: armor_compress 拆分 665->235 行 + compact 锁 datetime bug 修复
+
+- 类型：refactor
+- 适用范围：mark42-pkg/mark42/armor.py
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 拆分全仓最大单体函数 armor_compress (665 行, 最深 6 层嵌套) 为主编排器 + 13 个模块级子函数, 减少 65%。拆分过程中子函数单测暴露 P0 真 bug: _now_iso() 产出 aware 时间戳但锁/冷却期判定用 naive datetime.now() 相减, TypeError 被 except 静默吞掉, 导致 compact 锁与 30 分钟冷却期双双完全失效 (两实例可同时 compact, 反复压缩已压过的 session)。新增 _iso_age_seconds() 统一处理。补 43 个子函数单测。
+- 验收 / 验证：
+- ruff 0 报错; 1811 passed / 28 skipped (基线 1768 + 新增 43); mark42 status 正常; 版本四方一致 2.8.2; engine-daemon + armor-guard 重构后仍 active
+- 相关文件：
+- [未记录文件]
