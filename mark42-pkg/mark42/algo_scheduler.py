@@ -412,7 +412,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
     1. decide() 做决策
     2. 如需 PII 脱敏 → 先 redact
     3. 如需压缩 → 再 smartcrush
-    4. 验证压缩率, 失败回退原文
+    4. 验证压缩率, 失败回退到“最后一个已通过安全处理的版本”(已脱敏则为脱敏后内容)
 
     Args:
         content: 原始内容
@@ -449,6 +449,9 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
         if pii_stats["total_redactions"] > 0:
             current = redacted
             result["changed"] = True
+            # 安全不变量: 脱敏一旦生效, 立即同步到返回值。
+            # 后续压缩护栏可能提前 return, 绝不允许回退成未脱敏原文。
+            result["result"] = current
 
     # 2. 压缩 (如果需要) - 按 route_algo 选择算法
     if decision.should_compress:
@@ -481,7 +484,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
         if ratio < cfg.min_useful_ratio:
             result["fallback_reason"] = (
                 f"compression ratio {ratio:.2%} below threshold "
-                f"{cfg.min_useful_ratio:.2%}, kept original"
+                f"{cfg.min_useful_ratio:.2%}, kept pre-compression content"
             )
             return result
 
@@ -490,7 +493,7 @@ def process(content: str, config: SchedulerConfig | None = None) -> dict[str, An
             result["fallback_reason"] = (
                 f"compressed size {crushed_size}/{original_size} "
                 f"= {crushed_size/original_size:.2%} > {cfg.max_safe_ratio:.2%}, "
-                f"kept original"
+                f"kept pre-compression content"
             )
             return result
 

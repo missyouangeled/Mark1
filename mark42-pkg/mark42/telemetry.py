@@ -57,7 +57,25 @@ def _env_flag(name: str, default: str = "0") -> bool:
 
 TRACING_ENABLED = _env_flag("MARK42_TRACING_ENABLED")
 METRICS_ENABLED = _env_flag("MARK42_METRICS_ENABLED")
-METRICS_PORT = int(os.environ.get("MARK42_METRICS_PORT", "9464"))
+
+
+def _env_port(name: str, default: int = 9464) -> int:
+    """解析端口环境变量。非法值降级为默认值，绝不在 import 阶段报错。"""
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        port = int(raw.strip())
+    except ValueError:
+        logger.warning("%s=%r 不是合法端口，降级为 %d", name, raw, default)
+        return default
+    if not (1 <= port <= 65535):
+        logger.warning("%s=%d 超出有效端口范围，降级为 %d", name, port, default)
+        return default
+    return port
+
+
+METRICS_PORT = _env_port("MARK42_METRICS_PORT")
 SERVICE_NAME = os.environ.get("MARK42_OTEL_SERVICE_NAME", "mark42")
 
 # ── 依赖探测（缺失即降级，不报错） ────────────────────────
@@ -227,22 +245,56 @@ def span(name: str, **attributes: Any) -> Iterator[None]:
     用法：
         with span("armor.compress", strategy="llm"):
             ...
+
+    约定：telemetry 自身失败只降级并记 debug 日志，
+    但业务异常必须原样向外传播，绝不能被吞掉或替换。
     """
     if _tracer is None:
         yield
         return
+
+    # 阶段 1：创建 span。失败则退化为无追踪，但业务照常执行。
+    cm = None
+    span_obj = None
     try:
-        with _tracer.start_as_current_span(name) as s:
-            for k, v in attributes.items():
-                try:
-                    s.set_attribute(k, v)
-                except Exception as e:
-                    logger.debug("span %s 属性 %s 设置失败: %s", name, k, e)
-            yield
+        cm = _tracer.start_as_current_span(name)
+        span_obj = cm.__enter__()
     except Exception as e:
-        # 追踪失败绝不能影响业务
-        logger.debug("span %s 记录失败: %s", name, e)
+        logger.debug("span %s 创建失败: %s", name, e)
+        cm = None
+        span_obj = None
+
+    if cm is None:
         yield
+        return
+
+    # 阶段 2：设置属性，失败不影响业务。
+    if span_obj is not None:
+        for k, v in attributes.items():
+            try:
+                span_obj.set_attribute(k, v)
+            except Exception as e:
+                logger.debug("span %s 属性 %s 设置失败: %s", name, k, e)
+
+    # 阶段 3：执行业务。业务异常必须原样抛出。
+    try:
+        yield
+    except BaseException as exc:
+        try:
+            suppressed = cm.__exit__(type(exc), exc, exc.__traceback__)
+        except Exception as e:
+            # span 关闭失败不得替换业务异常
+            logger.debug("span %s 关闭失败: %s", name, e)
+            suppressed = False
+        if not suppressed:
+            raise
+        return
+
+    # 阶段 4：正常结束时关闭 span，关闭失败只降级。
+    try:
+        cm.__exit__(None, None, None)
+    except Exception as e:
+        logger.debug("span %s 关闭失败: %s", name, e)
 
 
 def record_loop_run(loop_type: str, status: str, duration_s: float | None = None) -> None:

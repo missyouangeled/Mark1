@@ -104,7 +104,7 @@ class TestBuiltinArchive:
         assert result == raw_entry
 
     def test_add_forwards_all_fields_to_impl(self, mocker):
-        """测试 add 方法正确转发所有字段到 record 方法。"""
+        """测试 add 方法按 ErrorArchive.record() 真实签名转发字段。"""
         mock_error_archive_class = mocker.patch(
             'mark42.error_archive.ErrorArchive'
         )
@@ -127,9 +127,14 @@ class TestBuiltinArchive:
         mock_impl.record.assert_called_once_with(
             category="test-cat",
             signature="test-sig",
-            error_summary="error happened",
-            root_cause="bug",
-            fix_applied="applied patch",
+            diagnosis="error happened",
+            context={
+                "summary": "error happened",
+                "root_cause": "bug",
+                "fix": "applied patch",
+            },
+            tags=None,
+            notes="root_cause: bug | fix: applied patch",
         )
         assert result == "entry-id-123"
 
@@ -167,10 +172,49 @@ class TestBuiltinArchive:
         mock_impl.record.assert_called_once_with(
             category="",
             signature="",
-            error_summary="",
-            root_cause="",
-            fix_applied="",
+            diagnosis="",
+            context=None,
+            tags=None,
+            notes="",
         )
+
+    def test_add_signature_matches_real_error_archive(self, tmp_path, monkeypatch):
+        """防回归：add() 必须能真实调通 ErrorArchive.record()。
+
+        历史 bug：传入 error_summary/root_cause/fix_applied 会抛
+        TypeError: unexpected keyword argument 'error_summary'。
+        纯 Mock 测试无法捕获这类签名断裂，所以这里用真实实现。
+        """
+        monkeypatch.setenv("MARK42_STATE", str(tmp_path))
+
+        from mark42.plugins.builtin_archive import BuiltinArchive
+        archive = BuiltinArchive()
+
+        entry_id = archive.add({
+            "category": "test-cat",
+            "signature": "real-sig",
+            "summary": "boom",
+            "root_cause": "rc",
+            "fix": "f",
+        })
+
+        assert entry_id
+        found = archive.lookup("real-sig", category="test-cat")
+        assert found is not None
+        assert found["diagnosis"] == "boom"
+
+    def test_approve_handles_ok_false_dict(self, mocker):
+        """approve_for_auto 返回 {'ok': False} 时必须报失败。"""
+        mock_error_archive_class = mocker.patch(
+            'mark42.error_archive.ErrorArchive'
+        )
+        mock_impl = mock_error_archive_class.return_value
+        mock_impl.approve_for_auto.return_value = {"ok": False, "reason": "blacklisted"}
+
+        from mark42.plugins.builtin_archive import BuiltinArchive
+        archive = BuiltinArchive()
+
+        assert archive.approve("entry-123") is False
 
     def test_approve_forwards_to_impl(self, mocker):
         """测试 approve 方法正确转发到实现。"""

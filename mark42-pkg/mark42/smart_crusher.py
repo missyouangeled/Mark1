@@ -10,10 +10,10 @@
 """
 
 import json
+import logging
 from typing import Any
 
-# 【2026-07-13】不能用相对路径, 因为 algo_scheduler 从外部 `from smart_crusher import smartcrush`
-from mark42.utils import safe_call
+log = logging.getLogger(__name__)
 
 
 class SmartCrusher:
@@ -101,10 +101,21 @@ class SmartCrusher:
     def _compress_numeric_array(self, arr: list) -> str:
         if not arr:
             return "[]"
+        # 健壮性：Python int 无上限，转 float 格式化可能抛 OverflowError。
+        # 统计信息不能因为格式化失败而击穿整个压缩流程。
+        total = sum(arr)
+        try:
+            mean_repr = f"{total / len(arr):.2f}"
+        except (OverflowError, ZeroDivisionError, ValueError):
+            # 退化为整数除法，不经过 float
+            try:
+                mean_repr = str(total // len(arr))
+            except Exception:
+                mean_repr = "n/a"
         return (f"[numeric array: length={len(arr)}, "
                 f"min={min(arr)}, max={max(arr)}, "
-                f"mean={sum(arr)/len(arr):.2f}, "
-                f"sum={sum(arr)}]")
+                f"mean={mean_repr}, "
+                f"sum={total}]")
 
     def _crush_mixed(self, content: str, stats: dict) -> tuple[str, dict]:
         lines = content.splitlines()
@@ -133,9 +144,26 @@ def get_smartcrusher() -> SmartCrusher:
     return _smartcrusher_singleton
 
 
-@safe_call(default=("", {"error": "smartcrush failed"}), label="smartcrush")
 def smartcrush(content: str) -> tuple[str, dict]:
-    return get_smartcrusher().crush(content)
+    """压缩 JSON/文本。
+
+    完整性不变量：压缩失败时必须返回**原始输入**，
+    绝不能返回空字符串把调用方的数据丢掉。
+    """
+    try:
+        return get_smartcrusher().crush(content)
+    except Exception as e:
+        log.warning("smartcrush failed, returning original content: %s: %s",
+                    type(e).__name__, e)
+        original_bytes = len((content or "").encode("utf-8"))
+        return content, {
+            "algorithm": "smartcrush",
+            "original_bytes": original_bytes,
+            "crushed_bytes": original_bytes,
+            "ratio": 0.0,
+            "status": "error_kept_original",
+            "error": f"{type(e).__name__}: {e}",
+        }
 
 
 def _run_tests():

@@ -141,6 +141,9 @@ class LLMTextCompressor:
             "llm_duration_ms": 0,
             "fallback_reason": None,
             "error": None,
+            "input_truncated_for_llm": False,
+            "tail_preserved_bytes": 0,
+            "all_source_covered": True,
         }
 
         if not text or not text.strip():
@@ -156,23 +159,28 @@ class LLMTextCompressor:
             stats["status"] = "passthrough_small"
             return text, stats
 
-        # 截断超长输入
+        # 截断超长输入：仅用于 LLM 请求副本，不得覆盖完整原文。
+        # 完整性不变量：任何 fallback/回退路径都必须基于 original_text，
+        # 绝不允许静默丢失输入尾部。
+        original_text = text
         truncated = False
+        llm_input = text
         if stats["original_bytes"] > self.max_input_bytes:
-            text = text.encode("utf-8")[:self.max_input_bytes].decode("utf-8", errors="ignore")
+            llm_input = text.encode("utf-8")[:self.max_input_bytes].decode("utf-8", errors="ignore")
             truncated = True
+        stats["input_truncated_for_llm"] = truncated
 
         # 解析 LLM 路由
         resolved = self._resolve_model()
         if not resolved:
             stats["status"] = "fallback_rule_based"
             stats["fallback_reason"] = "no_model_config"
-            return self._fallback(text, stats)
+            return self._fallback(original_text, stats)
 
         stats["llm_model"] = resolved.get("model", "?")
 
         # 调 LLM
-        prompt = PROMPTS[self.mode].format(text=text)
+        prompt = PROMPTS[self.mode].format(text=llm_input)
         t0 = time.time()
         try:
             result_text = self._call_llm(prompt, resolved)
@@ -182,7 +190,7 @@ class LLMTextCompressor:
             stats["status"] = "fallback_rule_based"
             stats["fallback_reason"] = "llm_exception"
             log.warning(f"LLM call failed: {stats['error']}, falling back to rule_based")
-            return self._fallback(text, stats)
+            return self._fallback(original_text, stats)
         stats["llm_duration_ms"] = int((time.time() - t0) * 1000)
         stats["llm_called"] = True
 
@@ -191,30 +199,45 @@ class LLMTextCompressor:
         if not result_text:
             stats["status"] = "fallback_rule_based"
             stats["fallback_reason"] = "empty_llm_output"
-            return self._fallback(text, stats)
+            return self._fallback(original_text, stats)
 
-        # 评估压缩率
-        crushed = len(result_text.encode("utf-8"))
+        # 完整性保障：若为 LLM 请求截断过输入，未送入模型的尾部必须原样保留，
+        # 防止“看似压缩成功”但实际丢掉输入尾部。
+        tail = original_text[len(llm_input):] if truncated else ""
+        if tail:
+            sep = "" if result_text.endswith("\n") else "\n"
+            final_text = f"{result_text}{sep}{tail}"
+        else:
+            final_text = result_text
+        stats["tail_preserved_bytes"] = len(tail.encode("utf-8"))
+        stats["all_source_covered"] = True
+
+        # 评估压缩率（基于实际交付的完整输出）
+        crushed = len(final_text.encode("utf-8"))
         ratio = 1.0 - crushed / max(1, stats["original_bytes"])
 
         if ratio < self.min_useful_ratio:
             stats["status"] = "fallback_low_ratio"
             stats["ratio"] = ratio
             stats["fallback_reason"] = f"ratio {ratio:.1%} < {self.min_useful_ratio:.0%}"
-            return text, stats
+            stats["crushed_bytes"] = stats["original_bytes"]
+            stats["crushed_lines"] = stats["original_lines"]
+            return original_text, stats
 
         if ratio > self.max_useful_ratio:
-            # 过度压缩, 可能丢了东西, 回退
+            # 过度压缩, 可能丢了东西, 回退完整原文
             stats["status"] = "fallback_low_ratio"
             stats["ratio"] = ratio
             stats["fallback_reason"] = f"ratio {ratio:.1%} > {self.max_useful_ratio:.0%} (over-compressed)"
-            return text, stats
+            stats["crushed_bytes"] = stats["original_bytes"]
+            stats["crushed_lines"] = stats["original_lines"]
+            return original_text, stats
 
         stats["crushed_bytes"] = crushed
-        stats["crushed_lines"] = result_text.count("\n") + (1 if not result_text.endswith("\n") else 0)
+        stats["crushed_lines"] = final_text.count("\n") + (1 if not final_text.endswith("\n") else 0)
         stats["ratio"] = ratio
         stats["status"] = "passthrough_truncated_input" if truncated else "compressed"
-        return result_text, stats
+        return final_text, stats
 
     def _resolve_model(self) -> dict[str, Any] | None:
         """从 Mark42 模型表解析 LLM 路由 (延迟导入避免循环)"""
