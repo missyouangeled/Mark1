@@ -7,6 +7,62 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 
 ## [Unreleased]
 
+### 重构
+- 🔨 **`armor_compress()` 拆分：665 行 → 235 行（-65%）**：该函数长期是全仓最大的
+  单体函数，压缩流程的六个阶段（索引构建、事件上报、冷却期检查、已压缩预检、
+  平台探测、CLI 调用、收尾审计）全部内联在一个函数体里，最深处嵌套 6 层缩进，
+  任何一个阶段都无法独立测试。现拆为主编排器 + 13 个模块级子函数：
+  - `_compress_build_index()` — LLM 优先 / 启发式回退的双分支索引构建
+  - `_compress_log_events()` — broker 事件上报
+  - `_compress_check_cooldown()` — 30 分钟压缩冷却期检查
+  - `_compress_check_already_compacted()` — session 已含 compaction 摘要的预检
+  - `_compress_run_compact_cli()` — Session Fence 验证 + `openclaw sessions compact` 调用
+    + 三分支结果判定（摘要膨胀 / 压缩成功 / 文件未变回退 maxlines）
+  - `_compress_write_action_log()` — actions.jsonl 审计写入 + bytesStatus 语义标记
+  - `_compress_check_ineffective_escalation()` — 连续 ≥3 次压缩无效的升级报
+  - `_compress_audit_hook()` — Post-Compact Audit 异步核对
+  - `_try_acquire_compact_lock()` / `_release_compact_lock()` / `_platform_compact_probe()`
+    从函数内嵌闭包提到模块级（`_platform_compact_probe` 的 `dry_run` 从闭包捕获
+    改为显式参数）
+  - `_compact_cooldown_file()` / `_compact_lock_file()` — 路径改为延迟求值函数，
+    避免测试 monkeypatch `XDG_STATE` 时路径在 import 期被固化
+  - 常量 `COMPACT_COOLDOWN_SEC` / `PLATFORM_PROBE_SEC` / `PLATFORM_PROBE_INTERVAL` /
+    `COMPACT_LOCK_TTL_SEC` 提到模块级；`_PLATFORM_PROBE_SKIP_SLEEP` 显式定义为
+    模块级 `False`（原先只在函数内 `getattr` 探测，模块级并不存在该属性）
+  公开 API `armor_compress(dry_run)` 签名与返回结构完全不变，六个 `skip-*` 动作码
+  （`skip` / `skip-cooldown` / `skip-already-compacted` / `skip-platform-handled` /
+  `skip-locked`）行为保持一致。
+
+### 修复
+- 🔒 **compact 锁与冷却期完全失效（P0，重构副产品）**：`_now_iso()` 产出带时区偏移的
+  时间戳（`2026-08-04T16:33:02+08:00`），但锁过期判定和冷却期判定都用 naive 的
+  `datetime.now()` 相减，触发
+  `TypeError: can't subtract offset-naive and offset-aware datetimes`。
+  两处的 `except` 都把异常静默吞掉，后果是：
+  1. **compact 锁形同虚设** — 异常后走「锁文件损坏」分支删锁重建，任何时刻
+     两个 Mark42 实例都能同时对同一 session 执行 compact；
+  2. **30 分钟冷却期形同虚设** — 反复 compact 已压缩过的 session，而 LLM 摘要 +
+     结构化元数据会让文件比原文更大（实测膨胀 10KB+）。
+  该 bug 在拆分前就存在，是子函数单测（同一进程连抢两次锁应第二次失败）把它暴露出来的。
+  修复：新增 `_iso_age_seconds()` 统一处理时间差，按解析结果的 `tzinfo` 决定用
+  aware 还是 naive 的当前时间，解析失败返回 `None` 而非抛异常。
+
+### 测试
+- ✅ **新增 `tests/test_armor_compress_units.py`（43 个子函数级单测）**：原有
+  `test_armor_compress.py` 全是走完整 `armor_compress()` 流程的端到端测试，
+  拆分后补齐阶段级覆盖 —— 锁机制 8 个（含 TTL 过期、文件损坏、缺时间戳恢复）、
+  平台探测 5 个、索引构建 8 个、冷却期 5 个、已压缩预检 6 个、
+  审计日志 5 个（bytesStatus 四态）、无效升级 6 个。
+- 🔧 **修正 `test_ineffective_history_triggers_escalation_event`**：该测试连续调用
+  `armor_compress()` 两次，原先依赖冷却期 bug 才能穿过第二次调用（属于
+  「靠 bug 侥幸通过」）。冷却期真正生效后显式清除冷却标记，模拟两次压缩间隔已超 30 分钟。
+- 📊 测试总数 1768 → 1811（+43），Ruff 0 告警。
+
+### 已知待办
+- ⚠️ **CI workflow 文件缺失**：2026-08-03 的记录称已补齐 `py3.13` 矩阵、版本一致性检查、
+  `build` job 和 `sbom` job，但仓库内 `.github/workflows/` 目录实际不存在，
+  只有 `ISSUE_TEMPLATE/`。需要重新落地。
+
 ### 修复
 - 🛡️ **JSON 状态写入改为原子操作（数据完整性，P0）**：`utils._save_json()` 和
   `config._conf_save_json()` 原本直接 `open(path, "w")` 截断旧文件再写，进程在写入
