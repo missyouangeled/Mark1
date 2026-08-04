@@ -55,3 +55,29 @@ Evaluate whether this capability belongs in agent workflow, hook automation, or 
 - Session Key: agent:main:main
 
 ---
+
+## [FEAT-20260803-001] missing-capability-request
+
+**Logged**: 2026-08-03T09:35:48.089Z
+**Priority**: medium
+**Status**: pending
+**Area**: docs
+
+### Requested Capability
+嗯 因为事实证明 你有推理能力。又有逻辑思维和解决问题的能力，那为什么不能学会主动表达呢。对吧～
+
+### User Context
+User explicitly asked for a concrete capability or workflow the assistant does not reliably have yet.
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+Evaluate whether this capability belongs in agent workflow, hook automation, or a dedicated skill update.
+
+### Metadata
+- Frequency: first_time
+- Related Features: self-improvement
+- Session Key: agent:main:main
+
+---

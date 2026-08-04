@@ -1,0 +1,71 @@
+{
+  "checkedAt": "2026-08-03 12:18:45",
+  "version": "2.8.1",
+  "armor": {
+    "usagePercent": 12.4,
+    "status": "ok",
+    "severity": "ok",
+    "summary": "上下文 12.4%，正常",
+    "contextWindow": 1000000,
+    "estimatedTokens": 123561,
+    "memoryIndex": {
+      "strategy": "llm-analyze",
+      "generatedAt": "2026-07-31T08:29:31.799266+08:00",
+      "modelGenerated": true
+    }
+  },
+  "engine": {
+    "activeLoops": 4,
+    "totalLoops": 4,
+    "loops": {
+      "health-watch": {
+        "status": "registered",
+        "template": "health-watch",
+        "cycle": 520,
+        "maxCycles": null,
+        "task": "健康监控",
+        "lastRun": "2026-08-03T12:13:30.845218+08:00"
+      },
+      "model-fallback": {
+        "status": "registered",
+        "template": "model-fallback",
+        "cycle": 5052,
+        "maxCycles": null,
+        "task": "模型可用性监测",
+        "lastRun": "2026-08-03T12:18:31.068384+08:00"
+      },
+      "memory-index": {
+        "status": "registered",
+        "template": "memory-index",
+        "cycle": 23,
+        "maxCycles": null,
+        "task": "记忆自动归类",
+        "lastRun": "2026-08-03T11:13:01.280532+08:00"
+      },
+      "context-guard": {
+        "status": "registered",
+        "template": "context-guard",
+        "cycle": 626,
+        "maxCycles": null,
+        "task": "守护上下文",
+        "lastRun": "2026-08-03T12:18:31.072922+08:00"
+      }
+    }
+  },
+  "heavy": {
+    "activeTasks": []
+  },
+  "logs": {
+    "lastRotation": "2026-08-03 12:17:00",
+    "rotationCount": 2760
+  },
+  "broker": {
+    "mark42Events": 26413,
+    "mark42SizeKB": 9621.5
+  },
+  "scratch": {
+    "totalDirs": 8,
+    "keptDirs": 2
+  },
+  "actions": []
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Mark42 Watchdog Timer — 每 5 分钟检查 daemon 存活
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=mark42-watchdog.service
+
+[Install]
+WantedBy=timers.target

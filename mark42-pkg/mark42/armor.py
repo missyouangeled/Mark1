@@ -58,6 +58,127 @@ except ImportError as e:
     _SCHEDULER_AVAILABLE = False
     _SCHEDULER_IMPORT_ERROR = str(e)
 
+# ── compact 编排常量 (2026-08-04 从 armor_compress 内部提取到模块级) ──
+# 拆分原因: armor_compress 原为 665 行巨型函数, 常量散落函数内部导致
+# 子逻辑无法独立测试。提到模块级后各阶段可单独 mock/覆盖。
+COMPACT_COOLDOWN_SEC = 1800   # compact 冷却期 30 分钟, 避免反复压缩已压过的 session
+PLATFORM_PROBE_SEC = 60       # 平台探测期总时长: 先等平台自己 auto-compaction
+PLATFORM_PROBE_INTERVAL = 10  # 探测期内每次检查间隔
+COMPACT_LOCK_TTL_SEC = 620    # compact 锁过期时间 (compact 超时 620s + 缓冲)
+
+# 测试钩子: conftest.py 会 setattr 为 True 以跳过平台探测期的真实 sleep
+_PLATFORM_PROBE_SKIP_SLEEP = False
+
+
+def _compact_cooldown_file() -> Path:
+    """compact 冷却期标记文件路径。
+
+    做成函数而非模块级常量: XDG_STATE 在测试中被 monkeypatch 重定向,
+    模块级常量会在 import 时固化成旧路径。
+    """
+    return XDG_STATE / "mark42" / "armor" / "compact-cooldown.json"
+
+
+def _compact_lock_file() -> Path:
+    """compact 锁文件路径。同上, 延迟求值避免测试路径固化。"""
+    return XDG_STATE / "mark42" / "armor" / "compact.lock"
+
+
+def _try_acquire_compact_lock() -> bool:
+    """尝试获取 compact 锁。返回 True 表示获取成功。
+
+    使用 O_CREAT|O_EXCL 原子创建，避免竞态条件。
+    """
+    import errno as _errno
+    lock_file = _compact_lock_file()
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # 先尝试原子创建（O_CREAT|O_EXCL）
+    try:
+        fd = os.open(
+            str(lock_file),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o644,
+        )
+        # 防御：若拿到 0/1/2（标准流被上层关闭时可能发生，如 pytest fd 捕获模式），
+        # 用 F_DUPFD 重定位到 >=3 的 fd；并把低位 slot 重新指向 /dev/null，
+        # 保证标准输入/输出/错误流始终有效，不会因后续 close 而损坏。
+        if fd < 3:
+            import fcntl as _fcntl
+            _high = _fcntl.fcntl(fd, _fcntl.F_DUPFD, 3)
+            _devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(_devnull, fd)
+            os.close(_devnull)
+            fd = _high
+        try:
+            os.write(fd, json.dumps({
+                "acquiredAt": _now_iso(),
+                "pid": os.getpid(),
+            }, ensure_ascii=False).encode())
+        finally:
+            os.close(fd)
+        return True
+    except OSError as e:
+        if e.errno != _errno.EEXIST:
+            # 非预期错误，保守起见不获取锁
+            return False
+
+    # 锁文件已存在，检查是否过期
+    try:
+        lock_data = json.loads(lock_file.read_text())
+        lock_ts = lock_data.get("acquiredAt")
+        if lock_ts:
+            from datetime import datetime as _dt
+            lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
+            if lock_age < COMPACT_LOCK_TTL_SEC:
+                return False  # 锁未过期
+        # 锁已过期，原子替换
+        lock_file.unlink(missing_ok=True)
+        return _try_acquire_compact_lock()  # 递归重试
+    except Exception:
+        # 锁文件损坏，删除后重试
+        lock_file.unlink(missing_ok=True)
+        return _try_acquire_compact_lock()
+
+
+def _release_compact_lock() -> None:
+    """释放 compact 锁。"""
+    try:
+        _compact_lock_file().unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning("ignored error: %s", e)
+
+
+def _platform_compact_probe(usage_val: float, dry_run: bool = False) -> bool:
+    """平台探测期：等待平台自己 compact。
+
+    Mark42 是跨平台铠甲, armor_compress 是最后自主救场能力, 但不能与平台自带的
+    auto-compaction 冲突。所以先等一个探测期看平台是否自己处理。
+
+    返回 True 表示平台已处理（usage 下降了），False 表示平台无反应。
+    """
+    if dry_run:
+        return False  # dry_run 不等
+    # 测试环境可跳过 sleep（conftest.py setattr _PLATFORM_PROBE_SKIP_SLEEP=True）
+    import sys as _sys
+    _armor_mod = _sys.modules.get(__name__)
+    if _armor_mod and getattr(_armor_mod, "_PLATFORM_PROBE_SKIP_SLEEP", False):
+        print("   [test] 跳过平台探测期 sleep")
+        return False
+    print(f"👀 平台探测期 ({PLATFORM_PROBE_SEC}s)：等待平台 auto-compaction 反应...")
+    for i in range(PLATFORM_PROBE_SEC // PLATFORM_PROBE_INTERVAL):
+        time.sleep(PLATFORM_PROBE_INTERVAL)
+        probe_check = armor_check()
+        probe_usage = probe_check.get("usagePercent", 0)
+        if probe_usage < usage_val - 5:
+            # usage 下降了 5%+，说明平台自己 compact 了
+            print(f"   ✅ 探测到 usage 下降: {usage_val}% -> {probe_usage}%，平台已处理")
+            return True
+        print(f"   ⏳ [{(i+1)*PLATFORM_PROBE_INTERVAL}s] usage={probe_usage}% (无变化)")
+    print("   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
+    return False
+
+
 
 def armor_check() -> dict[str, Any]:
     """检查上下文健康度。"""
@@ -474,6 +595,190 @@ def _hook_direct_smartcrush(session_messages: list[dict[str, Any]],
     return stats
 
 
+def _compress_build_index(
+    session_messages: list[dict[str, Any]],
+    usage: float,
+    algo_stats: dict[str, Any],
+    alert_pct: float,
+) -> dict[str, Any]:
+    """构建记忆索引 — LLM 优先，启发式回退。
+
+    2026-08-04 从 armor_compress 拆出。只负责分析 + 组装 index dict，
+    不做任何文件写入或事件上报，方便单独测试两条分支。
+
+    Args:
+        session_messages: session 尾部消息列表
+        usage: 当前上下文使用率
+        algo_stats: 阶段 1 压缩算法 hook 的统计结果
+        alert_pct: ALERT 阈值，用于启发式分支判定 recommendedAction
+
+    Returns:
+        index dict，含 strategyUsed 字段区分两条路径（llm-analyze / heuristic-classify）
+    """
+    llm_result = _llm_analyze(session_messages) if session_messages else None
+    if llm_result:
+        index = {
+            "generatedAt": _now_iso(),
+            "preCompressUsage": usage,
+            "modelGenerated": True,
+            "analyzedMessages": min(len(session_messages), 40),
+            "preserved": llm_result.get("preserved", {}),
+            "discarded": llm_result.get("discarded", {}),
+            "degradationDetected": llm_result.get("degradationDetected"),
+            "strategyUsed": "llm-analyze",
+            "recommendedAction": llm_result.get("suggestedAction", "monitor"),
+            "llmMeta": llm_result.get("_llm_meta", {}),
+            "algoStats": algo_stats,
+        }
+        print(f"🧠 LLM 分析完成 (model: {llm_result.get('_llm_meta', {}).get('model', '?')})")
+        return index
+
+    classification = _classify_messages(session_messages)
+    preserved_items = classification.get("preserved", [])
+    preserved_roles: dict[str, list[str]] = {}
+    for item in preserved_items:
+        role = item.get("role", "unknown")
+        preserved_roles.setdefault(role, []).append(item.get("preview", ""))
+    discarded_items = classification.get("discarded", [])
+    discarded_summary = [d.get("preview", "")[:80] for d in discarded_items[:5]]
+    degradation = None
+    if usage > 90:
+        degradation = "lost-in-middle"
+    elif classification.get("totalAnalyzed", 0) > 40:
+        degradation = "distraction"
+    index = {
+        "generatedAt": _now_iso(),
+        "preCompressUsage": usage,
+        "modelGenerated": False,
+        "analyzedMessages": classification.get("totalAnalyzed", 0),
+        "preserved": {
+            "userIdentity": "点点（袁文涛），1991-11-29，中文优先",
+            "byRole": {role: previews[:5] for role, previews in preserved_roles.items()},
+            "keyMessagesCount": len(preserved_items),
+        },
+        "discarded": {"samples": discarded_summary, "count": len(discarded_items)},
+        "degradationDetected": degradation,
+        "strategyUsed": "heuristic-classify",
+        "recommendedAction": "/compact" if usage >= alert_pct else "monitor",
+        "algoStats": algo_stats,
+    }
+    print("⚠️ LLM 不可用，回退到启发式分析")
+    return index
+
+
+def _compress_log_events(usage: float, dry_run: bool, index: dict[str, Any],
+                         warn_pct: float) -> None:
+    """上报压缩事件到 broker（health 频道 + 标准化 armor 频道）。
+
+    2026-08-04 从 armor_compress 拆出。纯副作用函数，无返回值。
+    """
+    _append_broker("health", "armor.compress",
+                   f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
+                   "warn" if usage >= warn_pct else "ok",
+                   f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
+                   {"usagePercent": usage, "dryRun": dry_run})
+    # ── C 项：标准化事件桥接 ──
+    _append_broker("armor", "mark42.armor.compress.done",
+                   f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
+                   "ok" if index.get('strategyUsed') == 'llm-analyze' else "warn",
+                   trim_detail(
+                       f"策略: {index.get('strategyUsed', '?')} | "
+                       f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) + len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
+                       f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
+                       180,
+                   ),
+                   {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
+                    "modelGenerated": index.get('modelGenerated', False)})
+
+
+def _compress_check_cooldown(index: dict[str, Any], index_path: Path,
+                            check: dict[str, Any]) -> dict[str, Any] | None:
+    """压缩冷却期检查。
+
+    2026-08-04 从 armor_compress 拆出。背景（修复 2026-07-29）：
+    连续 compact 已压缩过的 session 是无效操作——LLM 摘要 + 结构化元数据
+    会让文件比原文还大。加 30 分钟冷却期避免反复蹂躏。
+
+    副作用：命中冷却期时会回写 index 字段 + 落盘 index_path。
+
+    Returns:
+        命中冷却期时返回 skip 结果 dict；不命中返回 None 让主流程继续。
+    """
+    compact_cooldown_file = _compact_cooldown_file()
+    if not compact_cooldown_file.exists():
+        return None
+    try:
+        import json as _json
+        cd = _json.loads(compact_cooldown_file.read_text())
+        last_ts = cd.get("lastCompactTs")
+        if last_ts:
+            from datetime import datetime as _dt
+            last_dt = _dt.fromisoformat(last_ts)
+            elapsed = (datetime.now() - last_dt).total_seconds()
+            if elapsed < COMPACT_COOLDOWN_SEC:
+                remaining = int((COMPACT_COOLDOWN_SEC - elapsed) / 60)
+                print(f"⏸️ 压缩冷却中（还剩 {remaining} 分钟），跳过本次 compact")
+                index["compactTriggered"] = False
+                index["compactError"] = f"cooldown-{remaining}min"
+                index["compressionEffective"] = False
+                index["preCompactBytes"] = None
+                _save_json(index_path, index)
+                return {"action": "skip-cooldown", "reason": f"冷却中，还剩 {remaining} 分钟",
+                        "check": check}
+    except Exception as e:
+        logger.warning("冷却期检查失败（非致命）: %s", e)
+    return None
+
+
+def _compress_check_already_compacted(active: Path, index: dict[str, Any],
+                                     index_path: Path, usage: float,
+                                     check: dict[str, Any]) -> dict[str, Any] | None:
+    """预检 session 是否已被 compact 过。
+
+    2026-08-04 从 armor_compress 拆出。背景（修复 2026-07-29）：
+    如果 session 文件里已有 compaction 条目，说明最近被摘要过，
+    再跑 LLM compact 只会让摘要+元数据膨胀（实测变大 10KB+）。
+
+    副作用：命中时回写 index + 落盘 + 写冷却期标记 + 上报 broker 事件。
+
+    Returns:
+        命中时返回 skip 结果 dict；不命中返回 None。
+    """
+    try:
+        with open(active) as _f:
+            _head = _f.read(8192)  # 读前 8KB 够判断
+        if '"type":"compaction"' not in _head and '"type": "compaction"' not in _head:
+            return None
+        print("⏸️ Session 已含 compaction 摘要，跳过 LLM compact（避免摘要膨胀）")
+        index["compactTriggered"] = False
+        index["compactError"] = "session-already-compacted"
+        index["compressionEffective"] = False
+        index["preCompactBytes"] = active.stat().st_size
+        _save_json(index_path, index)
+        # 写冷却期标记
+        try:
+            cooldown_file = _compact_cooldown_file()
+            cooldown_file.parent.mkdir(parents=True, exist_ok=True)
+            cooldown_file.write_text(
+                json.dumps({"lastCompactTs": _now_iso(), "reason": "already-compacted"},
+                           ensure_ascii=False)
+            )
+        except Exception as e:
+            logger.warning("ignored error: %s", e)
+        _append_broker(
+            "armor", "mark42.armor.compact.skipped",
+            "Session 已含摘要，跳过 compact",
+            "info",
+            "session 文件检测到 compaction 条目，跳过避免摘要膨胀",
+            {"preBytes": index["preCompactBytes"], "usagePercent": usage},
+        )
+        return {"action": "skip-already-compacted", "reason": "session 已含 compaction 摘要",
+                "check": check}
+    except Exception as e:
+        logger.warning("预检 compaction 失败（非致命）: %s", e)
+    return None
+
+
 def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     """触发智能压缩 — LLM 优先，启发式回退。
     正常模式：usage < WARN 阈值时跳过。
@@ -491,74 +796,17 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 阶段 1: 压缩算法 hook (默认 disabled, 需 env 启用)
     algo_stats = armor_pre_compact_hook(session_messages, dry_run=dry_run)
 
-    llm_result = _llm_analyze(session_messages) if session_messages else None
-    if llm_result:
-        index = {
-            "generatedAt": _now_iso(),
-            "preCompressUsage": usage,
-            "modelGenerated": True,
-            "analyzedMessages": min(len(session_messages), 40),
-            "preserved": llm_result.get("preserved", {}),
-            "discarded": llm_result.get("discarded", {}),
-            "degradationDetected": llm_result.get("degradationDetected"),
-            "strategyUsed": "llm-analyze",
-            "recommendedAction": llm_result.get("suggestedAction", "monitor"),
-            "llmMeta": llm_result.get("_llm_meta", {}),
-            "algoStats": algo_stats,
-        }
-        print(f"🧠 LLM 分析完成 (model: {llm_result.get('_llm_meta', {}).get('model', '?')})")
-    else:
-        classification = _classify_messages(session_messages)
-        preserved_items = classification.get("preserved", [])
-        preserved_roles = {}
-        for item in preserved_items:
-            role = item.get("role", "unknown")
-            preserved_roles.setdefault(role, []).append(item.get("preview", ""))
-        discarded_items = classification.get("discarded", [])
-        discarded_summary = [d.get("preview", "")[:80] for d in discarded_items[:5]]
-        degradation = None
-        if usage > 90:
-            degradation = "lost-in-middle"
-        elif classification.get("totalAnalyzed", 0) > 40:
-            degradation = "distraction"
-        index = {
-            "generatedAt": _now_iso(),
-            "preCompressUsage": usage,
-            "modelGenerated": False,
-            "analyzedMessages": classification.get("totalAnalyzed", 0),
-            "preserved": {
-                "userIdentity": "点点（袁文涛），1991-11-29，中文优先",
-                "byRole": {role: previews[:5] for role, previews in preserved_roles.items()},
-                "keyMessagesCount": len(preserved_items),
-            },
-            "discarded": {"samples": discarded_summary, "count": len(discarded_items)},
-            "degradationDetected": degradation,
-            "strategyUsed": "heuristic-classify",
-            "recommendedAction": "/compact" if usage >= _alert_pct else "monitor",
-            "algoStats": algo_stats,
-        }
-        print("⚠️ LLM 不可用，回退到启发式分析")
+    # 阶段 2: 构建记忆索引（LLM 优先 / 启发式回退）
+    index = _compress_build_index(session_messages, usage, algo_stats, _alert_pct)
+
     index_path = ARMOR_STATE / "memory-index.json"
     actions_log = ARMOR_STATE / "actions.jsonl"
     history_dir = ARMOR_STATE / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
-    _append_broker("health", "armor.compress",
-                   f"上下文压缩{'预览' if dry_run else ''}: {usage}%",
-                   "warn" if usage >= _warn_pct else "ok",
-                   f"使用率 {usage}%，{'建议手动' if dry_run else '已生成'}记忆索引",
-                   {"usagePercent": usage, "dryRun": dry_run})
-    # ── C 项：标准化事件桥接 ──
-    _append_broker("armor", "mark42.armor.compress.done",
-                   f"铠甲压缩完成: {usage}% → {index.get('strategyUsed', '?')}",
-                   "ok" if index.get('strategyUsed') == 'llm-analyze' else "warn",
-                   trim_detail(
-                       f"策略: {index.get('strategyUsed', '?')} | "
-                       f"保留: {len(index.get('preserved', {}).get('byRole', {}).get('user', [])) + len(index.get('preserved', {}).get('byRole', {}).get('assistant', [])) if not index.get('modelGenerated') else len(str(index.get('preserved', {}).get('activeProjects', [])))} 条 | "
-                       f"丢弃: {len(index.get('discarded', {}).get('samples', index.get('discarded', {}).get('summary', '')))} 条",
-                       180,
-                   ),
-                   {"usagePercent": usage, "strategy": index.get('strategyUsed'), "dryRun": dry_run,
-                    "modelGenerated": index.get('modelGenerated', False)})
+
+    # 阶段 3: 事件上报
+    _compress_log_events(usage, dry_run, index, _warn_pct)
+
     # ── 实际压缩：通过 OpenClaw 合法 CLI 通道触发 /compact ──
     # 修复 (2026-06-24): 不再直接写 active session 文件！
     # 直接写文件会触发 sessionFileFenceKey 检测 (EmbeddedAttemptSessionTakeoverError)，
@@ -574,64 +822,21 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 修复 (2026-06-29): _save_json 必须在 compactTriggered/compactError 字段设置
     # 完成之后再调用，否则这两个字段会丢失到文件中（Bug：index 是 dict 引用，
     # _save_json 后修改 dict 不会回写到已写入的文件）。
-    # ── 修复 (2026-07-29): 压缩冷却期检查 ──
-    # 连续 compact 已压缩过的 session 是无效操作：LLM 摘要 + 结构化元数据
-    # 会让文件比原文还大。加 30 分钟冷却期避免反复蹂躏。
-    COMPACT_COOLDOWN_SEC = 1800  # 30 分钟
-    compact_cooldown_file = XDG_STATE / "mark42" / "armor" / "compact-cooldown.json"
-    if not dry_run and compact_cooldown_file.exists():
-        try:
-            import json as _json
-            cd = _json.loads(compact_cooldown_file.read_text())
-            last_ts = cd.get("lastCompactTs")
-            if last_ts:
-                from datetime import datetime as _dt
-                last_dt = _dt.fromisoformat(last_ts)
-                elapsed = (datetime.now() - last_dt).total_seconds()
-                if elapsed < COMPACT_COOLDOWN_SEC:
-                    remaining = int((COMPACT_COOLDOWN_SEC - elapsed) / 60)
-                    print(f"⏸️ 压缩冷却中（还剩 {remaining} 分钟），跳过本次 compact")
-                    index["compactTriggered"] = False
-                    index["compactError"] = f"cooldown-{remaining}min"
-                    index["compressionEffective"] = False
-                    index["preCompactBytes"] = None
-                    _save_json(index_path, index)
-                    return {"action": "skip-cooldown", "reason": f"冷却中，还剩 {remaining} 分钟", "check": check}
-        except Exception as e:
-            logger.warning("冷却期检查失败（非致命）: %s", e)
+    # ── 阶段 4: 压缩前置检查（冷却期 + 已压缩预检）──
+    # 两个检查已拆到模块级 (2026-08-04)，命中则直接返回 skip 结果。
+    # 背景（2026-07-29）：连续 compact 已压缩过的 session 是无效操作，
+    # LLM 摘要 + 结构化元数据会让文件比原文还大。
+    if not dry_run:
+        cooldown_result = _compress_check_cooldown(index, index_path, check)
+        if cooldown_result is not None:
+            return cooldown_result
 
-    # ── 修复 (2026-07-29): 预检 session 是否已被 compact 过 ──
-    # 如果 session 文件里已有 compaction 条目，说明最近被摘要过，
-    # 再跑 LLM compact 只会让摘要+元数据膨胀（实测变大 10KB+）
     if not dry_run and active:
-        try:
-            with open(active) as _f:
-                _head = _f.read(8192)  # 读前 8KB 够判断
-            if '"type":"compaction"' in _head or '"type": "compaction"' in _head:
-                print("⏸️ Session 已含 compaction 摘要，跳过 LLM compact（避免摘要膨胀）")
-                index["compactTriggered"] = False
-                index["compactError"] = "session-already-compacted"
-                index["compressionEffective"] = False
-                index["preCompactBytes"] = active.stat().st_size
-                _save_json(index_path, index)
-                # 写冷却期标记
-                try:
-                    compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
-                    compact_cooldown_file.write_text(
-                        json.dumps({"lastCompactTs": _now_iso(), "reason": "already-compacted"}, ensure_ascii=False)
-                    )
-                except Exception as e:
-                    logger.warning("ignored error: %s", e)
-                _append_broker(
-                    "armor", "mark42.armor.compact.skipped",
-                    "Session 已含摘要，跳过 compact",
-                    "info",
-                    "session 文件检测到 compaction 条目，跳过避免摘要膨胀",
-                    {"preBytes": index["preCompactBytes"], "usagePercent": usage},
-                )
-                return {"action": "skip-already-compacted", "reason": "session 已含 compaction 摘要", "check": check}
-        except Exception as e:
-            logger.warning("预检 compaction 失败（非致命）: %s", e)
+        already_result = _compress_check_already_compacted(
+            active, index, index_path, usage, check)
+        if already_result is not None:
+            return already_result
+
 
     # ── 修复 (2026-07-29): _get_context_window() 现在读 session 实际运行模型 ──
     # 之前读 primary config (doubao-seed-2.0-pro, 128K)，导致 GLM-5.2 (1M)
@@ -648,101 +853,11 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     # 3. usage 下降了 -> 平台已 compact，Mark42 跳过
     # 4. 探测期结束 usage 仍无变化 -> 平台没反应，Mark42 自主出手
     # 5. 出手前再检查 compact 锁，避免与另一个 Mark42 实例撞车
-    PLATFORM_PROBE_SEC = 60       # 探测期总时长
-    PLATFORM_PROBE_INTERVAL = 10  # 每次检查间隔
-    COMPACT_LOCK_FILE = XDG_STATE / "mark42" / "armor" / "compact.lock"
-    COMPACT_LOCK_TTL_SEC = 620    # 锁过期时间（compact 超时 620s + 缓冲）
-
-    def _try_acquire_compact_lock() -> bool:
-        """尝试获取 compact 锁。返回 True 表示获取成功。
-
-        使用 O_CREAT|O_EXCL 原子创建，避免竞态条件。
-        """
-        import errno as _errno
-        COMPACT_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-        # 先尝试原子创建（O_CREAT|O_EXCL）
-        try:
-            fd = os.open(
-                str(COMPACT_LOCK_FILE),
-                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                0o644,
-            )
-            # 防御：若拿到 0/1/2（标准流被上层关闭时可能发生，如 pytest fd 捕获模式），
-            # 用 F_DUPFD 重定位到 >=3 的 fd；并把低位 slot 重新指向 /dev/null，
-            # 保证标准输入/输出/错误流始终有效，不会因后续 close 而损坏。
-            if fd < 3:
-                import fcntl as _fcntl
-                _high = _fcntl.fcntl(fd, _fcntl.F_DUPFD, 3)
-                _devnull = os.open(os.devnull, os.O_WRONLY)
-                os.dup2(_devnull, fd)
-                os.close(_devnull)
-                fd = _high
-            try:
-                os.write(fd, json.dumps({
-                    "acquiredAt": _now_iso(),
-                    "pid": os.getpid(),
-                }, ensure_ascii=False).encode())
-            finally:
-                os.close(fd)
-            return True
-        except OSError as e:
-            if e.errno != _errno.EEXIST:
-                # 非预期错误，保守起见不获取锁
-                return False
-
-        # 锁文件已存在，检查是否过期
-        try:
-            lock_data = json.loads(COMPACT_LOCK_FILE.read_text())
-            lock_ts = lock_data.get("acquiredAt")
-            if lock_ts:
-                from datetime import datetime as _dt
-                lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
-                if lock_age < COMPACT_LOCK_TTL_SEC:
-                    return False  # 锁未过期
-            # 锁已过期，原子替换
-            COMPACT_LOCK_FILE.unlink(missing_ok=True)
-            return _try_acquire_compact_lock()  # 递归重试
-        except Exception:
-            # 锁文件损坏，删除后重试
-            COMPACT_LOCK_FILE.unlink(missing_ok=True)
-            return _try_acquire_compact_lock()
-
-    def _release_compact_lock() -> None:
-        """释放 compact 锁。"""
-        try:
-            COMPACT_LOCK_FILE.unlink(missing_ok=True)
-        except Exception as e:
-            logger.warning("ignored error: %s", e)
-
-    def _platform_compact_probe(usage_val: float) -> bool:
-        """平台探测期：等待平台自己 compact。
-        返回 True 表示平台已处理（usage 下降了），False 表示平台无反应。
-        """
-        if dry_run:
-            return False  # dry_run 不等
-        # 测试环境可跳过 sleep
-        import sys as _sys
-        _armor_mod = _sys.modules.get(__name__)
-        if _armor_mod and getattr(_armor_mod, "_PLATFORM_PROBE_SKIP_SLEEP", False):
-            print("   [test] 跳过平台探测期 sleep")
-            return False
-        print(f"👀 平台探测期 ({PLATFORM_PROBE_SEC}s)：等待平台 auto-compaction 反应...")
-        for i in range(PLATFORM_PROBE_SEC // PLATFORM_PROBE_INTERVAL):
-            time.sleep(PLATFORM_PROBE_INTERVAL)
-            probe_check = armor_check()
-            probe_usage = probe_check.get("usagePercent", 0)
-            if probe_usage < usage_val - 5:
-                # usage 下降了 5%+，说明平台自己 compact 了
-                print(f"   ✅ 探测到 usage 下降: {usage_val}% -> {probe_usage}%，平台已处理")
-                return True
-            print(f"   ⏳ [{(i+1)*PLATFORM_PROBE_INTERVAL}s] usage={probe_usage}% (无变化)")
-        print("   ⚠️ 平台探测期结束，usage 仍无下降，Mark42 自主出手")
-        return False
+    # 常量与三个子函数已提到模块级 (2026-08-04 拆分)
 
     if not dry_run and usage >= _warn_pct:
         # 1) 平台探测期
-        platform_handled = _platform_compact_probe(usage)
+        platform_handled = _platform_compact_probe(usage, dry_run=dry_run)
         if platform_handled:
             index["compactTriggered"] = False
             index["compactError"] = "platform-auto-compaction-handled"
@@ -922,8 +1037,9 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
                             )
                     # ── 压缩后写冷却期标记 ──
                     try:
-                        compact_cooldown_file.parent.mkdir(parents=True, exist_ok=True)
-                        compact_cooldown_file.write_text(
+                        _cooldown_f = _compact_cooldown_file()
+                        _cooldown_f.parent.mkdir(parents=True, exist_ok=True)
+                        _cooldown_f.write_text(
                             json.dumps({"lastCompactTs": _now_iso(), "reason": "post-compact"}, ensure_ascii=False)
                         )
                     except Exception as e:

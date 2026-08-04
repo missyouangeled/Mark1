@@ -1,0 +1,10 @@
+UNIT FILE                    STATE    PRESET
+mark42-armor-guard.service   enabled  enabled
+mark42-autonomy.service      static   -
+mark42-bootstrap.service     enabled  enabled
+mark42-engine-daemon.service enabled  enabled
+mark42-watchdog.service      disabled enabled
+mark42-autonomy.timer        enabled  enabled
+mark42-watchdog.timer        enabled  enabled
+
+7 unit files listed.
