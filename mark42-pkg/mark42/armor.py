@@ -968,6 +968,119 @@ def _compress_run_compact_cli(active_session: Path, index: dict[str, Any],
         logger.warning("ignored error: %s", e)
 
 
+def _compress_write_action_log(index: dict[str, Any], index_path: Path,
+                              actions_log: Path, usage: float,
+                              dry_run: bool) -> None:
+    """写 actions.jsonl 审计记录。
+
+    2026-08-04 从 armor_compress 拆出。
+
+    历史背景：
+    - 【2026-06-30 审查 J 修复】action_entry 必须写于 compact 后，同步 index 里的真值。
+      原动作写于函数入口，那时 preCompactBytes/postCompactBytes 还没填。
+    - 【2026-06-30 🟡4 修复】加 bytesStatus 语义标记，避免 reader 困惑 preBytes=null：
+      captured / skipped-dry-run / not-attempted / error
+    """
+    if dry_run:
+        bytes_status = "skipped-dry-run"
+    elif index.get("preCompactBytes") is not None and index.get("postCompactBytes") is not None:
+        bytes_status = "captured"
+    elif index.get("compactError"):
+        bytes_status = "error"
+    else:
+        bytes_status = "not-attempted"
+    action_entry = {
+        "ts": _now_iso(),
+        "action": "compress" if not dry_run else "compress-dryrun",
+        "preCompressUsage": usage,
+        "preBytes": index.get("preCompactBytes"),
+        "postBytes": index.get("postCompactBytes"),
+        "bytesSaved": index.get("bytesSaved"),
+        "bytesStatus": bytes_status,  # 🟡4 语义标记
+        "compressionEffective": index.get("compressionEffective"),
+        "compactTriggered": index.get("compactTriggered"),
+        "compactMethod": index.get("compactMethod"),
+        "compactError": index.get("compactError"),
+        "indexPath": str(index_path),
+    }
+    with open(actions_log, "a") as f:
+        f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
+
+
+def _compress_check_ineffective_escalation(index: dict[str, Any], history_dir: Path,
+                                          usage: float) -> None:
+    """连续压缩无效升级报（P0 补充）。
+
+    2026-08-04 从 armor_compress 拆出。
+
+    若 history 最近 ≥3 次压缩全部 compressionEffective=False 且本次也是 False，
+    说明 sessions.compact 调用一直不能压下 session，可能是配置文件不一致、
+    LLM 失败、或上下文估计偏差。则发升级事件到 broker，提醒人工干预。
+
+    升级逻辑本身的错误不能影响主流程，所以全部包在 try 里。
+    """
+    try:
+        # 本次判断: index 里是否有 compressionEffective=False 且已生成
+        if index.get("compressionEffective") is not False:
+            return
+        # 查 history 里最近 5 次 compressionEffective 字段
+        hist_files = sorted(history_dir.glob("memory-index-*.json"))[-5:]
+        ineffective_count = 0
+        total_count = 0
+        for hf in hist_files:
+            try:
+                h = json.loads(hf.read_text())
+                if "compressionEffective" in h:
+                    total_count += 1
+                    if h["compressionEffective"] is False:
+                        ineffective_count += 1
+            except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+                continue
+        if total_count >= 3 and ineffective_count == total_count:
+            # 连续 ≥3 次压缩全部无效, 升级 broker
+            _append_broker(
+                "armor", "mark42.armor.compact.ineffective",
+                f"连续 {ineffective_count}/{total_count} 次压缩未生效",
+                "warn",
+                trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / compact 子命令", 160),
+                {"ineffectiveCount": ineffective_count, "totalCount": total_count,
+                 "preUsage": usage},
+            )
+            print(trim_detail(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件", 120))
+    except Exception as e:
+        # 升级逻辑本身的错误不能影响主流程
+        print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
+
+
+def _compress_audit_hook(index: dict[str, Any]) -> None:
+    """Post-Compact Audit hook（异步，不阻塞）。
+
+    2026-08-04 从 armor_compress 拆出。
+
+    compact 完成（无论成功或失败）后自动核对关键信息是否丢失。
+    即使 compact 失败也审计——因为部分执行可能已丢失信息。
+    audit hook 失败不影响主流程。
+    """
+    try:
+        from .interfaces import get_audit
+        _audit = get_audit()
+        if _audit is not None:
+            _audit.audit_compact_async(
+                pre_compact_snapshot={
+                    "timestamp": _now_iso(),
+                    "source": "pre-compact",
+                    "compactTriggered": index.get("compactTriggered", False),
+                    "compactError": index.get("compactError", ""),
+                },
+                post_compact_summary={
+                    "timestamp": _now_iso(),
+                    "source": "post-compact",
+                },
+            )
+    except Exception as e:
+        logger.warning("ignored error: %s", e)  # audit hook 失败不影响主流程
+
+
 def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     """触发智能压缩 — LLM 优先，启发式回退。
     正常模式：usage < WARN 阈值时跳过。
@@ -1100,97 +1213,12 @@ def armor_compress(dry_run: bool = False) -> dict[str, Any]:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     _save_json(history_dir / f"memory-index-{ts}.json", index)
 
-    # 【2026-06-30 全面审查 J 修复】action_entry 写于 compact 后,同步 index 里的真值
-    # 原动作写于函数入口,那时 preCompactBytes/postCompactBytes 还没填
-    # 这样 actions.jsonl 能审计"压缩真截短了吗"(一键看透)
-    #
-    # 【2026-06-30 10:13 🟡4 修复】加 bytesStatus 语义标记,避免 reader 困惑 preBytes=null
-    # - "captured": 压缩完成, 字段有真值
-    # - "skipped-dry-run": dry_run 模式, 没真压缩, 字段为 null 是预期
-    # - "not-attempted": 上下文 < THRESHOLD_WARN, 未尝试 compact
-    # - "error": compact 报错 (没产生 postBytes)
-    if dry_run:
-        bytes_status = "skipped-dry-run"
-    elif index.get("preCompactBytes") is not None and index.get("postCompactBytes") is not None:
-        bytes_status = "captured"
-    elif index.get("compactError"):
-        bytes_status = "error"
-    else:
-        bytes_status = "not-attempted"
-    action_entry = {
-        "ts": _now_iso(),
-        "action": "compress" if not dry_run else "compress-dryrun",
-        "preCompressUsage": usage,
-        "preBytes": index.get("preCompactBytes"),
-        "postBytes": index.get("postCompactBytes"),
-        "bytesSaved": index.get("bytesSaved"),
-        "bytesStatus": bytes_status,  # 🟡4 语义标记
-        "compressionEffective": index.get("compressionEffective"),
-        "compactTriggered": index.get("compactTriggered"),
-        "compactMethod": index.get("compactMethod"),
-        "compactError": index.get("compactError"),
-        "indexPath": str(index_path),
-    }
-    with open(actions_log, "a") as f:
-        f.write(json.dumps(action_entry, ensure_ascii=False) + "\n")
-
-    # ── P0 补充: 连续压缩无效升级报 ──
-    # 若 history 最近 ≥3 次压缩全部 compressionEffective=False 且本次也是 False,
-    # 说明 sessions.compact 调用一直不能压下 session, 可能是配置文件不一致、LLM 失败、
-    # 或上下文估计偏差。则发升级事件到 broker, 提醒人工干预。
-    try:
-        # 本次判断: index 里是否有 compressionEffective=False 且已生成
-        if index.get("compressionEffective") is False:
-            # 查 history 里最近 5 次 compressionEffective 字段
-            hist_files = sorted(history_dir.glob("memory-index-*.json"))[-5:]
-            ineffective_count = 0
-            total_count = 0
-            for hf in hist_files:
-                try:
-                    h = json.loads(hf.read_text())
-                    if "compressionEffective" in h:
-                        total_count += 1
-                        if h["compressionEffective"] is False:
-                            ineffective_count += 1
-                except Exception:  # noqa: S112 (跳过损坏行，继续解析)
-                    continue
-            if total_count >= 3 and ineffective_count == total_count:
-                # 连续 ≥3 次压缩全部无效, 升级 broker
-                _append_broker(
-                    "armor", "mark42.armor.compact.ineffective",
-                    f"连续 {ineffective_count}/{total_count} 次压缩未生效",
-                    "warn",
-                    trim_detail("建议检查 contextWindow 配置 / LLM 可用性 / compact 子命令", 160),
-                    {"ineffectiveCount": ineffective_count, "totalCount": total_count,
-                     "preUsage": usage},
-                )
-                print(trim_detail(f"🚨 连续 {ineffective_count} 次压缩无效，升级 broker 事件", 120))
-    except Exception as e:
-        # 升级逻辑本身的错误不能影响主流程
-        print(trim_detail(f"⚠️ 连续无效检查失败 (非致命): {e}", 140))
-
-    # ── Post-Compact Audit hook（异步，不阻塞）──
-    # compact 完成（无论成功或失败）后自动核对关键信息是否丢失
-    # 即使 compact 失败也审计——因为部分执行可能已丢失信息
+    # ── 阶段 6: 收尾（审计日志 + 无效升级 + audit hook）──
+    # 三个子步骤已拆到模块级 (2026-08-04)
+    _compress_write_action_log(index, index_path, actions_log, usage, dry_run)
+    _compress_check_ineffective_escalation(index, history_dir, usage)
     if not dry_run:
-        try:
-            from .interfaces import get_audit
-            _audit = get_audit()
-            if _audit is not None:
-                _audit.audit_compact_async(
-                    pre_compact_snapshot={
-                        "timestamp": _now_iso(),
-                        "source": "pre-compact",
-                        "compactTriggered": index.get("compactTriggered", False),
-                        "compactError": index.get("compactError", ""),
-                    },
-                    post_compact_summary={
-                        "timestamp": _now_iso(),
-                        "source": "post-compact",
-                    },
-                )
-        except Exception as e:
-            logger.warning("ignored error: %s", e)  # audit hook 失败不影响主流程
+        _compress_audit_hook(index)
 
     return {"action": "compress", "indexWritten": str(index_path), "preCompressUsage": usage, "check": check}
 
