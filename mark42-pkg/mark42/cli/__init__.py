@@ -1043,6 +1043,8 @@ def main() -> None:
             heavy_start,
         )
         task_name = args.task_name or ""
+        # 退出码契约：heavy 子命令失败（任务不存在/未开工/参数缺失）必须返回非零，
+        # 否则 systemd 与脚本调用方无法区分成功与失败。
         if args.detect:
             auto_mode = getattr(args, 'auto', 'ask') or 'ask'
             heavy_detect_human(args.detect, auto_mode=auto_mode)
@@ -1052,29 +1054,36 @@ def main() -> None:
             heavy_start(args.start, task_name,
                        context_aware=not args.no_context_aware)
         elif args.execute and task_name:
-            heavy_execute(task_name, args.batch or None,
-                          command=args.command or None,
-                          execute_now=getattr(args, 'execute_now', False),
-                          retry=getattr(args, 'retry', False))
+            # heavy_execute() 失败（任务不存在/无可用 batch）返回 None
+            if heavy_execute(task_name, args.batch or None,
+                             command=args.command or None,
+                             execute_now=getattr(args, 'execute_now', False),
+                             retry=getattr(args, 'retry', False)) is None:
+                return 1
         elif args.execute_all and task_name:
             heavy_execute_all(task_name,
                               command=args.command or None,
                               execute_now=getattr(args, 'execute_now', False),
                               retry=getattr(args, 'retry', False))
         elif args.resume and task_name:
-            heavy_resume(task_name,
-                         command=args.command or None,
-                         execute_now=getattr(args, 'execute_now', False))
+            # heavy_resume() 任务不存在时返回 {"error": ...}
+            resume_result = heavy_resume(task_name,
+                                         command=args.command or None,
+                                         execute_now=getattr(args, 'execute_now', False))
+            if isinstance(resume_result, dict) and resume_result.get("error"):
+                return 1
         elif args.finish and task_name:
             heavy_finish(task_name)
         elif args.cleanup and task_name:
             heavy_cleanup(task_name)
         elif args.start:
             print("❌ --task-name 不能为空")
+            return 2
         elif args.preflight:
             heavy_preflight(args.preflight)
         else:
             print("❌ 请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup")
+            return 2
         return
 
     if args.module == "cost":

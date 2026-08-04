@@ -393,3 +393,117 @@ def test_heavy_detect_human_small_project(tmp_path, capsys):
         heavy_detect_human(str(tmp_path))
         output = capsys.readouterr().out
         assert "未達大工程标准" in output or "未达大工程标准" in output
+
+
+# ── 回归测试：Heavy 状态机真实性 ──────────────────────────
+
+
+def _setup_heavy_env(tmp_path, monkeypatch):
+    """构造隔离的 heavy 环境，返回 (scratch, heavy_state, work_dir)。"""
+    fake_scratch = tmp_path / "scratch"
+    fake_heavy = tmp_path / "heavy"
+    fake_scratch.mkdir(parents=True, exist_ok=True)
+    fake_heavy.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("mark42.heavy.SCRATCH", fake_scratch)
+    monkeypatch.setattr("mark42.heavy.HEAVY_STATE", fake_heavy)
+
+    work = tmp_path / "work"
+    work.mkdir()
+    for i in range(2):
+        (work / f"f{i}.txt").write_text("x\n")
+    return fake_scratch, fake_heavy, work
+
+
+def _batch_statuses(scratch, task_name):
+    st = json.loads((scratch / task_name / "status.json").read_text())
+    return {k: v.get("status") for k, v in st["subtasks"].items()}
+
+
+def test_dry_run_never_marks_batch_running(tmp_path, monkeypatch):
+    """回归测试：dry-run 只入队未执行，不得把批次写成 running。
+
+    历史 bug：execute_now=False 时仍先写 running，
+    而 heavy_finish() 忽略 running，导致从未执行的任务被归档为 finished。
+    """
+    from mark42.heavy import heavy_execute, heavy_start
+
+    scratch, _, work = _setup_heavy_env(tmp_path, monkeypatch)
+    heavy_start(str(work), "t1")
+
+    result = heavy_execute("t1")
+
+    assert result["dryRun"] is True
+    assert result["action"] == "queued"
+    assert result["startedPid"] is None
+
+    statuses = _batch_statuses(scratch, "t1")
+    assert "running" not in statuses.values()
+    assert "queued" in statuses.values()
+
+
+def test_finish_rejects_unexecuted_dry_run_batches(tmp_path, monkeypatch, capsys):
+    """回归测试：finish 必须拒绝仅入队(未真跑)的批次。"""
+    from mark42.heavy import heavy_execute, heavy_finish, heavy_start
+
+    _, fake_heavy, work = _setup_heavy_env(tmp_path, monkeypatch)
+    heavy_start(str(work), "t1")
+    heavy_execute("t1")
+
+    heavy_finish("t1")
+    captured = capsys.readouterr()
+
+    assert "不建议收工" in captured.out
+    heavy_status = json.loads((fake_heavy / "t1.json").read_text())
+    assert heavy_status.get("status") != "finished"
+
+
+def test_start_failure_persists_failed_not_running(tmp_path, monkeypatch):
+    """回归测试：后台进程启动失败必须持久化为 failed。
+
+    历史 bug：Popen 异常只改返回 dict 的 action，
+    磁盘状态仍是 running；heavy_resume 只重试 failed/pending，
+    heavy_finish 又忽略 running，该批次永远无法恢复。
+    """
+    import subprocess
+
+    from mark42.heavy import heavy_execute, heavy_start
+
+    scratch, _, work = _setup_heavy_env(tmp_path, monkeypatch)
+    heavy_start(str(work), "t1")
+
+    def boom(*args, **kwargs):
+        raise OSError("cannot start")
+
+    monkeypatch.setattr(subprocess, "Popen", boom)
+    result = heavy_execute("t1", execute_now=True)
+
+    assert result["action"] == "start_failed"
+    statuses = _batch_statuses(scratch, "t1")
+    assert "failed" in statuses.values()
+    assert "running" not in statuses.values()
+
+
+def test_resume_can_retry_failed_start(tmp_path, monkeypatch):
+    """启动失败的批次必须能被 resume 重新处理。"""
+    import subprocess
+
+    from mark42.heavy import heavy_execute, heavy_resume, heavy_start
+
+    _, _, work = _setup_heavy_env(tmp_path, monkeypatch)
+    heavy_start(str(work), "t1")
+
+    real_popen = subprocess.Popen
+
+    def boom(*args, **kwargs):
+        raise OSError("nope")
+
+    # 只临时探针 Popen，不能用 monkeypatch.undo()（会连 SCRATCH 一起撤销）
+    subprocess.Popen = boom
+    try:
+        heavy_execute("t1", execute_now=True)
+    finally:
+        subprocess.Popen = real_popen
+
+    summary = heavy_resume("t1")
+    assert summary["resumed"] >= 1
+    assert "error" not in summary

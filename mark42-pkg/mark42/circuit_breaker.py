@@ -13,6 +13,7 @@ Mark42 v3 R-CAND-02 · Circuit Breaker 熔断器
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,7 @@ class BreakerState:
     consecutive_failures: int = 0
     opened_at: float | None = None   # time.monotonic() 时间戳
     half_open_at: float | None = None
+    probe_in_flight: bool = False    # 半开态是否已有一个试探请求在飞
     recovery_timeout_s: float = 30.0     # 断路后 30s 半开试探
     failure_threshold: int = 3           # 连续失败 3 次断路
 
@@ -76,6 +78,10 @@ class CircuitBreaker:
         if not hasattr(self, '_shared_breakers'):
             type(self)._shared_breakers: dict[str, BreakerState] = {}
         self._breakers = type(self)._shared_breakers
+        # 保护半开试探名额的原子性（同进程多线程）
+        if not hasattr(type(self), '_shared_lock'):
+            type(self)._shared_lock = threading.Lock()
+        self._lock = type(self)._shared_lock
 
     @classmethod
     def _reset_shared(cls):
@@ -89,74 +95,106 @@ class CircuitBreaker:
         return self._breakers[core_id]
 
     def can_call(self, core_id: str) -> bool:
-        """是否可以调用该核心（未断路或半开试探中）。"""
-        b = self._get(core_id)
+        """是否可以调用该核心（未断路或半开试探中）。
 
-        if b.status == "closed":
-            return True
+        半开态只放行**一个**试探请求：其余并发请求直接快速失败，
+        避免恢复窗口结束瞬间大量请求同时打向还未恢复的下游（惊群）。
+        """
+        with self._lock:
+            b = self._get(core_id)
 
-        if b.status == "open":
-            # 检查是否到了半开时间
-            if b.opened_at and (time.monotonic() - b.opened_at) >= b.recovery_timeout_s:
-                b.status = "half_open"
-                b.half_open_at = time.monotonic()
-                logger.info("熔断器 %s 半开试探", core_id)
+            if b.status == "closed":
                 return True
-            return False
 
-        if b.status == "half_open":
-            return True  # 半开只允许一次试探
+            if b.status == "open":
+                # 检查是否到了半开时间
+                if b.opened_at and (time.monotonic() - b.opened_at) >= b.recovery_timeout_s:
+                    b.status = "half_open"
+                    b.half_open_at = time.monotonic()
+                    b.probe_in_flight = True     # 本次调用就是那一个试探
+                    logger.info("熔断器 %s 半开试探", core_id)
+                    return True
+                return False
 
-        return True
+            if b.status == "half_open":
+                # 已有试探在飞→拒绝；否则把试探名额交给本次调用
+                if b.probe_in_flight:
+                    return False
+                b.probe_in_flight = True
+                return True
+
+            return True
 
     def record_success(self, core_id: str):
         """记录成功调用。"""
-        b = self._get(core_id)
-        if b.status != "closed":
-            logger.info("熔断器 %s 恢复（%s -> closed）", core_id, b.status)
-        b.status = "closed"
-        b.consecutive_failures = 0
-        b.opened_at = None
-        b.half_open_at = None
+        with self._lock:
+            b = self._get(core_id)
+            if b.status != "closed":
+                logger.info("熔断器 %s 恢复（%s -> closed）", core_id, b.status)
+            b.status = "closed"
+            b.consecutive_failures = 0
+            b.opened_at = None
+            b.half_open_at = None
+            b.probe_in_flight = False
 
     def record_failure(self, core_id: str, reason: str = ""):
         """记录失败调用。"""
-        b = self._get(core_id)
-        b.consecutive_failures += 1
+        with self._lock:
+            b = self._get(core_id)
+            b.consecutive_failures += 1
 
-        if b.status == "half_open":
-            # 半开试探失败，重新断路
-            b.status = "open"
-            b.opened_at = time.monotonic()
-            logger.warning("熔断器 %s 半开试探失败，重新断路: %s", core_id, reason)
-            return
+            if b.status == "half_open":
+                # 半开试探失败，重新断路
+                b.status = "open"
+                b.opened_at = time.monotonic()
+                b.probe_in_flight = False
+                logger.warning("熔断器 %s 半开试探失败，重新断路: %s", core_id, reason)
+                return
 
-        if b.consecutive_failures >= b.failure_threshold and b.status == "closed":
-            b.status = "open"
-            b.opened_at = time.monotonic()
-            logger.warning("熔断器 %s 断路（连续失败 %d 次）: %s",
-                          core_id, b.consecutive_failures, reason)
+            if b.consecutive_failures >= b.failure_threshold and b.status == "closed":
+                b.status = "open"
+                b.opened_at = time.monotonic()
+                b.probe_in_flight = False
+                logger.warning("熔断器 %s 断路（连续失败 %d 次）: %s",
+                              core_id, b.consecutive_failures, reason)
+
+    def _refresh_recovery(self, core_id: str) -> None:
+        """仅刷新 open -> half_open 的时间到期判定，**不**消耗试探名额。
+
+        供 get_state / list_all 等只读观察调用使用；
+        若直接调 can_call() 会把唯一试探名额误消耗在“看一眼状态”上。
+        """
+        with self._lock:
+            b = self._get(core_id)
+            if b.status == "open" and b.opened_at and \
+                    (time.monotonic() - b.opened_at) >= b.recovery_timeout_s:
+                b.status = "half_open"
+                b.half_open_at = time.monotonic()
+                b.probe_in_flight = False
+                logger.info("熔断器 %s 进入半开窗口", core_id)
 
     def get_state(self, core_id: str) -> dict[str, Any]:
         """获取熔断器状态。"""
-        # 先检查是否该半开
-        self.can_call(core_id)
+        # 先刷新是否该半开（不消耗试探名额）
+        self._refresh_recovery(core_id)
         return self._get(core_id).to_dict()
 
     def list_all(self) -> list[dict[str, Any]]:
         """列出所有非 closed 熔断器状态。"""
-        # 检查所有 open 状态是否该半开
+        # 检查所有 open 状态是否该半开（不消耗试探名额）
         for core_id in list(self._breakers.keys()):
-            self.can_call(core_id)
+            self._refresh_recovery(core_id)
         return [b.to_dict() for b in self._breakers.values() if b.status != "closed"]
 
     def reset(self, core_id: str):
         """手动重置熔断器。"""
-        b = self._get(core_id)
-        b.status = "closed"
-        b.consecutive_failures = 0
-        b.opened_at = None
-        b.half_open_at = None
+        with self._lock:
+            b = self._get(core_id)
+            b.status = "closed"
+            b.consecutive_failures = 0
+            b.opened_at = None
+            b.half_open_at = None
+            b.probe_in_flight = False
         logger.info("熔断器 %s 手动重置", core_id)
 
     def reset_all(self):

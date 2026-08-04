@@ -142,14 +142,54 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
         self.assertIsNotNone(b.opened_at)
 
     def test_half_open_only_allows_one_call(self):
-        """半开状态只允许一次试探调用。"""
+        """半开状态只允许一次试探调用。
+
+        原测试断言第二次 can_call 仍返回 True，等于把“惊群”缺陷固化成预期，
+        与方法名和设计意图矛盾。正确语义：半开窗口内只放行一个探针，
+        其余并发请求快速失败，避免恢复瞬间大量请求打向未恢复的下游。
+        """
         self._force_open()
         b = self.cb._get("core_1")
         b.opened_at = time.monotonic() - 31.0
-        self.assertTrue(self.cb.can_call("core_1"))  # -> half_open, allowed
-        # 半开后不记录结果，再次 can_call 仍允许（半开只允许一次试探的语义
-        # 在 record_success/failure 后才会状态变化）
-        self.assertTrue(self.cb.can_call("core_1"))  # half_open still allows
+
+        # 第一个请求获得唯一试探名额
+        self.assertTrue(self.cb.can_call("core_1"))
+        self.assertEqual(b.status, "half_open")
+
+        # 试探结果未回报前，后续并发请求必须被拒绍
+        self.assertFalse(self.cb.can_call("core_1"))
+        self.assertFalse(self.cb.can_call("core_1"))
+
+        # 试探成功后恢复 closed，重新放行
+        self.cb.record_success("core_1")
+        self.assertEqual(b.status, "closed")
+        self.assertTrue(self.cb.can_call("core_1"))
+
+    def test_observation_does_not_consume_probe_quota(self):
+        """get_state / list_all 属于只读观察，不得消耗唯一试探名额。"""
+        self._force_open()
+        b = self.cb._get("core_1")
+        b.opened_at = time.monotonic() - 31.0
+
+        self.cb.get_state("core_1")
+        self.cb.list_all()
+        self.cb.get_state("core_1")
+
+        # 观察多次后，真实调用方仍应拿到试探名额
+        self.assertTrue(self.cb.can_call("core_1"))
+        self.assertFalse(self.cb.can_call("core_1"))
+
+    def test_half_open_probe_failure_blocks_further_calls(self):
+        """试探失败后重新断路，且立即拒绍后续请求。"""
+        self._force_open()
+        b = self.cb._get("core_1")
+        b.opened_at = time.monotonic() - 31.0
+
+        self.assertTrue(self.cb.can_call("core_1"))
+        self.cb.record_failure("core_1", "probe failed")
+
+        self.assertEqual(b.status, "open")
+        self.assertFalse(self.cb.can_call("core_1"))
 
 
 class TestCircuitBreakerMultiCore(unittest.TestCase):

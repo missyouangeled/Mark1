@@ -105,3 +105,81 @@ def test_invalid_subcommand(capsys):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v", "--tb=short"]))
+
+
+# ── 回归测试：模块入口退出码语义 ──────────────────────────
+
+
+class TestModuleEntrypointExitCodes:
+    """回归测试：`python -m mark42` 必须传播 CLI 返回码。
+
+    历史 bug：mark42/__main__.py 只调用 main() 而丢弃返回值，
+    CLI 内部 10 处 return 1/2 在模块路径下全部退化为退出码 0。
+    systemd 模板正是通过模块路径回退执行的，因此失败会被判成成功。
+    """
+
+    @staticmethod
+    def _run(args, env_extra=None):
+        import os
+        import subprocess
+        import sys
+
+        env = dict(os.environ)
+        if env_extra:
+            env.update(env_extra)
+        return subprocess.run(
+            [sys.executable, "-m", "mark42", *args],
+            capture_output=True, text=True, timeout=120, env=env,
+        )
+
+    def test_main_module_raises_system_exit(self):
+        """__main__.py 必须使用 SystemExit(main()) 传播返回码。"""
+        from pathlib import Path
+
+        import mark42
+
+        src = (Path(mark42.__file__).parent / "__main__.py").read_text()
+        assert "SystemExit(main())" in src
+
+    def test_version_succeeds(self):
+        proc = self._run(["--version"])
+        assert proc.returncode == 0
+        assert "Mark42" in proc.stdout
+
+    def test_unknown_subcommand_returns_two(self):
+        """不存在的子命令必须返回 argparse 错误码 2。"""
+        proc = self._run(["definitely-not-a-command"])
+        assert proc.returncode == 2
+
+    def test_heavy_missing_task_returns_nonzero(self, tmp_path):
+        """heavy 操作不存在的任务必须返回非零。"""
+        proc = self._run(
+            ["heavy", "--execute", "--task-name", "no-such-task-xyz"],
+            env_extra={
+                "MARK42_SCRATCH": str(tmp_path / "scratch"),
+                "MARK42_STATE": str(tmp_path / "state"),
+            },
+        )
+        assert proc.returncode != 0
+        assert "未开工" in proc.stdout
+
+    def test_heavy_without_action_returns_two(self, tmp_path):
+        """heavy 未指定任何动作必须返回 2。"""
+        proc = self._run(
+            ["heavy"],
+            env_extra={
+                "MARK42_SCRATCH": str(tmp_path / "scratch"),
+                "MARK42_STATE": str(tmp_path / "state"),
+            },
+        )
+        assert proc.returncode == 2
+
+    def test_heavy_start_without_task_name_returns_two(self, tmp_path):
+        proc = self._run(
+            ["heavy", "--start", str(tmp_path)],
+            env_extra={
+                "MARK42_SCRATCH": str(tmp_path / "scratch"),
+                "MARK42_STATE": str(tmp_path / "state"),
+            },
+        )
+        assert proc.returncode == 2

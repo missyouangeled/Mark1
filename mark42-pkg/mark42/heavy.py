@@ -302,10 +302,22 @@ def heavy_finish(task_name: str) -> None:
     total = len(subtasks)
     done = sum(1 for s in subtasks.values() if s.get("status") in ("done", "completed"))
     failed = sum(1 for s in subtasks.values() if s.get("status") in ("failed", "error"))
-    pending = sum(1 for s in subtasks.values() if s.get("status") == "pending")
+    # 收工门禁：任何未到达终态的批次都不能收工。
+    # 历史 bug：只统计 failed/pending，忽略 running，
+    # 导致 dry-run 后的假 running 批次也能被归档为 finished。
+    unfinished_statuses = ("pending", "queued", "starting", "running")
+    unfinished = {
+        bid: s.get("status")
+        for bid, s in subtasks.items()
+        if s.get("status") in unfinished_statuses
+    }
     print(f"🏁 大工程收工: {task_name}")
-    print(f"   结果: ✅ {done}/{total} 成功  |  ❌ {failed} 失败  |  ⏳ {pending} 未完成")
-    if failed > 0 or pending > 0:
+    print(f"   结果: ✅ {done}/{total} 成功  |  ❌ {failed} 失败  |  ⏳ {len(unfinished)} 未完成")
+    if failed > 0 or unfinished:
+        if unfinished:
+            detail = ", ".join(f"{bid}={stt}" for bid, stt in sorted(unfinished.items()))
+            print(f"   ⚠️ 尚未结束的批次: {detail}")
+            print("   💡 dry-run 只入队未执行；需 --execute-now 真跑完成后才能收工")
         print("   ⚠️ 不建议收工，请先处理失败/未完成子任务")
         return
     heavy_status = HEAVY_STATE / f"{task_name}.json"
@@ -355,13 +367,14 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
             logger.error("批次不存在: %s", target_id)
             print(f"❌ 批次 '{target_id}' 不存在")
             return
-        allowed = ("pending",) if not retry else ("pending", "failed")
+        # queued = dry-run 已入队但从未执行，属于可推进状态
+        allowed = ("pending", "queued") if not retry else ("pending", "queued", "failed")
         if subtasks[target_id]["status"] not in allowed:
             logger.warning("批次状态异常，跳过: %s (状态: %s)", target_id, subtasks[target_id]["status"])
             return
     else:
         # 优先 pending，retry 模式也找 failed
-        search_statuses = ("pending", "failed") if retry else ("pending",)
+        search_statuses = ("pending", "queued", "failed") if retry else ("pending", "queued")
         for bid, bt in sorted(subtasks.items()):
             if bt.get("status") in search_statuses:
                 target_id = bid
@@ -381,12 +394,16 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
         print(f"      {f}")
     if len(files) > 5:
         print(f"      ... 共 {len(files)} 个")
-    # 标记为 running（记录重试信息）
+    # 状态机不变量：running 只能表示“真的有进程在跑”。
+    # dry-run 只生成脚本并入队，永远不得写 running，
+    # 否则 heavy_finish() 会把从未执行的批次当成已可收工。
     retry_count = batch.get("retryCount", 0)
     if retry:
         retry_count += 1
-    batch["status"] = "running"
-    batch["startedAt"] = _now_iso()
+    batch["status"] = "starting" if execute_now else "queued"
+    batch["startedAt"] = _now_iso() if execute_now else None
+    batch["queuedAt"] = _now_iso()
+    batch["dryRun"] = not execute_now
     batch["retryCount"] = retry_count
     if retry:
         batch["lastRetryAt"] = _now_iso()
@@ -451,6 +468,8 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
             result["action"] = "started"
             result["startedPid"] = proc.pid
             result["logPath"] = str(log_path)
+            # 拿到 PID 才算真正 running
+            batch["status"] = "running"
             batch["pid"] = proc.pid
             batch["logPath"] = str(log_path)
             batch["dryRun"] = False
@@ -464,8 +483,20 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
             print(f"   🚀 启动后台进程 PID={proc.pid}")
             print(f"   📄 日志: {log_path}")
         except Exception as e:
+            # 启动失败必须持久化为 failed，否则会卡在假 running：
+            # heavy_resume() 只重试 failed/pending，heavy_finish() 又忽略 running。
             result["action"] = "start_failed"
             result["error"] = str(e)
+            batch["status"] = "failed"
+            batch["lastError"] = f"{type(e).__name__}: {e}"
+            batch["failedAt"] = _now_iso()
+            st["lastUpdate"] = _now_iso()
+            _save_json(status_file, st)
+            _append_broker("tasks", "heavy.batch.start_failed",
+                           f"批次启动失败: {target_id}", "error",
+                           f"任务: {task_name} | {type(e).__name__}: {e}",
+                           {"taskName": task_name, "batchId": target_id})
+            logger.error("批次 %s 启动失败: %s", target_id, e)
             print(f"   ❌ 启动失败: {e}")
     else:
         print(f"   📤 已入队: {queue_file}")
@@ -490,12 +521,12 @@ def heavy_execute_all(task_name: str, command: str | None = None,
         return []
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
-    search_statuses = ("pending", "failed") if retry else ("pending",)
+    search_statuses = ("pending", "queued", "failed") if retry else ("pending", "queued")
     pending = [bid for bid, bt in subtasks.items() if bt.get("status") in search_statuses]
     if not pending:
         print("✅ 无待处理子任务")
         return []
-    label = "pending/failed" if retry else "pending"
+    label = "pending/queued/failed" if retry else "pending/queued"
     print(f"⚙️ 处理全部 {len(pending)} 个 {label} 批次: {', '.join(pending)}")
     print(f"   模式: {'DRY-RUN (仅入队)' if not execute_now else '真执行 (后台进程)'}")
     results = []
@@ -528,10 +559,10 @@ def heavy_resume(task_name: str, command: str | None = None,
         return {"error": "task not found"}
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
-    # 找到所有需要重试的批次
+    # 找到所有需要重试的批次（queued = dry-run 入队但从未真跑）
     retryable = []
     for bid, bt in sorted(subtasks.items()):
-        if bt.get("status") in ("failed", "pending"):
+        if bt.get("status") in ("failed", "pending", "queued"):
             retryable.append(bid)
     if not retryable:
         print(f"✅ 任务 '{task_name}' 无需续传，所有批次已完成")
@@ -551,7 +582,7 @@ def heavy_resume(task_name: str, command: str | None = None,
     # 统计剩余未完成
     st = _load_json(status_file)
     remaining = sum(1 for bt in st.get("subtasks", {}).values()
-                    if bt.get("status") in ("pending", "failed", "running"))
+                    if bt.get("status") in ("pending", "queued", "starting", "failed", "running"))
     summary = {
         "resumed": len(retryable),
         "succeeded": done,
