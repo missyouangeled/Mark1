@@ -384,3 +384,130 @@ class TestEngineList:
 
         assert "list-test" in captured.out
         assert "周期:" in captured.out
+
+
+# ── 回归测试：Loop 事务性与状态机真实性 ─────────────────────
+
+
+class TestLoopTransactionSafety:
+    """回归测试：完整 read-modify-write 必须在同一把锁内。
+
+    历史 bug：调用方先 _load_loops() 读旧快照，修改后再 _save_loops()，
+    锁只保护最终写入。两个进程并发时后写者会整份覆盖对方新增的 Loop。
+    """
+
+    def test_locked_update_rereads_inside_lock(self):
+        """_locked_update_loops 必须在锁内重读，而不是使用调用方旧快照。"""
+        _save_loops({"a": {"status": "registered"}})
+
+        # 调用方持有的旧快照（不含 b）
+        stale = _load_loops()
+        assert "b" not in stale
+
+        # 另一路写入 b
+        def add_b(loops):
+            loops["b"] = {"status": "registered"}
+
+        engine._locked_update_loops(add_b)
+
+        # 再用事务方式写 c：不得因旧快照而丢掉 b
+        def add_c(loops):
+            loops["c"] = {"status": "registered"}
+
+        engine._locked_update_loops(add_c)
+
+        final = _load_loops()
+        assert sorted(final) == ["a", "b", "c"]
+
+    def test_engine_start_does_not_lose_concurrent_loop(self):
+        """engine_start 不得覆盖并发新增的其他 Loop。"""
+        _save_loops({"existing": {"status": "registered"}})
+
+        def add_other(loops):
+            loops["other"] = {"status": "registered"}
+
+        engine._locked_update_loops(add_other)
+        engine_start("new task", interval_s=60, template="brand-new")
+
+        final = _load_loops()
+        assert "existing" in final
+        assert "other" in final
+        assert "brand-new" in final
+
+    def test_engine_kill_missing_loop_reports_error(self, capsys):
+        """kill 不存在的 Loop 应报错而不是静默写入。"""
+        _save_loops({"keep": {"status": "registered"}})
+        engine_kill("no-such-loop")
+        captured = capsys.readouterr()
+        assert "不存在" in captured.out
+        assert sorted(_load_loops()) == ["keep"]
+
+
+class TestLoopStatusMachine:
+    """回归测试：Loop 异常后不得永久卡在 running。
+
+    历史 bug：执行前写 running，主执行体没有 try/except，
+    任意未捕获异常都会让 Loop 永久停留 running，daemon 从此不再调度。
+    """
+
+    def test_exception_marks_failed_not_running(self, monkeypatch):
+        engine_start("guard task", interval_s=1, template="context-guard")
+
+        def boom():
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            engine, "get_compress", lambda: type("X", (), {"check": staticmethod(boom)})()
+        )
+
+        with pytest.raises(RuntimeError, match="boom"):
+            engine_run_loop("context-guard")
+
+        state = _load_loops()["context-guard"]
+        assert state["status"] == "failed"
+        assert state["status"] != "running"
+        assert "RuntimeError: boom" in state["lastError"]
+        assert state["failedAt"]
+
+    def test_success_path_returns_to_registered(self):
+        """成功路径仍应回到 registered 并推进 cycle。"""
+        engine_start("generic task", interval_s=1, template="ok-loop")
+        engine_run_loop("ok-loop")
+
+        state = _load_loops()["ok-loop"]
+        assert state["status"] == "registered"
+        assert state["cycle"] == 1
+
+
+class TestCompressSubprocessEntrypoint:
+    """回归测试：上下文告警必须使用真实存在的模块入口。
+
+    历史 bug：硬编码执行仓库根目录 mark42.py（不存在），
+    子进程启动即失败，且父进程不检查退出码，告警被静默丢弃。
+    """
+
+    def test_repo_root_mark42_py_does_not_exist(self):
+        """确认硬编码目标确实不存在，说明旧实现必然失败。"""
+        from pathlib import Path
+
+        assert not (Path(engine.__file__).resolve().parent.parent / "mark42.py").exists()
+
+    def test_engine_source_uses_module_entrypoint(self):
+        """源码必须使用 -m mark42 而非硬编码脚本路径。"""
+        from pathlib import Path
+
+        src = Path(engine.__file__).read_text()
+        assert '"-m", "mark42"' in src
+        assert 'parent.parent / "mark42.py"' not in src
+
+    def test_module_entrypoint_is_runnable(self):
+        """python -m mark42 必须真实可用。"""
+        import subprocess
+        import sys
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "mark42", "--version"],
+            capture_output=True, text=True, timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "Mark42" in proc.stdout

@@ -9,7 +9,6 @@ import sys
 import time
 import urllib.request
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -174,6 +173,31 @@ def _save_loops(loops: dict[str, Any]) -> None:
             fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
 
+def _locked_update_loops(mutator: Any) -> Any:
+    """在同一把锁内完成 read-modify-write 完整事务。
+
+    历史问题：调用方先 _load_loops() 读旧快照，修改后再 _save_loops()，
+    锁只保护最终写入。两个进程并发时后写者会整份覆盖对方的新增 Loop。
+    本函数在锁内重读最新快照，再应用 mutator，避免丢更新。
+
+    Args:
+        mutator: 可调用对象，接收锁内重读到的 loops dict 并就地修改；
+                 其返回值作为本函数返回值透传给调用方。
+    """
+    import fcntl
+    ENGINE_STATE.mkdir(parents=True, exist_ok=True)
+    lock_path = str(ENGINE_LOOPS) + ".lock"
+    with open(lock_path, "a") as lf:
+        try:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+            loops = _load_json(ENGINE_LOOPS)   # 锁内重读，不用锁外旧快照
+            outcome = mutator(loops)
+            _save_json(ENGINE_LOOPS, loops)
+            return outcome
+        finally:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+
+
 def engine_templates() -> None:
     """列出所有可用 Loop 模板。"""
     print("🔄 可用 Loop 模板:\n")
@@ -213,27 +237,36 @@ def engine_list() -> None:
 
 def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template: str = "") -> None:
     """注册一个新的 Loop。"""
-    loops = _load_loops()
     name = template if template else f"loop-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    if name in loops and not template:
-        print(f"⚠️ Loop '{name}' 已存在，覆盖注册")
-    elif name in loops:
-        existing = loops[name]
-        # 如果同名 Loop 仍在活跃状态（非 killed），提示用户并覆盖为活跃
-        if existing.get("status", "killed") not in ("killed",):
-            print(f"⚠️ Loop '{name}' 已存在且活跃（状态: {existing.get('status')})，将被覆盖")
-    loops[name] = {
-        "task": task,
-        "interval": interval_s,
-        "maxCycles": max_cycles or None,
-        "template": template,
-        "status": "registered",
-        "cycle": 0,
-        "lastRun": None,
-        "lastResult": None,
-        "createdAt": _now_iso(),
-    }
-    _save_loops(loops)
+
+    def _mutate(loops: dict[str, Any]) -> list[str]:
+        warnings: list[str] = []
+        if name in loops and not template:
+            warnings.append(f"⚠️ Loop '{name}' 已存在，覆盖注册")
+        elif name in loops:
+            existing = loops[name]
+            # 如果同名 Loop 仍在活跃状态（非 killed），提示用户并覆盖为活跃
+            if existing.get("status", "killed") not in ("killed",):
+                warnings.append(
+                    f"⚠️ Loop '{name}' 已存在且活跃（状态: {existing.get('status')})，将被覆盖"
+                )
+        loops[name] = {
+            "task": task,
+            "interval": interval_s,
+            "maxCycles": max_cycles or None,
+            "template": template,
+            "status": "registered",
+            "cycle": 0,
+            "lastRun": None,
+            "lastResult": None,
+            "createdAt": _now_iso(),
+        }
+        return warnings
+
+    # 锁内重读 + 修改 + 写入，避免与 daemon 并发时丢失其他 Loop
+    for msg in _locked_update_loops(_mutate):
+        print(msg)
+
     print(f"🔄 Loop '{name}' 已注册")
     print(f"   任务: {task}")
     print(f"   周期: {interval_s}s  |  最大循环: {max_cycles or '无限'}")
@@ -253,15 +286,19 @@ def engine_start(task: str, interval_s: int = 300, max_cycles: int = 0, template
 
 def engine_kill(name: str) -> None:
     """终止一个 Loop。"""
-    loops = _load_loops()
-    if name not in loops:
+    def _mutate(loops: dict[str, Any]) -> str | None:
+        if name not in loops:
+            return None
+        old_status = loops[name].get("status", "?")
+        loops[name]["status"] = "killed"
+        loops[name]["killedAt"] = _now_iso()
+        return old_status
+
+    old_status = _locked_update_loops(_mutate)
+    if old_status is None:
         logger.error("Loop 不存在: %s", name)
         print(f"❌ Loop '{name}' 不存在")
         return
-    old_status = loops[name].get("status", "?")
-    loops[name]["status"] = "killed"
-    loops[name]["killedAt"] = _now_iso()
-    _save_loops(loops)
     print(f"💀 Loop '{name}' 已终止（原状态: {old_status})")
 
 
@@ -330,177 +367,191 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
     template_name = loop.get("template", "")
     task = loop["task"]
     print(f"▶️ 执行 Loop '{name}': {task}")
-    if template_name == "context-guard":
-        check = get_compress().check()
-        usage = check.get("usagePercent", 0)
-        print(f"   🔍 Observe: 上下文 {usage}%")
-        # 平台优先 + Mark42 兜底 (2026-07-29):
-        # armor_compress 内含平台探测期（60s 等平台自己 compact）+ compact 锁
-        # - WARN 阶段: 只监控+预警
-        # - ALERT 阶段: 触发 armor_compress 自主救场
-        if usage >= THRESHOLD_ALERT:
-            print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，启动自主救场")
-            try:
-                from .consciousness import Consciousness
-                cs = Consciousness()
-                issue = {"source": "armor", "category": "context_alert",
-                         "severity": "critical", "value": usage,
-                         "msg": f"上下文使用率 {usage}% 达到告警线"}
-                handle_result = cs.handle_issue(issue, dry_run=False)
-                path = handle_result.get("path", "")
-                print(f"   🔗 v3-5 路由: {path}")
-                loop["lastResult"] = {"action": "compress", "usage": usage, "v3_5_path": path}
-            except Exception as e:
-                print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
-                result = get_compress().compress()
-                verify = get_compress().check()
-                new_usage = verify.get("usagePercent", 0)
-                print(f"   ✅ Verify: {usage}% -> {new_usage}%")
-                loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
-        elif usage >= THRESHOLD_WARN:
-            print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，预警，等平台处理")
-            loop["lastResult"] = {"action": "monitor", "usage": usage}
-        else:
-            print("   ✅ Decide: 未达阈值，继续监控")
-            loop["lastResult"] = {"action": "monitor", "usage": usage}
-    elif template_name == "task-watch":
-        heavy_tasks = list(HEAVY_STATE.glob("*.json"))
-        active_tasks = []
-        for tf in heavy_tasks:
-            ts = _load_json(tf)
-            if ts.get("status") == "started":
-                active_tasks.append(ts.get("taskName"))
-        print(f"   🔍 Observe: {len(active_tasks)} 活跃重型任务")
-        pending = 0
-        failed = 0
-        for tn in active_tasks:
-            status_file = SCRATCH / tn / "status.json"
-            st = _load_json(status_file) if status_file.exists() else {}
-            p = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") == "pending")
-            f = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") in ("failed", "error"))
-            pending += p
-            failed += f
-            print(f"      {tn}: {p} pending, {f} failed")
-        loop["lastResult"] = {"activeTasks": active_tasks, "pending": pending, "failed": failed}
-    elif template_name == "health-watch":
-        try:
-            import shutil
-            # 使用 shutil.disk_usage 替代脆弱的 df -h 解析
-            root_usage = shutil.disk_usage("/")
-            disk_root_gb = root_usage.free / (1024**3)
-            disk_root = f"{disk_root_gb:.1f}G"
-            data_usage = shutil.disk_usage(str(DATA_MOUNT)) if DATA_MOUNT.exists() else None
-            disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
-            with open("/proc/meminfo") as f:
-                meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}
-            mem_avail_mb = meminfo.get("MemAvailable", 0) // 1024
-            mem_avail = f"{mem_avail_mb}M"
-        except Exception:
-            disk_root, disk_data, mem_avail = "?", "?", "?"
-            disk_root_gb, mem_avail_mb = 100, 1000
-        print(f"   🩺 根盘: {disk_root} | 数据盘: {disk_data} | 可用内存: {mem_avail}")
-        alerts = []
-        if disk_root_gb < 5:
-            alerts.append(f"磁盘不足 ({disk_root})")
-        if mem_avail_mb < 500:
-            alerts.append(f"内存紧张 ({mem_avail})")
-        if alerts:
-            print(f"   ⚠️ 告警: {', '.join(alerts)}")
-            _append_broker("health", "engine.health.warn", "系统资源告警", "warn", ", ".join(alerts), {})
-        loop["lastResult"] = {"diskRoot": disk_root, "diskData": disk_data, "memAvail": mem_avail, "alerts": alerts}
-    elif template_name == "model-fallback":
-        try:
-            resp = urllib.request.urlopen("http://127.0.0.1:18788/healthz", timeout=5)
-            gw_ok = resp.status == 200
-        except Exception:
-            gw_ok = False
-        print(f"   🔍 Gateway: {'✅ 正常' if gw_ok else '❌ 不可达'}")
-        loop["lastResult"] = {"gatewayOk": gw_ok}
-        if not gw_ok:
-            _append_broker("health", "engine.model.fallback", "Gateway 不可达", "error",
-                           "Gateway health check 失败", {})
-            # v3-5: 写错误档案（L5）+ 走 Consciousness 链路
-            try:
-                from .consciousness import Consciousness
-                cs = Consciousness()
-                issue = {"source": "engine", "category": "gateway_down",
-                         "severity": "critical",
-                         "msg": "Gateway 不可达"}
-                handle_result = cs.handle_issue(issue, dry_run=True)
-                print(f"   🔗 v3-5 路由: {handle_result.get('path', 'unknown')}")
-                loop["lastResult"]["v3_5_path"] = handle_result.get("path", "")
-            except Exception as e:
-                print(f"   ⚠️ v3-5 链路异常: {e}")
-    elif template_name == "memory-index":
-        # 扫描最近 7 天 memory/daily/ 文件，更新 INDEX.md 主题锚点
-        memory_dir = WORKSPACE / "memory" / "daily"
-        index_path = WORKSPACE / "memory" / "INDEX.md"
-        scanned = 0
-        new_anchors = []
-        if memory_dir.exists():
-            from datetime import datetime as _dt
-            from datetime import timedelta as _td
-            # 用日期比较而非时间戳比较，避免 00:00:00 < 当前时刻导致跳过当天
-            today = _dt.now().date()
-            cutoff_date = today - _td(days=7)
-            for df in sorted(memory_dir.glob("*.md"), reverse=True):
+    # 异常安全：主执行体任何未捕获异常都不得让 Loop 永久卡在 running。
+    try:
+        if template_name == "context-guard":
+            check = get_compress().check()
+            usage = check.get("usagePercent", 0)
+            print(f"   🔍 Observe: 上下文 {usage}%")
+            # 平台优先 + Mark42 兜底 (2026-07-29):
+            # armor_compress 内含平台探测期（60s 等平台自己 compact）+ compact 锁
+            # - WARN 阶段: 只监控+预警
+            # - ALERT 阶段: 触发 armor_compress 自主救场
+            if usage >= THRESHOLD_ALERT:
+                print(f"   🟠 Decide: 超 ALERT 阈值 ({THRESHOLD_ALERT}%)，启动自主救场")
                 try:
-                    date_str = df.stem
-                    dt = _dt.strptime(date_str, "%Y-%m-%d").date()
-                    if dt < cutoff_date:
-                        continue
-                    scanned += 1
-                    content = df.read_text()[:2000]
-                    # 提取 ## 标题作为主题锚点
-                    import re
-                    topics = re.findall(r'^##\s+(.+)', content, re.MULTILINE)
-                    for topic in topics:
-                        anchor = f"- [{date_str}] {topic.strip()}"
-                        if anchor not in new_anchors:
-                            new_anchors.append(anchor)
+                    from .consciousness import Consciousness
+                    cs = Consciousness()
+                    issue = {"source": "armor", "category": "context_alert",
+                             "severity": "critical", "value": usage,
+                             "msg": f"上下文使用率 {usage}% 达到告警线"}
+                    handle_result = cs.handle_issue(issue, dry_run=False)
+                    path = handle_result.get("path", "")
+                    print(f"   🔗 v3-5 路由: {path}")
+                    loop["lastResult"] = {"action": "compress", "usage": usage, "v3_5_path": path}
                 except Exception as e:
-                    logger.warning("ignored error: %s", e)
-            # 更新 INDEX.md
-            if new_anchors:
-                existing = index_path.read_text() if index_path.exists() else "# 记忆索引\n"
-                # 只追加不重复的锚点
-                added = 0
-                for anchor in new_anchors[:20]:
-                    if anchor not in existing:
-                        existing += f"\n{anchor}"
-                        added += 1
-                if added > 0:
-                    index_path.write_text(existing)
-        print(f"   📋 记忆索引: 扫描 {scanned} 天, 新增 {len(new_anchors)} 个锚点")
-        loop["lastResult"] = {"scannedDays": scanned, "newAnchors": len(new_anchors)}
-    else:
-        # 通用/自定义 Loop 回退
-        if template_name:
-            # 用户自定义模板（不含执行逻辑）- 使用 generic 路径
-            print(f"   ℹ️ 自定义模板 '{template_name}' 使用通用执行路径")
-            # 仅记录 broker 事件，不执行特定逻辑
-            loop["lastResult"] = {
-                "action": "executed",
-                "template": template_name,
-                "note": "自定义模板通用路径",
-            }
-        else:
-            # 无模板的通用 Loop
-            task_lower = task.lower()
-            if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
-                result = get_compress().compress()
-                loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+                    print(f"   ⚠️ v3-5 链路异常: {e}，回退直接压缩")
+                    result = get_compress().compress()
+                    verify = get_compress().check()
+                    new_usage = verify.get("usagePercent", 0)
+                    print(f"   ✅ Verify: {usage}% -> {new_usage}%")
+                    loop["lastResult"] = {"action": "compress", "before": usage, "after": new_usage}
+            elif usage >= THRESHOLD_WARN:
+                print(f"   🟡 Decide: 超 WARN 阈值 ({THRESHOLD_WARN}%)，预警，等平台处理")
+                loop["lastResult"] = {"action": "monitor", "usage": usage}
             else:
-                loop["lastResult"] = {"action": "executed", "note": "通用任务"}
+                print("   ✅ Decide: 未达阈值，继续监控")
+                loop["lastResult"] = {"action": "monitor", "usage": usage}
+        elif template_name == "task-watch":
+            heavy_tasks = list(HEAVY_STATE.glob("*.json"))
+            active_tasks = []
+            for tf in heavy_tasks:
+                ts = _load_json(tf)
+                if ts.get("status") == "started":
+                    active_tasks.append(ts.get("taskName"))
+            print(f"   🔍 Observe: {len(active_tasks)} 活跃重型任务")
+            pending = 0
+            failed = 0
+            for tn in active_tasks:
+                status_file = SCRATCH / tn / "status.json"
+                st = _load_json(status_file) if status_file.exists() else {}
+                p = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") == "pending")
+                f = sum(1 for s in st.get("subtasks", {}).values() if s.get("status") in ("failed", "error"))
+                pending += p
+                failed += f
+                print(f"      {tn}: {p} pending, {f} failed")
+            loop["lastResult"] = {"activeTasks": active_tasks, "pending": pending, "failed": failed}
+        elif template_name == "health-watch":
+            try:
+                import shutil
+                # 使用 shutil.disk_usage 替代脆弱的 df -h 解析
+                root_usage = shutil.disk_usage("/")
+                disk_root_gb = root_usage.free / (1024**3)
+                disk_root = f"{disk_root_gb:.1f}G"
+                data_usage = shutil.disk_usage(str(DATA_MOUNT)) if DATA_MOUNT.exists() else None
+                disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
+                with open("/proc/meminfo") as f:
+                    meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}
+                mem_avail_mb = meminfo.get("MemAvailable", 0) // 1024
+                mem_avail = f"{mem_avail_mb}M"
+            except Exception:
+                disk_root, disk_data, mem_avail = "?", "?", "?"
+                disk_root_gb, mem_avail_mb = 100, 1000
+            print(f"   🩺 根盘: {disk_root} | 数据盘: {disk_data} | 可用内存: {mem_avail}")
+            alerts = []
+            if disk_root_gb < 5:
+                alerts.append(f"磁盘不足 ({disk_root})")
+            if mem_avail_mb < 500:
+                alerts.append(f"内存紧张 ({mem_avail})")
+            if alerts:
+                print(f"   ⚠️ 告警: {', '.join(alerts)}")
+                _append_broker("health", "engine.health.warn", "系统资源告警", "warn", ", ".join(alerts), {})
+            loop["lastResult"] = {"diskRoot": disk_root, "diskData": disk_data, "memAvail": mem_avail, "alerts": alerts}
+        elif template_name == "model-fallback":
+            try:
+                resp = urllib.request.urlopen("http://127.0.0.1:18788/healthz", timeout=5)
+                gw_ok = resp.status == 200
+            except Exception:
+                gw_ok = False
+            print(f"   🔍 Gateway: {'✅ 正常' if gw_ok else '❌ 不可达'}")
+            loop["lastResult"] = {"gatewayOk": gw_ok}
+            if not gw_ok:
+                _append_broker("health", "engine.model.fallback", "Gateway 不可达", "error",
+                               "Gateway health check 失败", {})
+                # v3-5: 写错误档案（L5）+ 走 Consciousness 链路
+                try:
+                    from .consciousness import Consciousness
+                    cs = Consciousness()
+                    issue = {"source": "engine", "category": "gateway_down",
+                             "severity": "critical",
+                             "msg": "Gateway 不可达"}
+                    handle_result = cs.handle_issue(issue, dry_run=True)
+                    print(f"   🔗 v3-5 路由: {handle_result.get('path', 'unknown')}")
+                    loop["lastResult"]["v3_5_path"] = handle_result.get("path", "")
+                except Exception as e:
+                    print(f"   ⚠️ v3-5 链路异常: {e}")
+        elif template_name == "memory-index":
+            # 扫描最近 7 天 memory/daily/ 文件，更新 INDEX.md 主题锚点
+            memory_dir = WORKSPACE / "memory" / "daily"
+            index_path = WORKSPACE / "memory" / "INDEX.md"
+            scanned = 0
+            new_anchors = []
+            if memory_dir.exists():
+                from datetime import datetime as _dt
+                from datetime import timedelta as _td
+                # 用日期比较而非时间戳比较，避免 00:00:00 < 当前时刻导致跳过当天
+                today = _dt.now().date()
+                cutoff_date = today - _td(days=7)
+                for df in sorted(memory_dir.glob("*.md"), reverse=True):
+                    try:
+                        date_str = df.stem
+                        dt = _dt.strptime(date_str, "%Y-%m-%d").date()
+                        if dt < cutoff_date:
+                            continue
+                        scanned += 1
+                        content = df.read_text()[:2000]
+                        # 提取 ## 标题作为主题锚点
+                        import re
+                        topics = re.findall(r'^##\s+(.+)', content, re.MULTILINE)
+                        for topic in topics:
+                            anchor = f"- [{date_str}] {topic.strip()}"
+                            if anchor not in new_anchors:
+                                new_anchors.append(anchor)
+                    except Exception as e:
+                        logger.warning("ignored error: %s", e)
+                # 更新 INDEX.md
+                if new_anchors:
+                    existing = index_path.read_text() if index_path.exists() else "# 记忆索引\n"
+                    # 只追加不重复的锚点
+                    added = 0
+                    for anchor in new_anchors[:20]:
+                        if anchor not in existing:
+                            existing += f"\n{anchor}"
+                            added += 1
+                    if added > 0:
+                        index_path.write_text(existing)
+            print(f"   📋 记忆索引: 扫描 {scanned} 天, 新增 {len(new_anchors)} 个锚点")
+            loop["lastResult"] = {"scannedDays": scanned, "newAnchors": len(new_anchors)}
+        else:
+            # 通用/自定义 Loop 回退
+            if template_name:
+                # 用户自定义模板（不含执行逻辑）- 使用 generic 路径
+                print(f"   ℹ️ 自定义模板 '{template_name}' 使用通用执行路径")
+                # 仅记录 broker 事件，不执行特定逻辑
+                loop["lastResult"] = {
+                    "action": "executed",
+                    "template": template_name,
+                    "note": "自定义模板通用路径",
+                }
+            else:
+                # 无模板的通用 Loop
+                task_lower = task.lower()
+                if "context" in task_lower or "armor" in task_lower or "上下文" in task_lower:
+                    result = get_compress().compress()
+                    loop["lastResult"] = {"action": result.get("action"), "usage": result.get("preCompressUsage")}
+                else:
+                    loop["lastResult"] = {"action": "executed", "note": "通用任务"}
 
-    # ── C 项：Loop 执行完成 → emit 标准化事件 ──
-    _append_broker("engine", "mark42.engine.loop.completed",
-                   f"Loop '{name}' 执行完成",
-                   "ok" if not isinstance(loop.get("lastResult"), dict) or
-                           not loop["lastResult"].get("alerts") else "warn",
-                   f"模板: {template_name or '通用'} | cycle {loop.get('cycle',0)+1}",
-                   {"loopName": name, "template": template_name or "generic",
-                    "lastResult": loop.get("lastResult", {})})
+        # ── C 项：Loop 执行完成 → emit 标准化事件 ──
+        _append_broker("engine", "mark42.engine.loop.completed",
+                       f"Loop '{name}' 执行完成",
+                       "ok" if not isinstance(loop.get("lastResult"), dict) or
+                               not loop["lastResult"].get("alerts") else "warn",
+                       f"模板: {template_name or '通用'} | cycle {loop.get('cycle',0)+1}",
+                       {"loopName": name, "template": template_name or "generic",
+                        "lastResult": loop.get("lastResult", {})})
+    except BaseException as exc:
+        # 状态机不变量：running 必须迁移到终态，否则 daemon 不会再调度该 Loop。
+        loop["status"] = "failed"
+        loop["lastError"] = f"{type(exc).__name__}: {exc}"
+        loop["failedAt"] = _now_iso()
+        try:
+            _save_loops(loops)
+        except Exception as save_err:
+            logger.error("Loop %s 失败状态持久化失败: %s", name, save_err)
+        logger.error("Loop %s 执行异常: %s", name, loop["lastError"])
+        print(f"❌ Loop '{name}' 执行异常: {loop['lastError']}")
+        raise
     loop["cycle"] = loop.get("cycle", 0) + 1
     loop["status"] = "done"
     if loop.get("maxCycles") and loop["cycle"] >= loop["maxCycles"]:
@@ -569,15 +620,25 @@ def engine_daemon(interval_s: int = 30) -> None:
                         usage = metadata.get("usagePercent", 0)
                         if usage >= THRESHOLD_ALERT:
                             print(trim_summary(f"[{ts}] 🟠 收到上下文告警 ({usage}%)，启动压缩子进程", 120))
-                            script = str(Path(__file__).resolve().parent.parent / "mark42.py")
+                            # 正式入口：仓库根目录下并无 mark42.py，必须用 -m 模块入口，
+                            # 否则子进程启动即失败，且父进程不检查退出码会静默丢掉告警。
                             try:
-                                subprocess.Popen(
-                                    [sys.executable, "-u", script, "armor", "--compress"],
+                                proc = subprocess.Popen(
+                                    [sys.executable, "-u", "-m", "mark42", "armor", "--compress"],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     start_new_session=True,
                                 )
-                            except subprocess.SubprocessError as e:
+                                print(trim_summary(f"[{ts}] ✅ 压缩子进程已启动 (pid={proc.pid})", 120))
+                                _append_broker("engine", "mark42.engine.compress.spawned",
+                                               f"压缩子进程已启动: {usage}%", "ok",
+                                               trim_detail(f"pid={proc.pid}", 160),
+                                               {"usagePercent": usage, "pid": proc.pid})
+                            except (OSError, subprocess.SubprocessError) as e:
                                 print(trim_summary(f"[{ts}] ❌ 启动压缩子进程失败: {e}", 140))
+                                _append_broker("engine", "mark42.engine.compress.spawn_failed",
+                                               f"压缩子进程启动失败: {usage}%", "error",
+                                               trim_detail(f"{type(e).__name__}: {e}", 160),
+                                               {"usagePercent": usage})
                     # ── 模型故障检测（只感知，不切换 — OpenClaw 内置 failover 接管） ──
                     if "model.fallback" in source_evt or "engine.model.fallback" in source_evt:
                         summary = event.get("summary", "")
