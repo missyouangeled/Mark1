@@ -84,6 +84,29 @@ def _compact_lock_file() -> Path:
     return XDG_STATE / "mark42" / "armor" / "compact.lock"
 
 
+def _iso_age_seconds(iso_ts: str) -> float | None:
+    """计算 ISO 时间戳距今多少秒。兼容 aware / naive 两种格式。
+
+    【2026-08-04 Bug 修复】_now_iso() 产出的时间戳带时区偏移（如 +08:00），
+    而原代码用 datetime.now()（naive）相减，会抛：
+        TypeError: can't subtract offset-naive and offset-aware datetimes
+
+    后果（拆分前就存在的真 bug，被子函数单测暴露）：
+      1. compact 锁完全失效——异常被 except 吃掉后走「锁文件损坏」分支，
+         删锁重建，于是两个 Mark42 实例可以同时 compact。
+      2. 冷却期检查失效——同样被吃掉，30 分钟防重复压缩形同虚设。
+
+    Returns: 秒数；无法解析时返回 None。
+    """
+    from datetime import datetime as _dt
+    try:
+        parsed = _dt.fromisoformat(iso_ts)
+    except (ValueError, TypeError):
+        return None
+    now = _dt.now(tz=parsed.tzinfo) if parsed.tzinfo is not None else _dt.now()
+    return (now - parsed).total_seconds()
+
+
 def _try_acquire_compact_lock() -> bool:
     """尝试获取 compact 锁。返回 True 表示获取成功。
 
@@ -128,9 +151,8 @@ def _try_acquire_compact_lock() -> bool:
         lock_data = json.loads(lock_file.read_text())
         lock_ts = lock_data.get("acquiredAt")
         if lock_ts:
-            from datetime import datetime as _dt
-            lock_age = (datetime.now() - _dt.fromisoformat(lock_ts)).total_seconds()
-            if lock_age < COMPACT_LOCK_TTL_SEC:
+            lock_age = _iso_age_seconds(lock_ts)
+            if lock_age is not None and lock_age < COMPACT_LOCK_TTL_SEC:
                 return False  # 锁未过期
         # 锁已过期，原子替换
         lock_file.unlink(missing_ok=True)
@@ -712,10 +734,10 @@ def _compress_check_cooldown(index: dict[str, Any], index_path: Path,
         cd = _json.loads(compact_cooldown_file.read_text())
         last_ts = cd.get("lastCompactTs")
         if last_ts:
-            from datetime import datetime as _dt
-            last_dt = _dt.fromisoformat(last_ts)
-            elapsed = (datetime.now() - last_dt).total_seconds()
-            if elapsed < COMPACT_COOLDOWN_SEC:
+            # 【2026-08-04 Bug 修复】原代码 datetime.now() - fromisoformat(aware)
+            # 会抛 TypeError 并被下方 except 吃掉 -> 冷却期形同虚设。
+            elapsed = _iso_age_seconds(last_ts)
+            if elapsed is not None and elapsed < COMPACT_COOLDOWN_SEC:
                 remaining = int((COMPACT_COOLDOWN_SEC - elapsed) / 60)
                 print(f"⏸️ 压缩冷却中（还剩 {remaining} 分钟），跳过本次 compact")
                 index["compactTriggered"] = False

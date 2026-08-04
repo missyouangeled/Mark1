@@ -539,6 +539,13 @@ class TestArmorCompress:
             new_path.write_text(src.read_text())
             existing = sorted(history_dir.glob("memory-index-*.json"))
 
+        # 【2026-08-04】清掉第一次压缩写下的冷却期标记。
+        # 背景: 冷却期检查原有 aware/naive datetime 相减的 TypeError bug,
+        # 异常被 except 吃掉导致冷却期形同虚设, 本测试因此"侥幸通过"。
+        # bug 修复后冷却期真生效, 第二次 armor_compress 会被拦在升级检查之前,
+        # 所以这里显式清标记, 模拟两次压缩间隔已超过 30 分钟。
+        armor._compact_cooldown_file().unlink(missing_ok=True)
+
         # 再跑一次
         _setup_high_usage(mocker, target_pct=80.0)
         armor.armor_compress()
