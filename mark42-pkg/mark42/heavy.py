@@ -335,7 +335,7 @@ def heavy_finish(task_name: str) -> None:
 
 
 def heavy_execute(task_name: str, batch_id: str | None = None, command: str | None = None,
-                   execute_now: bool = False, retry: bool = False) -> dict[str, Any]:
+                   execute_now: bool = False, retry: bool = False) -> dict[str, Any] | None:
     """准备并（可选）执行大工程子任务 — 将 batch 分配给后台分身。
     不传 batch_id 则按序处理第一个 pending batch。
 

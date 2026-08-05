@@ -865,13 +865,13 @@ def main() -> int | None:
             if get_config_path().exists():
                 print(f"⚙️ 配置文件已存在: {get_config_path()}")
                 print("  使用 --config 查看，或删除后重新 --init")
-                return
+                return 0
             interactive_init()
-            return
+            return 0
         if args.config:
             from ..config import mark42_config
             mark42_config()
-            return
+            return 0
         if args.tune_compaction:
             from ..compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
             token_aware = getattr(args, 'token_aware', False)
@@ -892,9 +892,9 @@ def main() -> int | None:
                 result = compaction_apply(auto_confirm=False)
                 print_apply_result(result)
                 print("  💡 使用 --apply 实际应用更改，或 --tune-compaction --apply")
-            return
+            return 0
         parser.print_help()
-        return
+        return 0
 
     if args.module == "logs":
         from ..logs import log_rotate, log_rotate_status
@@ -904,7 +904,7 @@ def main() -> int | None:
             log_rotate_status()
         else:
             log_rotate_status()
-        return
+        return 0
 
     if args.module == "armor":
         from ..armor import armor_check, armor_compress, armor_compress_queue_stats, armor_guard
@@ -927,7 +927,7 @@ def main() -> int | None:
             print("📦 压缩队列统计")
             if "error" in stats:
                 print(f"   ❌ {stats['error']}")
-                return
+                return 0
             for k, v in stats.items():
                 print(f"   {k}: {v}")
         elif args.smartcrush:
@@ -954,7 +954,7 @@ def main() -> int | None:
             print(f"   使用率: {result.get('usagePercent', 0)}% "
                   f"({result.get('estimatedTokens', 0)/1000:.0f}K / {result.get('contextWindow', 0)/1000:.0f}K)")
             print(f"   {trim_summary(result.get('summary', ''), 100)}")
-        return
+        return 0
 
     if args.module == "audit":
         import json as _json
@@ -966,22 +966,22 @@ def main() -> int | None:
             reports = sorted(_audit_dir.glob("audit-*.json"), reverse=True) if _audit_dir.exists() else []
             if not reports:
                 print("🔍 暂无审计报告")
-                return
+                return 0
             r = _json.loads(reports[0].read_text())
             _print_audit_report(r)
-            return
+            return 0
 
         if args.list:
             reports = sorted(_audit_dir.glob("audit-*.json"), reverse=True) if _audit_dir.exists() else []
             if not reports:
                 print("🔍 暂无审计报告")
-                return
+                return 0
             print(f"🔍 审计报告 ({len(reports)} 份)")
             for rp in reports[:20]:
                 r = _json.loads(rp.read_text())
                 emoji = {"pass": "✅", "partial": "⚠️", "fail": "❌", "skip": "⏭️", "error": "💥"}.get(r.get("verdict", ""), "?")
                 print(f"  {emoji} {rp.name} | score={r.get('score', 0)} | {r.get('timestamp', '')[:19]}")
-            return
+            return 0
 
         if args.run:
             from ..interfaces import get_audit
@@ -989,7 +989,7 @@ def main() -> int | None:
             _audit = get_audit()
             if _audit is None:
                 print("❌ 审计模块未注册")
-                return
+                return 0
             print("🔍 开始审计...")
             result = _audit.audit_compact(
                 pre_compact_snapshot={"timestamp": _now_iso(), "source": "manual"},
@@ -1005,23 +1005,23 @@ def main() -> int | None:
                 for f in findings:
                     emoji = {"preserved": "✅", "degraded": "⚠️", "lost": "❌"}.get(f.get("status", ""), "?")
                     print(f"     {emoji} [{f.get('category', '')}] {f.get('item', '')[:60]}")
-            return
+            return 0
 
         if args.show:
             rp = _audit_dir / args.show if not args.show.startswith("/") else __import__("pathlib").Path(args.show)
             if not rp.exists():
                 print(f"❌ 报告不存在: {rp}")
-                return
+                return 0
             r = _json.loads(rp.read_text())
             _print_audit_report(r)
-            return
+            return 0
 
         print("🔍 Post-Compact Audit -- 用法:")
         print("  mark42 audit --last    查看最近审计报告")
         print("  mark42 audit --list    列出所有审计报告")
         print("  mark42 audit --run     手动触发审计")
         print("  mark42 audit --show <name>  查看指定报告")
-        return
+        return 0
 
     if args.module == "engine":
         from ..engine import (
@@ -1057,7 +1057,7 @@ def main() -> int | None:
             engine_daemon(args.interval)
         else:
             engine_list()
-        return
+        return 0
 
     if args.module == "heavy":
         from ..heavy import (
@@ -1112,7 +1112,7 @@ def main() -> int | None:
         else:
             print("❌ 请指定 --preflight / --start / --execute / --execute-all / --finish / --cleanup")
             return 2
-        return
+        return 0
 
     if args.module == "cost":
         from ..cost_tracker import cli_cost_month, cli_cost_today, cli_cost_top
@@ -1122,7 +1122,7 @@ def main() -> int | None:
             cli_cost_top(n=args.top_n, days=args.days)
         else:
             cli_cost_today()
-        return
+        return 0
 
     if args.module == "compaction":
         from ..compaction_diag import compaction_apply, compaction_diagnose, print_apply_result, print_diagnose
@@ -1141,7 +1141,7 @@ def main() -> int | None:
         if diag["actionable"]:
             print("  💡 如需自动调优: mark42 --tune-compaction")
             print("     直接应用: mark42 --tune-compaction --apply")
-        return
+        return 0
 
     if args.module == "assemble":
         if args.status:
@@ -1152,7 +1152,7 @@ def main() -> int | None:
             assemble_restart()
         else:
             assemble()
-        return
+        return 0
 
     if args.module == "context-safety":
         from ..context_safety import (
@@ -1174,20 +1174,20 @@ def main() -> int | None:
             sys.exit(context_safety_verify(verbose=getattr(args, 'verbose', False)))
         else:
             context_safety_status(verbose=getattr(args, 'verbose', False))
-        return
+        return 0
 
     if args.module == "status":
         if getattr(args, 'metrics', False):
             # G11: Prometheus 格式指标输出
             _print_metrics()
-            return
+            return 0
         if getattr(args, 'json', False):
             import json as _j
             result = status_dashboard(json_mode=True)
             print(_j.dumps(result, indent=2, ensure_ascii=False))
         else:
             status_dashboard(verbose=getattr(args, 'verbose', False))
-        return
+        return 0
 
     if args.module == "archive":
         # v3-2 错误档案 — 委派给 error_archive 子模块
@@ -1227,7 +1227,7 @@ def main() -> int | None:
             for k, v in s["by_status"].items():
                 print(f"  {k:18s} {v}")
             print(f"已授权自动执行: {s['auto_approved_count']}\n")
-        return
+        return 0
 
     if args.module == "consciousness":
         # v3-3 战甲意识层 — 委派给 consciousness 子模块
@@ -1305,7 +1305,7 @@ def main() -> int | None:
                 print(f"   需要答对 {result.get('min_correct')} 题")
             print()
             print(_j5.dumps(result, indent=2, ensure_ascii=False, default=str)[:500])
-        return
+        return 0
 
     if args.module == "cores":
 
@@ -1338,7 +1338,7 @@ def main() -> int | None:
                 return 1
             r = cli_cores_restore(args.core_id)
             print(f"{'✅' if r['ok'] else '❌'} 恢复 {args.core_id}: {r['ok']}")
-        return
+        return 0
 
     if args.module == "chaos":
 
@@ -1368,7 +1368,7 @@ def main() -> int | None:
             for r in history:
                 icon = "✅" if r.get('status') == "passed" else "❌"
                 print(f"  {icon} {r.get('experiment',''):<30} {r.get('started_at','')[:19]}  {r.get('duration_ms',0)}ms")
-        return
+        return 0
 
     if args.module == "module":
 
@@ -1396,7 +1396,7 @@ def main() -> int | None:
             s = mhm.summary()
             print("🔌 模块级协议摘要\n")
             print(f"  总计: {s['total']} | 🟢 {s['green']} | 🟡 {s['yellow']} | 🔴 {s['red']}")
-        return
+        return 0
 
     if args.module == "cluster":
 
@@ -1427,7 +1427,7 @@ def main() -> int | None:
                 return 1
             r = cm.replace(args.name, source=args.source)
             print(f"{'✅' if r.get('ok') else '❌'} {r.get('note','')} (action recorded)")
-        return
+        return 0
 
     if args.module == "breaker":
         from ..circuit_breaker import CircuitBreaker
@@ -1462,7 +1462,7 @@ def main() -> int | None:
         elif args.action == "reset-all":
             cb.reset_all()
             print("✅ 所有熔断器已重置")
-        return
+        return 0
 
     if args.module == "arclock":
         import json as _j10
@@ -1535,7 +1535,7 @@ def main() -> int | None:
                     print("  ✅ 加载成功（无自动化测试，请手动验证）")
             except Exception as e:
                 print(f"  ❌ 调用失败: {e}")
-        return
+        return 0
 
     if args.module == "metrics-server":
         from ..metrics_server import run_server
@@ -1546,7 +1546,7 @@ def main() -> int | None:
         print("   Ctrl+C 停止")
         print()
         run_server(port=args.port, host=args.host)
-        return
+        return 0
 
     if args.module == "watchdog":
         from ..watchdog import watchdog_check
