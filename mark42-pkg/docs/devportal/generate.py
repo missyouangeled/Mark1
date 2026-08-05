@@ -183,7 +183,7 @@ def _build_docs_nav():
     # 顶层文档：用友好标签，未登记的按文件名
     for f in sorted(docs_root.glob("*.md")):
         label, desc = _DOC_LABELS.get(f.name, (f.stem, "项目文档"))
-        items.append((label, f"mark42-pkg/docs/{f.name}", desc))
+        items.append((label, f"docs/{f.stem}.html", desc))
     # design/ 与 plans/：全量收录，标签带前缀便于分组
     for sub, prefix in (("design", "设计"), ("plans", "方案")):
         d = docs_root / sub
@@ -194,7 +194,7 @@ def _build_docs_nav():
             for junk in ("mark42-", "Mark42-"):
                 if name.startswith(junk):
                     name = name[len(junk):]
-            items.append((f"{prefix}-{name[:24]}", f"mark42-pkg/docs/{sub}/{f.name}", f.stem))
+            items.append((f"{prefix}-{name[:24]}", f"docs/{sub}/{f.stem}.html", f.stem))
     return items
 
 DOCS_NAV = _build_docs_nav()
@@ -205,19 +205,21 @@ def file_url(rel_path: str) -> str:
     return f"file://{abs_path}"
 
 def render_module_row(src_rel: str, name: str, desc: str, tests: list) -> str:
-    # 【2026-08-05 修正】原为 PKG / src_rel，拼出 mark42-pkg/armor.py —— 缺了
-    # 中间的 mark42/ 包层（源码 7-29 从 scripts/mark42_modules/ 迁入包内）。
-    # 导致门户里 68 个源码链接全部指向不存在的路径。
-    # 子包路径（如 audit/checker.py）也能正确拼接。
+    # 【2026-08-05 修正】两轮修正：
+    # ① 原为 PKG / src_rel，拼出 mark42-pkg/armor.py —— 缺了中间 mark42/ 包层
+    #   （源码 7-29 从 scripts/mark42_modules/ 迁入包内），68 个链接全失效。
+    # ② 改用相对路径指门户内副本：绝对路径指向 workspace 隐藏目录，
+    #   门户整体拷到其他机器/其他位置后全部失效。
+    # 存在性校验仍用绝对路径（构建时验证源文件真存在）。
     src_abs = PKG / "mark42" / src_rel
-    src_url = f"file://{src_abs.resolve()}"
+    src_url = f"mark42/{src_rel}"
     test_links = ""
     if tests:
         test_links = '<div class="tests">'
         for t in tests:
             test_path = PKG / "tests" / t
             if test_path.exists():
-                test_links += f'<a class="link test" href="file://{test_path.resolve()}" target="_blank">🧪 {t}</a> '
+                test_links += f'<a class="link test" href="tests/{t}" target="_blank">🧪 {t}</a> '
             else:
                 test_links += f'<span class="link test-missing">🧪 {t} (缺)</span> '
         test_links += '</div>'
@@ -300,8 +302,10 @@ body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif
 
 # 侧边栏文档链接
 for label, rel, desc in DOCS_NAV:
-    url = file_url(rel)
-    html += f'    <a href="{url}" target="_blank" title="{desc}">{label}</a>\n'
+    # 【2026-08-05 修正】原用 file_url() 拼绝对路径指向 workspace 外部的 .md，
+    # 但浏览器不渲染 .md（点了只会下载或空白），且链接跑出门户目录导致
+    # 整体拷走后失效。现改为相对路径指门户内的 .html（由 pandoc 预渲染）。
+    html += f'    <a href="{rel}" target="_blank" title="{desc}">{label}</a>\n'
 
 # 侧边栏分类锚点
 html += '\n    <h3>🗂️ 模块分类</h3>\n'
@@ -341,3 +345,17 @@ print(f"✅ 已生成: {OUTPUT}")
 print(f"   大小: {OUTPUT.stat().st_size} 字节")
 print(f"   模块数: {sum(len(c['modules']) for c in CATEGORIES)}")
 print(f"   文档数: {len(DOCS_NAV)}")
+
+# 【2026-08-05 新增】自动部署到桌面门户。
+# 页内链接已改为相对路径，只有放在带 mark42/ tests/ docs/ 副本的
+# 门户目录下才能点开。生成在项目目录而不部署，等于生成了一份
+# 链接全坏的页面 —— 这正是之前桌面只剩下载页的原因。
+PORTAL = Path("/home/missyouangeled/Desktop/mark42-dev-portal")
+if PORTAL.is_dir():
+    import shutil
+    dest = PORTAL / OUTPUT.name
+    shutil.copy2(OUTPUT, dest)
+    print(f"📦 已部署到门户: {dest}")
+else:
+    print(f"⚠️  未找到门户目录 {PORTAL}，跳过部署。"
+          f"页内为相对路径，需放在带 mark42//tests//docs/ 副本的目录下才能点开。")
