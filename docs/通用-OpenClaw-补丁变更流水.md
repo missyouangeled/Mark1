@@ -2450,3 +2450,90 @@ P3-4 剩余 106 项 mypy 属渐进式标注债（`no-any-return` 27、`index` 17
 ### 遗留
 
 `no-any-return` 类问题已全部按真实契约收敛，但**这类问题会随新代码回归**。建议后续把 mypy 纳入 CI 门禁，否则今天的清零会慢慢退化。
+
+## 2026-08-05 11:20:00 CST (+08:00) — mypy 纳入 CI 门禁 + Mark42 全系统严格审查
+
+- 类型：ci + audit + fix
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- commits：32eeccbb（CI 门禁）、ac7ab830（审查修复）
+
+## 一、mypy 纳入 CI 门禁（32eeccbb）
+
+新增 `.github/workflows/ci.yml`（8 步）+ `.pre-commit-config.yaml` 新增 `mypy-mark42` hook。
+
+**关键设计**：
+- `working-directory: mark42-pkg` — 否则读不到包内 `[tool.mypy]` 配置，门禁会退化成默认宽松规则而形同虚设
+- 整包检查而非逐文件 — 逐文件会漏跨模块签名不符（今日 `actions_runner` 调 `assemble_restart(agent=...)` 那个真 bug 正属此类）
+- **禁止伪清零守卫**：`cast` 上限 0，`type: ignore` 上限 1
+- pre-commit hook 用 `bash -c 'cd mark42-pkg && ...'` — pre-commit 在仓库根执行
+- 原有 hook 一个未动（已 diff 校验：仅新增 1 个 id）
+
+**门禁有效性已实测**（不只是写进配置）：
+- 注入 `def _load_state() -> int:` → mypy rc=1 报 11 处错误；恢复后 rc=0
+- 注入 `from typing import cast` → **守卫最初漏判**（原 grep 只匹配 `cast(` 调用形式），已修正为同时匹配导入，复验能抓到
+
+## 二、全系统严格审查
+
+范围：22 个 CLI 模块、58 项只读实测、服务层、四大 Loop、核心能力、假死专项。
+
+### 假死结论：0 项
+
+| 检查项 | 实测结果 |
+|---|---|
+| 守护进程存活 | armor-guard / engine-daemon 均 Ss 状态，运行 10190s |
+| 心跳新鲜度 | `daemon-heartbeat.json` 距今 15s |
+| **cycle 真推进** | 间隔 65s 取两次：341 → 343（+2）✓ |
+| 四大 Loop | 全部 registered，无一超自身周期 3 倍 |
+| 日志活跃 | engine-daemon 28s 前、armor-guard 212s 前仍在写 |
+| 僵尸/孤儿进程 | 0 |
+| 锁残留 | 3 个陈旧锁均 0 字节且 flock 测试未被持有 → 非死锁 |
+| compact 锁 | 无残留 |
+| timer 停摆 | 8 个 timer 全部按时触发 |
+
+### 审查中被误导 3 次（都查清了，记录以免后人再踩）
+
+1. **日志"22 天未更新"** — 我按代码默认 `LOG_DIR` 去 `/mnt/data/.../logs/` 看，发现 mtime 是 22 天前，差点判为假死。真相：systemd 单元用 `MARK42_LOG_DIR` 覆盖到 `~/.local/state/.../logs/`，那里 28s 前刚写。**`/mnt/data` 那份是僵尸副本**。手动跑 CLI 时无此环境变量会解析到 `/mnt/data` —— 这是真实的运维陷阱。
+2. **心跳文件停在 7-13** — `daemon-heartbeat-main.json`（带 `agent` 字段的旧格式）是孤儿文件，现代码只写 `daemon-heartbeat.json`。
+3. **修复只落一半** — 改了 `cli/status.py` 但 CLI 看不到效果。真相：`status_dashboard` 在 `cli/__init__.py` 与 `cli/status.py` 各有一份**重复实现**。
+
+### 修复的 3 项真实缺陷（ac7ab830）
+
+1. **`consciousness revalidate` 退出码谎报**（原报"异常"，复核后更严重）
+   读协议验证 0/10 全败但 `rc=0`。根因：consciousness 分支所有子动作共用末尾 `return 0`。已修为未通过返回 1。实测 rc: 0 → 1。
+   失败根因属环境问题：`model.yaml` 的 consciousness 仍指向 `apihub.agnes-ai.com`，该域名解析到 `2001::8079:926d`（Teredo 保留段不可路由）。而 MEMORY.md 记载 agnes 已于 7-28 被移出 fallback 链 —— **配置未跟上决策**。对比：火山方舟返回 401（网络可达），advisor 走火山方舟 ping 成功，故非本机断网。
+2. **`--config` 自相矛盾** — 显示"上下文窗口: 0K"与多个"?"，而同时 `armor --check` 报 contextWindow=1000000。根因：展示层直接取 state JSON，早期精简版 state 缺键无回退。已改为回退运行时生效值。
+3. **幽灵任务** — `status` 报 t1=started 但 `heavy --finish` 报"任务不存在"。根因与分身推测不同：`scratchPath` 字段只写入、**从未被任何代码读取**，所有操作都按当前 `SCRATCH` 推导；残留状态文件的 scratchPath 指向已废弃临时目录。已在采集阶段识别 orphan 并标注 ⚠️。
+
+### 分身误报 1 项（不修）
+
+`cost top` 被指"标题硬编码 Top 3"。核实代码为 `Top {len(top)}`，实测 `--top-n 2` 正确显示 "Top 2" —— 显示 3 是因为确实只有 3 个调用方。
+
+### 核心能力真实验证（不只看命令是否报错）
+
+| 能力 | 实测 |
+|---|---|
+| SmartCrusher 压缩 | 28591 → 902 字节，ratio 96.8% ✓ |
+| 熔断器（P2-13） | 连续失败后 status=open，单探针保证在位 ✓ |
+| PII 脱敏（P1-2） | 邮箱/手机号均替换为 `[REDACTED:*]`，无原文泄漏 ✓ |
+| 原子写（P3-3） | 写读回一致 ✓ |
+| 成本日报（今早修的时区 bug） | calls=1，未回归 ✓ |
+| watchdog（P2-8） | 含心跳新鲜度判定 + 重启后复查，实跑 rc=0 ✓ |
+| lifecycle-maintainer | 虽 failed 但**功能正常**（增量更新 119 条成功），属退出码语义问题，与 revalidate 同类 |
+
+### 遗留待办（未修，记录备查）
+
+| 优先级 | 项 | 说明 |
+|---|---|---|
+| P1 | `model.yaml` consciousness 指向废弃端点 | 建议改为火山方舟；涉及改用户配置文件，需你确认 |
+| P1 | `status_dashboard` 重复实现 | 两处并存，改一处会漏；建议合并 |
+| P2 | `/mnt/data/.../logs/` 僵尸日志副本 | 会误导排查者；建议清理或统一路径解析 |
+| P2 | `lifecycle-maintainer` exit 1 | 功能正常但退出码误报，同 revalidate 类问题 |
+| P3 | `t1.json`/`t2.json` 残留状态 | 现已标注 ⚠️，可安全清理 |
+| P3 | `daemon-heartbeat-main.json` 孤儿文件 | 7-13 遗留旧格式 |
+
+### 总评
+
+**系统整体健康，无假死。** 服务层、Loop 层、核心能力层全部实测通过。发现的问题集中在**退出码语义**与**展示层一致性**两类——都不影响核心功能，但会在自动化场景下掩盖真实失效（`revalidate` 那个尤其危险：能力完全不可用却报成功）。
+
+审查方法上值得记的一条：**三次差点误判，都是因为"看到一个陈旧时间戳就下结论"**。正确做法是先确认自己看的是不是进程真正在写的那个文件（`/proc/<pid>/fd/1`）。
