@@ -436,13 +436,20 @@ class Consciousness:
                     "action": "blocked_by_blacklist"}
 
         # 按 issue 类型选执行函数
-        executor = _REMEDIATION_EXECUTORS.get(issue.get("category"))
+        # 【P3-4】category 可能缺失或不是字符串，先收敛再查表
+        # （dict.get 要求 key 类型匹配，传 None 会让类型契约失效）
+        category_key = issue.get("category")
+        executor = (
+            _REMEDIATION_EXECUTORS.get(category_key)
+            if isinstance(category_key, str)
+            else None
+        )
         if executor is None:
             return {"ok": False, "reason": f"无 auto_remediate 实现: {cat}",
                     "action": "no_executor"}
 
         if dry_run:
-            r = {"ok": True, "dry_run": True,
+            r: dict[str, Any] = {"ok": True, "dry_run": True,
                     "action": "would_execute",
                     "reason": f"dry-run: 准备执行 {executor.__name__} for {cat}",
                     "next_step": "加 --execute-now 才真跑"}

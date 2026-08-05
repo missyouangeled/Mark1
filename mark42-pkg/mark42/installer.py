@@ -170,8 +170,8 @@ def install_systemd(workspace: str = "") -> int:
     if failures:
         # 安装状态不得误报：systemctl 失败时绝不能输出“安装完成”
         print("❌ 安装未完全成功，以下步骤失败：")
-        for f in failures:
-            print(f"   • {f}")
+        for failure in failures:
+            print(f"   • {failure}")
         if enabled:
             print()
             print("已成功启用：")
@@ -245,8 +245,8 @@ def uninstall_systemd() -> int:
     print()
     if failures:
         print("❌ 卸载未完全成功：")
-        for f in failures:
-            print(f"   • {f}")
+        for failure in failures:
+            print(f"   • {failure}")
         return 1
 
     print("✅ 卸载完成")

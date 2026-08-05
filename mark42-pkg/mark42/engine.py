@@ -340,12 +340,17 @@ def engine_kill(name: str) -> None:
     def _mutate(loops: dict[str, Any]) -> str | None:
         if name not in loops:
             return None
-        old_status = loops[name].get("status", "?")
+        # 状态值来自 JSON，可能不是字符串；统一转字符串以符合声明契约（P3-4）
+        raw = loops[name].get("status", "?")
+        old = raw if isinstance(raw, str) else str(raw)
         loops[name]["status"] = "killed"
         loops[name]["killedAt"] = _now_iso()
-        return old_status
+        return old
 
-    old_status = _locked_update_loops(_mutate)
+    # _locked_update_loops 的 mutator 返回值是 Any，按真实契约收敛：
+    # _mutate 返回 str（旧状态）或 None（loop 不存在）
+    raw_status = _locked_update_loops(_mutate)
+    old_status: str | None = raw_status if isinstance(raw_status, str) else None
     if old_status is None:
         logger.error("Loop 不存在: %s", name)
         print(f"❌ Loop '{name}' 不存在")

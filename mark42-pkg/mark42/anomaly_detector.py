@@ -145,13 +145,16 @@ class AnomalyDetector:
     组合阈值检测 + Z-Score 检测。
     """
 
-    DEFAULT_THRESHOLDS = {
+    # 【P3-4】显式标注 float：ThresholdDetector 期望 dict[str, dict[str, float]]，
+    # 原先字面量被推成 int 导致 arg-type 不符。int 数值上兼容 float，
+    # 标 float 同时允许将来配置小数阈值。
+    DEFAULT_THRESHOLDS: dict[str, dict[str, float]] = {
         "disk_free_gb": {"warn": 5, "crit": 2},
         "mem_avail_mb": {"warn": 500, "crit": 200},
         "context_usage_pct": {"warn_high": 85, "crit_high": 95},
     }
 
-    def __init__(self, thresholds: dict | None = None):
+    def __init__(self, thresholds: dict[str, dict[str, float]] | None = None):
         self.thresholds = thresholds or self.DEFAULT_THRESHOLDS
         self.threshold_detector = ThresholdDetector(self.thresholds)
         self.zscore_detector = ZScoreDetector(window_size=20, z_threshold=2.5)

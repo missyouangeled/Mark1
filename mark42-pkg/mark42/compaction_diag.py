@@ -784,7 +784,9 @@ def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[
     # ── 汇总当前配置 ──────────────────────────────────────
 
     # 11. 汇总当前配置
-    current_config = {}
+    # 【P3-4】显式标注：否则 mypy 从后续赋值推出 Literal 键集合，
+    # 再加 "memoryFlush" 这个键就报 index 错误
+    current_config: dict[str, Any] = {}
     for k in ("mode", "truncateAfterCompaction", "notifyUser",
               "maxActiveTranscriptBytes", "keepRecentTokens", "reserveTokens"):
         if k in cc:

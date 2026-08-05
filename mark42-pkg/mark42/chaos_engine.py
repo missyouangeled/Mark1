@@ -99,7 +99,24 @@ class ChaosEngine:
                 details=f"未知实验: {name}",
             )
 
-        return experiments[name](dry_run=dry_run)
+        # 实验表值类型经动态构造退化为 Any，按真实契约收敛（P3-4）
+        outcome = experiments[name](dry_run=dry_run)
+        if not isinstance(outcome, ChaosResult):
+            return ChaosResult(
+                experiment=name,
+                started_at=datetime.now(timezone.utc).isoformat(),
+                duration_ms=0,
+                status="error",
+                setup_ok=False,
+                execute_ok=False,
+                verify_ok=False,
+                cleanup_ok=False,
+                details=(
+                    f"实验实现返回了 {type(outcome).__name__}，"
+                    "而非 ChaosResult"
+                ),
+            )
+        return outcome
 
     def run_suite(self, dry_run: bool = True) -> list[ChaosResult]:
         """执行全部实验套件。"""
@@ -539,8 +556,12 @@ class ChaosEngine:
         # 临时 monkeypatch load_config，注入不可达端点
         from . import llm_provider as lp
         original_load = lp.load_config
-        def _mock_load():
-            cfg = original_load()
+        def _mock_load(path: Path | None = None) -> dict:
+            """【2026-08-05 修复 P3-4】原实现是零参函数，但它替换的
+            llm_provider.load_config 真实签名是 load_config(path=None)。
+            任何调用方传 path 都会 TypeError —— 混沌实验本身反而成了故障源。
+            """
+            cfg = original_load(path) if path is not None else original_load()
             mc = cfg.get("mark42", {}).get("consciousness", {})
             mc["runtime"] = "api"
             mc["base_url"] = "http://127.0.0.1:1"

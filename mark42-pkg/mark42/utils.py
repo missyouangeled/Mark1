@@ -351,7 +351,8 @@ def _estimate_tokens_smart(session_path: Path, scan_lines: int = 200) -> dict[st
                 f.seek(0, 2)
                 pos = f.tell()
                 chunk = b""
-                lines_collected: list[str] = []
+                # 二进制读取，元素是 bytes（chunk.split(b"\n") 的结果）
+                lines_collected: list[bytes] = []
                 while pos > 0 and len(lines_collected) < scan_lines_n:
                     step = min(16384, pos)
                     pos -= step

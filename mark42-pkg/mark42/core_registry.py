@@ -132,7 +132,8 @@ def _probe_http(url: str, timeout: int = 3) -> bool:
     """HTTP 探活。"""
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:  # noqa: S310 (LLM API urllib，url 来自受信配置)
-            return r.status == 200
+            # 显式 bool()：urlopen 返回对象为 Any，比较结果也退化成 Any（P3-4）
+            return bool(r.status == 200)
     except Exception:
         return False
 

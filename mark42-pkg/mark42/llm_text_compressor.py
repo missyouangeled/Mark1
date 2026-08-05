@@ -248,7 +248,10 @@ class LLMTextCompressor:
                 from .config import resolve_model
             except ImportError:
                 return None
-        return resolve_model(self.config_key)
+        # resolve_model 经三层兼容导入，静态类型退化为 Any；
+        # 按真实契约收敛为 dict | None（P3-4）
+        resolved = resolve_model(self.config_key)
+        return resolved if isinstance(resolved, dict) else None
 
     def _call_llm(self, prompt: str, resolved: dict[str, Any]) -> str:
         """调 LLM API, 返回 content 文本 (不解析 JSON)"""
@@ -286,6 +289,9 @@ class LLMTextCompressor:
         if not choices:
             raise RuntimeError("LLM returned no choices")
         content = choices[0].get("message", {}).get("content", "")
+        # content 来自 LLM 响应 JSON，非字符串时统一转字符串（P3-4）
+        if not isinstance(content, str):
+            content = "" if content is None else str(content)
         # 顺便记 token 用量
         # 借用 stats 的字段, 但 stats 在上层, 这里通过闭包不可见
         # 用返回值没法传, 改为 LLM 调完后调用方从 data 抓 (但 _call_llm 简单返回 content)

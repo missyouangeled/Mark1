@@ -540,6 +540,12 @@ def _llm_analyze(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
                 content = content[4:]
             content = content.strip()
         result = json.loads(content)
+        # LLM 响应 JSON 顶层必须是对象，否则后续 result["_llm_meta"] 会崩（P3-4）
+        if not isinstance(result, dict):
+            print(
+                f"    ⚠️ _llm_analyze 响应顶层不是对象（{type(result).__name__}），已丢弃"
+            )
+            return None
         result["_llm_meta"] = {
             "model": data.get("model"),
             "tokens": data.get("usage", {}),
