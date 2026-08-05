@@ -124,13 +124,27 @@ def _now_ts() -> float:
     return datetime.now(timezone.utc).timestamp()
 
 def _load_json(path: Path) -> dict[str, Any]:
+    """读取 JSON 状态文件。非对象顶层或损坏内容统一降级为 {}。
+
+    【2026-08-05 P3-4】原实现直接 `return json.load(f)`，声明返回 dict
+    但实际可能返回 list / str / int —— 合法 JSON 顶层是数组时，
+    调用方一用 `.get()` 就 AttributeError（已实测复现）。
+    Armor/Engine/Heavy 全部状态读取都走这里，影面很大。
+    """
     if not path.exists():
         return {}
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
+    if not isinstance(data, dict):
+        logger.warning(
+            "状态文件顶层不是 JSON 对象（实际 %s），已降级为空字典: %s",
+            type(data).__name__, path,
+        )
+        return {}
+    return data
 
 @safe_call(default=None, label="save_json")
 def _save_json(path: Path, data: dict[str, Any]) -> None:
@@ -337,7 +351,7 @@ def _estimate_tokens_smart(session_path: Path, scan_lines: int = 200) -> dict[st
                 f.seek(0, 2)
                 pos = f.tell()
                 chunk = b""
-                lines_collected = []
+                lines_collected: list[str] = []
                 while pos > 0 and len(lines_collected) < scan_lines_n:
                     step = min(16384, pos)
                     pos -= step

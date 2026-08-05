@@ -118,7 +118,8 @@ class OpenClawSummaryExtractor:
                 if msg.get("type") == "compaction":
                     # 摘要文本在 summary 字段里
                     summary = msg.get("summary", "")
-                    if summary:
+                    # 字段可能是任意 JSON 类型，只接受非空字符串（P3-4）
+                    if isinstance(summary, str) and summary:
                         return summary
                     # summary 为空时，尝试 details 里的补充信息
                     details = msg.get("details", {})
@@ -134,7 +135,11 @@ class OpenClawSummaryExtractor:
                 # 兼容旧格式：有些版本 compaction 摘要在 system 消息的 content 里
                 content = msg.get("content", "")
                 role = msg.get("role", "")
-                if role == "system" and "<summary>" in content:
+                if (
+                    role == "system"
+                    and isinstance(content, str)
+                    and "<summary>" in content
+                ):
                     return content
 
             # 如果没找到明确标记，返回最后几条消息作为"当前上下文"
@@ -174,7 +179,12 @@ class OpenClawSummaryExtractor:
                     try:
                         msg = json.loads(line)
                         content = msg.get("content", "")
-                        if any(marker in content for marker in self._COMPACTION_MARKERS):
+                        if not isinstance(content, str):
+                            continue
+                        if any(
+                            marker in content
+                            for marker in self._COMPACTION_MARKERS
+                        ):
                             return content
                     except (json.JSONDecodeError, TypeError):
                         continue

@@ -181,7 +181,9 @@ class LogClassifier:
                     return level
         # 没匹配到关键词，用 source 规则的默认级别
         if source_rule:
-            return source_rule.get("default_level", "info")
+            level = source_rule.get("default_level", "info")
+            # 规则里写了非字符串时退回 info，避免把非法级别传给下游（P3-4）
+            return level if isinstance(level, str) else "info"
         return "info"
 
     def classify_batch(self, events: list[dict[str, Any]]) -> list[ClassificationResult]:

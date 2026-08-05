@@ -255,9 +255,14 @@ def get(section: str, key: str, default: Any = None) -> Any:
 
 
 def get_section(section: str) -> dict[str, Any]:
-    """读取整个配置节。如 get_section("models")。"""
+    """读取整个配置节。如 get_section("models")。
+
+    节内容不是 dict（用户把 [models] 写成标量/数组）时返回 {}，
+    避免调用方拿到非 dict 后崩在 .get()（P3-4）。
+    """
     cfg = load_config()
-    return cfg.get(section, {})
+    value = cfg.get(section, {})
+    return value if isinstance(value, dict) else {}
 
 
 # ── 配置初始化 ────────────────────────────────────────────

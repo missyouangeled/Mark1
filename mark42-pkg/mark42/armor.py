@@ -398,7 +398,7 @@ def armor_check() -> dict[str, Any]:
 
 def _read_session_tail(jsonl_path: Path, lines: int = 60) -> list[dict[str, Any]]:
     """读取 JSONL 会话文件尾部 N 行。兼容 OpenClaw 嵌套格式。"""
-    messages = []
+    messages: list[dict[str, Any]] = []
     try:
         with open(jsonl_path, "rb") as f:
             f.seek(0, 2)
@@ -564,7 +564,7 @@ def armor_pre_compact_hook(session_messages: list[dict[str, Any]],
     - dry_run=True 永远不修改数据, 只报告能压缩多少
     - 失败静默 (返回 stats with error)
     """
-    stats = {
+    stats: dict[str, Any] = {
         "enabled": False,
         "ran": False,
         "algorithm": None,

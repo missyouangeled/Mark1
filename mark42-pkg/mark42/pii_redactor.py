@@ -200,7 +200,7 @@ class PIIRedactor:
             (脱敏后字符串, 统计信息)
             统计信息包含: original_bytes, redacted_bytes, redactions_by_type
         """
-        stats = {
+        stats: dict[str, Any] = {
             "original_bytes": len(content.encode('utf-8')),
             "redacted_bytes": 0,
             "redactions_by_type": {pii_type: 0 for pii_type in self.compiled_patterns},
@@ -249,7 +249,7 @@ class PIIRedactor:
         Returns:
             (脱敏后对象, 统计信息)
         """
-        total_stats = {
+        total_stats: dict[str, Any] = {
             "original_bytes": 0,
             "redacted_bytes": 0,
             "total_redactions": 0,

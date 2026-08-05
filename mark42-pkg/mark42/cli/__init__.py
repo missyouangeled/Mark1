@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 import sys
+from typing import Any
 
 from ..output_guard import trim_detail, trim_summary
 
@@ -50,7 +51,7 @@ def _find_mark42_processes() -> dict:
     """兜底扫描 Mark42 守护相关进程。"""
     import subprocess
 
-    result = {"parent": None, "children": []}
+    result: dict[str, Any] = {"parent": None, "children": []}
     try:
         out = subprocess.check_output(
             ["ps", "-eo", "pid=,ppid=,args="],

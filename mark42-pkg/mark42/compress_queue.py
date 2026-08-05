@@ -327,6 +327,7 @@ def _run_tests() -> bool:
     check("1.4 成功无 error", req.error is None)
     check("1.5 changed=True (JSON 大输入应被压缩)", req.result.get("changed") is True)
     check("1.6 route_algo=smartcrush", req.result.get("route_algo") == "smartcrush")
+    assert req.result is not None, "wait 已完成但 result 为空"
     print(f"  → route={req.result['route_algo']} ratio={req.result['ratio']:.1%} "
           f"elapsed={req.result['elapsed']:.2f}s")
     q.shutdown()
@@ -373,6 +374,8 @@ def _run_tests() -> bool:
     urgent.wait(timeout=20.0)
     low.wait(timeout=20.0)
     # urgent 应先完成 = urgent 绝对完成时间 (enqueuedAt + elapsed) 早于 low
+    assert urgent.result is not None, "urgent 超时未完成"
+    assert low.result is not None, "low 超时未完成"
     urgent_finish = urgent.result["finishedAt"]
     low_finish = low.result["finishedAt"]
     check("3.1 urgent 真比 low 先完成", urgent_finish < low_finish)
@@ -469,6 +472,7 @@ def _run_tests() -> bool:
     q9.enqueue(r)
     r.wait(timeout=10.0)
     check("9.1 diff 异步处理", r.result is not None)
+    assert r.result is not None, "diff 请求超时未完成"
     check("9.2 route_algo=diff", r.result["route_algo"] == "diff")
     print(f"  → route={r.result['route_algo']} ratio={r.result['ratio']:.1%}")
     q9.shutdown()

@@ -236,7 +236,7 @@ def heavy_start(path_str: str, task_name: str, context_aware: bool = True) -> No
     num_batches = max(1, (total_files + batch_size - 1) // batch_size)
     print(f"   📂 文件: {total_files} 个 ({total_size_mb:.1f} MB)")
     print(f"   📦 批次: {num_batches} 批 (每批 ≤{batch_size} 个文件)")
-    batches = []
+    batches: list[dict[str, Any]] = []
     for i in range(0, total_files, batch_size):
         chunk = files[i:i + batch_size]
         batches.append({

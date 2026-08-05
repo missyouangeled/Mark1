@@ -357,7 +357,7 @@ class CoreRegistry:
 
     def summary(self) -> dict[str, Any]:
         """摘要统计。"""
-        statuses = {}
+        statuses: dict[str, int] = {}
         for c in self.cores.values():
             statuses[c.status] = statuses.get(c.status, 0) + 1
         return {

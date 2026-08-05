@@ -140,17 +140,40 @@ def load_config(path: Path | None = None) -> dict[str, Any]:
     return cfg
 
 
+def _mark42_section(cfg: dict[str, Any]) -> dict[str, Any]:
+    """取 cfg["mark42"] 段；非 dict 时视为缺失（P3-4）。"""
+    section = cfg.get("mark42", {})
+    return section if isinstance(section, dict) else {}
+
+
 def get_consciousness_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
-    """从配置里取 consciousness 段；缺则补默认。"""
-    return cfg.get("mark42", {}).get("consciousness", DEFAULT_CONFIG["mark42"]["consciousness"])
+    """从配置里取 consciousness 段；缺或类型不符则补默认。"""
+    value = _mark42_section(cfg).get(
+        "consciousness", DEFAULT_CONFIG["mark42"]["consciousness"]
+    )
+    if isinstance(value, dict):
+        return value
+    logger.warning("consciousness 配置段不是对象，已回退默认值")
+    return dict(DEFAULT_CONFIG["mark42"]["consciousness"])
 
 
 def get_advisor_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
-    return cfg.get("mark42", {}).get("advisor", DEFAULT_CONFIG["mark42"]["advisor"])
+    value = _mark42_section(cfg).get(
+        "advisor", DEFAULT_CONFIG["mark42"]["advisor"]
+    )
+    if isinstance(value, dict):
+        return value
+    logger.warning("advisor 配置段不是对象，已回退默认值")
+    return dict(DEFAULT_CONFIG["mark42"]["advisor"])
 
 
 def get_fallback_chain(cfg: dict[str, Any]) -> list[str]:
-    return cfg.get("mark42", {}).get("fallback_chain", ["stub"])
+    """fallback 链必须是字符串列表，否则回退 ["stub"]（P3-4）。"""
+    value = _mark42_section(cfg).get("fallback_chain", ["stub"])
+    if isinstance(value, list) and all(isinstance(x, str) for x in value):
+        return value
+    logger.warning("fallback_chain 不是字符串列表，已回退 ['stub']")
+    return ["stub"]
 
 
 # ── Runtime 实现 ─────────────────────────────────────
@@ -339,13 +362,16 @@ def build_provider(cfg_section: dict[str, Any]) -> LLMProvider:
         return StubRuntime(model=cfg_section.get("model", "stub-model"))
 
     try:
-        return cls(
+        # 显式标注：_RUNTIME_REGISTRY 值类型为 Any，直接 return 会让
+        # 声明的 -> LLMProvider 退化成 Any（P3-4）
+        provider: LLMProvider = cls(
             model=cfg_section.get("model", ""),
             base_url=cfg_section.get("base_url", ""),
             api_key=cfg_section.get("api_key", ""),
             timeout_seconds=int(cfg_section.get("timeout_seconds", 60)),
             max_retries=int(cfg_section.get("max_retries", 1)),
         )
+        return provider
     except LLMProviderError as e:
         # 配置错误（缺 base_url / api_key 等）→ 降级 stub
         logger.warning("构造 %s 失败: %s，降级到 stub", runtime_name, e)

@@ -88,11 +88,17 @@ SESSION_MAINTENANCE_BASELINE = {
 
 
 def _load_openclaw_config() -> dict[str, Any]:
+    """读取 openclaw.json。顶层非对象时显式失败（P3-4）。"""
     config_path = _openclaw_config_path()
     if not config_path.exists():
         raise FileNotFoundError(f"缺少配置文件: {config_path}")
     with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"配置顶层必须是 JSON 对象，实际是 {type(data).__name__}: {config_path}"
+        )
+    return data
 
 
 def _save_openclaw_config(data: dict[str, Any]) -> None:
@@ -165,7 +171,8 @@ def _get_current_session_override() -> dict[str, Any]:
 
 
 def _compare_value(actual: Any, expected: Any) -> bool:
-    return actual == expected
+    """比较配置值。显式转 bool —— `==` 对自定义类型可能返回非 bool（P3-4）。"""
+    return bool(actual == expected)
 
 
 def _status_checks(config: dict[str, Any]) -> list[dict[str, Any]]:

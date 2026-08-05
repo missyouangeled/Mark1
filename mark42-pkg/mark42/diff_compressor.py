@@ -100,7 +100,7 @@ class DiffCompressor:
     def _split_hunks(self, content: str, stats: dict) -> list[str]:
         """把 diff 切成若干 hunk 块 (含 file header + @@ ... @@ + body)"""
         blocks = []
-        current = []
+        current: list[str] = []
 
         for line in content.splitlines():
             if line.startswith("@@"):

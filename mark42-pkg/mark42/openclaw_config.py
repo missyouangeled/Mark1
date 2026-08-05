@@ -158,10 +158,21 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def _load(path: Path) -> dict[str, Any]:
+    """读取 openclaw.json。顶层必须是对象，否则拒绝继续。
+
+    【2026-08-05 P3-4】这里读到的内容会被 patch 后原子写回，
+    若顶层不是对象（如被写成数组），后续 merge 会静默产出错误结构
+    并覆盖真实配置。宁可显式失败也不能带着错误结构往下走。
+    """
     if not path.exists():
         raise ConfigWriteError(f"缺少配置文件: {path}")
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ConfigWriteError(
+            f"配置顶层必须是 JSON 对象，实际是 {type(data).__name__}: {path}"
+        )
+    return data
 
 
 def _validate() -> tuple[bool, str]:

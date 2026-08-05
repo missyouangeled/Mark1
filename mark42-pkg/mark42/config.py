@@ -187,13 +187,21 @@ def _conf_now_iso() -> str:
     return datetime.now(timezone(timedelta(hours=8))).isoformat()
 
 def _conf_load_json(path: Path) -> dict:
+    """读取 JSON 配置。顶层非对象一律降级为 {}（P3-4，同 utils._load_json）。"""
     if not path.exists():
         return {}
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
+    if not isinstance(data, dict):
+        logger.warning(
+            "配置文件顶层不是 JSON 对象（实际 %s），已降级为空字典: %s",
+            type(data).__name__, path,
+        )
+        return {}
+    return data
 
 def _conf_save_json(path: Path, data: dict) -> None:
     """原子写入 JSON。

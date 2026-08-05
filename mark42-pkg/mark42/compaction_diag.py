@@ -149,9 +149,17 @@ def _load_openclaw_json() -> dict[str, Any] | None:
         return None
     try:
         with open(config_path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return None
+    # 顶层非对象时按"读不到"处理，避免调用方在 .get() 上崩（P3-4）
+    if not isinstance(data, dict):
+        logger.warning(
+            "openclaw.json 顶层不是 JSON 对象（实际 %s）: %s",
+            type(data).__name__, config_path,
+        )
+        return None
+    return data
 
 
 def _get_compaction_config() -> dict[str, Any] | None:
@@ -160,8 +168,35 @@ def _get_compaction_config() -> dict[str, Any] | None:
     if not cfg:
         return None
     agents = cfg.get("agents", {})
+    if not isinstance(agents, dict):
+        return None
     defaults = agents.get("defaults", {})
-    return defaults.get("compaction", {})
+    if not isinstance(defaults, dict):
+        return None
+    compaction = defaults.get("compaction", {})
+    return compaction if isinstance(compaction, dict) else {}
+
+
+def _coerce_context_window(value: Any) -> int | None:
+    """把配置里的 contextWindow 收敛为正整数。
+
+    【P3-4】原实现直接 `return m["contextWindow"]`，配置里写成字符串时
+    返回 str，后续 `ctx_window // 1000` 之类算术会 TypeError。
+    非正整数一律视为无效，交由调用方回退默认值。
+    """
+    if isinstance(value, bool):  # bool 是 int 子类，需先排除
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except (TypeError, ValueError):
+            return None
+        if parsed > 0:
+            logger.warning("contextWindow 配置为字符串 %r，已按整数解析", value)
+            return parsed
+    return None
 
 
 def _get_context_window() -> int:
@@ -177,12 +212,16 @@ def _get_context_window() -> int:
                 mods = p.get("models", [])
                 if isinstance(mods, list):
                     for m in mods:
-                        if isinstance(m, dict) and m.get("contextWindow"):
-                            return m["contextWindow"]
+                        if isinstance(m, dict):
+                            win = _coerce_context_window(m.get("contextWindow"))
+                            if win is not None:
+                                return win
                 elif isinstance(mods, dict):
                     for _mname, mcfg in mods.items():
-                        if isinstance(mcfg, dict) and mcfg.get("contextWindow"):
-                            return mcfg["contextWindow"]
+                        if isinstance(mcfg, dict):
+                            win = _coerce_context_window(mcfg.get("contextWindow"))
+                            if win is not None:
+                                return win
     return DEFAULT_CONTEXT_WINDOW
 
 

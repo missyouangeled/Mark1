@@ -23,10 +23,13 @@ LOG_ROTATION_STATE = ARMOR_STATE.parent / "log-rotation.json"
 
 
 def _load_state() -> dict:
+    """读取日志轮替状态。顶层非对象时退回默认值（P3-4）。"""
     if LOG_ROTATION_STATE.exists():
         try:
             with open(LOG_ROTATION_STATE) as f:
-                return json.load(f)
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
         except (json.JSONDecodeError, OSError):
             pass
     return {"lastRotation": None, "rotationCount": 0}

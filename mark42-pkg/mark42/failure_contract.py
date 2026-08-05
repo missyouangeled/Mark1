@@ -254,12 +254,14 @@ class FailureContractGenerator:
         )
 
     def get_core_name(self, core_id: str) -> str:
-        """获取核心的人类可读名称。"""
-        return self._core_config.get(core_id, {}).get("core_name", core_id)
+        """获取核心的人类可读名称。配置值非字符串时退回 core_id（P3-4）。"""
+        name = self._core_config.get(core_id, {}).get("core_name", core_id)
+        return name if isinstance(name, str) else core_id
 
     def get_missing_capabilities(self, core_id: str) -> list[str]:
-        """获取核心的缺失能力列表。"""
-        return self._core_config.get(core_id, {}).get("missing_capabilities", [])
+        """获取核心的缺失能力列表。配置值非列表时退回空列表（P3-4）。"""
+        caps = self._core_config.get(core_id, {}).get("missing_capabilities", [])
+        return caps if isinstance(caps, list) else []
 
 
 # ── FAILURE.md 渲染 ──────────────────────────────────
