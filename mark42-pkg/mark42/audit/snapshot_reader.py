@@ -13,10 +13,13 @@ OpenClaw 实现：从数据盘 session-backup 目录读最新快照（路径由 
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 # ── 数据盘快照根目录 ──────────────────────────────────
 
@@ -242,7 +245,14 @@ class OpenClawSnapshotReader:
                             item = line[2:][:80]
                             if item not in items:
                                 items.append(item)
-                except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+                except OSError as e:
+                    logger.warning("规则文件读取失败，已跳过: %s (%s)", rule_file, e)
+                    continue
+                except Exception as e:
+                    logger.warning(
+                        "规则文件解析失败，已跳过: %s (%s: %s)",
+                        rule_file, type(e).__name__, e,
+                    )
                     continue
 
         return items[:30]  # 限制数量避免过长

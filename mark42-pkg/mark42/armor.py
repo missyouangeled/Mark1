@@ -1162,6 +1162,7 @@ def _compress_check_ineffective_escalation(index: dict[str, Any], history_dir: P
         hist_files = sorted(history_dir.glob("memory-index-*.json"))[-5:]
         ineffective_count = 0
         total_count = 0
+        unreadable = 0
         for hf in hist_files:
             try:
                 h = json.loads(hf.read_text())
@@ -1169,8 +1170,17 @@ def _compress_check_ineffective_escalation(index: dict[str, Any], history_dir: P
                     total_count += 1
                     if h["compressionEffective"] is False:
                         ineffective_count += 1
-            except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+            except (OSError, json.JSONDecodeError):
+                # 关键区分：这里的判定是"连续 N 次压缩全部无效就升级告警"。
+                # 如果坏文件被静默跳过, total_count 会偏小, 可能让本该触发的
+                # 升级条件(total_count >= 3)永远不满足 —— 静默削弱了告警能力。
+                unreadable += 1
                 continue
+        if unreadable:
+            logger.warning(
+                "压缩历史有 %d/%d 份无法解析已跳过, 无效压缩升级判定可能偏保守",
+                unreadable, len(hist_files),
+            )
         if total_count >= 3 and ineffective_count == total_count:
             # 连续 ≥3 次压缩全部无效, 升级 broker
             _append_broker(
@@ -1591,14 +1601,18 @@ def armor_llm_stats(window: int = 50) -> dict[str, Any]:
     try:
         with open(actions_log) as f:
             lines = f.readlines()[-window:]
-    except Exception:
-        return {"error": "读取 actions.jsonl 失败"}
+    except OSError as e:
+        # 原实现只回 "读取失败" 而丢掉真实原因(权限/编码/磁盘),
+        # 调用方与运维都无法判断该怎么处理
+        logger.error("读取 actions.jsonl 失败: %s (%s)", actions_log, e)
+        return {"error": f"读取 actions.jsonl 失败: {type(e).__name__}: {e}"}
 
     total = 0
     llm_success = 0
     fallback = 0
     other = 0
     errors = 0
+    unparsed: list[str] = []
 
     for line in lines:
         try:
@@ -1617,8 +1631,17 @@ def armor_llm_stats(window: int = 50) -> dict[str, Any]:
                 errors += 1
             else:
                 other += 1
-        except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            # 统计口径必须可信: 坏样本静默丢弃会让 llm_rate 失真
+            # (分母变小 -> 成功率虚高), 因此累计并在结束时告警
+            unparsed.append(f"{type(e).__name__}")
             continue
+
+    if unparsed:
+        logger.warning(
+            "压缩方法统计有 %d 份样本无法解析已跳过(%s), llm_rate 可能失真",
+            len(unparsed), ", ".join(sorted(set(unparsed))),
+        )
 
     effective_total = llm_success + fallback
     llm_rate = (llm_success / effective_total) if effective_total > 0 else 0.0

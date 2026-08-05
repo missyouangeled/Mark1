@@ -228,11 +228,20 @@ def cli_classify_recent(limit: int = 20) -> list[dict[str, Any]]:
     events = []
     with open(broker_file) as f:
         lines = f.readlines()
+    corrupted = 0
     for line in lines[-limit:]:
         try:
             events.append(json.loads(line.strip()))
-        except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+        except json.JSONDecodeError:
+            # 单条损坏行不该中断整批解析，但必须留痕：
+            # 否则"解析出 0 条"与"文件全是坏行"外部完全无法区分
+            corrupted += 1
             continue
+    if corrupted:
+        logger.warning(
+            "broker 事件有 %d/%d 行 JSON 损坏已跳过: %s",
+            corrupted, len(lines[-limit:]), broker_file,
+        )
 
     clf = LogClassifier()
     results = []

@@ -475,7 +475,12 @@ def _get_context_window() -> int:
                 if '"type":"model_change"' in _line or '"type": "model_change"' in _line:
                     try:
                         _last_model = json.loads(_line)
-                    except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+                    except json.JSONDecodeError as e:
+                        # 该行看起来是 model_change 但解析失败 —— 记下来，
+                        # 否则会静默退化成"没找到模型信息"，与真的没有无法区分
+                        logger.debug(
+                            "model_change 行 JSON 解析失败，已跳过: %s", e
+                        )
                         continue
             if _last_model:
                 actual_provider = _last_model.get("provider", "")

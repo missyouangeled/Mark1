@@ -19,9 +19,12 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from ..config import WORKSPACE
+
+logger = logging.getLogger(__name__)
 
 # ── 默认 pinned 文件 ─────────────────────────────────
 
@@ -71,7 +74,16 @@ class ConstraintPinner:
                 if extracted and total_chars + len(extracted) <= MAX_TOTAL_CHARS:
                     sections.append(extracted)
                     total_chars += len(extracted)
-            except Exception:  # noqa: S112 (跳过损坏行，继续解析)
+            except OSError as e:
+                # IO 层失败（权限/编码/文件消失）——与"文件里没内容"是两回事
+                logger.warning("约束文件读取失败，已跳过: %s (%s)", fname, e)
+                continue
+            except Exception as e:
+                # 解析层失败：记下文件名与异常类型，便于定位是哪份约束坏了
+                logger.warning(
+                    "约束文件解析失败，已跳过: %s (%s: %s)",
+                    fname, type(e).__name__, e,
+                )
                 continue
 
         if not sections:
