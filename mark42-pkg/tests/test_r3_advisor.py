@@ -13,7 +13,6 @@ R3 验收测试 · 战甲主动交流意识
 import json
 from unittest.mock import MagicMock
 
-import pytest
 
 from mark42.advisor_client import (
     AdvisorClient,
@@ -258,7 +257,6 @@ class TestR3ConsciousnessIntegration:
         result = c.self_check()
         assert result is not None
 
-    @pytest.mark.skip(reason="mock leakage in full suite")
     def test_consciousness_handle_issue_unknown(self):
         """handle_issue 处理未知问题。"""
         from mark42.consciousness import Consciousness

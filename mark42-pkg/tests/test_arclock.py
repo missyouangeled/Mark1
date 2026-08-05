@@ -272,7 +272,10 @@ class TestBuiltinPlugins:
 # ── P4: 现有模块走注册器测试 ──
 
 class TestModuleIntegration:
-    pytestmark = pytest.mark.skip(reason="heavy.py import change")
+    # 【2026-08-05 P3-2 复核】此 skip **有效**，不予撤销：
+    # heavy.py 目前仍直接 from .config / .utils 导入，尚未改为走注册器。
+    # 这是真实的待办（架构演进），不是过期标记。撤销会得到真实失败。
+    pytestmark = pytest.mark.skip(reason="heavy.py 尚未改为走注册器导入（真实待办）")
     """测试现有模块的导入已被改为走注册器。"""
 
     def test_engine_imports_from_interfaces(self):

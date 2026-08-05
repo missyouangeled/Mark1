@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from mark42.chaos_engine import (
     ChaosEngine,
@@ -120,7 +119,6 @@ class TestExperimentList:
 class TestDryRunExperiments:
     """所有实验在 dry_run=True 时都应通过。"""
 
-    @pytest.mark.skip(reason="status mismatch, needs fix")
     def test_kill_engine_dry_run(self, tmp_path):
         engine = ChaosEngine(chaos_dir=tmp_path)
         r = engine.run_experiment("kill_engine", dry_run=True)
@@ -129,7 +127,6 @@ class TestDryRunExperiments:
         assert r.setup_ok is True
         assert "[DRY-RUN]" in r.details
 
-    @pytest.mark.skip(reason="status mismatch, needs fix")
     def test_kill_armor_dry_run(self, tmp_path):
         engine = ChaosEngine(chaos_dir=tmp_path)
         r = engine.run_experiment("kill_armor", dry_run=True)
@@ -211,7 +208,6 @@ class TestUnknownExperiment:
 
 
 class TestRunSuite:
-    @pytest.mark.skip(reason="status mismatch, needs fix")
     def test_run_suite_returns_results_for_all(self, tmp_path):
         engine = ChaosEngine(chaos_dir=tmp_path)
         results = engine.run_suite(dry_run=True)
@@ -463,3 +459,61 @@ class TestNewExperiments:
         finally:
             # 兜底：万一 cleanup 失败
             target.write_text(original, encoding="utf-8")
+
+
+class TestNoStaleSkipMarks:
+    """P3-2 防回归：不得再用 skip 长期掩盖非环境型失败。
+
+    历史情况：本文件 3 项 + test_r3_advisor.py 1 项被标
+    `skip(reason="status mismatch, needs fix")` / `"mock leakage in full suite"`。
+    2026-08-05 复核发现**四项全部能通过**（含全量套件下），说明问题早已被
+    其他修复顺带治好，但 skip 标记没人回来撤 —— 于是 4 个关键测试长期不跑。
+
+    这类"过期 skip"比失败更危险：它让套件显示为绿，却实际没有覆盖。
+    本守卫确保这几项保持真实执行，且新增 skip 必须写明有效理由。
+    """
+
+    ALLOWED_SKIP_REASONS = (
+        "examples",       # 仓外目录依赖（环境型）
+        "注册器",          # heavy.py 架构演进待办
+        "环境型",
+    )
+
+    def test_chaos_dry_run_tests_are_not_skipped(self):
+        """三项 dry-run 测试必须真实执行。"""
+        import inspect
+
+        src = inspect.getsource(TestDryRunExperiments)
+        assert "pytest.mark.skip" not in src, (
+            "dry-run 实验测试不得被 skip 掩盖（P3-2）"
+        )
+
+    def test_run_suite_test_is_not_skipped(self):
+        import inspect
+
+        src = inspect.getsource(TestRunSuite)
+        assert "pytest.mark.skip" not in src, "run_suite 测试不得被 skip 掩盖（P3-2）"
+
+    def test_remaining_skips_have_valid_reasons(self):
+        """仓内其余 skip 必须写明环境型或明确待办理由，禁止 'needs fix' 式占位。"""
+        import re
+        from pathlib import Path
+
+        tests_dir = Path(__file__).resolve().parent
+        offenders = []
+        banned = ("needs fix", "mock leakage", "TODO", "todo", "暫", "先跳过")
+
+        for path in sorted(tests_dir.rglob("test_*.py")):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                # 匹配任意形式的 skip 标记（含 pytestmark = / 别名导入 / 动态引用），
+                # 只排除 skipif（那是条件跳过，属正常用法）
+                if ".mark.skip(" not in line or "skipif" in line:
+                    continue
+                m = re.search(r'reason\s*=\s*["\']([^"\']*)["\']', line)
+                reason = m.group(1) if m else ""
+                if any(b in reason for b in banned):
+                    offenders.append(f"{path.name}: {reason}")
+
+        assert not offenders, (
+            "发现占位式 skip 理由，应修复测试或写明真实原因：" + "; ".join(offenders)
+        )

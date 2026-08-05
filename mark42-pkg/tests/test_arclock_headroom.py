@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="requires examples module")
+# 【2026-08-05 P3-2 复核】此 skip **有效**，属环境型：
+# 依赖仓外 examples/ 目录（当前不存在）。方案 P3-2 也未将其列入应修复清单。
+pytestmark = pytest.mark.skip(reason="需要仓外 examples 模块（环境型依赖）")
 
 # 确保 examples 目录在 PYTHONPATH 中
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
