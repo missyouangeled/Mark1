@@ -2226,3 +2226,49 @@
 - 昨日 `test_cost_tracker.py` 用 `timestamp[:10]` 当查询日期，是照着 bug 语义写的。
 
 **判据**：测试变红时先问「它断言的是正确语义，还是当前实现？」若是后者，改测试；若是前者，改代码。不可反过来为了让测试变绿而迁就错误实现。
+
+## 2026-08-05 08:42:00 CST (+08:00) — Mark42 P1-5：context-safety apply 先校验后替换 + 失败回滚
+
+- 类型：fix (P1 级 — 方案中最后一个 P1)
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg/mark42/context_safety.py、mark42/cli/__init__.py
+- 补丁注册表：未更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- commit：ebff7fad
+
+### 问题（已实证复现）
+
+旧流程：`_load` → `_merge` → `_backup` → `_save`（**写正式文件**）→ `validate`。validate 失败只把 `validateOk=False` 塞进返回值，**已写入的无效配置原地留着**。备份虽然建了却从没人用它回滚。
+
+触发条件（方案指出）：merge 结果是合法 JSON 但不符 OpenClaw schema。后果：**Gateway 直接起不来**（对应 CASE-20260616-002 那一类）。
+
+复现结果：validate 返回 FAIL，20 项变更已落盘，正式配置带着新基线，无任何回滚。
+
+### 修复
+
+1. 生成候选配置
+2. 写入**临时文件**，令 `openclaw config validate` 通过 `OPENCLAW_CONFIG` 指向它（该能力正是上一轮 P2-16 修通的）
+3. 预校验失败 → 直接拒绝，正式配置一个字节都没被碰
+4. 预校验通过且非 dry-run → 备份 → 原子替换
+5. 写入后**再次校验**，失败立即从备份回滚
+6. 回滚失败作为独立高严重错误上报（`logger.critical` + `rollbackFailed` + 退出码 2）
+7. apply 默认 dry-run，真实写入需 `--execute-now`（对齐仓内 `heavy_execute` 的 dry-run 默认安全惯例）
+
+### 两处实测纠正了我最初的实现（重要）
+
+- **`_exclusive_lock()` 不可重入**。我最初把整个流程包在锁里，实测同进程嵌套获取会 `ConfigWriteError` 超时——因为 `_save_openclaw_config` 内部自己拿锁。已改为持锁范围只限写入区间。**教训：不要靠推断 flock 语义，写完立刻实测。**
+- **预校验必须只信任明确的 schema 拒绝**。最初版本把 CLI 任何非零返回都当"候选非法"，结果测试环境下 CLI 读不到配置就报 FAIL，把环境问题误判成 schema 非法，会**永久堵死正常 apply**。现改为：只有当 CLI 确实读到了我们的临时文件（输出中含该路径）才判定非法，否则降级为"预校验不可用"，回退到写入后复验兜底。这个缺陷是被既有测试 `test_validate_failure_propagated` 实际暴露的。
+
+### 验收
+
+- ruff 全过；全量 **1951 项收集 0 失败**（今日 1915 → 1925 → 1941 → 1951）
+- 新增 `TestApplyRollbackSafety` 10 项，覆盖方案全部四条验收标准
+- 防回归有效：回退回滚逻辑 → 3 项转红；回退候选预校验 → 1 项转红
+- 真实环境：`apply`（dry-run）rc=0 未改配置；`verify` rc=0 pass=3 fail=0；`openclaw config validate` 仍 Config valid
+- gateway / armor-guard / engine-daemon 全部 active
+
+### 方案进度
+
+P1 全部清零。剩余：P2-6（配置锁外读取）、P2-7（TOML 双轨制，路径部分已由 P2-16 接通）、P3-2/3/4/5/6。
