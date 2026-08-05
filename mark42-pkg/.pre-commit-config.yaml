@@ -13,6 +13,28 @@ repos:
       - id: ruff-format
         files: ^mark42-pkg/
 
+  # ── 静态类型门禁（2026-08-05 纳入）──
+  # 背景：当日把 mypy 从 174 项降到 0，期间捞出 8 个真 bug
+  # （PID 类型崩溃、混沌实验签名不符、两处退出码契约漏洞等）。
+  # 清零容易保持难 —— no-any-return 这类问题随便写个读 JSON 的函数就会
+  # 冒出来，因此必须设门禁，否则会慢慢退化回去。
+  - repo: local
+    hooks:
+      - id: mypy-mark42
+        name: mypy (mark42 包，零错误门禁)
+        language: system
+        types: [python]
+        # 只查生产代码；tests 已在 pyproject.toml 里 ignore_errors
+        files: ^mark42-pkg/mark42/
+        # pass_filenames=false：必须整包检查。逐文件跑会漏掉跨模块
+        # 签名不符（本轮 actions_runner 那两个真 bug 正是跨模块调用错误）
+        pass_filenames: false
+        # pre-commit 在**仓库根**（workspace）执行，而 mypy 配置在
+        # mark42-pkg/pyproject.toml，故必须显式 cd 过去，否则读不到配置
+        # （会退化成默认宽松规则，门禁形同虚设）。
+        entry: bash -c 'cd mark42-pkg && python3 -m mypy mark42/'
+        require_serial: true
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

@@ -1,0 +1,101 @@
+# Mark42 CI 门禁
+#
+# 【2026-08-05 新增】背景：当日把 mypy 从 174 项错误降到 0，期间捞出 8 个
+# 真 bug —— PID 非整数导致 assemble status 崩溃、混沌实验 monkeypatch 签名
+# 不符（验证韧性的工具自己成了故障源）、两处退出码契约漏洞（未知子命令被
+# 当成功）、JSON 顶层非对象导致全仓状态读取崩溃等。
+#
+# 这些都不是"类型噪音"，是 mypy 帮忙发现的实质缺陷。但清零容易保持难：
+# no-any-return 这类问题随便写个读 JSON 的函数就会冒出来。因此设为门禁。
+#
+# 门禁原则：
+#   - mypy 必须零错误（不接受用 Any / cast / # type: ignore 伪清零）
+#   - ruff 必须零告警
+#   - 全量测试必须零失败
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'mark42-pkg/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'mark42-pkg/**'
+      - '.github/workflows/ci.yml'
+  # 允许手动触发，便于验证门禁本身
+  workflow_dispatch:
+
+defaults:
+  run:
+    # 所有步骤都在包目录下执行，保证读到 mark42-pkg/pyproject.toml 的
+    # [tool.mypy] 与 [tool.ruff] 配置（否则会退化成默认宽松规则，门禁失效）
+    working-directory: mark42-pkg
+
+jobs:
+  quality-gate:
+    name: 质量门禁 (ruff + mypy + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          # 与 pyproject.toml 的 requires-python 及 [tool.mypy]
+          # python_version 保持一致
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Ruff 检查（零告警门禁）
+        run: python -m ruff check mark42/ tests/
+
+      - name: Mypy 检查（零错误门禁）
+        # 必须整包检查而非逐文件：逐文件跑会漏掉跨模块签名不符
+        # （本轮 actions_runner 调用 assemble_restart(agent=...) 这个真 bug
+        #  正是跨模块调用错误，逐文件检查发现不了）
+        run: python -m mypy mark42/
+
+      - name: 禁止用 cast / type:ignore 伪清零
+        # 守卫：mypy 零错误必须靠真实修复达成。
+        # 允许既有的 1 处 type: ignore（telemetry.py，装饰器返回类型限制），
+        # 但不允许新增；cast 一律不允许。
+        run: |
+          # 同时匹配调用点 cast(...) 与导入 `from typing import cast`
+          # （只匹配 'cast(' 会漏掉导入形式 —— 已实测漏判）
+          CAST_COUNT=$(grep -rnE '(\bcast\(|import.*\bcast\b)' mark42/ --include='*.py' | wc -l)
+          IGNORE_COUNT=$(grep -rn 'type: ignore' mark42/ --include='*.py' | wc -l)
+          echo "cast 出现次数: $CAST_COUNT (允许上限 0)"
+          echo "type: ignore 出现次数: $IGNORE_COUNT (允许上限 1)"
+          if [ "$CAST_COUNT" -gt 0 ]; then
+            echo "::error::检测到 typing.cast，请按真实契约修类型而非强制转换"
+            grep -rnE '(\bcast\(|import.*\bcast\b)' mark42/ --include='*.py'
+            exit 1
+          fi
+          if [ "$IGNORE_COUNT" -gt 1 ]; then
+            echo "::error::type: ignore 超出允许上限，请修真实类型问题"
+            grep -rn 'type: ignore' mark42/ --include='*.py'
+            exit 1
+          fi
+
+      - name: 全量测试（零失败门禁）
+        run: python -m pytest -q
+
+      - name: 测试文件数下限守卫
+        # 对应 AGENTS.md 升级后自检清单第 6 条：
+        # tests/ 下不应少于 45 个文件，防止测试被误删或漏收集
+        run: |
+          COUNT=$(find tests -name 'test_*.py' | wc -l)
+          echo "测试文件数: $COUNT (下限 45)"
+          if [ "$COUNT" -lt 45 ]; then
+            echo "::error::测试文件数低于下限，可能有测试被误删或未被收集"
+            exit 1
+          fi
