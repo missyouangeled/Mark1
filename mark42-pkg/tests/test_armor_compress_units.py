@@ -7,6 +7,7 @@
 
 分组：
   TestCompactLock          — compact 锁的获取/释放/过期/损坏恢复
+  TestCompactLockOwnership — P2-15 锁所有权校验（不踩他人锁）
   TestPlatformProbe        — 平台探测期
   TestBuildIndex           — 索引构建双分支（LLM / 启发式）
   TestCooldownCheck        — 冷却期检查
@@ -16,6 +17,7 @@
 """
 import json
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from mark42 import armor
 
@@ -71,6 +73,136 @@ class TestCompactLock:
         lock_file.parent.mkdir(parents=True, exist_ok=True)
         lock_file.write_text(json.dumps({"pid": 12345}))  # 缺 acquiredAt
         assert armor._try_acquire_compact_lock() is True
+
+
+class TestCompactLockOwnership:
+    """P2-15 防回归：锁的删除必须验证所有权，不能踩掉他人锁。
+
+    历史 bug（两处）：
+      1. 回收过期/损坏锁时，check 与 unlink 非原子。期间另一进程可能
+         已回收旧锁并建了**新鲜锁**，无条件 unlink 会把新锁删掉。
+      2. ``_release_compact_lock()`` 无条件 unlink：本进程锁若已超时被别人
+         接管，释放时会删掉**对方正在用的锁**，互斥彻底失效。
+
+    修复：锁内写唯一 token，删除前重新比对 token + inode。
+    """
+
+    def test_lock_contains_unique_token(self, armor_state):
+        assert armor._try_acquire_compact_lock() is True
+        data = json.loads(armor._compact_lock_file().read_text())
+        assert data["token"], "锁必须带唯一 token（PID 会被复用，不能单靠 PID）"
+        assert str(data["pid"]) in data["token"]
+
+    def test_tokens_differ_across_acquisitions(self, armor_state):
+        assert armor._try_acquire_compact_lock() is True
+        first = json.loads(armor._compact_lock_file().read_text())["token"]
+        armor._release_compact_lock()
+        assert armor._try_acquire_compact_lock() is True
+        second = json.loads(armor._compact_lock_file().read_text())["token"]
+        assert first != second
+
+    def test_release_refuses_to_delete_other_process_lock(self, armor_state):
+        """锁属于别的进程时，release 必须拒绞删除。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({
+            "acquiredAt": armor._now_iso(),
+            "pid": 99999,          # 不是本进程
+            "token": "99999-other",
+        }))
+        armor._release_compact_lock()
+        assert lock_file.exists(), "不得删除他人持有的锁"
+        assert json.loads(lock_file.read_text())["pid"] == 99999
+
+    def test_release_removes_own_lock(self, armor_state):
+        """自己的锁必须能正常释放（不能因加了校验而释放不掉）。"""
+        assert armor._try_acquire_compact_lock() is True
+        armor._release_compact_lock()
+        assert not armor._compact_lock_file().exists()
+
+    def test_unlink_refuses_when_token_changed(self, armor_state):
+        """观测后锁被换主（token 不符），必须放手。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({
+            "acquiredAt": armor._now_iso(), "pid": 88888, "token": "new-tok",
+        }))
+        observed_ino = lock_file.stat().st_ino
+        # 拿着旧 token 去删（模拟观测到的是 old-tok）
+        deleted = armor._unlink_compact_lock_if_same(
+            lock_file, "old-tok", observed_ino
+        )
+        assert deleted is False
+        assert lock_file.exists()
+        assert json.loads(lock_file.read_text())["pid"] == 88888
+
+    def test_unlink_refuses_when_inode_changed(self, armor_state):
+        """观测后锁文件被重建（inode 变化），必须放手。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({
+            "acquiredAt": armor._now_iso(), "pid": 88888, "token": "tok",
+        }))
+        stale_ino = lock_file.stat().st_ino - 1  # 一个肯定不同的 inode
+        deleted = armor._unlink_compact_lock_if_same(lock_file, "tok", stale_ino)
+        assert deleted is False
+        assert lock_file.exists()
+
+    def test_unlink_allows_when_identity_matches(self, armor_state):
+        """token 与 inode 都对得上才允许删除。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({
+            "acquiredAt": armor._now_iso(), "pid": 4242, "token": "tok",
+        }))
+        ino = lock_file.stat().st_ino
+        assert armor._unlink_compact_lock_if_same(lock_file, "tok", ino) is True
+        assert not lock_file.exists()
+
+    def test_unlink_refuses_when_corrupt_lock_taken_over(self, armor_state):
+        """观测时是损坏锁(无 token)，但已被健康锁接管时不得删。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({
+            "acquiredAt": armor._now_iso(), "pid": 55555, "token": "healthy",
+        }))
+        ino = lock_file.stat().st_ino
+        # expected_token=None 代表“观测时读到的是损坏/无 token 锁”
+        deleted = armor._unlink_compact_lock_if_same(lock_file, None, ino)
+        assert deleted is False
+        assert lock_file.exists()
+
+    def test_missing_lock_unlink_is_noop(self, armor_state):
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        assert armor._unlink_compact_lock_if_same(lock_file, "tok", 1) is False
+
+    def test_reclaim_retries_are_bounded(self, armor_state):
+        """锁被反复抢占时必须有界返回 False，不能无限递归。"""
+        lock_file = armor._compact_lock_file()
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        expired = (datetime.now() - timedelta(seconds=700)).isoformat()
+
+        def write_expired():
+            lock_file.write_text(json.dumps({
+                "acquiredAt": expired, "pid": 77777, "token": "x",
+            }))
+
+        write_expired()
+        calls = {"n": 0}
+        real = armor._unlink_compact_lock_if_same
+
+        def always_replaced(lf, tok, ino):
+            calls["n"] += 1
+            result = real(lf, tok, ino)
+            write_expired()  # 删掉后立刻又出现过期锁
+            return result
+
+        with patch.object(armor, "_unlink_compact_lock_if_same", always_replaced):
+            assert armor._try_acquire_compact_lock() is False
+        assert calls["n"] <= armor._COMPACT_LOCK_RECLAIM_RETRIES + 1, (
+            "回收重试必须有上界"
+        )
 
 
 class TestPlatformProbe:

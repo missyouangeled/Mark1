@@ -8,6 +8,7 @@ import os
 import subprocess
 import time
 import urllib.request
+import uuid
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -65,6 +66,7 @@ COMPACT_COOLDOWN_SEC = 1800   # compact 冷却期 30 分钟, 避免反复压缩�
 PLATFORM_PROBE_SEC = 60       # 平台探测期总时长: 先等平台自己 auto-compaction
 PLATFORM_PROBE_INTERVAL = 10  # 探测期内每次检查间隔
 COMPACT_LOCK_TTL_SEC = 620    # compact 锁过期时间 (compact 超时 620s + 缓冲)
+_COMPACT_LOCK_RECLAIM_RETRIES = 3  # 过期/损坏锁的回收重试上界（防无界递归）
 
 # 测试钩子: conftest.py 会 setattr 为 True 以跳过平台探测期的真实 sleep
 _PLATFORM_PROBE_SKIP_SLEEP = False
@@ -82,6 +84,77 @@ def _compact_cooldown_file() -> Path:
 def _compact_lock_file() -> Path:
     """compact 锁文件路径。同上, 延迟求值避免测试路径固化。"""
     return XDG_STATE / "mark42" / "armor" / "compact.lock"
+
+
+def _new_compact_lock_token() -> str:
+    """生成锁的唯一所有权 token（PID 会被复用，不能单靠 PID）。"""
+    return f"{os.getpid()}-{uuid.uuid4().hex}"
+
+
+def _lock_inode(lock_file: Path) -> int | None:
+    """取锁文件当前 inode；不存在或不可读返回 None。"""
+    try:
+        return lock_file.stat().st_ino
+    except OSError:
+        return None
+
+
+def _read_compact_lock_identity(lock_file: Path) -> tuple[dict, int | None] | None:
+    """读锁内容 + 同时记下当时的 inode。
+
+    返回 ``(lock_data, inode)``；锁不存在时返回 None。
+    内容不是合法 JSON 时 ``lock_data`` 为空 dict（交给调用方当损坏锁处理）。
+    inode 用于删除前比对：即使文件名相同，被重建过的锁 inode 也会变。
+    """
+    try:
+        raw = lock_file.read_text()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return None
+    ino = _lock_inode(lock_file)
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            data = {}
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+    return data, ino
+
+
+def _unlink_compact_lock_if_same(
+    lock_file: Path, expected_token: str | None, expected_ino: int | None
+) -> bool:
+    """仅当锁仍是「自己刚刚观测到的那一份」时才删除。
+
+    这是 P2-15 的核心修复：check 与 unlink 之间存在时间窗，
+    另一进程可能已回收旧锁并建了**新鲜锁**。删除前重新比对
+    token 与 inode，不一致就说明锁已换主，必须放手。
+
+    返回是否实际执行了删除。
+    """
+    current = _read_compact_lock_identity(lock_file)
+    if current is None:
+        return False  # 已被别人删了，无需动作
+    current_data, current_ino = current
+
+    if expected_ino is not None and current_ino != expected_ino:
+        logger.warning("compact 锁已被重建(inode 变化)，放弃删除以免踩掉他人锁")
+        return False
+    if expected_token is not None and current_data.get("token") != expected_token:
+        logger.warning("compact 锁已换主(token 不符)，放弃删除以免踩掉他人锁")
+        return False
+    if expected_token is None and current_data.get("token"):
+        # 观测时是损坏/无 token 锁，现在却有了合法 token —— 已被健康锁接管
+        logger.warning("compact 锁已被健康锁接管，放弃删除")
+        return False
+
+    try:
+        lock_file.unlink(missing_ok=True)
+        return True
+    except OSError as e:
+        logger.warning("compact 锁删除失败: %s", e)
+        return False
 
 
 def _iso_age_seconds(iso_ts: str) -> float | None:
@@ -111,7 +184,17 @@ def _try_acquire_compact_lock() -> bool:
     """尝试获取 compact 锁。返回 True 表示获取成功。
 
     使用 O_CREAT|O_EXCL 原子创建，避免竞态条件。
+
+    锁内写入唯一 ``token``（含 PID），回收过期/损坏锁时只删除
+    「自己刚刚读到的那一份」（比对 token 与 inode）。否则在 check 与
+    unlink 之间，另一进程可能已回收旧锁并建了**新鲜锁**，
+    无条件 unlink 会把别人的新锁踩掉（P2-15）。
     """
+    return _acquire_compact_lock_once(_COMPACT_LOCK_RECLAIM_RETRIES)
+
+
+def _acquire_compact_lock_once(retries_left: int) -> bool:
+    """单轮锁获取。``retries_left`` 给回收重试封顶，避免无界递归。"""
     import errno as _errno
     lock_file = _compact_lock_file()
     lock_file.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +220,7 @@ def _try_acquire_compact_lock() -> bool:
             os.write(fd, json.dumps({
                 "acquiredAt": _now_iso(),
                 "pid": os.getpid(),
+                "token": _new_compact_lock_token(),
             }, ensure_ascii=False).encode())
         finally:
             os.close(fd)
@@ -146,27 +230,56 @@ def _try_acquire_compact_lock() -> bool:
             # 非预期错误，保守起见不获取锁
             return False
 
+    if retries_left <= 0:
+        # 回收重试耗尽：锁一直被别的进程抢走，本轮放弃
+        logger.warning("compact 锁回收重试耗尽，本轮放弃抢锁")
+        return False
+
     # 锁文件已存在，检查是否过期
     try:
-        lock_data = json.loads(lock_file.read_text())
+        observed = _read_compact_lock_identity(lock_file)
+        if observed is None:
+            # 读不到（刚被删掉）——直接重试抢锁
+            return _acquire_compact_lock_once(retries_left - 1)
+        lock_data, observed_ino = observed
         lock_ts = lock_data.get("acquiredAt")
         if lock_ts:
             lock_age = _iso_age_seconds(lock_ts)
             if lock_age is not None and lock_age < COMPACT_LOCK_TTL_SEC:
                 return False  # 锁未过期
-        # 锁已过期，原子替换
-        lock_file.unlink(missing_ok=True)
-        return _try_acquire_compact_lock()  # 递归重试
+        # 锁已过期（或缺 acquiredAt）：只删除自己刚读到的那份
+        _unlink_compact_lock_if_same(
+            lock_file, lock_data.get("token"), observed_ino
+        )
+        return _acquire_compact_lock_once(retries_left - 1)
     except Exception:
-        # 锁文件损坏，删除后重试
-        lock_file.unlink(missing_ok=True)
-        return _try_acquire_compact_lock()
+        # 锁文件损坏：同样只删自己观测到的那份 inode
+        _unlink_compact_lock_if_same(lock_file, None, _lock_inode(lock_file))
+        return _acquire_compact_lock_once(retries_left - 1)
 
 
 def _release_compact_lock() -> None:
-    """释放 compact 锁。"""
+    """释放 compact 锁——**仅当锁确实属于本进程时**。
+
+    旧实现无条件 unlink：如果本进程的锁已因超时被别人回收、
+    而对方正在持锁工作，这里会把**对方的锁**删掉，
+    导致第三个进程也能抢入 —— 互斥彻底失效（P2-15）。
+    """
+    lock_file = _compact_lock_file()
     try:
-        _compact_lock_file().unlink(missing_ok=True)
+        observed = _read_compact_lock_identity(lock_file)
+        if observed is None:
+            return  # 锁已不存在，幂等
+        lock_data, observed_ino = observed
+        if lock_data.get("pid") != os.getpid():
+            logger.warning(
+                "compact 锁已不属于本进程(持有者 pid=%s)，拒绞删除",
+                lock_data.get("pid"),
+            )
+            return
+        _unlink_compact_lock_if_same(
+            lock_file, lock_data.get("token"), observed_ino
+        )
     except Exception as e:
         logger.warning("ignored error: %s", e)
 
