@@ -547,11 +547,42 @@ def _migrate_config_if_needed(cfg: dict[str, Any]) -> dict[str, Any]:
     - 只改 schema 相关字段，不动用户自定义的阈值/模型/daemon 配置；
     - 迁移前生成一次 .bak 备份，便于回滚；
     - 旧 "version" 值挪到 legacyVersion 留痕，不直接丢弃。
+
+    【2026-08-05 修复 P3-6】原实现只判断“等不等于当前版本”，于是
+    **任何非当前版本都会进迁移** —— 包括 schema 3/4/99 等**未来**版本，
+    也会被改写成当前版本并写回磁盘。后果：新版本写的配置被旧版
+    程序读一次就静默降级，新版本才认识的字段语义也可能被误解。
+
+    现行为：
+    - schema < 当前：正常向上迁移（原行为不变）
+    - schema == 当前：直接返回
+    - schema > 当前：**拒绞降级与写回**，只告警并原样返回（只读兼容）。
+      需要强行降级时可设 MARK42_ALLOW_SCHEMA_DOWNGRADE=1 显式开启。
     """
     if not isinstance(cfg, dict) or not cfg:
         return cfg
-    if cfg.get("configSchemaVersion") == CONFIG_SCHEMA_VERSION:
+
+    current = cfg.get("configSchemaVersion")
+    if current == CONFIG_SCHEMA_VERSION:
         return cfg
+
+    # 未来 schema：默认只读，不降级、不写回
+    if isinstance(current, int) and current > CONFIG_SCHEMA_VERSION:
+        if os.environ.get("MARK42_ALLOW_SCHEMA_DOWNGRADE", "").strip() not in (
+            "1", "true", "True", "yes",
+        ):
+            logger.warning(
+                "配置 schema v%s 高于本程序支持的 v%s，已按**只读**处理："
+                "不降级、不写回。请升级 Mark42；确需强行降级请设置 "
+                "MARK42_ALLOW_SCHEMA_DOWNGRADE=1。",
+                current, CONFIG_SCHEMA_VERSION,
+            )
+            return cfg
+        logger.warning(
+            "MARK42_ALLOW_SCHEMA_DOWNGRADE 已开启，将把 schema v%s 强行降为 v%s，"
+            "新版本特有字段可能被误解",
+            current, CONFIG_SCHEMA_VERSION,
+        )
 
     migrated = dict(cfg)
     legacy_version = migrated.pop("version", None)

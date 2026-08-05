@@ -162,3 +162,115 @@ class TestResolveModel:
         if result is not None:
             # 实际环境有配置，跳过此断言
             pass
+
+
+class TestSchemaDowngradeProtection:
+    """P3-6 防回归：未来 schema 不得被静默降级。
+
+    历史 bug（已实证复现）：`_migrate_config_if_needed` 只判断
+    "等不等于当前版本"，于是**任何非当前版本都会进迁移** ——
+    schema 3/4/99 等未来版本也会被改写成当前版本**并写回磁盘**。
+
+    后果：新版本 Mark42 写的配置，被旧版程序读一次就永久降级；
+    新版本才认识的字段语义也可能被误解。这类损坏是不可逆的。
+
+    修复后行为：
+      schema <  当前 -> 正常向上迁移（原行为不变）
+      schema == 当前 -> 直接返回
+      schema >  当前 -> 拒绝降级与写回，只告警并原样返回（只读兼容）
+                        需强行降级须显式设 MARK42_ALLOW_SCHEMA_DOWNGRADE=1
+    """
+
+    def test_future_schema_is_not_downgraded(self, monkeypatch):
+        from mark42.config import (
+            CONFIG_SCHEMA_VERSION,
+            _migrate_config_if_needed,
+        )
+
+        monkeypatch.delenv("MARK42_ALLOW_SCHEMA_DOWNGRADE", raising=False)
+        future_version = CONFIG_SCHEMA_VERSION + 97
+        cfg = {
+            "configSchemaVersion": future_version,
+            "newFeatureField": {"deep": "value"},
+            "thresholds": {"warn": 42},
+        }
+        out = _migrate_config_if_needed(cfg)
+
+        assert out["configSchemaVersion"] == future_version, "未来 schema 被降级了"
+        assert out["newFeatureField"] == {"deep": "value"}, "未来字段被丢弃"
+        assert "migratedAt" not in out, "未来 schema 不该被打迁移标记"
+        assert "migratedByVersion" not in out
+
+    def test_future_schema_warns(self, monkeypatch, caplog):
+        import logging
+
+        from mark42.config import (
+            CONFIG_SCHEMA_VERSION,
+            _migrate_config_if_needed,
+        )
+
+        monkeypatch.delenv("MARK42_ALLOW_SCHEMA_DOWNGRADE", raising=False)
+        with caplog.at_level(logging.WARNING):
+            _migrate_config_if_needed(
+                {"configSchemaVersion": CONFIG_SCHEMA_VERSION + 1}
+            )
+        assert any("只读" in r.message for r in caplog.records), (
+            "未来 schema 必须明确告警，不能静默"
+        )
+
+    def test_future_schema_not_written_back(self, monkeypatch, tmp_path):
+        """关键：未来 schema 绝不能写回磁盘（写回即造成永久降级）。"""
+        from mark42 import config as cfg_mod
+
+        monkeypatch.delenv("MARK42_ALLOW_SCHEMA_DOWNGRADE", raising=False)
+        saved = []
+        monkeypatch.setattr(cfg_mod, "_save_config", lambda c: saved.append(c))
+
+        cfg_mod._migrate_config_if_needed(
+            {"configSchemaVersion": cfg_mod.CONFIG_SCHEMA_VERSION + 5}
+        )
+        assert saved == [], "未来 schema 被写回磁盘了"
+
+    def test_explicit_override_allows_downgrade(self, monkeypatch):
+        """显式开启环境变量后才允许降级（提供逃生舱但不默认）。"""
+        from mark42.config import (
+            CONFIG_SCHEMA_VERSION,
+            _migrate_config_if_needed,
+        )
+
+        monkeypatch.setenv("MARK42_ALLOW_SCHEMA_DOWNGRADE", "1")
+        out = _migrate_config_if_needed(
+            {"configSchemaVersion": CONFIG_SCHEMA_VERSION + 3}
+        )
+        assert out["configSchemaVersion"] == CONFIG_SCHEMA_VERSION
+
+    def test_old_schema_still_migrates_up(self, monkeypatch):
+        """向上迁移是原有能力，不得被本次修复破坏。"""
+        from mark42 import config as cfg_mod
+
+        monkeypatch.setattr(cfg_mod, "_save_config", lambda c: None)
+        out = cfg_mod._migrate_config_if_needed(
+            {"version": "2.3.0", "thresholds": {"warn": 70}}
+        )
+        assert out["configSchemaVersion"] == cfg_mod.CONFIG_SCHEMA_VERSION
+        assert out["legacyVersion"] == "2.3.0"
+        # 用户自定义配置不得被动
+        assert out["thresholds"] == {"warn": 70}
+
+    def test_current_schema_returns_same_object(self):
+        from mark42.config import (
+            CONFIG_SCHEMA_VERSION,
+            _migrate_config_if_needed,
+        )
+
+        cfg = {"configSchemaVersion": CONFIG_SCHEMA_VERSION, "x": 1}
+        assert _migrate_config_if_needed(cfg) is cfg
+
+    def test_non_int_schema_does_not_crash(self, monkeypatch):
+        """schema 字段被写成字符串等异常值时不得崩溃。"""
+        from mark42 import config as cfg_mod
+
+        monkeypatch.setattr(cfg_mod, "_save_config", lambda c: None)
+        out = cfg_mod._migrate_config_if_needed({"configSchemaVersion": "bad"})
+        # 非法值按"需要迁移"处理，迁到当前版本
+        assert out["configSchemaVersion"] == cfg_mod.CONFIG_SCHEMA_VERSION
