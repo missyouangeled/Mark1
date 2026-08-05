@@ -654,3 +654,100 @@ class TestApplyRollbackSafety:
         ok, output = cs._validate_candidate_config({"agents": {}})
         assert ok is True, "预校验不可用时应降级放行，交由写入后复验兜底"
         assert output == ""
+
+
+class TestConcurrentWriteSafety:
+    """P2-6 防回归：不得基于锁外快照整份覆盖，静默吃掉并发写入。
+
+    历史 bug（两处，均实证复现）：
+      - `context_safety_apply` 与 `compaction_apply` 都在**锁外**读配置快照，
+        锁只包住最后一步写入，中间隔着整个 diagnose/merge 过程；
+      - 并发时会拿陈旧快照整份覆盖，静默吃掉别人
+        （另一个 Mark42 模块 / Control UI / 用户）刚写的字段。
+      - `compaction_diag` 的原注释已经指出这个风险，但代码并未解决。
+
+    修复：写入统一走 `patch_openclaw_config(mutate=...)`，
+    该原语在**锁内重读**最新配置后才执行 mutator。
+    """
+
+    MARKER_KEY = "USER_CONCURRENT_EDIT"
+
+    def _make_config(self, tmp_path):
+        config_path = tmp_path / "openclaw.json"
+        config_path.write_text(
+            json.dumps({"agents": {"defaults": {}}}), encoding="utf-8"
+        )
+        return config_path
+
+    def test_apply_preserves_field_written_after_snapshot(
+        self, tmp_path, monkeypatch
+    ):
+        """A 读快照后 B 写入新字段 -> A 落盘不得吃掉该字段。"""
+        config_path = self._make_config(tmp_path)
+        monkeypatch.setattr(cs, "OPENCLAW_CONFIG", config_path)
+        monkeypatch.setattr(cs, "_validate_candidate_config", lambda c: (True, ""))
+        monkeypatch.setattr(cs, "_run_openclaw_validate", lambda: (True, "ok"))
+
+        real_load = cs._load_openclaw_config
+
+        def load_then_concurrent_write():
+            snapshot = real_load()
+            # 模拟另一个进程在 A 读完快照之后写入
+            live = json.loads(config_path.read_text(encoding="utf-8"))
+            live[self.MARKER_KEY] = "并发写入的重要设置"
+            config_path.write_text(json.dumps(live), encoding="utf-8")
+            return snapshot
+
+        monkeypatch.setattr(cs, "_load_openclaw_config", load_then_concurrent_write)
+
+        result = cs.context_safety_apply(execute_now=True)
+        after = json.loads(config_path.read_text(encoding="utf-8"))
+
+        assert result["written"] is True
+        # A 自己的基线仍要生效
+        assert "compaction" in after["agents"]["defaults"]
+        # 且不能吃掉 B 的字段
+        assert self.MARKER_KEY in after, "锁外快照整份覆盖，吃掉了并发写入"
+
+    def test_apply_recomputes_changes_inside_lock(self, tmp_path, monkeypatch):
+        """mutator 必须在锁内拿到的**最新**配置上重算，而非复用快照结果。"""
+        config_path = self._make_config(tmp_path)
+        monkeypatch.setattr(cs, "OPENCLAW_CONFIG", config_path)
+        monkeypatch.setattr(cs, "_validate_candidate_config", lambda c: (True, ""))
+        monkeypatch.setattr(cs, "_run_openclaw_validate", lambda: (True, "ok"))
+
+        seen: list[dict] = []
+        real_merge = cs._merge_context_safety_patch
+
+        def spy_merge(config):
+            seen.append(config)
+            return real_merge(config)
+
+        monkeypatch.setattr(cs, "_merge_context_safety_patch", spy_merge)
+        cs.context_safety_apply(execute_now=True)
+
+        # 至少两次：一次算快照（供 dry-run 预览/预校验），一次在锁内重算
+        assert len(seen) >= 2, "写入路径必须在锁内重新 merge 一次"
+
+    def test_nothing_to_do_when_peer_already_aligned(self, tmp_path, monkeypatch):
+        """锁内重读发现别人已对齐好基线时，应报 nothing_to_do 而非重复写。"""
+        config_path = self._make_config(tmp_path)
+        monkeypatch.setattr(cs, "OPENCLAW_CONFIG", config_path)
+        monkeypatch.setattr(cs, "_validate_candidate_config", lambda c: (True, ""))
+        monkeypatch.setattr(cs, "_run_openclaw_validate", lambda: (True, "ok"))
+
+        # 锁内 merge 时假装已无变更（等价于别的进程刚对齐完）
+        calls = {"n": 0}
+        real_merge = cs._merge_context_safety_patch
+
+        def merge_then_empty(config):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return real_merge(config)  # 快照阶段仍报有变更
+            return config, []              # 锁内重算：已无需修改
+
+        monkeypatch.setattr(cs, "_merge_context_safety_patch", merge_then_empty)
+        result = cs.context_safety_apply(execute_now=True)
+
+        assert result["changed"] == []
+        assert result["written"] is False

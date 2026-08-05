@@ -389,11 +389,12 @@ def context_safety_apply(
     不符 OpenClaw schema，Gateway 直接起不来。
 
     现流程：
-      1. 锁内重读最新配置（不用陈旧快照，兼顾 P2-6）
+      1. 读取快照用于 dry-run 预览与候选预校验
       2. 生成候选配置
       3. 在**临时文件**上校验候选配置
       4. 预校验失败 -> 直接拒绞写入（正式配置未被碰过）
-      5. 预校验通过 -> 备份 + 原子替换
+      5. 预校验通过且非 dry-run -> 走 ``patch_openclaw_config(mutate=...)``，
+         **锁内重读最新配置**后重算 patch（P2-6），再备份 + 原子替换
       6. 写入后**再次校验**，失败立即从备份回滚
       7. 回滚失败作为独立高严重错误上报
 
@@ -461,11 +462,56 @@ def context_safety_apply(
         print("dry-run：未写入。确认无误后加 --execute-now 真实应用。")
         return result
 
-    # 真实写入：备份 -> 原子替换 -> 复验 -> 失败回滚
-    backup = _backup_openclaw_config()
+    # 真实写入：走 patch_openclaw_config(mutate=...)，**锁内重读**后重算 patch
+    # 【P2-6】上面的 config 是锁外读的快照，只能用于 dry-run 预览与
+    # 候选预校验。若直接拿它整份写盘，会静默吃掉这期间别人
+    # （compaction_apply / Control UI / 用户）刚写的字段。
+    # 注意：_exclusive_lock() 不可重入，所以不能自己再包一层锁，
+    # 必须把写入整体交给该原语。
+    from .openclaw_config import ConfigWriteError, patch_openclaw_config
+
+    locked_changed: list[str] = []
+
+    def _mutate(live_config: dict[str, Any]) -> list[str]:
+        """在锁内拿到的**最新**配置上重新对齐基线。"""
+        _, live_changed = _merge_context_safety_patch(live_config)
+        locked_changed.clear()
+        locked_changed.extend(live_changed)
+        return live_changed
+
+    try:
+        patch_result = patch_openclaw_config(
+            mutate=_mutate,
+            apply=True,
+            backup_tag="mark42-context-safety",
+            config_path=_openclaw_config_path(),
+            # 写后校验由本函数自己跑（需要把输出带进返回值并控制回滚上报）
+            validate=False,
+        )
+    except ConfigWriteError as e:
+        result["validateOk"] = False
+        result["validateOutput"] = str(e)
+        result["rollbackNote"] = "写入失败，已保持/恢复原配置"
+        print("backup: none")
+        print(f"validate: FAIL（写入失败：{e}）")
+        return result
+
+    if patch_result.get("status") == "nothing_to_do":
+        # 锁内重读后发现别的进程已经对齐好了
+        result["changed"] = []
+        print("backup: none")
+        print("changed: none（锁内重读后发现基线已对齐）")
+        valid, output = _run_openclaw_validate()
+        result["validateOk"] = valid
+        result["validateOutput"] = output
+        print(f"validate: {'PASS' if valid else 'FAIL'}")
+        return result
+
+    backup = Path(patch_result["backupPath"])
     result["backup"] = str(backup)
-    _save_openclaw_config(new_config)
     result["written"] = True
+    if locked_changed:
+        result["changed"] = locked_changed
 
     valid, output = _run_openclaw_validate()
     result["validateOk"] = valid
@@ -474,10 +520,10 @@ def context_safety_apply(
     print(f"backup: {backup}")
     print("changed:")
     if verbose:
-        for item in changed:
+        for item in result["changed"]:
             print(f"  - {item}")
     else:
-        print(f"  - {len(changed)} 项变更")
+        print(f"  - {len(result['changed'])} 项变更")
     print(f"validate: {'PASS' if valid else 'FAIL'}")
     if output:
         print(output)

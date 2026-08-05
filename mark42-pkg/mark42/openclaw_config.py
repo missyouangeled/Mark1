@@ -221,6 +221,7 @@ def patch_openclaw_config(
     apply: bool = False,
     backup_tag: str = "mark42",
     validate: bool = True,
+    config_path: Path | None = None,
 ) -> dict[str, Any]:
     """安全地对 openclaw.json 做字段级修改。
 
@@ -231,6 +232,9 @@ def patch_openclaw_config(
         apply: False（默认）只预览不写盘；True 才真正落盘。
         backup_tag: 备份文件名标记。
         validate: 写后是否执行 openclaw config validate。
+        config_path: 显式指定目标配置路径。缺省走统一路径解析器。
+                调用方（如 context_safety）自己持有路径语义时必须传，
+                否则两边各自解析会造成跳模块路径断裂。
 
     Returns:
         含 status / changes / backupPath 的结果字典。
@@ -243,7 +247,8 @@ def patch_openclaw_config(
 
     with _exclusive_lock():
         # 关键：在锁内重新读盘，避免基于过期快照覆盖别人刚写的内容
-        config_path = _openclaw_config_path()
+        if config_path is None:
+            config_path = _openclaw_config_path()
         current = _load(config_path)
         candidate = json.loads(json.dumps(current))  # 深拷贝
 

@@ -1031,3 +1031,116 @@ class TestLoadOpenclawJsonErrors:
         monkeypatch.setattr(cd, "_OPENCLAW_JSON", tmp_path / "nonexistent.json")
         result = cd._get_compaction_config()
         assert result is None
+
+
+class TestCompactionConcurrentWriteSafety:
+    """P2-6 防回归：compaction_apply 不得基于锁外快照整份覆盖。
+
+    历史 bug（已实证复现）：`cfg = _load_openclaw_json()` 在**锁外**读快照，
+    锁只包住最后一步 `_atomic_write_json`，中间隔着整个 diagnose + merge。
+    并发时会拿陈旧快照整份覆盖，静默吃掉别人刚写的字段。
+
+    讽刺的是原代码注释已写明"与 context_safety 并发时会基于旧快照整份覆盖，
+    静默吃掉用户改动"，但代码并未解决。
+
+    修复：写入走 `patch_openclaw_config(mutate=...)`，锁内重读后再执行 mutator。
+    """
+
+    MARKER_KEY = "USER_CONCURRENT_EDIT"
+    FAKE_DIAG = {
+        "actionable": True,
+        "issues": [
+            {
+                "key": "keepRecentTokens",
+                "status": "too_low",
+                "current": 100,
+                "advice": "偏低",
+            }
+        ],
+    }
+
+    def test_apply_preserves_field_written_after_snapshot(
+        self, tmp_path, monkeypatch
+    ):
+        """A 读快照后 B 写入新字段 -> A 落盘不得吃掉该字段。"""
+        config_path = tmp_path / "openclaw.json"
+        config_path.write_text(
+            json.dumps(
+                {"agents": {"defaults": {"compaction": {"keepRecentTokens": 100}}}}
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "compaction_diagnose", lambda: self.FAKE_DIAG)
+
+        real_load = cd._load_openclaw_json
+
+        def load_then_concurrent_write():
+            snapshot = real_load()
+            live = json.loads(config_path.read_text(encoding="utf-8"))
+            live[self.MARKER_KEY] = "并发写入的重要设置"
+            config_path.write_text(json.dumps(live), encoding="utf-8")
+            return snapshot
+
+        monkeypatch.setattr(cd, "_load_openclaw_json", load_then_concurrent_write)
+
+        result = cd.compaction_apply(auto_confirm=True)
+        after = json.loads(config_path.read_text(encoding="utf-8"))
+
+        assert result["status"] == "applied"
+        # A 自己的修改仍要生效
+        assert after["agents"]["defaults"]["compaction"]["keepRecentTokens"] != 100
+        # 且不能吃掉 B 的字段
+        assert self.MARKER_KEY in after, "锁外快照整份覆盖，吃掉了并发写入"
+
+    def test_changes_recomputed_inside_lock(self, tmp_path, monkeypatch):
+        """变更必须在锁内拿到的最新配置上重算。"""
+        config_path = tmp_path / "openclaw.json"
+        config_path.write_text(
+            json.dumps(
+                {"agents": {"defaults": {"compaction": {"keepRecentTokens": 100}}}}
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "compaction_diagnose", lambda: self.FAKE_DIAG)
+
+        seen = []
+        real_collect = cd._collect_compaction_changes
+
+        def spy_collect(cfg, diag):
+            seen.append(cfg)
+            return real_collect(cfg, diag)
+
+        monkeypatch.setattr(cd, "_collect_compaction_changes", spy_collect)
+        cd.compaction_apply(auto_confirm=True)
+
+        assert len(seen) >= 2, "写入路径必须在锁内重算一次变更"
+
+    def test_dry_run_still_does_not_write(self, tmp_path, monkeypatch):
+        """改造后 dry-run 仍然不得写盘。"""
+        config_path = tmp_path / "openclaw.json"
+        original = {
+            "agents": {"defaults": {"compaction": {"keepRecentTokens": 100}}}
+        }
+        config_path.write_text(json.dumps(original), encoding="utf-8")
+        monkeypatch.setattr(cd, "_OPENCLAW_JSON", config_path)
+        monkeypatch.setattr(cd, "compaction_diagnose", lambda: self.FAKE_DIAG)
+
+        result = cd.compaction_apply(auto_confirm=False)
+
+        assert result["status"] == "dry_run"
+        assert json.loads(config_path.read_text(encoding="utf-8")) == original
+
+    def test_collect_changes_is_pure_per_call(self, tmp_path):
+        """_collect_compaction_changes 每次调用都应基于传入 cfg 独立计算。"""
+        cfg_a = {"agents": {"defaults": {"compaction": {"keepRecentTokens": 100}}}}
+        cfg_b = {"agents": {"defaults": {"compaction": {"keepRecentTokens": 100}}}}
+
+        changes_a = cd._collect_compaction_changes(cfg_a, self.FAKE_DIAG)
+        changes_b = cd._collect_compaction_changes(cfg_b, self.FAKE_DIAG)
+
+        assert changes_a == changes_b
+        # 且确实原地改了各自传入的 cfg
+        assert cfg_a["agents"]["defaults"]["compaction"]["keepRecentTokens"] != 100
+        assert cfg_b["agents"]["defaults"]["compaction"]["keepRecentTokens"] != 100

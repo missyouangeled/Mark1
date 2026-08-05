@@ -355,8 +355,46 @@ class TestErrorHandling:
             patch_openclaw_config({"a": 1}, apply=True)
 
     def test_call_sites_use_atomic_writer(self):
-        """防回归：两个调用方不得再出现裸 open(...,\"w\") 写 openclaw.json。"""
+        """防回归：两个调用方不得再出现裸 open 写 openclaw.json。
+
+        【2026-08-05 P2-6】原实现断言源码里必须出现 ``_atomic_write_json``
+        和 ``_exclusive_lock`` 两个符号名 —— 把**实现细节**当成了契约。
+        P2-6 把写入整体委托给 ``patch_openclaw_config()``
+        （它内部就是锁内重读 + 原子写 + 备份 + 回滚）后该断言失败，
+        但安全性反而**更强**了。
+
+        现改为断言真正的不变量：
+          1. 不得出现裸 open(..., "w") 写配置（这才是要防的东西）
+          2. 必须走安全写入通道之一：直接用原子写原语，
+             或委托给 patch_openclaw_config
+        """
+        import re
+
         for mod in ("context_safety.py", "compaction_diag.py"):
             src = (Path(PKG_ROOT) / "mark42" / mod).read_text(encoding="utf-8")
-            assert "_atomic_write_json" in src, f"{mod} 未接入原子写入"
-            assert "_exclusive_lock" in src, f"{mod} 未接入跨进程锁"
+
+            for m in re.finditer(r"""open\(([^)]*),\s*["']w["']""", src):
+                target = m.group(1)
+                assert "config" not in target.lower(), (
+                    f"{mod} 出现裸 open 写配置: {m.group(0)}"
+                )
+
+            safe_channels = ("_atomic_write_json", "patch_openclaw_config")
+            assert any(ch in src for ch in safe_channels), (
+                f"{mod} 未接入任何安全写入通道（预期之一：{safe_channels}）"
+            )
+
+    def test_call_sites_never_write_config_without_lock(self):
+        """安全写入通道本身必须带跨进程锁。
+
+        调用方可以委托给 patch_openclaw_config（它自己拿锁），
+        但如果直接用 _atomic_write_json，就必须自己拿 _exclusive_lock。
+        """
+        for mod in ("context_safety.py", "compaction_diag.py"):
+            src = (Path(PKG_ROOT) / "mark42" / mod).read_text(encoding="utf-8")
+            if "patch_openclaw_config" in src:
+                continue  # 已委托给自带锁的原语
+            assert "_exclusive_lock" in src, (
+                f"{mod} 直接用原子写却未拿跨进程锁"
+            )
+

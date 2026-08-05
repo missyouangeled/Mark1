@@ -6,7 +6,6 @@ v2.0 (2026-06-16): 升级至病因层——令牌感知、双层阈值、摘要�
 
 import json
 import logging
-import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -774,38 +773,21 @@ def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[
     }
 
 
-def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
-    """根据诊断结果自动调优 OpenClaw 压缩配置。
-    auto_confirm=False → 只生成建议不写入
-    auto_confirm=True → 自动应用更改
+def _collect_compaction_changes(
+    cfg: dict[str, Any], diag: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """按诊断结果**原地修改** ``cfg``，返回变更描述列表。
+
+    抽成独立函数是为了让它能作为 ``patch_openclaw_config(mutate=...)``
+    的 mutator 在**锁内**对最新配置执行（P2-6）。
     """
-    diag = compaction_diagnose()
+    compact = (
+        cfg.setdefault("agents", {})
+        .setdefault("defaults", {})
+        .setdefault("compaction", {})
+    )
+    changes: list[dict[str, Any]] = []
 
-    if not diag["actionable"]:
-        return {
-            "appliedAt": _now_iso(),
-            "status": "nothing_to_do",
-            "summary": "压缩配置已在舒适范围，无需修改",
-            "changes": [],
-            "diagnose": diag,
-        }
-
-    cfg = _load_openclaw_json()
-    if not cfg:
-        return {
-            "appliedAt": _now_iso(),
-            "status": "error",
-            "summary": "无法读取 openclaw.json",
-            "changes": [],
-            "diagnose": diag,
-        }
-
-    # 确保路径存在
-    compact = cfg.setdefault("agents", {}).setdefault("defaults", {}).setdefault("compaction", {})
-
-    changes = []
-
-    # 遍历 issues，对超出范围的自动修正
     for issue in diag["issues"]:
         key = issue.get("key", "")
         status = issue.get("status", "")
@@ -849,6 +831,36 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
                 "reason": _MISSING_ALERTS["memoryFlush"]["fix"],
             })
 
+    return changes
+
+
+def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
+    """根据诊断结果自动调优 OpenClaw 压缩配置。
+    auto_confirm=False → 只生成建议不写入
+    auto_confirm=True → 自动应用更改
+    """
+    diag = compaction_diagnose()
+
+    if not diag["actionable"]:
+        return {
+            "appliedAt": _now_iso(),
+            "status": "nothing_to_do",
+            "summary": "压缩配置已在舒适范围，无需修改",
+            "changes": [],
+            "diagnose": diag,
+        }
+
+    cfg = _load_openclaw_json()
+    if not cfg:
+        return {
+            "appliedAt": _now_iso(),
+            "status": "error",
+            "summary": "无法读取 openclaw.json",
+            "changes": [],
+            "diagnose": diag,
+        }
+
+    changes = _collect_compaction_changes(cfg, diag)
     if not changes:
         return {
             "appliedAt": _now_iso(),
@@ -859,31 +871,68 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
         }
 
     if auto_confirm:
-        # 备份
-        config_path = _openclaw_json_path()
-        bak = Path(str(config_path) + ".bak." + datetime.now().strftime("%Y%m%d"))
-        shutil.copy2(config_path, bak)
+        # 【2026-08-05 修复 P2-6】改走 patch_openclaw_config(mutate=...)。
+        # 旧实现虽然已经是“原子写 + 跳进程锁”（P0-3），但 cfg 是在
+        # **锁外**读的快照，锁只包了最后一步写入，中间隔着整个
+        # diagnose + merge 过程。并发时会拿陈旧快照**整份覆盖**，
+        # 静默吃掉别人（context_safety / Control UI / 用户）刚写的字段。
+        # 原注释已经指出了这个风险，但代码并未解决。
+        #
+        # patch_openclaw_config 内部会在**锁内重读**最新配置再跑 mutator，
+        # 并自带备份 / 原子写 / 写后校验 / 失败回滚。
+        from .openclaw_config import ConfigWriteError, patch_openclaw_config
 
-        # 【2026-08-03 修复 P0-3】改为原子写入 + 跳进程锁。
-        # 原实现直接 open(path, "w") 截断，写一半崩溃会让 openclaw.json 变成
-        # 半截 JSON，Gateway 起不来（CASE-20260616-002，High）；
-        # 且与 context_safety 并发时会基于旧快照整份覆盖，静默吃掉用户改动。
+        applied_changes: list[dict[str, Any]] = []
+
+        def _mutate(live_cfg: dict[str, Any]) -> list[str]:
+            """在锁内拿到的**最新**配置上重算变更。"""
+            applied_changes.clear()
+            applied_changes.extend(_collect_compaction_changes(live_cfg, diag))
+            # patch_openclaw_config 靠返回列表非空判定“有变更”
+            return [f"agents.defaults.compaction.{c['key']}" for c in applied_changes]
+
         try:
-            from .openclaw_config import _atomic_write_json, _exclusive_lock
+            result = patch_openclaw_config(
+                mutate=_mutate,
+                apply=True,
+                backup_tag="mark42-compaction",
+                config_path=_openclaw_json_path(),
+                # 保持与原实现一致：compaction_apply 不跑
+                # openclaw config validate（该校验属于 context-safety 的职责）。
+                # 这里只修正并发读写语义（P2-6），不顺带改变校验行为。
+                validate=False,
+            )
+        except ConfigWriteError as e:
+            logger.error("写入 openclaw.json 失败（已保持/恢复原配置）: %s", e)
+            return {
+                "appliedAt": _now_iso(),
+                "status": "error",
+                "error": str(e),
+                "rollback": "已恢复原配置",
+                "changes": [],
+                "diagnose": diag,
+            }
 
-            with _exclusive_lock():
-                _atomic_write_json(config_path, cfg)
-        except Exception as e:
-            logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
-            shutil.copy2(bak, config_path)
-            return {"status": "error", "error": str(e), "rollback": "已恢复备份"}
+        # 锁内重算后可能发现已无需修改（别的进程已经改好了）
+        if result.get("status") == "nothing_to_do":
+            return {
+                "appliedAt": _now_iso(),
+                "status": "nothing_to_do",
+                "summary": "锁内重读后发现配置已在舱适范围，无需修改",
+                "changes": [],
+                "diagnose": diag,
+            }
 
+        backup_path = result.get("backupPath")
+        backup_name = Path(backup_path).name if backup_path else "无"
         return {
             "appliedAt": _now_iso(),
             "status": "applied",
-            "summary": f"已应用 {len(changes)} 项压缩配置优化（备份 {bak.name}）",
-            "backupPath": str(bak),
-            "changes": changes,
+            "summary": (
+                f"已应用 {len(applied_changes)} 项压缩配置优化（备份 {backup_name}）"
+            ),
+            "backupPath": backup_path,
+            "changes": applied_changes,
             "diagnose": diag,
         }
     else:
