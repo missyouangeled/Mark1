@@ -2325,3 +2325,80 @@ P1 全部清零。剩余：P2-6（配置锁外读取）、P2-7（TOML 双轨制�
 ### 方案进度
 
 P1 全部清零。P2 仅剩 P2-7（TOML 双轨制，路径部分已由 P2-16 接通）。剩余 P3-2/3/4/5/6。
+
+## 2026-08-05 10:00:00 CST (+08:00) — Mark42 审查方案全部完成：P2-7 + P3 五项
+
+- 类型：fix / test / refactor
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg 全仓
+- commits：6d14fa6f、9a2f5259、34e5a882、956babf3、bd8eee2d、f4baa5e1、74473986
+
+### P2-7：TOML 双轨制（6d14fa6f）
+
+实证复现与方案描述完全一致：TOML 里 `warn=11`，`load_config()` 读到 11，运行时 `THRESHOLD_WARN` 仍是 70。**配置向导让用户填的 `[paths]`/`[thresholds]` 全是废的。**
+
+明确职责划分：TOML = 用户期望配置；环境变量 = 部署/临时覆盖；state JSON = 内部运行状态。优先级 env > TOML > 默认值。新增 `get_effective_config()` 与 `get_config_source()`，接入 `mark42 --config` 分两段展示。
+
+关键细节：`load_config()` 会 merge 包内默认模板，所以「能读到值」≠「用户配了这项」。若用它做来源判定会把默认值全标成 `toml:`（实测标错 crit 与 scratch）。因此新增 `get_user_only()` 只认用户文件里真实存在的键。
+
+### P3-2：4 项过期 skip（9a2f5259）
+
+复核发现四项**全部能通过**（含全量套件下），skip 理由「status mismatch」「mock leakage」早已不成立——问题被其他修复顺带治好，标记没人撤，导致 4 个关键测试长期不跑。**这类过期 skip 比失败更危险：套件显示为绿却实际无覆盖。**
+
+同时复核另两处 skip 确认**有效不撤**（heavy.py 未走注册器是真实架构待办；examples 目录依赖属环境型），并补明理由。新增守卫禁止 `needs fix` 式占位理由。
+
+### P3-3：原子写故障注入（34e5a882）
+
+`os.kill` 写在写函数**调用之前**，子进程压根没进写流程。**实证：把 `_save_json` 退化成裸 `open(path,"w")`，旧测试依然全绿**——它从未验证过原子性。
+
+改为参数化 5 个真实注入点（after_open / after_write / after_flush / after_fsync / before_replace），并新增 after_replace 场景（原子性的另一半，原测试完全没覆盖）。新测试有效性自证：退化原子写 → 7 项立即转红。
+
+### P3-5：6 处静默异常（956babf3）
+
+方案列出的 6 处全部确认。危害不只是难调试，有两处**静默削弱系统能力**：armor 的「连续 N 次压缩无效就升级告警」依赖 total_count，坏文件静默跳过使分母偏小，本该触发的升级可能永不满足；llm_rate 分母变小导致成功率虚高。
+
+修法：异常类型收窄、IO 与解析失败分开记录、逐行场景累计坏行数一次性告警。顺带修 armor 读 actions.jsonl 时 `return {"error": "读取失败"}` 丢弃真实原因的问题。
+
+### P3-6：未来 schema 降级（bd8eee2d）
+
+`_migrate_config_if_needed` 只判断「等不等于当前版本」，于是 schema 99 也被改写成 2**并写回磁盘**。新版本配置被旧版程序读一次即永久降级。改为未来 schema 只读兼容 + 显式 `MARK42_ALLOW_SCHEMA_DOWNGRADE=1` 逃生舱。
+
+### P3-4：mypy 174 → 106（f4baa5e1、74473986）
+
+**捞出 4 个真 bug**：
+1. `audit/checker.py` 导入根本不存在的 `get_llm_provider`，外层宽泛 except 吞掉 ImportError ——**审计的 LLM 语义对比能力从未真正工作过**。修复后实测返回 `APIRuntime`，能力恢复。
+2. `actions_runner.py:159` `assemble_restart(agent=...)` —— 真实签名零参，调用即 TypeError。
+3. `actions_runner.py:183` `status_dashboard(all_agents=...)` —— 同类，调用即 TypeError。
+4. `perf_bench.py` `_warmup` 标注与全部 3 个调用点不符。
+
+另修方案点名三处 + `chaos_engine` 11 个 `_verify_*` 真实契约（`bool | dict`）+ `circuit_breaker` 类属性显式化 + `main()` 返回类型。
+
+全仓 `cast` 0 处，`type: ignore` 仍为原有 1 处——**未用 Any/cast 伪清零**。
+
+### 全轮验收
+
+- ruff 全过；全量 **1997 项收集 0 失败**（今日 1915 → 1997）
+- mypy 174 → 106
+- 每项修复均验证防回归有效（回退即转红）
+- 真实环境：`--config` / `context-safety verify` / `context-safety apply` / `--tune-compaction` / `module check` / `breaker list` 全部 rc=0；`openclaw config validate` 仍 Config valid；用户 TOML 内容未被改写（md5 校验）
+- 退出码语义逐条实测未变；gateway 与 Mark42 三服务全部 active
+
+### ⚠️ 系统性测试债（今日 4 次命中，建议专项治理）
+
+| 次序 | 测试 | 问题 |
+|---|---|---|
+| 1 | `test_cost_tracker` | 用 `timestamp[:10]` 当查询日期，照着 bug 语义写 |
+| 2 | `test_module_default_points_at_real_path` | grep 源码硬编码常量 |
+| 3 | `test_call_sites_use_atomic_writer` | grep 源码符号名当契约 |
+| 4 | `test_actions_runner` 两项 | mock 断言固化了会抛 TypeError 的调用 |
+
+前三类共性是**用「源码里有没有某个字符串」替代「行为对不对」**；第四类是**mock 接受任何参数，签名不符永远暴露不出来**。
+
+针对第四类已给出解法：新增 `test_assemble_restart_called_with_real_signature`，用 `inspect.signature().bind()` 校验真实函数能否接受该调用形式——这是 mock 断言无法覆盖的盲区。建议推广到所有 mock 密集的测试。
+
+**判据（已多次验证有效）**：测试变红时先问「它断言的是正确语义，还是当前实现？」是后者改测试，是前者改代码。不可为了变绿而迁就错误实现。
+
+### 方案进度：P0/P1/P2 全部清零，P3 全部完成
+
+P3-4 剩余 106 项 mypy 属渐进式标注债（`no-any-return` 27、`index` 17、`assignment` 16 等），分散 14 个文件，每处需单独核对真实契约，无已知运行时影响。
