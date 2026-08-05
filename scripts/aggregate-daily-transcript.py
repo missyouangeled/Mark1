@@ -213,7 +213,12 @@ def build_transcript_md(messages_by_session: list, target_date: str):
     return "\n".join(lines)
 
 
-def aggregate(target_date: str, dry_run: bool = False, print_only: bool = False):
+def aggregate(
+    target_date: str,
+    dry_run: bool = False,
+    print_only: bool = False,
+    force_overwrite: bool = False,
+):
     """主入口"""
     sessions = load_sessions_index()
     if not sessions:
@@ -247,6 +252,29 @@ def aggregate(target_date: str, dry_run: bool = False, print_only: bool = False)
     # 写入文件
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{target_date}-transcript.md"
+
+    # --- 防缩水守卫（2026-08-05 加）---
+    # 背景：session JSONL 会被 compaction 截断，早期消息不再存在。
+    # 此脚本原先无条件 "w" 覆盖，导致 8-05 的 51KB transcript 被覆盖成 1KB。
+    # 规则：新内容显著短于已有文件时，拒绝覆盖，改为写 .partial 并告警。
+    SHRINK_RATIO = 0.8          # 新内容不得少于旧文件的 80%
+    if output_path.exists() and not force_overwrite:
+        old_size = output_path.stat().st_size
+        new_size = len(md.encode("utf-8"))
+        if old_size > 0 and new_size < old_size * SHRINK_RATIO:
+            partial_path = output_path.with_suffix(".md.partial")
+            with open(partial_path, "w") as f:
+                f.write(md)
+            print(
+                f"[aggregate] !! 拒绝覆盖：新内容 {new_size} 字节 < 旧文件 {old_size} 字节 x {SHRINK_RATIO}。\n"
+                f"[aggregate]    很可能是 session 已被 compaction 截断。\n"
+                f"[aggregate]    新内容已写入: {partial_path}\n"
+                f"[aggregate]    原文件保持不变: {output_path}\n"
+                f"[aggregate]    如需强制覆盖请加 --force-overwrite",
+                file=sys.stderr,
+            )
+            return 2
+
     with open(output_path, "w") as f:
         f.write(md)
     print(f"[aggregate] 已写入: {output_path} ({len(md)} 字符)", file=sys.stderr)
@@ -258,6 +286,11 @@ def main():
     parser = argparse.ArgumentParser(description="统一日报采集脚本")
     parser.add_argument("--date", default=None, help="目标日期 YYYY-MM-DD（默认今天）")
     parser.add_argument("--dry-run", action="store_true", help="只看不写文件")
+    parser.add_argument(
+        "--force-overwrite",
+        action="store_true",
+        help="绕过防缩水守卫，强制覆盖（会丢失已有更长内容，谨慎使用）",
+    )
     parser.add_argument("--print", dest="print_only", action="store_true", help="输出到 stdout")
     args = parser.parse_args()
 
@@ -266,7 +299,12 @@ def main():
     else:
         target_date = datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d")
 
-    return aggregate(target_date, dry_run=args.dry_run, print_only=args.print_only)
+    return aggregate(
+        target_date,
+        dry_run=args.dry_run,
+        print_only=args.print_only,
+        force_overwrite=args.force_overwrite,
+    )
 
 
 if __name__ == "__main__":
