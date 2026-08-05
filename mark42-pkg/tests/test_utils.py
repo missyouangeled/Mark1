@@ -181,6 +181,42 @@ class TestSaveJson:
         loaded = _load_json(path)
         assert loaded == data2
 
+    def test_accepts_str_path_and_actually_writes(self, tmp_path):
+        """【2026-08-05 防回归】传 str 路径时必须真落盘。
+
+        修复前：path.parent 抛 AttributeError，被 @safe_call(default=None)
+        静默吞掉 —— 调用方以为保存成功，实际一个字节都没写。
+        2026-08-05 09:24 真实发生过两次。这里断言的是「数据真的到了磁盘」，
+        不是「没报错」——因为原 bug 的症状恰恰就是不报错。
+        """
+        path = tmp_path / "nested" / "from_str.json"
+        data = {"via": "str-path", "n": 42}
+
+        _save_json(str(path), data)
+
+        assert path.exists(), "传 str 路径时文件未落盘（静默失败回归）"
+        assert json.loads(path.read_text(encoding="utf-8")) == data
+
+    def test_str_path_creates_missing_parent_dirs(self, tmp_path):
+        """【2026-08-05 防回归】str 路径也要能递归建父目录。"""
+        path = tmp_path / "a" / "b" / "c" / "deep.json"
+        _save_json(str(path), {"deep": True})
+        assert path.exists()
+        assert _load_json(path) == {"deep": True}
+
+    def test_str_path_atomic_overwrite(self, tmp_path):
+        """【2026-08-05 防回归】str 路径走的也必须是同一条原子写入路径。
+
+        写完不能残留 .tmp 中间文件，且内容为完整新值。
+        """
+        path = tmp_path / "atomic_str.json"
+        _save_json(path, {"v": 1})
+        _save_json(str(path), {"v": 2})
+
+        assert _load_json(path) == {"v": 2}
+        leftovers = [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+        assert not leftovers, f"残留临时文件，原子写入路径未走完: {leftovers}"
+
 
 class TestSafeMtime:
     """测试 _safe_mtime 安全获取 mtime"""

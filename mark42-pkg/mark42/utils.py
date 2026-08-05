@@ -1,6 +1,7 @@
 """Mark42 工具函数模块。"""
 
 import functools
+import inspect
 import logging
 
 logger = logging.getLogger(__name__)
@@ -158,7 +159,29 @@ def _save_json(path: Path, data: dict[str, Any]) -> None:
     现改为：同目录临时文件 → 写入 → flush → fsync → os.replace() 原子替换。
     os.replace() 在同一文件系统上是原子操作，读者要么看到完整旧内容，
     要么看到完整新内容，不会看到中间态。异常时清理临时文件，原文件不动。
+
+    【2026-08-05 修复】入口强制 str → Path 归一化。
+    此前若调用方传入 str（例如把 audit/report.py 中 `return str(report_path)`
+    的返回值再喂回来），会在 path.parent 处抛 AttributeError，
+    而该异常被 @safe_call(default=None) 静默吞掉 —— 表现为
+    「状态保存看起来成功了，实际一个字节都没落盘」。
+    2026-08-05 09:24 实际发生过两次。这类静默失败比崩溃更危险，
+    所以这里既做归一化，也在类型不对时留下 warning 以便定位调用方。
     """
+    if not isinstance(path, Path):
+        # 记录调用方，避免以后再出现「不知道谁传的 str」
+        caller = "unknown"
+        try:
+            frame = inspect.stack()[2]
+            caller = f"{Path(frame.filename).name}:{frame.lineno}"
+        except Exception as exc:  # noqa: BLE001 - 取调用方仅用于诊断，失败不能影响主流程
+            logger.debug("获取 _save_json 调用方失败（不影响写入）: %s", exc)
+        logger.warning(
+            "_save_json 收到非 Path 类型 %s（调用方 %s），已自动转换。"
+            "请修正调用方直接传 Path，避免依赖此兼容层。",
+            type(path).__name__, caller,
+        )
+        path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(data, indent=2, ensure_ascii=False)
     tmp_name = None
