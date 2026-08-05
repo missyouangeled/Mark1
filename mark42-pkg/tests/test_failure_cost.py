@@ -9,12 +9,14 @@ FAILURE.md 降级契约落地测试 + 成本追踪测试
 """
 
 import json
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from mark42.cost_tracker import (
     MODEL_PRICING,
     CostRecord,
     CostTracker,
+    _local_date,
     record_cost,
 )
 
@@ -343,6 +345,97 @@ class TestCostTrackerSummary:
             assert len(rows) == 2
             assert "model" in rows[0]
             assert "cost_cny" in rows[0]
+
+
+class TestDailySummaryTimezone:
+    """防回归：汇总日期必须按**本地**时区归属，不能直接切 UTC 时间戳前缀。
+
+    历史 bug：``record()`` 用 ``datetime.now(timezone.utc)`` 落盘，而
+    ``get_daily_summary()`` 默认日期取本地今天，却用 ``timestamp[:10]``
+    直接比对。UTC+8 下本地 00:00–08:00 写入的记录 UTC 日期仍为前一天，
+    导致早班时段成本日报恒为 0。
+    """
+
+    def test_local_date_converts_utc_to_local(self):
+        # UTC 23:30 在 UTC+8 已经是次日 07:30
+        got = _local_date("2026-08-04T23:30:00+00:00")
+        expected = (
+            datetime(2026, 8, 4, 23, 30, tzinfo=timezone.utc)
+            .astimezone()
+            .strftime("%Y-%m-%d")
+        )
+        assert got == expected
+
+    def test_local_date_accepts_z_suffix_and_naive(self):
+        expected = (
+            datetime(2026, 8, 4, 23, 30, tzinfo=timezone.utc)
+            .astimezone()
+            .strftime("%Y-%m-%d")
+        )
+        # Z 结尾与裸时间戳（按 UTC 解释）应与显式 +00:00 一致
+        assert _local_date("2026-08-04T23:30:00Z") == expected
+        assert _local_date("2026-08-04T23:30:00") == expected
+
+    def test_local_date_tolerates_dirty_data(self):
+        # 单条脏数据不能让整份汇总抛异常
+        assert _local_date("not-a-date") == "not-a-date"[:10]
+        assert _local_date("") == ""
+
+    def test_daily_summary_counts_record_written_now(self, tmp_path):
+        """当下写入的记录必须出现在「今日」汇总里——早班时段也不能丢。"""
+        tracker = CostTracker(costs_file=tmp_path / "costs.jsonl")
+        tracker.record("doubao-seed-2.0-pro", 100, 50, "mod_a")
+
+        summary = tracker.get_daily_summary()
+        assert summary["total_calls"] == 1
+
+    def test_daily_summary_uses_local_day_boundary(self, tmp_path):
+        """手写 UTC 跳日时间戳，应归入它对应的**本地**日期而非 UTC 日期。"""
+        costs_file = tmp_path / "costs.jsonl"
+        utc_dt = datetime(2026, 8, 4, 23, 30, tzinfo=timezone.utc)
+        record = {
+            "timestamp": utc_dt.isoformat(),
+            "model": "glm-5.2",
+            "prompt_tokens": 200,
+            "completion_tokens": 100,
+            "total_tokens": 300,
+            "cost_cny": 1.0,
+            "caller_module": "mod_b",
+        }
+        costs_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        tracker = CostTracker(costs_file=costs_file)
+        local_day = utc_dt.astimezone().strftime("%Y-%m-%d")
+        utc_day = utc_dt.strftime("%Y-%m-%d")
+
+        assert tracker.get_daily_summary(local_day)["total_calls"] == 1
+        if local_day != utc_day:
+            assert tracker.get_daily_summary(utc_day)["total_calls"] == 0
+
+    def test_monthly_and_csv_share_local_date_semantics(self, tmp_path):
+        """月报分组与 CSV 导出必须跟日报用同一套日期语义。"""
+        costs_file = tmp_path / "costs.jsonl"
+        utc_dt = datetime(2026, 8, 4, 23, 30, tzinfo=timezone.utc)
+        record = {
+            "timestamp": utc_dt.isoformat(),
+            "model": "glm-5.2",
+            "prompt_tokens": 200,
+            "completion_tokens": 100,
+            "total_tokens": 300,
+            "cost_cny": 1.0,
+            "caller_module": "mod_b",
+        }
+        costs_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        tracker = CostTracker(costs_file=costs_file)
+        local_day = utc_dt.astimezone().strftime("%Y-%m-%d")
+
+        monthly = tracker.get_monthly_summary(local_day[:7])
+        assert monthly["total_calls"] == 1
+        assert local_day in monthly["by_day"]
+
+        csv_path = tmp_path / "export.csv"
+        assert tracker.export_csv(local_day, local_day, str(csv_path)) == 1
 
 
 class TestModelPricing:

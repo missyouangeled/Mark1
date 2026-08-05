@@ -17,6 +17,7 @@ from mark42.cost_tracker import (
     MODEL_PRICING,
     CostRecord,
     CostTracker,
+    _local_date,
     record_cost,
 )
 
@@ -236,10 +237,10 @@ class TestCostTracker:
         tracker.record("model-a", 100, 50)  # 同一天
         tracker.record("model-b", 200, 100)  # 同一天
 
-        # 获取今天的汇总（用 timestamp 中的日期）
-        # 先读取实际的日期
+        # 汇总按**本地**日期归属（记录落盘为 UTC），
+        # 这里必须用本地日期查询，不能直接切 UTC 时间戳前缀。
         records = tracker._load_all()
-        today = records[0]["timestamp"][:10]
+        today = _local_date(records[0]["timestamp"])
 
         summary = tracker.get_daily_summary(today)
 

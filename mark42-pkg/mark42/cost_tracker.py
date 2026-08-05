@@ -12,9 +12,6 @@ Mark42 成本追踪模块
 
 from __future__ import annotations
 
-import logging
-
-logger = logging.getLogger(__name__)
 import csv
 import json
 from dataclasses import asdict, dataclass
@@ -39,6 +36,32 @@ MODEL_PRICING = {
     "agnes-image-2.1-flash": {"input": 0.0, "output": 0.02},  # 按次计费
     "default": {"input": 0.004, "output": 0.012},  # 默认用 doubao 价格
 }
+
+
+def _local_date(timestamp: str) -> str:
+    """把记录时间戳换算成**本地**日期 YYYY-MM-DD。
+
+    记录落盘用 UTC（``datetime.now(timezone.utc)``），但汇总查询的默认
+    日期取本地时间。在 UTC+8 下，本地 00:00–08:00 之间写入的记录 UTC
+    日期仍是前一天，直接切片 ``timestamp[:10]`` 会导致
+    ``get_daily_summary()`` 恒为 0（每天早班时段成本报表全空）。
+    这里统一换算成本地日期，保证「今日」= 用户所在时区的今日。
+
+    无法解析或缺失时区的历史记录：裸时间戳按 UTC 解释；彻底解析失败
+    时退回原始前缀，不抛异常（汇总不能因单条脏数据崩掉）。
+    """
+    if not timestamp:
+        return ""
+    raw = timestamp.strip()
+    if raw.endswith(("Z", "z")):
+        raw = raw[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return timestamp[:10]
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone().strftime("%Y-%m-%d")
 
 
 @dataclass
@@ -132,7 +155,9 @@ class CostTracker:
             date = datetime.now().strftime("%Y-%m-%d")
 
         records = self._load_all()
-        day_records = [r for r in records if r["timestamp"][:10] == date]
+        day_records = [
+            r for r in records if _local_date(r.get("timestamp", "")) == date
+        ]
 
         return self._summarize(day_records, f"日报 {date}")
 
@@ -149,14 +174,17 @@ class CostTracker:
             year_month = datetime.now().strftime("%Y-%m")
 
         records = self._load_all()
-        month_records = [r for r in records if r["timestamp"][:7] == year_month]
+        month_records = [
+            r for r in records
+            if _local_date(r.get("timestamp", ""))[:7] == year_month
+        ]
 
         summary = self._summarize(month_records, f"月报 {year_month}")
 
         # 按天分组
         by_day: dict[str, dict] = {}
         for r in month_records:
-            day = r["timestamp"][:10]
+            day = _local_date(r.get("timestamp", ""))
             if day not in by_day:
                 by_day[day] = {"calls": 0, "tokens": 0, "cost": 0.0}
             by_day[day]["calls"] += 1
@@ -195,7 +223,7 @@ class CostTracker:
         records = self._load_all()
         filtered = [
             r for r in records
-            if start_date <= r["timestamp"][:10] <= end_date
+            if start_date <= _local_date(r.get("timestamp", "")) <= end_date
         ]
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
