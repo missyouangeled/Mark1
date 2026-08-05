@@ -57,5 +57,8 @@ openclaw-workspace-state.json
 docs/backup/
 media/Seedream-Images/
 
-# Mark42 dev portal (生成器 + 产物，不入库)
-mark42-pkg/docs/devportal/
+# Mark42 dev portal
+# 【2026-08-05 修正】原规则整目录排除，连生成器脚本一起排在外面。
+# 但生成器和产物性质不同：产物可重建，生成器丢了就重建不了。
+# 现只排除产物，保留 generate*.py 入库。
+mark42-pkg/docs/devportal/*.html
