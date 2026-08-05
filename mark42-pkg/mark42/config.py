@@ -9,6 +9,144 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+# ── 有效配置解析：单一入口 + 来源追踪 (P2-7) ─────────────
+#
+# 背景：配置向导（mark42 init）会把 ``[paths]`` / ``[thresholds]`` /
+# ``[models]`` 写进 ``~/.config/mark42/config.toml``，文档也告诉用户可以改。
+# 但核心模块一直只读环境变量与硬编码常量 —— 形成双轨制：
+# 用户把 TOML 里 warn 改成 11，``load_config()`` 读到的是 11，
+# 而运行时 ``THRESHOLD_WARN`` 仍为 70。向导让用户填的东西全是废的。
+#
+# 职责划分（本次明确）：
+#   TOML  = 用户**期望**配置（可手改，人看的）
+#   环境变量 = 部署/临时覆盖（优先于 TOML，方便 systemd 与测试）
+#   state JSON = 内部**运行状态**（程序写，不当用户配置）
+#
+# 优先级：环境变量 > TOML > 代码默认值。
+
+_CONFIG_SOURCES: dict[str, str] = {}
+
+
+def _read_toml_value(section: str, key: str) -> Any:
+    """读 TOML 单项配置。任何异常都不得影响常量初始化。
+
+    本函数在**模块 import 期**被调用。TOML 写坏、权限不对、
+    甚至 user_config 自己出错，都只能降级到默认值，
+    绝不能让整个包导入失败。
+    """
+    try:
+        # 关键：用 get_user_only 而非 get —— load_config() 会先 merge 包内
+        # 默认模板，"读到值"不等于"用户真的配了这项"，否则会把代码默认值
+        # 误标成 toml: 来源。
+        from .user_config import get_user_only as _toml_get
+
+        return _toml_get(section, key, None)
+    except Exception:
+        logger.debug("读 TOML [%s] %s 失败，降级为默认值", section, key, exc_info=True)
+        return None
+
+
+def _resolve_int(
+    *, env: str, section: str, key: str, default: int, name: str
+) -> int:
+    """解析整型配置：环境变量 > TOML > 默认值，并记录生效来源。"""
+    raw_env = os.environ.get(env)
+    if raw_env is not None and str(raw_env).strip():
+        try:
+            value = int(str(raw_env).strip())
+            _CONFIG_SOURCES[name] = f"env:{env}"
+            return value
+        except (TypeError, ValueError):
+            logger.warning(
+                "环境变量 %s=%r 不是合法整数，忽略并继续回退", env, raw_env
+            )
+
+    toml_value = _read_toml_value(section, key)
+    if toml_value is not None:
+        try:
+            value = int(toml_value)
+            _CONFIG_SOURCES[name] = f"toml:[{section}].{key}"
+            return value
+        except (TypeError, ValueError):
+            logger.warning(
+                "TOML [%s] %s=%r 不是合法整数，忽略并回退默认值",
+                section, key, toml_value,
+            )
+
+    _CONFIG_SOURCES[name] = "default"
+    return default
+
+
+def _resolve_path(
+    *, env: str, section: str, key: str, default: str, name: str
+) -> Path:
+    """解析路径配置：环境变量 > TOML > 默认值，并记录生效来源。"""
+    raw_env = os.environ.get(env)
+    if raw_env is not None and str(raw_env).strip():
+        _CONFIG_SOURCES[name] = f"env:{env}"
+        return Path(str(raw_env)).expanduser()
+
+    toml_value = _read_toml_value(section, key)
+    if isinstance(toml_value, str) and toml_value.strip():
+        _CONFIG_SOURCES[name] = f"toml:[{section}].{key}"
+        return Path(toml_value).expanduser()
+
+    _CONFIG_SOURCES[name] = "default"
+    return Path(default).expanduser()
+
+
+def get_config_source(name: str) -> str:
+    """返回某项有效配置的**生效来源**，例如 ``env:MARK42_CTX_WARN_PCT``、
+    ``toml:[thresholds].warn``、``default``。未知项返回 ``unknown``。"""
+    return _CONFIG_SOURCES.get(name, "unknown")
+
+
+def get_effective_config() -> dict[str, Any]:
+    """返回最终生效的配置快照 + 逐项来源（P2-7 唯一权威入口）。
+
+    用于回答“我改了 TOML 到底生没生效”这类问题：
+    ``values`` 是运行时真正在用的值，``sources`` 说明每项从哪里来。
+    """
+    values = {
+        "paths.workspace": str(WORKSPACE),
+        "paths.scratch": str(SCRATCH),
+        "paths.xdg_state": str(XDG_STATE),
+        "paths.openclaw_config": str(_effective_openclaw_config_path()),
+        "thresholds.warn": THRESHOLD_WARN,
+        "thresholds.alert": THRESHOLD_ALERT,
+        "thresholds.crit": THRESHOLD_CRIT,
+        "thresholds.bytes_per_ktoken": BYTES_PER_KTOKEN,
+    }
+    return {
+        "values": values,
+        "sources": {
+            **{key: get_config_source(key) for key in values},
+            # 路径类中唯一不由本模块解析的项，来源单独推导
+            "paths.openclaw_config": _openclaw_config_source(),
+        },
+    }
+
+
+def _effective_openclaw_config_path() -> Path:
+    """openclaw.json 路径——转发给 P2-16 建的统一解析器，不重复实现。"""
+    try:
+        from .user_config import get_openclaw_config_path
+
+        return get_openclaw_config_path()
+    except Exception:  # pragma: no cover - 防御分支
+        return Path("~/.openclaw/openclaw.json").expanduser()
+
+
+def _openclaw_config_source() -> str:
+    """openclaw.json 路径的生效来源（与 P2-16 解析器的优先级保持一致）。"""
+    if os.environ.get("OPENCLAW_CONFIG", "").strip():
+        return "env:OPENCLAW_CONFIG"
+    toml_value = _read_toml_value("paths", "openclaw_config")
+    if isinstance(toml_value, str) and toml_value.strip():
+        return "toml:[paths].openclaw_config"
+    return "default"
+
 # ── 版本单一来源 ────────────────────────────────────────
 # 【2026-08-03 修复】此前 __init__.py / pyproject.toml / CLI --version / mark42_init()
 # 四处各自硬编码版本号，导致 mark42_init() 写入 2.3.0 而实际安装版本是 2.8.1，
@@ -99,10 +237,11 @@ def _conf_save_json(path: Path, data: dict) -> None:
 # 文档和 systemd unit 都声明了，installer.py / watchdog.py 也在用，
 # 但 config.py 之前完全不读，导致 unit 里的 Environment= 完全无效，
 # 用户以为做了路径隔离实际上没有。现统一优先级：环境变量 > 平台默认。
-WORKSPACE = Path(
-    os.environ.get("MARK42_WORKSPACE")
-    or str(Path(__file__).resolve().parent.parent.parent)
-).expanduser()
+WORKSPACE = _resolve_path(
+    env="MARK42_WORKSPACE", section="paths", key="workspace",
+    default=str(Path(__file__).resolve().parent.parent.parent),
+    name="paths.workspace",
+)
 SCRIPTS = WORKSPACE / "scripts"
 
 # OpenClaw 可执行文件路径（动态查找，不硬编码）
@@ -110,20 +249,31 @@ import shutil as _shutil
 
 OPENCLAW_BIN = _shutil.which("openclaw") or str(Path.home() / ".npm-global" / "bin" / "openclaw")
 
-XDG_STATE = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state")))
+XDG_STATE = _resolve_path(
+    env="XDG_STATE_HOME", section="paths", key="xdg_state",
+    default=str(Path.home() / ".local" / "state"), name="paths.xdg_state",
+)
 # MARK42_STATE_DIR 可直接指定状态目录，优先于 XDG 推导
 MARK42_STATE = Path(
     os.environ.get("MARK42_STATE_DIR") or str(XDG_STATE / "openclaw" / "mark42")
 ).expanduser()
 
 # SCRATCH 路径（7/01 修： env 路由 + 数据盘 fallback）
-# 优先级：MARK42_SCRATCH env > $MARK42_DATA_MOUNT/openclaw/scratch > XDG_STATE fallback
+# 优先级：MARK42_SCRATCH env > TOML [paths].scratch
+#         > $MARK42_DATA_MOUNT/openclaw/scratch > XDG_STATE fallback
 # 避免非点点机器数据盘不存在时 hard-fail
 # 数据盘挂载点：可用 MARK42_DATA_MOUNT env 覆盖（默认 /mnt/data）
 DATA_MOUNT = Path(os.environ.get("MARK42_DATA_MOUNT", "/mnt/data"))
-SCRATCH = Path(os.environ.get("MARK42_SCRATCH", str(DATA_MOUNT / "openclaw" / "scratch")))
-if not SCRATCH.parent.parent.exists():
+# 【P2-7】纳入 TOML [paths].scratch。注意仍要保留数据盘 fallback：
+# 显式指定（env/TOML）的路径按用户意图直接采用，不做存在性回退；
+# 只有走「数据盘默认值」时才在数据盘缺失时回退到 XDG_STATE。
+SCRATCH = _resolve_path(
+    env="MARK42_SCRATCH", section="paths", key="scratch",
+    default=str(DATA_MOUNT / "openclaw" / "scratch"), name="paths.scratch",
+)
+if get_config_source("paths.scratch") == "default" and not SCRATCH.parent.parent.exists():
     SCRATCH = XDG_STATE / "openclaw" / "scratch"
+    _CONFIG_SOURCES["paths.scratch"] = "default:xdg-fallback"
 
 # 数据盘路径（优先 DATA_MOUNT，回退 ~/.local/state）
 DATA_ROOT = DATA_MOUNT / "openclaw" / "mark42"
@@ -156,9 +306,20 @@ MARK42_BROKER_EVENTS = BROKER_DIR / "mark42-events.jsonl"
 # 小窗口 (128K): 用基准值 70/85/95
 # 大窗口 (1M):   更早介入 60/75/90 (context rot 更严重)
 # 通过 get_dynamic_thresholds(context_window) 动态计算
-THRESHOLD_WARN = int(os.environ.get("MARK42_CTX_WARN_PCT", "70"))
-THRESHOLD_ALERT = int(os.environ.get("MARK42_CTX_ALERT_PCT", "85"))
-THRESHOLD_CRIT = int(os.environ.get("MARK42_CTX_CRIT_PCT", "95"))
+# 【P2-7】改走 _resolve_int：环境变量 > TOML [thresholds] > 代码默认值。
+# 原实现只读环境变量，用户改 TOML 完全无效。
+THRESHOLD_WARN = _resolve_int(
+    env="MARK42_CTX_WARN_PCT", section="thresholds", key="warn",
+    default=70, name="thresholds.warn",
+)
+THRESHOLD_ALERT = _resolve_int(
+    env="MARK42_CTX_ALERT_PCT", section="thresholds", key="alert",
+    default=85, name="thresholds.alert",
+)
+THRESHOLD_CRIT = _resolve_int(
+    env="MARK42_CTX_CRIT_PCT", section="thresholds", key="crit",
+    default=95, name="thresholds.crit",
+)
 
 # 动态阈值计算参数
 # Anthropic 研究表明 context rot 在大窗口下更严重，应更早介入
@@ -204,7 +365,10 @@ def get_dynamic_thresholds(context_window: int) -> tuple[int, int, int]:
         # 小窗口：用基准值
         return THRESHOLD_WARN, THRESHOLD_ALERT, THRESHOLD_CRIT
 
-BYTES_PER_KTOKEN = int(os.environ.get("MARK42_CTX_BYTES_PER_KTOKEN", str(2 * 1024)))
+BYTES_PER_KTOKEN = _resolve_int(
+    env="MARK42_CTX_BYTES_PER_KTOKEN", section="thresholds",
+    key="bytes_per_ktoken", default=2 * 1024, name="thresholds.bytes_per_ktoken",
+)
 DEFAULT_CONTEXT_WINDOW = 131072
 
 BROKER_SOURCE = "mark42"
@@ -451,9 +615,33 @@ def mark42_init() -> None:
     print(f"   阈值: WARN={THRESHOLD_WARN}% ALERT={THRESHOLD_ALERT}% CRIT={THRESHOLD_CRIT}%")
     print("   使用 'mark42 --config' 查看/修改")
 
+def print_effective_config() -> None:
+    """打印**运行时真正生效**的配置及其来源（P2-7）。
+
+    这一段回答的是"我改了 TOML 到底生没生效"。
+    下方 state JSON 段落展示的是内部运行状态，两者职责不同，不要混看。
+    """
+    eff = get_effective_config()
+    print("\n   生效配置（含来源追踪）:")
+    print("     " + "-" * 62)
+    for key, value in eff["values"].items():
+        source = eff["sources"].get(key, "unknown")
+        print(f"     {key:<32} {str(value):<22} <- {source}")
+    print("     " + "-" * 62)
+    print("     来源优先级: env 环境变量 > toml 用户配置 > default 代码默认值")
+    try:
+        from .user_config import get_config_path as _toml_path
+
+        print(f"     用户 TOML 路径: {_toml_path()}")
+    except Exception:  # pragma: no cover - 防御分支
+        logger.debug("无法解析用户 TOML 路径，跳过该行显示", exc_info=True)
+
+
 def mark42_config() -> None:
     if not CONFIG_PATH.exists():
         print("❌ 尚未初始化，请先运行: mark42.py --init")
+        print("（下面仍显示当前生效配置，便于排查 TOML 是否被读取）")
+        print_effective_config()
         return
     cfg = _load_config()
     print("⚙️ Mark42 配置:\n")
@@ -481,3 +669,7 @@ def mark42_config() -> None:
     print("\n   重型战甲:")
     print(f"     大工程检测: {'启用' if h.get('autoDetectEnabled') else '关闭'}")
     print(f"     检测模式: {h.get('autoDetect', 'ask')} (ask=询问/semi=半自动30s/full=全自动)")
+
+    # 【P2-7】上面是内部运行状态(state JSON)，下面是真正生效的用户配置。
+    # 明确区分二者，避免用户以为改了 TOML 就等于改了运行时。
+    print_effective_config()

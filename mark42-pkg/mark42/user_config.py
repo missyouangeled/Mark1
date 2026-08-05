@@ -165,6 +165,7 @@ def get_openclaw_config_path() -> Path:
 # ── 配置加载 ──────────────────────────────────────────────
 
 _cache: dict[str, Any] | None = None
+_user_only_cache: dict[str, Any] | None = None
 
 
 def load_config(force_reload: bool = False) -> dict[str, Any]:
@@ -202,6 +203,37 @@ def load_config(force_reload: bool = False) -> dict[str, Any]:
 
     _cache = config
     return config
+
+
+def load_user_only_config(force_reload: bool = False) -> dict[str, Any]:
+    """只加载**用户自己写的** TOML，不合并包内默认模板。
+
+    ``load_config()`` 会先 merge 包内 ``templates/config.toml``，因此
+    “能读到值”并不等于“用户真的配了这一项”。做来源追踪（P2-7）
+    时必须区分二者，否则会把代码默认值误标为 ``toml:``。
+    """
+    global _user_only_cache
+    if _user_only_cache is not None and not force_reload:
+        return _user_only_cache
+
+    user_path = get_config_path()
+    config: dict[str, Any] = {}
+    if user_path.exists():
+        try:
+            config = _parse_toml(user_path.read_text(encoding="utf-8"))
+        except Exception:
+            import logging
+
+            logging.debug("用户配置解析失败，视为未配置", exc_info=True)
+            config = {}
+
+    _user_only_cache = config
+    return config
+
+
+def get_user_only(section: str, key: str, default: Any = None) -> Any:
+    """只从用户 TOML 取值（不回退包内模板）。用于来源追踪。"""
+    return load_user_only_config().get(section, {}).get(key, default)
 
 
 def _deep_merge(base: dict, override: dict) -> None:
@@ -253,7 +285,8 @@ def init_user_config(force: bool = False) -> Path:
 
 
 def reload() -> dict[str, Any]:
-    """强制重新加载配置。"""
+    """强制重新加载配置（含 user-only 缓存）。"""
+    load_user_only_config(force_reload=True)
     return load_config(force_reload=True)
 
 
