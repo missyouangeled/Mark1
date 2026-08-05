@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 import sys
 from typing import Any, TypedDict
 
-from ..output_guard import trim_detail, trim_summary
+from ..output_guard import trim_summary
 
 
 def _get_version() -> str:
@@ -429,203 +429,29 @@ def assemble() -> None:
         _shutdown(None, None)
 
 
-def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | None:
-    """一屏聚合 Armor/Engine/Heavy/Logs 状态。
-    json_mode=True 返回 dict，不打印。
+def status_dashboard(
+    json_mode: bool = False, verbose: bool = False
+) -> dict[str, Any] | None:
+    """一屏聚合系统状态 —— 委托给 cli/status.py 的模块化实现。
+
+    【2026-08-05 合并】此处原有一份 199 行的单体实现，与
+    ``mark42/cli/status.py`` 中的模块化版本（采集 / 文本 / JSON 三段分离）
+    **长期并存**。两份实现完全独立，任何 status 相关改动都必须两处同步，
+    否则会出现"直接调函数能看到效果、走 CLI 看不到"的诡异现象 ——
+    本次系统审查修"幽灵任务"标注时确实被此绕了一圈。
+
+    合并前已严格比对两份实现的输出（不允许改变行为）：
+      - JSON 模式 9 个共有字段值**完全一致**
+      - status.py 版额外提供 telemetry 字段（旧单体缺失该能力）
+      - 文本模式非空输出行数相同（均 23 行）
+    即 status.py 版是旧实现的严格超集，故保留它、删除单体版。
+
+    保留本函数作为薄委托层，避免破坏既有导入
+    （actions_runner 等模块 from .cli import status_dashboard）。
     """
-    from datetime import datetime
+    from .status import status_dashboard as _impl
 
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # ── Armor ──
-    from ..armor import armor_check
-    from ..config import (
-        ARMOR_STATE,
-        ENGINE_STATE,
-        HEAVY_STATE,
-        MARK42_BROKER_EVENTS,
-        SCRATCH,
-        THRESHOLD_ALERT,
-        THRESHOLD_WARN,
-    )
-    from ..utils import _load_json
-
-    check = armor_check()
-    usage = check.get("usagePercent", 0)
-    status_icon = "🟢" if usage < THRESHOLD_WARN else ("🟠" if usage < THRESHOLD_ALERT else "🔴")
-
-    # 版本号
-    # 【2026-08-03 修复】统一走 get_version()，不再读运行时 config.json 里的陈旧值
-    version = _get_version()
-
-    # 记忆索引
-    index_path = ARMOR_STATE / "memory-index.json"
-    idx = None
-    gen_time = None
-    strat = None
-    if index_path.exists():
-        idx = _load_json(index_path)
-        gen_time = idx.get("generatedAt", "?")
-        strat = idx.get("strategyUsed", "?")
-
-    # ── Engine ──
-    loops = _load_json(ENGINE_STATE / "loops.json")
-    active = sum(1 for lp in loops.values() if lp.get("status") in ("registered", "running"))
-    total = len(loops)
-
-    # ── Heavy ──
-    heavy_tasks = list(HEAVY_STATE.glob("*.json"))
-    # 【2026-08-05 审查修复】识别"幽灵任务"：状态文件说 started 但
-    # 对应 scratch 工作目录已不存在。status 若只读状态文件就报 started，
-    # 会与 heavy --finish（按当前 SCRATCH 查找）的判定相互矛盾。
-    # 注意：cli/status.py 里有一份同名实现，两处必须同步修（本次审查
-    # 发现 status_dashboard 存在重复实现，已记入报告待后续合并）。
-    heavy_orphan_names = set()
-    for _tf in heavy_tasks:
-        _ts = _load_json(_tf)
-        if _ts.get("status") == "started":
-            _n = _ts.get("taskName")
-            if isinstance(_n, str) and _n and not (SCRATCH / _n).exists():
-                heavy_orphan_names.add(_n)
-
-    # ── Logs ──
-    from ..logs import _load_state as _logs_state
-    ls = _logs_state()
-    last_rot = ls.get("lastRotation", "从未")
-    count = ls.get("rotationCount", 0)
-
-    # broker 事件
-    broker_lines = 0
-    broker_size = 0
-    if MARK42_BROKER_EVENTS.exists():
-        broker_size = MARK42_BROKER_EVENTS.stat().st_size
-        broker_lines = sum(1 for _ in open(MARK42_BROKER_EVENTS))
-
-    # scratch
-    dirs = []
-    kept = 0
-    if SCRATCH.exists():
-        dirs = [d for d in SCRATCH.iterdir() if d.is_dir()]
-        kept = sum(1 for d in dirs if (d / ".keep").exists())
-
-    # ── 人类可读输出 ──
-    if not json_mode:
-        print("\n" + "="*56)
-        print("  🦾 Mark42 系统状态")
-        print("="*56)
-        print(f"  检查时间: {now_str}\n")
-        print("  🛡️ 上下文铠甲")
-        print(f"     {status_icon} {usage}% ({trim_summary(check.get('summary', ''), 100)})")
-        if idx:
-            print(f"     🧠 索引: {strat} ({gen_time[:16] if gen_time else '?'})")
-        else:
-            print("     🧠 索引: 无")
-        print("\n  🔄 循环引擎")
-        print(f"     Loop: {active} 活跃 / {total} 注册")
-        if loops:
-            for name, loop in sorted(loops.items()):
-                cyc = loop.get("cycle", 0)
-                max_c = loop.get("maxCycles")
-                stat = loop.get("status")
-                icon = "▶️" if stat == "running" else ("⏸️" if stat == "registered" else "⏹")
-                print(f"     {icon} {name}: {stat} (cycle {cyc}/{max_c or '∞'})")
-                if verbose and loop.get("task"):
-                    print(f"        task: {trim_detail(loop.get('task'), 160)}")
-        print("\n  ⚙️ 重型战甲")
-        if heavy_tasks:
-            for tf in sorted(heavy_tasks):
-                ts = _load_json(tf)
-                name = ts.get("taskName", "?")
-                stat = ts.get("status", "?")
-                tsum = ts.get("summary", "")
-                icon = "🔄" if stat == "started" else ("✅" if stat == "finished" else "⏳")
-                if name in heavy_orphan_names:
-                    icon = "⚠️"
-                    stat = f"{stat}（工作目录已不存在，疑似残留状态）"
-                print(f"     {icon} {name}: {stat} — {trim_summary(tsum, 100)}")
-                if verbose and ts.get("checkedAt"):
-                    print(f"        checkedAt: {ts.get('checkedAt')}")
-        else:
-            print("     ℹ️ 无活跃任务")
-        print("\n  🧹 日志轮替")
-        print(f"     上次: {last_rot} (累计 {count} 次)")
-        if MARK42_BROKER_EVENTS.exists():
-            print(f"     Mark42 Broker: {broker_size/1024:.1f}KB ({broker_lines} 行)")
-        if SCRATCH.exists():
-            print(f"     Scratch: {len(dirs)} 目录 ({kept} 受保护)")
-        print("\n  ── 快速操作 ──")
-        if usage >= THRESHOLD_WARN:
-            print("     ⚠️ 上下文偏高 → 建议: /compact")
-        if active == 0:
-            print("     💡 引擎空闲 → 注册: engine --start")
-        print("="*56 + "\n")
-
-    # ── 构建 JSON 输出数据 ──
-    status_data: dict[str, Any] = {
-        "checkedAt": now_str,
-        "version": version,
-        "armor": {
-            "usagePercent": usage,
-            "status": check.get("status", "?"),
-            "severity": check.get("severity", "?"),
-            "summary": check.get("summary", ""),
-            "contextWindow": check.get("contextWindow", 0),
-            "estimatedTokens": check.get("estimatedTokens", 0),
-            "memoryIndex": {
-                "strategy": idx.get("strategyUsed", "?") if idx else "none",
-                "generatedAt": idx.get("generatedAt") if idx else None,
-                "modelGenerated": idx.get("modelGenerated", False) if idx else False,
-            } if idx else None,
-        },
-        "engine": {
-            "activeLoops": active,
-            "totalLoops": total,
-            "loops": {
-                name: {
-                    "status": loop.get("status"),
-                    "template": loop.get("template"),
-                    "cycle": loop.get("cycle", 0),
-                    "maxCycles": loop.get("maxCycles"),
-                    "task": loop.get("task"),
-                    "lastRun": loop.get("lastRun"),
-                }
-                for name, loop in loops.items()
-            },
-        },
-        "heavy": {
-            "activeTasks": [
-                {
-                    "name": ts.get("taskName"),
-                    "status": ts.get("status"),
-                    "summary": ts.get("summary"),
-                }
-                for tf in heavy_tasks for ts in [_load_json(tf)]
-            ],
-        },
-        "logs": {
-            "lastRotation": last_rot,
-            "rotationCount": count,
-        },
-        "broker": {
-            "mark42Events": broker_lines if MARK42_BROKER_EVENTS.exists() else 0,
-            "mark42SizeKB": round(broker_size / 1024, 1) if MARK42_BROKER_EVENTS.exists() else 0,
-        },
-        "scratch": {
-            "totalDirs": len(dirs) if SCRATCH.exists() else 0,
-            "keptDirs": kept if SCRATCH.exists() else 0,
-        },
-        "actions": [],
-    }
-    # 快速操作建议
-    if usage >= THRESHOLD_WARN:
-        status_data["actions"].append("建议 /compact")
-    if active == 0:
-        status_data["actions"].append("引擎空闲，建议注册 Loop")
-
-    if json_mode:
-        return status_data
-
-    return None
+    return _impl(json_mode=json_mode, verbose=verbose)
 
 
 def _print_metrics() -> None:
