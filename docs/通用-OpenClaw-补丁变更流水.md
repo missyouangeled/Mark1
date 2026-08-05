@@ -2147,3 +2147,34 @@
 - ruff 0 报错; 1811 passed / 28 skipped (基线 1768 + 新增 43); mark42 status 正常; 版本四方一致 2.8.2; engine-daemon + armor-guard 重构后仍 active
 - 相关文件：
 - [未记录文件]
+
+## 2026-08-05 08:05:00 CST (+08:00) — Mark42: 成本汇总时区归属 bug 修复（早班日报恒为 0）
+
+- 类型：fix (P1 级数据正确性)
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg/mark42/cost_tracker.py
+- 补丁注册表：未更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+- 结果摘要：
+- 昨日审查工作（P1-1 完成后）跑全量测试暴露一个此前未被发现的真 bug：`record()` 用 `datetime.now(timezone.utc)` 落盘时间戳，而 `get_daily_summary()` 默认日期取本地 `datetime.now()`，却用 `timestamp[:10]` 直接比对。UTC+8 下本地 00:00–08:00 写入的记录 UTC 日期仍为前一天，导致**每天早班时段查今日成本恒为 0**；月报 `by_day` 分组与 `export_csv` 日期区间同源同坑（错分到前一天）。
+- 新增 `_local_date()` 统一把落盘时间戳换算为本地日期，兼容 `Z` 结尾 / 显式 offset / 裸时间戳（按 UTC 解释），脏数据退回原始前缀且不抛异常（单条脏数据不能让整份汇总崩掉）。日报/月报/by_day/CSV 四处共用同一套日期语义。
+- 顺手清理文件顶部重复的 `logging.getLogger` 覆盖（下方 `get_logger` 才是实际生效的）。
+- 修正 `test_cost_tracker.py::test_get_daily_summary_with_data`：原测试用 `timestamp[:10]` 当查询日期，是照着 bug 的语义写的。
+- 验收 / 验证：
+- ruff 全过；全量 **1915 项收集 0 失败**（76 个测试文件，远超自检清单 45 项底线）
+- 新增 `TestDailySummaryTimezone` 6 项防回归；**已验证有效**：回退 `get_daily_summary` 一行即 3 项转红，恢复转绿
+- 实证复现：手写 UTC `2026-08-04T23:30` 时间戳，修复后查本地 08-05 得 1 条、查 UTC 08-04 得 0 条；旧逻辑等效算法查本地今日得 0（即早班恒为 0 的根因）
+- `python -m mark42 status` rc=0 正常
+- 6 个提交已推送 origin/master（13c07588..5c1bd516）
+- 相关文件：
+- `mark42-pkg/mark42/cost_tracker.py`（修改）
+- `mark42-pkg/tests/test_failure_cost.py`（新增 6 项防回归）
+- `mark42-pkg/tests/test_cost_tracker.py`（修正 1 项错误语义测试）
+
+### 附：08:01:45 Mark42 三服务集体 inactive 事件说明（非故障）
+
+排查结论：**预期行为，无需处理**。`mark42-armor-guard` / `engine-daemon` / `bootstrap` 三个 unit 均配置了 `BindsTo=openclaw-gateway.service`（2026-07-31 P1 加固引入），因此 gateway 重启时会一起停，gateway 起来后再自动拉起。当时 gateway 正在 `draining 2 active task(s)` 走优雅重启（本会话自身触发），08:03:51 gateway active，三服务随即全部 active。系统层 `systemctl is-system-running` 全程 `running`，无关机/挂起动作。
+
+教训：看到多个服务**同一秒**集体 Stopping 时，应先查 unit 之间的 `BindsTo`/`PartOf` 依赖关系，而不是先怀疑崩溃。
