@@ -1,4 +1,58 @@
-# Mark42 更新日志
+## 2026-08-05 #41 - v2.8.2 全量审查 + 修复闭环 + 工程体系硬化
+
+**版本**: v2.8.2
+**提交**: 41 次提交（bef02e2e 及之前全部）
+**文件变更**: 259 文件, +8228/−1540 行
+**门禁终检**: 1975 passed / 25 skipped / 0 failed · mypy 0 issues · ruff All checks passed
+
+### 变更清单
+
+**1. 8-04：armor_compress 重构 + P1 批次修复**
+- armor_compress 三轮拆分：680 行函数拆为 5 子功能 + 常量提模块级，补齐 43 个单测
+- 修复 aware/naive datetime 相减 bug（冷却期检查被 except 吃掉，形同虚设）
+- 版本号 2.8.1 → 2.8.2
+- P1 修复批次（隐私回退/异常真实性/数据完整性/scheduler 安全策略/Loop 事务锁/熔断器单探针/systemd 部署链契约）
+
+**2. 8-05 上午：审查方案 P1/P2/P3 全部清零（24 次提交）**
+- 成本时区 bug（早班日报恒为 0，根因 UTC 落盘 vs 本地查询）
+- P2-15 compact 锁 unlink 竞态（token + inode 双重校验，inode 会复用）
+- P2-16 openclaw.json 路径硬编码（模块级常量固化，OPENCLAW_CONFIG 向导全部无效）
+- P1-5 context-safety apply 先校验后替换（发现 flock() 不可重入，差点锁死）
+- P2-6 并发整份覆盖（已有正确原语但没人用，统一走 patch_openclaw_config）
+- P2-7 TOML 双轨制（建 get_effective_config + 来源追踪）
+- P3-3 原子写故障注入修复（os.kill 写在写函数调用之前，旧测试从未验证原子性）
+- P3-5 静默异常 6 处（其中两处静默削弱系统能力）
+- P3-6 未来 schema 降级（新版配置被旧版程序读一次就永久降级）
+- **mypy 174→0 分五轮，捞出 8 个真 bug**（详见 CHANGELOG）
+- CI 门禁：GitHub Actions 8 步 + pre-commit hook，含禁止 cast/type:ignore 伪清零守卫
+
+**3. 8-05 中午：全系统审查 + 3 项真实缺陷修复**
+- 审查结论：0 项假死（cycle 真在推进，四 Loop 无一超周期 3 倍）
+- consciousness revalidate 谎报成功（0/10 全败但 rc=0，model.yaml 指向被退出的 agnes 旧域名）
+- --config 显示上下文窗口 0K 与 armor --check 报 1000000 自相矛盾——修复
+- 幽灵任务（scratchPath 只写不读）
+- 合并 status_dashboard 双重实现
+- 僵尸日志陷阱归档 + 加 README
+
+**4. 8-05 下午：修复_ save_json 静默丢盘**
+- _save_json 入口强制 str→Path 归一化
+- 调用方传 str 时静默吞 AttributeError，08-05 09:24 真实发生两次数据丢盘
+- 防回归 3 项，回退验证有效
+
+**5. 工程体系硬化**
+- 三元门禁：ruff 零告警 · mypy 零错误 · 全量测试零失败
+- 元守卫：禁止 cast/type:ignore 伪清零 · 测试文件数下限
+- 40 份游离文档（18161 行）从桌面目录抢救入库
+- dev-portal 生成器脚本纳入版本控制
+
+### 验证结果
+- 全量 1975 项测试 0 失败（新增 3 项 str→Path 防回归）
+- ruff All checks passed；mypy 0 issues（74 源码文件）
+- 5 条关键 CLI 全 rc=0；armor-guard / engine-daemon 均 active
+- CHANGELOG 已更新到 2.8.2
+
+---
+
 
 > 每次代码/功能变动后追加一条，按日期倒序。
 > 格式：日期 → 版本 → 标题 → 变更清单 → 验证结果。

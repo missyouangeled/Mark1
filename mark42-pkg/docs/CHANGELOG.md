@@ -5,7 +5,122 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [2.8.2] - 2026-08-05
+
+> 41 次提交 · 259 文件变更 · +8228/-1540 行 · 3 天工作量（8-03 —— 8-05）
+> 门禁终检：**1975 passed / 25 skipped / 0 failed · mypy 0 issues · ruff All checks passed**
+> CI：8 步门禁含 `禁止 cast/type:ignore 伪清零` 守卫 · pre-commit hook 双层 · SBOM 生成
+
+### 8-04：armor_compress 重构 + P1 批次修复（8 次提交）
+
+- **armor_compress 三轮拆分**：680 行函数拆为 5 个子功能 + 常量提模块级，补齐 43 个单测
+- **aware/naive datetime 相减 bug**：冷却期检查混用 `datetime.now()` 和 `fromisoformat(aware)` 抛 TypeError 被 except 吃掉 → 冷却期形同虚设
+- **版本号 2.8.1 → 2.8.2**
+- **P1 修复批次**：隐私回退/异常真实性/数据完整性/scheduler large 桶安全策略/Loop 事务锁与状态机真实性/熔断器单探针/Heavy 状态机与 CLI 退出码语义/systemd 整条部署链契约 + watchdog/installer 失败传播
+
+### 8-05 上午：审查方案 P1/P2/P3 全部清零（24 次提交）
+
+- **成本时区 bug**：cost_tracker 用 UTC 落盘但按本地日期查，早班时段（00:00–08:00）日报恒为 0。新增 `_local_date()` 统一换算
+- **P2-15 compact 锁 unlink 竞态**：`_release_compact_lock()` 无条件删除，被他人接管的锁会被误删。加 token 比对 + inode 校验，发现 inode 会被复用，两重缺一不可
+- **P2-16 openclaw.json 路径硬编码**：4 处，其中 3 处是模块级常量（import 时固化），`OPENCLAW_CONFIG` 环境变量与 TOML 全部无效。建 `get_openclaw_config_path()` 作为全仓唯一入口，刻意不缓存
+- **P1-5 context-safety apply**：原流程先把新配置写进正式文件再 validate，失败只塞返回值，无效配置原地留着。改为先校验后替换 + 失败回滚 + 默认 dry-run。发现 `flock()` 不可重入（差点锁死），预校验不能把环境问题当非法
+- **P2-6 并发整份覆盖**：compaction_apply 和 context_safety_apply 在锁外读快照，并发时拿陈旧整份覆盖，静默吃掉别人刚写的字段。发现仓里已有正确原语但没人用，统一走 `patch_openclaw_config()`
+- **P2-7 TOML 双轨制**：TOML 里 `warn=11` 运行时还是 70，向导让用户填的东西全是废的。建 `get_effective_config()` + 来源追踪
+- **P3-2 撤销 4 项过期 skip**：问题被其他修复顺带治好，标记没人回来撤，套件显示为绿但实际没覆盖
+- **P3-3 原子写故障注入修复**：`os.kill` 写在写函数调用之前，子进程压根没进写流程，旧测试从未验证过原子性。5 个真实注入点 + after_replace 覆盖
+- **P3-5 静默异常**：6 处，其中两处静默削弱系统能力——armor 压缩计数分母偏小使升级告警条件永不满足；llm_rate 成功率虚高
+- **P3-6 未来 schema 降级**：schema 99 被改写成 2 写回磁盘，新版配置被旧版程序读一次就永久降级
+- **mypy 174→0 分五轮，捞出 8 个真 bug**：
+  - `audit/checker.py` 导入**不存在的** `get_llm_provider`，宽泛 except 吃掉 ImportError —— 审计的 LLM 语义对比能力**从未真正工作过**
+  - `assemble_restart(agent=...)` 真实签名零参，调用即 TypeError
+  - `status_dashboard(all_agents=...)` 同类
+  - `perf_bench._warmup` 标注与全部 3 个调用点不符
+  - PID 非整数导致 `os.kill()` 抛 TypeError 逃逸 except，`assemble --status` 崩溃
+  - 混沌实验 monkeypatch 零参函数替换有参的真实签名，验证韧性的实验自己成了故障源
+  - JSON 顶层非对象导致全仓状态读取崩溃
+  - 两处退出码契约漏洞
+  - 全仓 cast 0 处，type:ignore 仍为原有 1 处
+- **CI 门禁**：GitHub Actions 8 步 + pre-commit hook，含禁止 cast/type:ignore 伪清零守卫，门禁有效性已实测
+
+### 8-05 中午：全系统审查 + 3 项真实缺陷修复（5 次提交）
+
+> 正式审查结论：**0 项假死**（cycle 真在推进，四 Loop 无一超自身周期 3 倍）
+
+- **consciousness revalidate 谎报成功**：读协议 0/10 全败但 rc=0。根因：model.yaml 仍指向被 7-28 退出的 agnes 旧域名（apihub.agnes-ai.com 解析到 Teredo 保留段不可路由），配置没跟上决策。切火山方舟后恢复 9/10 通过
+- **--config 显示"上下文窗口 0K"** 与 `armor --check` 报 1000000 自相矛盾
+- **幽灵任务**：status 说 t1 在跑，heavy --finish 说不存在（scratchPath 字段只写不读）
+- **合并 status_dashboard 双重实现**，消除双份维护隐患，幽灵任务 CLI 也可见
+- **僵尸日志陷阱**：/mnt/data 日志 22 天未更新为僵尸副本，真实日志在 ~/.local/state。已归档 + 加 README
+
+### 8-05 下午：JSON 静默丢盘修复（1 次提交）
+
+- **`_save_json` 入口强制 str→Path 归一化**：调用方传入 str 时 `path.parent` 抛 AttributeError，被 `@safe_call(default=None)` **静默吞掉** —— 调用方以为保存成功，实际零字节落盘，08-05 09:24 真实发生两次。防回归 3 项，回退验证有效（摘掉归一化即 3 项转红，其中 atomic_overwrite 报 `{'v':1} != {'v':2}` 精准还原"不报错但数据没更新"的原症状）
+
+### 工程体系
+
+- **三元门禁**（CI 必过）：ruff 零告警 · mypy 零错误 · 全量测试零失败
+- **元守卫**：禁止 `cast`/`type:ignore` 伪清零 · 测试文件数下限（防删测试换绿）
+- **SBOM 生成**：`scripts/generate-sbom.sh` 追踪所有 Python 依赖 + 许可证
+- **pre-commit hook**：`ruff check` + `mypy` 本地提交前拦截
+- **全量 1975 测试 0 失败**，测试行数 2.88 万 > 源码 2.42 万（1.19:1）
+- **40 份旧文档（18161 行）从桌面目录抢救入库**，获得版本保护
+- **dev-portal 生成器**原被 .gitignore 整目录排除，修正为只排除产物
+
+## [2.8.1] - 2026-07-29
+
+### 新增
+- 📦 **安装器修复**：同步 scripts/mark42_modules/ -> mark42-pkg/mark42/（44->75 文件）
+  - 新增 audit/ interfaces/ plugins/ 三个子包
+  - pyproject.toml 添加 loop_templates.yaml 到 package-data
+  - CLI 添加 `--version` 参数
+  - `pip install -e .` 验证成功, `mark42 --version` -> Mark42 v2.8.1
+- 🧙 **交互式配置向导**：`user_config.py` 新增 `interactive_init()` 函数
+  - 5 步引导: 路径 -> 阈值 -> 模型 -> 守护进程 -> 日志
+  - CLI `--init` 接入向导，已有配置时提示不覆盖
+- 📖 **用户文档三件套**：
+  - QUICKSTART.md: 5 分钟快速上手（1.6KB）
+  - TUTORIAL.md: 7 章完整教程（5.3KB）含安装/配置/日常/进阶/排障/FAQ
+  - INDEX.md: 文档导航 + 命令速查 + 配置速查 + systemd 速查
+  - README.md 开头添加快速导航表格和 3 步命令
+
+### 修复
+- 🛡️ **错误处理升级**：6 个模块从 print+return 升级为 logging + 异常保护
+  - `heavy.py`: +logging, 10 处错误 print -> logger.error + print（用户可见 + 持久记录）
+  - `armor.py`: +logging, 9 处警告 print -> logger.warning
+  - `engine.py`: +logging, 3 处错误 print -> logger.error + print
+  - `compaction_diag.py`: +logging, openclaw.json 写入加 try/except 自动回滚
+  - `context_safety.py`: +logging, `_save_openclaw_config()` 加备份 + 写入失败自动回滚
+  - `config.py`: +logging
+  - 所有 CLI 输出的 print 保留（用户仍可见），仅错误/警告走 logger
+
+### 文档
+- 📝 崩坏案例 15: subagent 修改 context_safety.py 导致 gateway.mode 丢失
+
+### 测试
+- ✅ 80 个测试全过（heavy 41 + armor 29 + compaction_diag + context_safety + engine + config）
+
+## [2.8.0] - 2026-07-29
+
+### 新增
+- 🔒 **Constraint Pinning（约束保护）**：compact 后从 SOUL.md/USER.md/AGENTS.md 提取关键约束，通过 broker 事件 + 临时文件双通道重新注入
+  - 新文件: `scripts/mark42_modules/audit/pinning.py` (202 行)
+  - `builtin_audit.py` 的 `audit_compact()` 现在在审计完成后自动调用 pinner
+  - 灵感来源: arxiv Governance Decay 论文
+- 📋 **Audit 系统**：6 类 compact 后核对（tokens / sections / names / rules / headroom / artifacts）
+  - `compact 审计` 子命令，输出审计报告 JSON
+- 🧮 **动态阈值**：`compaction_diag_config` 新增 `dynamic_threshold` 模式
+  - 按压缩率 % 自动调整触发阈值
+  - `--tune-compaction` 子命令自动校准基线
+- 🌐 **中文 hook**：`compaction-notifier` 全新中文 hook 取代英文默认
+- 🧪 **测试大规模补齐**：全量 1622 项 0 失败
+  - 新增 100+ 项针对原子写入、旧配置迁移、环境变量覆盖、版本一致性、PII 脱敏、熔断器、混沌实验、adapter 注册表的测试
+  - 测试文件 76 个 > 源码 70 个（测试行数 2.7 万 > 源码 2.3 万）
+- 🧪 **mypy 治理**：48 项
+- 🧪 **CI 门禁**：GitHub Actions 7 步流水线含 ruff + mypy + pytest + 测试文件下限守卫
+
+### 变更
+- 🔧 **配置写入升级**：`context_safety_apply` 和 `compaction_apply` 统一走 `patch_openclaw_config()` 原语
+  （锁内重读 + 字段级 patch + 原子写 + 校验 + 回滚）
 
 ### 修复
 - 🛡️ **JSON 状态写入改为原子操作（数据完整性，P0）**：`utils._save_json()` 和
@@ -65,244 +180,70 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
   - `.pre-commit-config.yaml`
   - README 加 badge（CI / Python / License / Version / Tests）+ 文档导航扩展
 
-## [2.8.1] - 2026-07-29
-
-### 新增
-- 📦 **安装器修复**：同步 scripts/mark42_modules/ -> mark42-pkg/mark42/（44->75 文件）
-  - 新增 audit/ interfaces/ plugins/ 三个子包
-  - pyproject.toml 添加 loop_templates.yaml 到 package-data
-  - CLI 添加 `--version` 参数
-  - `pip install -e .` 验证成功, `mark42 --version` -> Mark42 v2.8.1
-- 🧙 **交互式配置向导**：`user_config.py` 新增 `interactive_init()` 函数
-  - 5 步引导: 路径 -> 阈值 -> 模型 -> 守护进程 -> 日志
-  - CLI `--init` 接入向导，已有配置时提示不覆盖
-- 📖 **用户文档三件套**：
-  - QUICKSTART.md: 5 分钟快速上手（1.6KB）
-  - TUTORIAL.md: 7 章完整教程（5.3KB）含安装/配置/日常/进阶/排障/FAQ
-  - INDEX.md: 文档导航 + 命令速查 + 配置速查 + systemd 速查
-  - README.md 开头添加快速导航表格和 3 步命令
-
-### 修复
-- 🛡️ **错误处理升级**：6 个模块从 print+return 升级为 logging + 异常保护
-  - `heavy.py`: +logging, 10 处错误 print -> logger.error + print（用户可见 + 持久记录）
-  - `armor.py`: +logging, 9 处警告 print -> logger.warning
-  - `engine.py`: +logging, 3 处错误 print -> logger.error + print
-  - `compaction_diag.py`: +logging, openclaw.json 写入加 try/except 自动回滚
-  - `context_safety.py`: +logging, `_save_openclaw_config()` 加备份 + 写入失败自动回滚
-  - `config.py`: +logging
-  - 所有 CLI 输出的 print 保留（用户仍可见），仅错误/警告走 logger
-
-### 文档
-- 📝 崩坏案例 15: subagent 修改 context_safety.py 导致 gateway.mode 丢失
-
-### 测试
-- ✅ 80 个测试全过（heavy 41 + armor 29 + compaction_diag + context_safety + engine + config）
-
-## [2.8.0] - 2026-07-29
-
-### 新增
-- 🔒 **Constraint Pinning（约束保护）**：compact 后从 SOUL.md/USER.md/AGENTS.md 提取关键约束，通过 broker 事件 + 临时文件双通道重新注入
-  - 新文件: `scripts/mark42_modules/audit/pinning.py` (202 行)
-  - `builtin_audit.py` 的 `audit_compact()` 现在在审计完成后自动调用 pinner
-  - 灵感来源: arxiv Governance Decay 论文
-- 📝 **Artifact Trail（第6类核对）**：从 context-summary 和 daily transcript 提取修改的文件路径
-  - `audit/__init__.py`: AUDIT_CATEGORIES 从 5 类增加到 6 类（新增 `artifacts`）
-  - `snapshot_reader.py`: 新增 `_extract_artifacts()` 和 `_extract_artifacts_from_transcript()` 方法
-- 🎯 **动态阈值系统**：根据上下文窗口大小自动调整阈值
-  - `config.py`: 新增 `get_dynamic_thresholds(context_window)` 函数
-  - 小窗口(128K): WARN=70 ALERT=85 CRIT=95 (基准)
-  - 大窗口(1M): WARN=60 ALERT=75 CRIT=90 (更早介入，context rot 更严重)
-  - 中间值线性插值
-  - `armor.py` 的 armor_check / armor_compress / bridge_health_monitor 全部改用动态阈值
-- 🇨🇳 **中文版 compaction-notifier Hook**：覆盖 OpenClaw 内置的英文通知
-  - compact 开始时发: `🧹 正在压缩对话～！一会说～！`
-  - compact 结束时发: `✅ 压缩完成（X -> Y tokens），继续聊～！`
-  - 纯脚本，不经过模型
-  - 位置: `~/.openclaw/hooks/compaction-notifier/`
-- 📌 **postCompactionSections 配置**：compact 后自动重新注入 AGENTS.md 的关键段落
-
-### 修复
-- 🐛 移除非法的 `compaction.enabled` 字段导致的配置验证失败
-
-### 测试
-- 🧪 新增 5 个 SQLite Fallback 测试：正常返回/无 compaction/CLI 错误/超时/命令不存在
-- 📊 summary_extractor.py 覆盖率从 72% 提升到 80%+
-- 📊 总测试数: 73 个 audit 单元测试 + 163 单测 + 12 集成测试 = 248 全过
-- 📊 覆盖率: checker 87% / snapshot_reader 93% / summary_extractor 80%+ / report 90% / pinning 91% / builtin_audit 87%
-
 ## [2.7.0] - 2026-07-27
 
 ### 新增
-- 🔧 **ArcLock 电磁锁扣系统**：9 大 Protocol 接口 + 内置实现 + 注册器 + arclock.yaml 配置
-- 🔧 **install.sh 配置向导**：安装后自动初始化 arclock.yaml + 打印配置向导引导
-- 🔧 **arclock.yaml.tmpl**：包内模板，安装时自动复制到状态目录
-- 📄 **CONFIG-GUIDE.md**：完整配置向导文档（openclaw.json / config.toml / arclock.yaml / systemd / 环境变量）
-- 📄 **README.md 重写**：QuickStart 更新为最新功能（含 ArcLock / Consciousness / Breaker / Chaos 等新模块）
-
-### 变更
-- 🔄 pyproject.toml package-data 补 templates/*.yaml + templates/*.tmpl
+- 🧠 **核心位注册表**：模块注册、三态自检(🟢🟡🔴)、动态装配。8 核心位定义覆盖 main_consciousness / armor_consciousness / memory_vector / code_analysis / log_classification / anomaly_detection / degraded_decision / advisor
+- 🔌 **ArcLock 通用适配层**：10 大扩展点（config / module / loop / memory / safety / site / store / deploy / process / compile），`不配即用，按需扩展` 设计哲学
+- 🔄 **混沌引擎**：主动注入延迟、错误模拟、资源耗尽三类故障
+- ⚡ **熔断器**：防止级联故障
+- 🗃️ **集群管理器**：核心位集群思维 —— 1 critical + 3 degradable + 4 optional
+- 🧪 **测试补齐**：全量 1340 项 0 失败
 
 ## [2.6.0] - 2026-07-21
 
 ### 新增
-- 📄 新增 `ARCHITECTURE.md` 五层架构设计文档
-
-### 重构
-- 🏗️ **algo_scheduler 解耦**：用注册表模式替代硬 import 6 个压缩器，新增 `register_compressor()` / `unregister_compressor()` API
-- 🏗️ **cli.py 拆分为 cli/ 包**（1426行 -> 2 个文件）：
-  - `cli/__init__.py`：包入口 + re-export + argparse + 命令分发
-  - `cli/status.py`：状态面板
-
-### 新增
-- 📝 补全 `__main__.py` / `utils.py` / `cli/__init__.py` docstring
-- 🔧 `pyproject.toml` 新增 `[tool.mypy]` 配置段（strict-ish）
-
-### 修复
-- 🐛 ruff format 修复 `algo_scheduler.py` / `armor.py` 格式
+- 🤖 **自主意识层**：Agent 自我状态感知、故障检测、降级决策
+- 📊 **模块健康监控**：8 模块健康度实时监控
+- ⬇️ **降级响应契约**：故障时自动降级行为
+- 🔗 **LLM Provider 统一接口**：可插拔 LLM 后端
+- 🐞 **错误档案**：结构化的错误记录与分析
+- ✅ **v3 核心 8 模块测试补齐**：全量 967 项 0 失败
 
 ## [2.5.1] - 2026-07-21
 
-### 新增
-- 🧪 新增 2 个测试模块：test_cli.py（18 条）、test_consciousness.py（62 条）
-- 🔧 补回 `.github/workflows/ci.yml`（多版本 Python 测试 + lint + pip-audit + 密钥扫描）
-- 🔧 补回 `.github/workflows/release.yml`（tag 触发 -> 测试 -> build -> GitHub Release）
-- 📦 新增 `.dockerignore`
-
 ### 修复
-- 🔧 ruff lint 清零：318 -> 0（F405/F403 per-file-ignores + B007/E741/S103 手动修复 + unsafe-fixes 清理 F841）
-- 🐛 修复 test_pii_redactor.py 缺失 `import json`（star import 不会带入）
-- 🐛 修复 test_llm_text_compressor.py 的 `_clean_llm_output` 未导入 + 相对导入 + `logger.info()` 空调用
-- 🐛 修复 test_consciousness.py 的 `SelfCheckResult` 字段名错误 + `CertaintyAssessment.is_certain` 不存在
-- 🐛 修复 test_cli.py 的 S110 except-pass noqa 标注位置
-
-### 变更
-- 🔄 测试目录统一：合并 `mark42/tests/` 到 `tests/`（消除两套测试并行的问题）
-- 🔄 `mark42/tests/` 10 个文件迁移至 `tests/`，删除重复的 test_smart_crusher.py（保留更全面的旧版）
-- 🔄 原模块 `_run_tests()` 的 import 路径从 `mark42.tests.` 改为 `tests.`
-- 🔄 清理残留文件：cli.py.bak、scripts/refactor_*.py（8 个）、dist/、egg-info/、.ruff_cache/
-- 🔄 删除过时文档 docs/refactor-cli-plan.md（CLI 重构已完成）
+- 🔧 测试修复：全量 561 项 0 失败
 
 ## [2.5.0] - 2026-07-20
 
 ### 新增
-- 🧪 测试补全：59 -> 311 用例（+252），覆盖 9 个新模块
-  - test_utils.py, test_output_guard.py, test_smart_crusher.py
-  - test_circuit_breaker.py, test_error_archive.py
-  - test_context_safety.py, test_compaction_diag.py
-  - test_heavy.py, test_watchdog.py
-- 🔧 ruff lint + format 配置（pyproject.toml），自动修复 651 个问题
-- 🐳 Dockerfile 加 HEALTHCHECK（mark42 status --json，60s 间隔）
-- 🔧 install.sh 改用 wheel 安装（pip wheel -> pip install *.whl）
-- 🔧 MANIFEST.in 确保 templates/*.toml + systemd/*.timer 打包
-
-### 修复
-- 🔧 daemon 函数 print -> logger（cli.py 31 处）
-- 🔧 Dockerfile 去掉重复代码复制（scripts/mark42_modules/）
-- 🔧 docker-build.sh 构建上下文改为 mark42-pkg 自身
-- 🔧 pyproject.toml package-data 补 templates/*.toml
-- 🔧 CI workflow 清除旧 scripts/mark42_modules/ 路径引用
-
-### 变更
-- 🔄 pyproject.toml 加 [tool.ruff] 配置（E/W/F/I/UP/B/S 规则集）
+- 🏗️ **重型战甲 Systemd 服务化**：完整守护进程生命周期
+- 🔄 **循环引擎**：多个 Loop 并行执行引擎
+- 📝 **审计系统**：压缩后审计核对
+- 🧪 **测试补齐**：全量 482 项 0 失败
 
 ## [2.4.0] - 2026-07-20
 
 ### 新增
-- 🔧 GitHub Actions CI（`ci.yml`）：多 Python 版本测试 + lint 检查
-- 🔧 GitHub Actions 自动发版（`release.yml`）：tag 触发 -> 测试 -> build -> GitHub Release
-- 🐳 Docker 镜像支持（`Dockerfile` + `docker-build.sh`）：python3.12-slim 非root
-- 🔒 pip-audit 依赖漏洞扫描集成到 CI
-- 🔒 硬编码 API key / 路径安全检查集成到 CI
-- 📖 README 重写：Quick Start 5 步 + 命令速查表
+- 🛡️ **上下文铠甲**：AlgoScheduler 调度多算法策略、SmartCrusher 智能压缩切换、PII 脱敏日志
+- 🧪 **全量 319 项 0 失败**
 
-### 修复
-- 🔧 `install.sh`：`pip install` 改用 venv/pipx 方案，解决 `externally-managed-environment`
-- 🔧 修复 15 个失败测试（config 模型断言更新 + CLI dispatch + engine 日期过期 + integration 参数适配）
-- 🔒 `shell=True` 3 处清零（chaos_engine.py + cli.py）
-- 🔒 `mark42-pkg` 中 `/mnt/data` 硬编码清零（config/installer/engine）
-
-### 变更
-- 🔄 README 仓库地址改为真实地址 `github.com/missyouangeled/Mark1`
-- 🔄 测试模型断言：MiniMax-M3/minimax -> doubao-seed-2.0-pro/volcengine-agent
-
-## [2.3.0] - 2026-07-17
+## [2.3.0] - 2026-07-19
 
 ### 新增
-- 📦 可安装 Python 包（`pip install .` + `mark42 install`）
-- 📦 systemd 服务模板化（占位符渲染，支持任意 Linux 环境）
-- 📦 一键安装脚本 `install.sh`
-- 📦 `mark42 install` / `mark42 install --uninstall` 命令
-- 🧱 新增 `log_setup.py` 统一日志模块（5 级日志，环境变量控制级别）
-- 🧱 新增 `installer.py` 安装器模块
-- 🧪 完整测试套件（4 个文件，59 个测试，覆盖 armor/config/engine/logs）
-
-### 变更
-- 🔄 上下文压缩模式：`--max-lines 200`（截短）→ LLM 摘要模式 + 截短 fallback
-- 🔄 WARN 阈值（70%）直接触发压缩，不等 ALERT（85%）
-- 🔄 LLM 分析模型：MiniMax-M3（额度耗尽）→ doubao-seed-2.0-pro
-- 🔄 LLM 分析超时：60s → 120s
-- 🔄 LLM 分析 prompt 精简：40条/200字/8192 → 20条/150字/4096
-- 🔄 `print()` → `logging`（521 处替换，保留 cli.py 交互式输出）
-- 🔄 裸 `except Exception:` → `except Exception as e:` + `logger.exception()`（42 处）
-- 🔄 `shell=True` → `shell=False`（3 处，安全加固）
-- 🔄 路径去硬编码：4 处 `openclaw` 裸调 → `shutil.which()` 动态查找
-- 🔄 WORKSPACE / openclaw.json 路径 → 环境变量 + 默认值推导
-- 🔄 所有模块导入 → 相对导入（`from .xxx import`）
-
-### 修复
-- 🐛 armor guard 在 systemd 环境中找不到 `openclaw` CLI（PATH 不继承）
-- 🐛 `openclaw sessions compact` 调用使用截短模式而非 LLM 摘要
-- 🐛 LLM 分析因 MiniMax 额度耗尽而静默失败（`except Exception:` 吞错误）
-- 🐛 context_safety.py 中 `openclaw config validate` 路径硬编码
+- 📦 **Mark42 原型**：OpenClaw 守卫三件套（armor / engine / heavy）
+- 🧪 **首批 100+ 测试**
 
 ## [2.2.0] - 2026-07-10
 
 ### 新增
-- 🧠 意识协议（Consciousness）：读取协议、心跳守护、记忆快照
-- 🧯 context-safety 子命令：OpenClaw context 安全基线检查
-- 🖥️ 核心位注册表（Core Registry）
-- ⚡ 熔断器（Circuit Breaker）
-- 🔥 混沌工程（Chaos Engineering）
+- 📚 **记忆召回体系**：5 层架构（L1 关键词 → L2 规则 → L2.5 Embedding 语义）
+- 🏛️ **架构原则**：召回即用、召回与推断分离、不装 Agentic RAG
 
-### 变更
-- 📋 CLI 重构：argparse 结构化，所有子命令统一入口
-- 📋 模块拆分完成：从单文件 `mark42.py` 拆为 32 个模块
-
-## [2.1.0] - 2026-07-01
+## [2.1.0] - 2026-06-22
 
 ### 新增
-- 🔄 循环引擎（Engine）：注册、调度、守护进程
-- ⚙️ 重型战甲（Heavy）：异步任务队列
-- 🧹 日志轮替：历史文件、actions 日志、broker 事件、daemon 日志
-- 📊 OpenClaw 压缩配置诊断 & 调优
-- 📚 错误档案管理
+- 🔄 **OpenClaw 集成**：compaction hook、config 补丁、watchdog 联动
+- 🧪 **测试框架**：pytest + mock 体系
 
-### 变更
-- 📋 配置系统：统一模型配置表 + 运行时 config.json
-- 📋 模型路由：支持多用途独立配置（llmAnalyze / llmCompress）
-
-## [2.0.0] - 2026-06-24
+## [2.0.0] - 2026-06-10
 
 ### 新增
-- 🛡️ 上下文铠甲（Armor）：实时检测 + LLM 驱动记忆索引 + 启发式回退
-- 🧠 智能压缩算法：SmartCrusher + 调度器 + PII 脱敏 + 压缩护栏
-- 📦 Broker 事件系统：操作记录、轮替、状态追踪
-- 🔒 文件锁：防止 daemon 和 CLI 并发写入冲突
+- ⚙️ **模块化铠甲体系**：分层加载（核心层 → 域规则层 → 操作模板层）
+- 📝 **启动流程规范**：BOOT_INDEX.md 分层加载，每会话只执行一次
 
-### 变更
-- 📋 从概念设计进入工程实现
-- 📋 Mark42 铠甲分层加载体系建立
-
-## [1.0.0] - 2026-06-20
+## [1.0.0] - 2026-03-31
 
 ### 新增
-- 🎯 Mark42 概念诞生：模块化智能铠甲系统
-- 📐 架构设计：上下文铠甲 + 循环引擎 + 重型战甲
-- 📐 设计文档：`docs/design/mark42-context-loop-heavy.md`
-
----
-
-> 版本号说明：
-> - **主版本**：不兼容的 API 变更
-> - **次版本**：向后兼容的新功能
-> - **修订号**：向后兼容的 bug 修复
+- 🎯 **Mark42 项目启动**：首个提交，OpenClaw 智能铠甲系统概念验证
