@@ -5,8 +5,23 @@ from pathlib import Path
 
 WORKSPACE = Path("/home/missyouangeled/.openclaw/workspace")
 PKG = WORKSPACE / "mark42-pkg"
-DESIGN_DOCS = WORKSPACE / "docs" / "design"
-PLAN_DOCS = WORKSPACE / "docs" / "plans"
+# 【2026-08-05 修正】原指向 workspace/docs/（旧位置，只有 22 份）。
+# 40 份文档已于 8-05 纳入 mark42-pkg/docs/ 版本控制，改从项目目录读。
+DESIGN_DOCS = PKG / "docs" / "design"
+PLAN_DOCS = PKG / "docs" / "plans"
+# 版本号从包里读，不再硬编码（原写死 2.8.1，升版后页面不跟进）
+def _read_version() -> str:
+    try:
+        import re as _re
+        txt = (PKG / "mark42" / "__init__.py").read_text(encoding="utf-8")
+        m = _re.search(r'__version__\s*=\s*["\']([^"\']+)', txt)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return "unknown"
+
+VERSION = _read_version()
 OUTPUT = Path("/home/missyouangeled/.openclaw/workspace/mark42-pkg/docs/devportal/mark42-developer-portal.html")
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 
@@ -114,6 +129,8 @@ CATEGORIES = [
         "desc": "基础设施、日志、配置等",
         "modules": [
             ("config.py", "配置", "XDG路径 + 配置初始化", ["test_config.py"]),
+            ("openclaw_config.py", "OpenClaw 配置解析", "openclaw.json 单一路径入口（CLI > env > TOML > 默认）", []),
+            ("telemetry.py", "可观测性", "指标采集与上报", []),
             ("utils.py", "工具函数", "JSON加载、文件锁等", []),
             ("logs.py", "日志管理", "日志轮转", ["test_logs.py"]),
             ("log_setup.py", "日志初始化", "统一日志获取", ["test_log_setup.py"]),
@@ -139,30 +156,48 @@ CATEGORIES = [
 ]
 
 # 全局文档导航
-DOCS_NAV = [
-    ("入门", "mark42-pkg/QUICKSTART.md", "5分钟跑起来"),
-    ("教程", "mark42-pkg/TUTORIAL.md", "从零完整学习"),
-    ("架构", "mark42-pkg/ARCHITECTURE.md", "整体架构"),
-    ("配置", "mark42-pkg/docs/CONFIG-GUIDE.md", "配置详解"),
-    ("迁移", "mark42-pkg/MIGRATION.md", "版本迁移"),
-    ("故障", "mark42-pkg/TROUBLESHOOTING.md", "问题排查"),
-    ("路线", "mark42-pkg/ROADMAP.md", "未来方向"),
-    ("变更", "mark42-pkg/CHANGELOG.md", "更新日志"),
-    ("安全", "mark42-pkg/SECURITY.md", "安全策略"),
-    ("贡献", "mark42-pkg/CONTRIBUTING.md", "贡献指南"),
-    ("设计-v2", "docs/design/mark42-8core-modules-v2.md", "8核模块化设计 v2"),
-    ("设计-架构", "docs/design/mark42-架构设计.md", "Mark42 整体架构"),
-    ("设计-压缩手册", "docs/design/mark42-开发手册-压缩子系统.md", "压缩子系统开发手册(1200+行)"),
-    ("设计-测试手册", "docs/design/mark42-测试手册.md", "测试手册"),
-    ("设计-工程管理", "docs/design/mark42-工程管理方案.md", "工程管理方案"),
-    ("设计-开发经验", "docs/design/mark42-开发经验.md", "20个bug的根因总结"),
-    ("设计-更新日志", "docs/design/mark42-更新日志.md", "设计变更日志"),
-    ("方案-OSv3", "docs/plans/40-Mark42-OS化深化方案-v3.md", "v3 OS 化深化方案"),
-    ("方案-Headroom", "docs/design/mark42-压缩方案借鉴Headroom-20260624.md", "压缩方案借鉴Headroom"),
-    ("报告-全量审查", "docs/design/mark42-全量审查报告-20260729.md", "全量审查报告"),
-    ("报告-发行审计", "docs/design/mark42-发行审计报告-20260720.md", "发行审计报告"),
-    ("报告-性能基准", "docs/design/mark42-性能基准报告-20260720.md", "性能基准报告"),
-]
+# 【2026-08-05 改为自动扫描】原为手工维护的 22 条列表，且路径指向旧位置
+# （40 份文档已于 8-05 迁入 mark42-pkg/docs/，旧路径链接全部失效）。
+# 现改为扫描项目 docs/ 目录，保证门户与真实文档集永不脱节。
+_DOC_LABELS = {
+    "QUICKSTART.md": ("入门", "5分钟跑起来"),
+    "TUTORIAL.md": ("教程", "从零完整学习"),
+    "ARCHITECTURE.md": ("架构", "整体架构"),
+    "CONFIG-GUIDE.md": ("配置", "配置详解"),
+    "MIGRATION.md": ("迁移", "版本迁移"),
+    "TROUBLESHOOTING.md": ("故障", "问题排查"),
+    "ROADMAP.md": ("路线", "未来方向"),
+    "CHANGELOG.md": ("变更", "更新日志"),
+    "SECURITY.md": ("安全", "安全策略"),
+    "CONTRIBUTING.md": ("贡献", "贡献指南"),
+    "INDEX.md": ("索引", "文档导航"),
+    "README.md": ("说明", "项目说明"),
+    "SBOM.md": ("依赖", "软件物料清单"),
+}
+
+def _build_docs_nav():
+    docs_root = PKG / "docs"
+    if not docs_root.is_dir():
+        return []
+    items = []
+    # 顶层文档：用友好标签，未登记的按文件名
+    for f in sorted(docs_root.glob("*.md")):
+        label, desc = _DOC_LABELS.get(f.name, (f.stem, "项目文档"))
+        items.append((label, f"mark42-pkg/docs/{f.name}", desc))
+    # design/ 与 plans/：全量收录，标签带前缀便于分组
+    for sub, prefix in (("design", "设计"), ("plans", "方案")):
+        d = docs_root / sub
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.md")):
+            name = f.stem
+            for junk in ("mark42-", "Mark42-"):
+                if name.startswith(junk):
+                    name = name[len(junk):]
+            items.append((f"{prefix}-{name[:24]}", f"mark42-pkg/docs/{sub}/{f.name}", f.stem))
+    return items
+
+DOCS_NAV = _build_docs_nav()
 
 def file_url(rel_path: str) -> str:
     """生成 file:// 绝对路径 URL"""
@@ -170,7 +205,11 @@ def file_url(rel_path: str) -> str:
     return f"file://{abs_path}"
 
 def render_module_row(src_rel: str, name: str, desc: str, tests: list) -> str:
-    src_abs = PKG / src_rel
+    # 【2026-08-05 修正】原为 PKG / src_rel，拼出 mark42-pkg/armor.py —— 缺了
+    # 中间的 mark42/ 包层（源码 7-29 从 scripts/mark42_modules/ 迁入包内）。
+    # 导致门户里 68 个源码链接全部指向不存在的路径。
+    # 子包路径（如 audit/checker.py）也能正确拼接。
+    src_abs = PKG / "mark42" / src_rel
     src_url = f"file://{src_abs.resolve()}"
     test_links = ""
     if tests:
@@ -209,7 +248,7 @@ html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>Mark42 开发门户 v2.8.1</title>
+<title>Mark42 开发门户 v{VERSION}</title>
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.6; color: #1f2937; background: #f9fafb; }}
@@ -252,7 +291,7 @@ body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif
 <body>
 <div class="header">
   <h1>🛡️ Mark42 开发门户</h1>
-  <div class="meta">模块化智能铠甲系统 · v2.8.1 · {len(CATEGORIES)} 大类 · 共 {sum(len(c["modules"]) for c in CATEGORIES)} 个模块</div>
+  <div class="meta">模块化智能铠甲系统 · v{VERSION} · {len(CATEGORIES)} 大类 · 共 {sum(len(c["modules"]) for c in CATEGORIES)} 个模块</div>
 </div>
 <div class="container">
   <aside class="sidebar">
