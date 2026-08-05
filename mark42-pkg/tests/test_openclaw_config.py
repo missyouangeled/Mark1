@@ -131,34 +131,106 @@ class TestAtomicWrite:
         _atomic_write_json(p, {"a": 2})
         assert (p.stat().st_mode & 0o777) == 0o600
 
-    def test_kill_during_write_keeps_config_valid(self, tmp_path):
-        """故障注入：写入途中 SIGKILL，配置仍必须是完整可解析的 JSON。
+    @pytest.mark.parametrize(
+        "kill_stage",
+        ["after_open", "after_write", "after_flush", "after_fsync", "before_replace"],
+    )
+    def test_kill_at_each_stage_keeps_config_valid(self, tmp_path, kill_stage):
+        """故障注入：在写入流程**各阶段** SIGKILL，配置仍必须完整可解析。
 
         这是 P0-3 最核心的验收点——旧实现在这里会留下半截文件。
+
+        【2026-08-05 修复 P3-3】原实现在 `_atomic_write_json` **调用之前**就
+        `os.kill(os.getpid(), SIGKILL)`，子进程压根没进写函数 ——
+        只证明了"完全没写时旧文件没变"，是同义反复。
+        现改为在临时文件写入、flush、fsync、os.replace 前后分别注入故障。
         """
         p = tmp_path / "openclaw.json"
         _atomic_write_json(p, SAMPLE_CONFIG)
 
         script = f"""
 import os, signal, sys
+from pathlib import Path
 sys.path.insert(0, {PKG_ROOT!r})
 from mark42.openclaw_config import _atomic_write_json
+
+STAGE = {kill_stage!r}
+_die = lambda: os.kill(os.getpid(), signal.SIGKILL)
+
+real_fdopen = os.fdopen
+class Wrapped:
+    def __init__(self, f): self._f = f
+    def write(self, data):
+        n = self._f.write(data)
+        if STAGE == "after_write": _die()
+        return n
+    def flush(self):
+        self._f.flush()
+        if STAGE == "after_flush": _die()
+    def fileno(self): return self._f.fileno()
+    def __enter__(self): return self
+    def __exit__(self, *a): return self._f.__exit__(*a)
+
+def fake_fdopen(fd, *a, **k):
+    f = real_fdopen(fd, *a, **k)
+    if STAGE == "after_open": _die()
+    return Wrapped(f)
+
+real_fsync = os.fsync
+def fake_fsync(fd):
+    real_fsync(fd)
+    if STAGE == "after_fsync": _die()
+
+real_replace = os.replace
+def fake_replace(src, dst):
+    if STAGE == "before_replace": _die()
+    return real_replace(src, dst)
+
+os.fdopen = fake_fdopen
+os.fsync = fake_fsync
+os.replace = fake_replace
+
 big = {{"payload": ["x" * 400] * 5000}}
-os.kill(os.getpid(), signal.SIGKILL)
-_atomic_write_json({str(p)!r}, big)
+_atomic_write_json(Path({str(p)!r}), big)
 """
         proc = subprocess.run(
             [sys.executable, "-c", script], capture_output=True, timeout=60
         )
-        assert proc.returncode != 0
+        assert proc.returncode == -9, (
+            f"阶段 {kill_stage} 未被 SIGKILL 终止，returncode={proc.returncode}，"
+            f"stderr={proc.stderr.decode('utf-8', 'replace')[:400]}"
+        )
 
         loaded = json.loads(p.read_text(encoding="utf-8"))
-        assert loaded == SAMPLE_CONFIG, "配置被写坏了——原子性失效"
+        assert loaded == SAMPLE_CONFIG, f"阶段 {kill_stage}：配置被写坏了——原子性失效"
         # API key 必须还在
         assert (
             loaded["models"]["providers"]["volcengine-agent"]["apiKey"]
-            == "sk-secret-do-not-lose"
+            == SAMPLE_CONFIG["models"]["providers"]["volcengine-agent"]["apiKey"]
         )
+
+    def test_kill_after_replace_sees_new_config(self, tmp_path):
+        """os.replace 完成后被杀，必须看到完整新配置（原子性的另一半）。"""
+        p = tmp_path / "openclaw.json"
+        _atomic_write_json(p, SAMPLE_CONFIG)
+
+        script = f"""
+import os, signal, sys
+from pathlib import Path
+sys.path.insert(0, {PKG_ROOT!r})
+from mark42.openclaw_config import _atomic_write_json
+real_replace = os.replace
+def fake_replace(src, dst):
+    real_replace(src, dst)
+    os.kill(os.getpid(), signal.SIGKILL)
+os.replace = fake_replace
+_atomic_write_json(Path({str(p)!r}), {{"marker": "new-config"}})
+"""
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, timeout=60
+        )
+        assert proc.returncode == -9
+        assert json.loads(p.read_text(encoding="utf-8")) == {"marker": "new-config"}
 
 
 # ── 字段级 merge：不整份覆盖 ──────────────────────────────

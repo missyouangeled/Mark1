@@ -121,28 +121,139 @@ class TestAtomicWrite:
         _save_json(p, {"a": 2})
         assert (p.stat().st_mode & 0o777) == 0o644
 
-    def test_kill_during_write_leaves_valid_file(self, workdir):
-        """真实故障注入：子进程写入途中被 SIGKILL，原文件仍必须可解析。"""
+    @pytest.mark.parametrize(
+        "kill_stage",
+        ["after_open", "after_write", "after_flush", "after_fsync", "before_replace"],
+    )
+    def test_kill_at_each_write_stage_leaves_valid_file(self, workdir, kill_stage):
+        """真实故障注入：在写入流程**各阶段**被 SIGKILL，原文件仍必须完整可解析。
+
+        【2026-08-05 修复 P3-3】原实现在 `_save_json` **调用之前**就
+        `os.kill(os.getpid(), SIGKILL)`，子进程压根没进写函数 ——
+        只证明了"完全没写时旧文件没变"，是同义反复，毫无验证价值。
+
+        现改为在临时文件写入、flush、fsync、os.replace 前后分别设置故障注入点，
+        真正验证原子写的核心承诺：读者要么看到完整旧内容，要么看到完整新内容。
+        """
         p = workdir / "state.json"
         _save_json(p, {"generation": "original"})
 
         pkg_root = str(Path(__file__).resolve().parent.parent)
         script = f'''
 import os, signal, sys
+from pathlib import Path
 sys.path.insert(0, {pkg_root!r})
-from mark42.utils import _save_json
+import mark42.utils as U
+
+STAGE = {kill_stage!r}
+_die = lambda: os.kill(os.getpid(), signal.SIGKILL)
+
+# 在原子写的各个真实阶段挂钩，确保进程确实已经进入写流程
+real_fdopen = os.fdopen
+class Wrapped:
+    def __init__(self, f): self._f = f
+    def write(self, data):
+        n = self._f.write(data)
+        if STAGE == "after_write": _die()
+        return n
+    def flush(self):
+        self._f.flush()
+        if STAGE == "after_flush": _die()
+    def fileno(self): return self._f.fileno()
+    def __enter__(self): return self
+    def __exit__(self, *a): return self._f.__exit__(*a)
+
+def fake_fdopen(fd, *a, **k):
+    f = real_fdopen(fd, *a, **k)
+    if STAGE == "after_open": _die()
+    return Wrapped(f)
+
+real_fsync = os.fsync
+def fake_fsync(fd):
+    real_fsync(fd)
+    if STAGE == "after_fsync": _die()
+
+real_replace = os.replace
+def fake_replace(src, dst):
+    if STAGE == "before_replace": _die()
+    return real_replace(src, dst)
+
+os.fdopen = fake_fdopen
+os.fsync = fake_fsync
+os.replace = fake_replace
+
 big = {{"generation": "new", "payload": ["x" * 500] * 4000}}
-os.kill(os.getpid(), signal.SIGKILL)
-_save_json({str(p)!r}, big)
+U._save_json(Path({str(p)!r}), big)
 '''
         proc = subprocess.run(
-            [sys.executable, "-c", script], capture_output=True, timeout=30
+            [sys.executable, "-c", script], capture_output=True, timeout=60
         )
-        assert proc.returncode != 0  # 确实被杀了
+        # 确认真的被 SIGKILL（-9），而不是普通异常退出
+        assert proc.returncode == -9, (
+            f"阶段 {kill_stage} 未被 SIGKILL 终止，returncode={proc.returncode}，"
+            f"stderr={proc.stderr.decode('utf-8', 'replace')[:400]}"
+        )
 
-        # 关键断言：文件没被截断成半截 JSON
+        # 核心断言：原文件必须完整可解析，且仍是旧内容
         loaded = _load_json(p)
-        assert loaded == {"generation": "original"}
+        assert loaded == {"generation": "original"}, (
+            f"阶段 {kill_stage} 后原文件被破坏或被部分写入：{str(loaded)[:200]}"
+        )
+
+    def test_kill_after_replace_sees_new_content(self, workdir):
+        """os.replace 完成后被杀，必须看到**完整新内容**（原子性的另一半）。"""
+        p = workdir / "state.json"
+        _save_json(p, {"generation": "original"})
+
+        pkg_root = str(Path(__file__).resolve().parent.parent)
+        script = f'''
+import os, signal, sys
+from pathlib import Path
+sys.path.insert(0, {pkg_root!r})
+import mark42.utils as U
+
+real_replace = os.replace
+def fake_replace(src, dst):
+    real_replace(src, dst)
+    os.kill(os.getpid(), signal.SIGKILL)   # 替换已完成后立刻死
+os.replace = fake_replace
+
+U._save_json(Path({str(p)!r}), {{"generation": "new"}})
+'''
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, timeout=60
+        )
+        assert proc.returncode == -9
+
+        loaded = _load_json(p)
+        assert loaded == {"generation": "new"}, (
+            "replace 已完成却没看到新内容，原子替换未生效"
+        )
+
+    def test_no_temp_files_left_after_crash(self, workdir):
+        """崩溃后不得残留大量临时文件（会撑爆状态目录）。"""
+        p = workdir / "state.json"
+        _save_json(p, {"generation": "original"})
+
+        pkg_root = str(Path(__file__).resolve().parent.parent)
+        script = f'''
+import os, signal, sys
+from pathlib import Path
+sys.path.insert(0, {pkg_root!r})
+import mark42.utils as U
+real_replace = os.replace
+def fake_replace(src, dst):
+    os.kill(os.getpid(), signal.SIGKILL)
+os.replace = fake_replace
+U._save_json(Path({str(p)!r}), {{"generation": "new"}})
+'''
+        subprocess.run([sys.executable, "-c", script], capture_output=True, timeout=60)
+
+        # SIGKILL 无法执行 finally，残留 1 个临时文件属预期；
+        # 但原文件必须完好，且不得出现被截断的目标文件
+        assert _load_json(p) == {"generation": "original"}
+        leftovers = list(workdir.glob(".state.json.*.tmp"))
+        assert len(leftovers) <= 1, f"残留过多临时文件: {leftovers}"
 
 
 def _concurrent_writer(args):
