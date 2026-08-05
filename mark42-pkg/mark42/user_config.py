@@ -7,6 +7,9 @@
 1. 环境变量 MARK42_CONFIG 指定的路径
 2. ~/.config/mark42/config.toml
 3. 包内 templates/config.toml（默认值）
+
+本模块另提供 ``get_openclaw_config_path()``，作为全仓解析
+``openclaw.json`` 路径的**唯一入口**（P2-16）。
 """
 
 from __future__ import annotations
@@ -102,6 +105,61 @@ def get_default_config_path() -> Path:
 
     pkg_dir = Path(mark42.__file__).parent
     return pkg_dir / "templates" / "config.toml"
+
+
+# ── OpenClaw 配置路径：全局单一解析器 (P2-16) ─────────────
+
+_DEFAULT_OPENCLAW_CONFIG = "~/.openclaw/openclaw.json"
+
+# CLI 显式指定的路径（最高优先级）。由 CLI 入口调 set_openclaw_config_override() 注入。
+_openclaw_config_override: Path | None = None
+
+
+def set_openclaw_config_override(path: str | Path | None) -> None:
+    """设置/清除 CLI 级的 openclaw.json 路径覆盖。"""
+    global _openclaw_config_override
+    _openclaw_config_override = Path(path).expanduser() if path else None
+
+
+def get_openclaw_config_path() -> Path:
+    """解析 openclaw.json 的实际路径 —— **全仓唯一入口** (P2-16)。
+
+    优先级：CLI 显式指定 > 环境变量 ``OPENCLAW_CONFIG``
+              > TOML ``[paths] openclaw_config`` > 平台默认。
+
+    历史问题：``openclaw_config.py`` / ``context_safety.py`` /
+    ``compaction_diag.py`` / ``config.py`` 各自硬编码
+    ``Path.home() / ".openclaw" / "openclaw.json"``，且多为**模块级常量**
+    （import 时就固化）。后果：环境变量与配置向导写入的
+    ``[paths] openclaw_config`` 完全无效，多实例/容器/测试隔离下
+    会误操作真实用户配置。
+
+    注意：本函数每次调用都重新解析，不缓存。调用方必须在**使用时**
+    调用，不得赋给模块级常量，否则会重现同一个 bug。
+    """
+    # 1. CLI 显式指定
+    if _openclaw_config_override is not None:
+        return _openclaw_config_override
+
+    # 2. 环境变量
+    env_path = os.environ.get("OPENCLAW_CONFIG")
+    if env_path and env_path.strip():
+        return Path(env_path).expanduser()
+
+    # 3. TOML [paths] openclaw_config
+    #    此处不能让 TOML 解析异常影响路径解析，否则配置写坏会连带
+    #    整个路径体系崩掉，因此广泛捕获后退回默认。
+    try:
+        toml_path = get("paths", "openclaw_config", "")
+        if isinstance(toml_path, str) and toml_path.strip():
+            return Path(toml_path).expanduser()
+    except Exception:  # pragma: no cover - 防御分支
+        import logging
+
+        logging.debug("读取 TOML [paths] openclaw_config 失败，退回默认", exc_info=True)
+
+    # 4. 平台默认
+    return Path(_DEFAULT_OPENCLAW_CONFIG).expanduser()
 
 
 # ── 配置加载 ──────────────────────────────────────────────

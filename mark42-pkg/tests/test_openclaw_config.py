@@ -62,17 +62,44 @@ class TestSafetyGuard:
         assert fake_config != real
         assert "openclaw_home" in str(fake_config)
 
-    def test_module_default_points_at_real_path(self):
-        """模块默认值应指向真实路径（说明生产行为正确）。
+    def test_module_default_points_at_real_path(self, monkeypatch):
+        """无任何覆盖时，默认必须指向真实用户配置（生产行为正确）。
 
-        注意：这里用读源码而不是 importlib.reload 来验证。
-        reload 会把其他测试 monkeypatch 的路径全部冲回真实值，
-        造成测试间污染，更危险的是后续测试可能真的去写用户配置。
+        原实现靠 grep 源码字符串
+        ``OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"``
+        来验证，把**实现细节**当成了契约：P2-16 把硬编码常量换成
+        延迟解析器后该断言就失败了，但生产行为完全正确。
+        现改为直接断言**行为**：没有 CLI/环境变量/TOML 覆盖时，
+        解析结果就是 ``~/.openclaw/openclaw.json``。
+
+        仍然不用 importlib.reload：reload 会把其他测试 monkeypatch 的路径
+        全部冲回真实值，造成测试间污染，更危险的是后续测试可能真的
+        去写用户配置。
+        """
+        from mark42 import openclaw_config, user_config
+
+        monkeypatch.delenv("OPENCLAW_CONFIG", raising=False)
+        monkeypatch.setattr(user_config, "get", lambda *a, **k: "")
+        user_config.set_openclaw_config_override(None)
+        # 确保模块级没有残留的显式赋值
+        monkeypatch.delattr(openclaw_config, "OPENCLAW_CONFIG", raising=False)
+
+        # 根 conftest 会把 HOME 指向临时目录做隔离，
+        # 因此断言「相对于当前 HOME 的默认位置」而非硬编码绝对路径。
+        assert openclaw_config._openclaw_config_path() == (
+            Path("~/.openclaw/openclaw.json").expanduser()
+        )
+
+    def test_module_has_no_import_time_hardcoded_constant(self):
+        """P2-16 防回归：不得重新引入 import 时固化的硬编码常量。
+
+        一旦有人把 ``OPENCLAW_CONFIG = Path.home()/...`` 写回模块顶层，
+        环境变量与 TOML 配置就又会静默失效。
         """
         src = (Path(PKG_ROOT) / "mark42" / "openclaw_config.py").read_text(
             encoding="utf-8"
         )
-        assert 'OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"' in src
+        assert 'OPENCLAW_CONFIG = Path.home()' not in src
 
 
 # ── 原子写入 ──────────────────────────────────────────────

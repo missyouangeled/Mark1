@@ -17,7 +17,30 @@ from .utils import _now_iso
 logger = logging.getLogger(__name__)
 
 
-OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
+def _openclaw_config_path() -> Path:
+    """openclaw.json 实际路径。延迟求值，尊重 CLI/环境变量/TOML (P2-16)。
+
+    若调用方（包括测试）**显式**给本模块赋了 ``OPENCLAW_CONFIG``，
+    则以该赋值为准（保留原有注入契约）。未赋值时才走统一解析器。
+    关键区别：旧实现在 import 时就把默认值写成模块常量，使得环境变量
+    永远无法生效；现在默认不预先赋值。
+    """
+    explicit = globals().get("OPENCLAW_CONFIG")
+    if explicit is not None:
+        return Path(explicit)
+
+    from .user_config import get_openclaw_config_path
+
+    return get_openclaw_config_path()
+
+
+def __getattr__(name: str):
+    """向后兼容：旧代码/测试仍可读模块级 ``OPENCLAW_CONFIG``（每次重新解析）。"""
+    if name == "OPENCLAW_CONFIG":
+        return _openclaw_config_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 SESSIONS_STORE = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
 TOOL_CHECK_FILE = Path.home() / ".openclaw" / "workspace" / "tmp" / "tool-check.txt"
 
@@ -65,9 +88,10 @@ SESSION_MAINTENANCE_BASELINE = {
 
 
 def _load_openclaw_config() -> dict[str, Any]:
-    if not OPENCLAW_CONFIG.exists():
-        raise FileNotFoundError(f"缺少配置文件: {OPENCLAW_CONFIG}")
-    with open(OPENCLAW_CONFIG, encoding="utf-8") as f:
+    config_path = _openclaw_config_path()
+    if not config_path.exists():
+        raise FileNotFoundError(f"缺少配置文件: {config_path}")
+    with open(config_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -81,23 +105,25 @@ def _save_openclaw_config(data: dict[str, Any]) -> None:
     """
     from .openclaw_config import _atomic_write_json, _exclusive_lock
 
-    bak = Path(str(OPENCLAW_CONFIG) + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
-    if OPENCLAW_CONFIG.exists():
-        shutil.copy2(OPENCLAW_CONFIG, bak)
+    config_path = _openclaw_config_path()
+    bak = Path(str(config_path) + ".bak." + datetime.now().strftime("%Y%m%d%H%M%S"))
+    if config_path.exists():
+        shutil.copy2(config_path, bak)
     try:
         with _exclusive_lock():
-            _atomic_write_json(OPENCLAW_CONFIG, data)
+            _atomic_write_json(config_path, data)
     except Exception as e:
         logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
         if bak.exists():
-            shutil.copy2(bak, OPENCLAW_CONFIG)
+            shutil.copy2(bak, config_path)
         raise
 
 
 def _backup_openclaw_config() -> Path:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = OPENCLAW_CONFIG.with_name(f"openclaw.json.mark42-context-safety-{stamp}.bak")
-    shutil.copy2(OPENCLAW_CONFIG, backup)
+    config_path = _openclaw_config_path()
+    backup = config_path.with_name(f"openclaw.json.mark42-context-safety-{stamp}.bak")
+    shutil.copy2(config_path, backup)
     return backup
 
 
@@ -223,7 +249,7 @@ def context_safety_status(verbose: bool = False) -> dict[str, Any]:
     config = _load_openclaw_config()
     checks = _status_checks(config)
     print("== Mark42 Context Safety Status ==")
-    print(f"config: {OPENCLAW_CONFIG}")
+    print(f"config: {_openclaw_config_path()}")
     counts = _print_checks(checks, verbose=verbose)
     print(f"summary: pass={counts['pass']} warn={counts['warn']} fail={counts['fail']} info={counts['info']}")
     return {"checks": checks, "summary": counts, "checkedAt": _now_iso()}
@@ -346,11 +372,12 @@ def _run_light_smoke_checks() -> tuple[bool, list[str]]:
         ok = False
         lines.append(f"[FAIL] read smoke: 缺少测试文件 {TOOL_CHECK_FILE}")
 
-    if OPENCLAW_CONFIG.exists():
+    config_path = _openclaw_config_path()
+    if config_path.exists():
         lines.append("[PASS] internal status smoke: openclaw 配置文件存在")
     else:
         ok = False
-        lines.append(f"[FAIL] internal status smoke: 缺少配置文件 {OPENCLAW_CONFIG}")
+        lines.append(f"[FAIL] internal status smoke: 缺少配置文件 {config_path}")
 
     try:
         proc = subprocess.run(

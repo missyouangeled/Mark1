@@ -327,7 +327,19 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
     base_url = model_entry.get("baseUrlFallback", "")
 
     # 从 openclaw.json 取 API key 和 baseUrl
-    openclaw_path = Path.home() / ".openclaw" / "openclaw.json"
+    # 路径走统一解析器（P2-16）。此处兼容两种加载方式：
+    # 作为包模块（mark42.config）时走相对导入；
+    # 被当顶层模块加载（llm_text_compressor 的 `from config import ...`
+    # 兵底路径）时相对导入会抛 ImportError，退回绝对导入。
+    try:
+        from .user_config import get_openclaw_config_path
+    except ImportError:  # pragma: no cover - 无包上下文的兵底分支
+        try:
+            from mark42.user_config import get_openclaw_config_path
+        except ImportError:
+            from user_config import get_openclaw_config_path
+
+    openclaw_path = get_openclaw_config_path()
     if openclaw_path.exists():
         try:
             oc = json.loads(openclaw_path.read_text())

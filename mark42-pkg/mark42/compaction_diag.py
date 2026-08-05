@@ -19,7 +19,26 @@ from .utils import _now_iso
 # ── 常量 ──────────────────────────────────────────────
 
 # 默认路径
-_OPENCLAW_JSON = Path.home() / ".openclaw" / "openclaw.json"
+def _openclaw_json_path() -> Path:
+    """openclaw.json 实际路径。延迟求值，尊重 CLI/环境变量/TOML (P2-16)。
+
+    若调用方（包括测试）**显式**给本模块赋了 ``_OPENCLAW_JSON``，
+    则以该赋值为准（保留原有注入契约）。未赋值时才走统一解析器。
+    """
+    explicit = globals().get("_OPENCLAW_JSON")
+    if explicit is not None:
+        return Path(explicit)
+
+    from .user_config import get_openclaw_config_path
+
+    return get_openclaw_config_path()
+
+
+def __getattr__(name: str):
+    """向后兼容：旧代码/测试仍可读模块级 ``_OPENCLAW_JSON``（每次重新解析）。"""
+    if name == "_OPENCLAW_JSON":
+        return _openclaw_json_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # 舒适范围定义（基于 128K+ 上下文窗口模型的实践数据）
 _COMFORT_ZONES = {
@@ -124,10 +143,11 @@ _ISOLATION_HIGH_TOKEN_KB = 80      # 单 session > 此 token 数 (K) → 建议�
 
 def _load_openclaw_json() -> dict[str, Any] | None:
     """加载 openclaw.json。"""
-    if not _OPENCLAW_JSON.exists():
+    config_path = _openclaw_json_path()
+    if not config_path.exists():
         return None
     try:
-        with open(_OPENCLAW_JSON) as f:
+        with open(config_path) as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return None
@@ -594,7 +614,7 @@ def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[
             "diagnosedAt": _now_iso(),
             "status": "no_config",
             "summary": "未找到 compaction 配置段（agents.defaults.compaction 可能为空）",
-            "openclawJsonPath": str(_OPENCLAW_JSON),
+            "openclawJsonPath": str(_openclaw_json_path()),
             "contextWindow": ctx_window,
             "issues": [],
             "advice": [],
@@ -743,7 +763,7 @@ def compaction_diagnose(token_aware: bool = False, probe: bool = False) -> dict[
             f"发现 {sum(1 for i in issues if i['severity'] != 'ok')} 个优化点"
             if has_warn else "所有压缩配置在舒适范围内 ✅"
         ),
-        "openclawJsonPath": str(_OPENCLAW_JSON),
+        "openclawJsonPath": str(_openclaw_json_path()),
         "contextWindow": ctx_window,
         "todaySessionCount": session_count,
         "largestTranscriptMB": round(largest_mb, 1),
@@ -840,8 +860,9 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
 
     if auto_confirm:
         # 备份
-        bak = Path(str(_OPENCLAW_JSON) + ".bak." + datetime.now().strftime("%Y%m%d"))
-        shutil.copy2(_OPENCLAW_JSON, bak)
+        config_path = _openclaw_json_path()
+        bak = Path(str(config_path) + ".bak." + datetime.now().strftime("%Y%m%d"))
+        shutil.copy2(config_path, bak)
 
         # 【2026-08-03 修复 P0-3】改为原子写入 + 跳进程锁。
         # 原实现直接 open(path, "w") 截断，写一半崩溃会让 openclaw.json 变成
@@ -851,10 +872,10 @@ def compaction_apply(auto_confirm: bool = False) -> dict[str, Any]:
             from .openclaw_config import _atomic_write_json, _exclusive_lock
 
             with _exclusive_lock():
-                _atomic_write_json(_OPENCLAW_JSON, cfg)
+                _atomic_write_json(config_path, cfg)
         except Exception as e:
             logger.error("写入 openclaw.json 失败，正在回滚: %s", e)
-            shutil.copy2(bak, _OPENCLAW_JSON)
+            shutil.copy2(bak, config_path)
             return {"status": "error", "error": str(e), "rollback": "已恢复备份"}
 
         return {

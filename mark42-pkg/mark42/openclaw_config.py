@@ -50,9 +50,41 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
-# 锁文件与目标文件同目录，保证在同一文件系统上
-_LOCK_PATH = OPENCLAW_CONFIG.with_name(".openclaw.json.mark42.lock")
+def _openclaw_config_path() -> Path:
+    """openclaw.json 实际路径。延迟求值，尊重 CLI/环境变量/TOML (P2-16)。
+
+    若调用方（包括测试）**显式**给本模块赋了 ``OPENCLAW_CONFIG``，
+    则以该赋值为准（保留原有注入契约）。未赋值时才走统一解析器。
+    关键区别：旧实现在 import 时就把默认值写成模块常量，使得环境变量
+    永远无法生效；现在默认不预先赋值。
+    """
+    explicit = globals().get("OPENCLAW_CONFIG")
+    if explicit is not None:
+        return Path(explicit)
+
+    from .user_config import get_openclaw_config_path
+
+    return get_openclaw_config_path()
+
+
+def _lock_path() -> Path:
+    """锁文件与目标文件同目录，保证在同一文件系统上。"""
+    return _openclaw_config_path().with_name(".openclaw.json.mark42.lock")
+
+
+def __getattr__(name: str) -> Any:
+    """向后兼容：旧代码/测试可能仍读模块级 ``OPENCLAW_CONFIG``。
+
+    注意：这里每次访问都重新解析，因此不会像旧常量那样在
+    import 时就固化路径。新代码请直接用 ``_openclaw_config_path()``。
+    """
+    if name == "OPENCLAW_CONFIG":
+        return _openclaw_config_path()
+    if name == "_LOCK_PATH":
+        return _lock_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 _LOCK_TIMEOUT_S = 30
 
 
@@ -67,8 +99,9 @@ def _exclusive_lock(timeout_s: int = _LOCK_TIMEOUT_S) -> Iterator[None]:
     用独立锁文件而不是锁目标文件本身：避免 os.replace() 把被锁的 inode 换掉，
     导致其他进程锁在了一个已经不是目标文件的 inode 上。
     """
-    _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(_LOCK_PATH), os.O_CREAT | os.O_RDWR, 0o600)
+    lock_path = _lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
     acquired = False
     try:
         import time
@@ -210,7 +243,8 @@ def patch_openclaw_config(
 
     with _exclusive_lock():
         # 关键：在锁内重新读盘，避免基于过期快照覆盖别人刚写的内容
-        current = _load(OPENCLAW_CONFIG)
+        config_path = _openclaw_config_path()
+        current = _load(config_path)
         candidate = json.loads(json.dumps(current))  # 深拷贝
 
         if patch is not None:
@@ -234,18 +268,18 @@ def patch_openclaw_config(
             }
 
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = OPENCLAW_CONFIG.with_name(
-            f"{OPENCLAW_CONFIG.name}.{backup_tag}-{stamp}.bak"
+        backup = config_path.with_name(
+            f"{config_path.name}.{backup_tag}-{stamp}.bak"
         )
-        shutil.copy2(OPENCLAW_CONFIG, backup)
+        shutil.copy2(config_path, backup)
 
         try:
-            _atomic_write_json(OPENCLAW_CONFIG, candidate)
+            _atomic_write_json(config_path, candidate)
         except Exception as e:
             # 原子写入失败时原文件本就未被触碰，但仍显式恢复以防万一
             logger.error("写入 openclaw.json 失败: %s", e)
             try:
-                shutil.copy2(backup, OPENCLAW_CONFIG)
+                shutil.copy2(backup, config_path)
             except OSError:
                 pass
             raise ConfigWriteError(f"写入失败，已保持原配置: {e}") from e
@@ -254,7 +288,7 @@ def patch_openclaw_config(
             ok, detail = _validate()
             if not ok:
                 logger.error("配置校验失败，正在回滚: %s", detail)
-                shutil.copy2(backup, OPENCLAW_CONFIG)
+                shutil.copy2(backup, config_path)
                 raise ConfigWriteError(
                     f"配置校验失败，已回滚到修改前状态: {detail}"
                 )
