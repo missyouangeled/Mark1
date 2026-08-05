@@ -2402,3 +2402,51 @@ P1 全部清零。P2 仅剩 P2-7（TOML 双轨制，路径部分已由 P2-16 接
 ### 方案进度：P0/P1/P2 全部清零，P3 全部完成
 
 P3-4 剩余 106 项 mypy 属渐进式标注债（`no-any-return` 27、`index` 17、`assignment` 16 等），分散 14 个文件，每处需单独核对真实契约，无已知运行时影响。
+
+## 2026-08-05 10:45:00 CST (+08:00) — Mark42 mypy 清零：174 → 0
+
+- 类型：fix（渐进式类型治理 + 真 bug 修复）
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg 全仓
+- commits：0a2f1f3f、e7057ae7、7b0ede21、ba16ae85（本轮）+ f4baa5e1、74473986（前置）
+
+### 结果
+
+`mypy mark42/` → **Success: no issues found in 74 source files**
+
+**全仓 `cast` 0 处；`type: ignore` 仍为原有 1 处**（`telemetry.py:378`，非本轮新增）——未用方案明令禁止的 `Any`/`cast`/`# type: ignore` 伪清零。
+
+### 治理原则
+
+每处消错都要求**同时是真实健壮性提升**。绝大多数不是加标注，而是补运行时类型校验、按真实契约修签名、或消除同名变量承载不同类型。
+
+### 本轮捞出的真 bug（mypy 是手段，不是目的）
+
+| # | 位置 | 问题 |
+|---|---|---|
+| 1 | `utils._load_json` | 声明返回 dict 但直接返回 `json.load()`。**实测**：顶层为数组时返回 list，调用方一用 `.get()` 即 AttributeError。Armor/Engine/Heavy 全部状态读取都走这里 |
+| 2 | `cli._pid_alive` | `os.kill("123", 0)` 抛 **TypeError** 而非 OSError，逃出 except，整个 `assemble --status` 崩溃。**已实测确认** |
+| 3 | `engine` task-watch | `active_tasks.append(ts.get("taskName"))` 未校验，None 进列表后 `SCRATCH / None` 抛 TypeError，整个 Loop 异常，根因只是某状态文件缺字段 |
+| 4 | `consciousness._cli` | 标注 `-> int` 但有分支隐式返回 None，`SystemExit(None)` = 退出码 0，未知子命令被当成功 |
+| 5 | `cli.main` | 同类退出码漏洞 |
+| 6 | `chaos_engine._mock_load` | 零参函数替换真实签名 `load_config(path=None)`，调用方传 path 即 TypeError ——**用来验证韧性的混沌实验，自己成了故障源** |
+| 7 | `compaction_diag` | 直接返回配置里的 `contextWindow`，写成字符串时后续 `// 1000` TypeError |
+| 8 | `diff_compressor._split_hunks` | 标注 `list[str]` 实际返回 `list[list[str]]` |
+
+### 值得记的两件事
+
+**一、标注写错比不标更糟。** 我在第三轮把 `utils.lines_collected` 标成 `list[str]`，但那段是二进制读取（`chunk.split(b"\n")`），实际是 `list[bytes]`。第五轮才发现并改正。错误标注会让后续维护者按错误假设写代码。
+
+**二、`bool` 是 `int` 子类这个坑踩了两次。** `_coerce_context_window` 和 `_coerce_pid` 都必须先排除 `bool`，否则 `True` 会被当成有效整数 1。两处都补了边界测试验证。
+
+### 验收
+
+- ruff 全过；mypy 0 errors；全量 **1997 项收集 0 失败**
+- 12 条 CLI 成功路径全 rc=0；`heavy` 不存在任务与非法命令仍 rc=2（退出码语义未变）
+- `openclaw config validate` 仍 Config valid
+- gateway 与 Mark42 三服务全部 active
+
+### 遗留
+
+`no-any-return` 类问题已全部按真实契约收敛，但**这类问题会随新代码回归**。建议后续把 mypy 纳入 CI 门禁，否则今天的清零会慢慢退化。
