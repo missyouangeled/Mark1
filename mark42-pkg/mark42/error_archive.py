@@ -502,16 +502,18 @@ def _cli() -> int:
         entries = entries[: args.limit]
         print(f"\n{'ID':32s} | {'CATEGORY':32s} | {'CNT':3s} | {'STATUS':15s} | LAST_SEEN")
         print("-" * 100)
-        for e in entries:
-            _print_entry_row(e)
+        for entry in entries:
+            _print_entry_row(entry)
         print(f"\n共 {len(entries)} 条（总 {arc.stats()['total']} 条）\n")
 
     elif args.cmd == "show":
-        e = arc.get(args.entry_id)
-        if e is None:
+        # 【P3-4】不复用循环变量名 —— 上面 entry 是 ArchiveEntry,
+        # 这里 arc.get() 返回 ArchiveEntry | None
+        target = arc.get(args.entry_id)
+        if target is None:
             print(f"❌ 找不到 {args.entry_id}")
             return 1
-        print(json.dumps(e.to_dict(), indent=2, ensure_ascii=False))
+        print(json.dumps(target.to_dict(), indent=2, ensure_ascii=False))
 
     elif args.cmd == "approve":
         r = arc.approve_for_auto(args.entry_id, scope=args.scope)

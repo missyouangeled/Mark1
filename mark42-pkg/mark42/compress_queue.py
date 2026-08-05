@@ -325,9 +325,10 @@ def _run_tests() -> bool:
     check("1.2 wait 10s 内完成", completed)
     check("1.3 result 或 error 至少一个存在", req.result is not None or req.error is not None)
     check("1.4 成功无 error", req.error is None)
+    # 断言前置：后面几行都要用 req.result，先确认非 None（P3-4）
+    assert req.result is not None, "wait 已完成但 result 为空"
     check("1.5 changed=True (JSON 大输入应被压缩)", req.result.get("changed") is True)
     check("1.6 route_algo=smartcrush", req.result.get("route_algo") == "smartcrush")
-    assert req.result is not None, "wait 已完成但 result 为空"
     print(f"  → route={req.result['route_algo']} ratio={req.result['ratio']:.1%} "
           f"elapsed={req.result['elapsed']:.2f}s")
     q.shutdown()

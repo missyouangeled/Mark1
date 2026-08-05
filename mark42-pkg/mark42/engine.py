@@ -455,11 +455,24 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 loop["lastResult"] = {"action": "monitor", "usage": usage}
         elif template_name == "task-watch":
             heavy_tasks = list(HEAVY_STATE.glob("*.json"))
-            active_tasks = []
+            # 【2026-08-05 修复 P3-4】原实现直接 append(ts.get("taskName")),
+            # taskName 缺失或不是字符串时会把 None 放进列表, 下面
+            # `SCRATCH / tn` 直接 TypeError:
+            #   unsupported operand type(s) for /: 'PosixPath' and 'NoneType'
+            # 这会让整个 task-watch Loop 抛异常(P2-5 之后会被标记 failed),
+            # 而根因只是某个 heavy 状态文件缺字段。
+            active_tasks: list[str] = []
             for tf in heavy_tasks:
                 ts = _load_json(tf)
-                if ts.get("status") == "started":
-                    active_tasks.append(ts.get("taskName"))
+                if ts.get("status") != "started":
+                    continue
+                task_name = ts.get("taskName")
+                if isinstance(task_name, str) and task_name:
+                    active_tasks.append(task_name)
+                else:
+                    logger.warning(
+                        "heavy 状态文件缺少合法 taskName, 已跳过: %s", tf
+                    )
             print(f"   🔍 Observe: {len(active_tasks)} 活跃重型任务")
             pending = 0
             failed = 0

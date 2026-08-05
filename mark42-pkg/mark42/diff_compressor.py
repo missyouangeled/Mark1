@@ -98,8 +98,14 @@ class DiffCompressor:
 
         return "\n".join(out_lines)
 
-    def _split_hunks(self, content: str, stats: dict) -> list[str]:
-        """把 diff 切成若干 hunk 块 (含 file header + @@ ... @@ + body)"""
+    def _split_hunks(self, content: str, stats: dict) -> list[list[str]]:
+        """把 diff 切成若干 hunk 块 (含 file header + @@ ... @@ + body)
+
+        【P3-4】返回的是**每个 hunk 的行列表**, 原标注 list[str] 写错了 ——
+        blocks.append(current) 里 current 是 list[str], 所以整体是
+        list[list[str]]。调用方 _process_hunk(hunk, ...) 期望 list[str],
+        逐块传入本就正确, 只是标注与实现不符。
+        """
         blocks = []
         current: list[str] = []
 

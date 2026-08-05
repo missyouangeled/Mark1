@@ -946,6 +946,13 @@ def _cli() -> int:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
 
+    # 【2026-08-05 修复 P3-4】三个分支都不匹配时原实现走到底隐式返回 None,
+    # 而 `SystemExit(None)` 等于退出码 0 —— 未知子命令会被当成功。
+    # argparse 的 required=True 虽让这条路径难触发, 但退出码契约不能
+    # 依赖外部约束; 显式返回 2 与 CLI 其余"参数错误"语义一致。
+    print(f"❌ 未知子命令: {args.cmd}")
+    return 2
+
 
 if __name__ == "__main__":
     raise SystemExit(_cli())

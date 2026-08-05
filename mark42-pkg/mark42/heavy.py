@@ -353,25 +353,25 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
     if not status_file.exists():
         logger.error("任务未开工: %s", task_name)
         print(f"❌ 任务 '{task_name}' 未开工")
-        return
+        return None
     st = _load_json(status_file)
     subtasks = st.get("subtasks", {})
     if not subtasks:
         logger.error("任务无子任务")
         print("❌ 任务无子任务")
-        return
+        return None
     # 确定目标 batch
     target_id = batch_id
     if target_id:
         if target_id not in subtasks:
             logger.error("批次不存在: %s", target_id)
             print(f"❌ 批次 '{target_id}' 不存在")
-            return
+            return None
         # queued = dry-run 已入队但从未执行，属于可推进状态
         allowed = ("pending", "queued") if not retry else ("pending", "queued", "failed")
         if subtasks[target_id]["status"] not in allowed:
             logger.warning("批次状态异常，跳过: %s (状态: %s)", target_id, subtasks[target_id]["status"])
-            return
+            return None
     else:
         # 优先 pending，retry 模式也找 failed
         search_statuses = ("pending", "queued", "failed") if retry else ("pending", "queued")
@@ -384,7 +384,7 @@ def heavy_execute(task_name: str, batch_id: str | None = None, command: str | No
                 print("✅ 无 pending/failed 子任务需要处理")
             else:
                 print("✅ 所有批次已完成，无 pending 子任务")
-            return
+            return None
     batch = subtasks[target_id]
     files = batch.get("files", [])
     target_path = Path(st.get("targetPath", str(task_dir.parent)))

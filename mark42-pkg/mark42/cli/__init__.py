@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 import sys
-from typing import Any
+from typing import Any, TypedDict
 
 from ..output_guard import trim_detail, trim_summary
 
@@ -37,11 +37,59 @@ def _trim_daemon_logs(log_dir):
             pass
 
 
-def _pid_alive(pid: int) -> bool:
-    """检查 PID 是否存活。"""
+class _ProcInfo(TypedDict):
+    """单个进程条目（父或子）。"""
+
+    name: str
+    pid: int | None
+    alive: bool
+
+
+class _AssembleStatus(TypedDict):
+    """assemble status 的结构。
+
+    【P3-4】原先是裸 dict，异构值让 mypy 把 result["parent"] 推成 object，
+    后续 result["parent"]["pid"] 报 index / attr-defined。
+    """
+
+    pidFile: str
+    pidFileExists: bool
+    parent: _ProcInfo
+    children: list[_ProcInfo]
+
+
+def _coerce_pid(value: Any) -> int | None:
+    """把 PID 文件里读出的值收敛为正整数, 无法解析返回 None。
+
+    【2026-08-05 修复 P3-4】PID 来自 JSON, 可能是字符串(手改配置/旧格式)。
+    原实现直接 os.kill(pid, 0), 传字符串时抛 TypeError ——
+    而 except 只捕 OSError, TypeError 会逃逸并让整个 assemble status 崩掉。
+    已实测: os.kill("123", 0) -> TypeError: 'str' object cannot be
+    interpreted as an integer。
+    """
+    if isinstance(value, bool):  # bool 是 int 子类, 需先排除
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except (TypeError, ValueError):
+            return None
+        if parsed > 0:
+            return parsed
+    return None
+
+
+def _pid_alive(pid: Any) -> bool:
+    """检查 PID 是否存活。非法 PID 一律视为不存活。"""
     import os
+
+    real_pid = _coerce_pid(pid)
+    if real_pid is None:
+        return False
     try:
-        os.kill(pid, 0)
+        os.kill(real_pid, 0)
         return True
     except OSError:
         return False
@@ -84,7 +132,7 @@ def _find_mark42_processes() -> dict:
     return result
 
 
-def assemble_status() -> dict:
+def assemble_status() -> "_AssembleStatus":
     """查看 assemble / armor-guard / engine-daemon 当前状态。"""
 
     from ..config import ARMOR_STATE
@@ -95,19 +143,19 @@ def assemble_status() -> dict:
     parent = data.get("parent") or {}
     children = data.get("children") or []
 
-    result = {
+    result: _AssembleStatus = {
         "pidFile": str(pid_file),
         "pidFileExists": pid_file.exists(),
         "parent": {
-            "name": parent.get("name", "assemble"),
-            "pid": parent.get("pid"),
-            "alive": _pid_alive(parent.get("pid")) if parent.get("pid") else False,
+            "name": str(parent.get("name", "assemble")),
+            "pid": _coerce_pid(parent.get("pid")),
+            "alive": _pid_alive(parent.get("pid")),
         },
         "children": [
             {
-                "name": c.get("name"),
-                "pid": c.get("pid"),
-                "alive": _pid_alive(c.get("pid")) if c.get("pid") else False,
+                "name": str(c.get("name", "")),
+                "pid": _coerce_pid(c.get("pid")),
+                "alive": _pid_alive(c.get("pid")),
             }
             for c in children
         ],
@@ -498,7 +546,7 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
         print("="*56 + "\n")
 
     # ── 构建 JSON 输出数据 ──
-    status_data = {
+    status_data: dict[str, Any] = {
         "checkedAt": now_str,
         "version": version,
         "armor": {
@@ -1184,8 +1232,10 @@ def main() -> int | None:
             return 0
         if getattr(args, 'json', False):
             import json as _j
-            result = status_dashboard(json_mode=True)
-            print(_j.dumps(result, indent=2, ensure_ascii=False))
+            # 【P3-4】不复用变量名 result —— 别处 result 是 dict[str, Any],
+            # status_dashboard 返回 dict | None
+            dashboard = status_dashboard(json_mode=True)
+            print(_j.dumps(dashboard, indent=2, ensure_ascii=False))
         else:
             status_dashboard(verbose=getattr(args, 'verbose', False))
         return 0
@@ -1201,16 +1251,16 @@ def main() -> int | None:
             entries = arc.list_entries(status=args.status, category=args.category)[:args.limit]
             print(f"\n{'ID':32s} | {'CATEGORY':32s} | {'CNT':3s} | {'STATUS':15s} | LAST_SEEN")
             print("-" * 100)
-            for e in entries:
-                _print_entry_row(e)
+            for entry in entries:
+                _print_entry_row(entry)
             print(f"\n共 {len(entries)} 条（总 {arc.stats()['total']} 条）\n")
         elif args.action == "show":
-            e = arc.get(args.entry_id)
-            if e is None:
+            target = arc.get(args.entry_id)
+            if target is None:
                 print(f"❌ 找不到 {args.entry_id}")
                 return 1
             import json as _j3
-            print(_j3.dumps(e.to_dict(), indent=2, ensure_ascii=False))
+            print(_j3.dumps(target.to_dict(), indent=2, ensure_ascii=False))
         elif args.action == "approve":
             r = arc.approve_for_auto(args.entry_id, scope=args.scope)
             print(r["reason"])
@@ -1348,14 +1398,19 @@ def main() -> int | None:
         if args.action == "list":
             exps = ce.list_experiments()
             print(f"🔥 混沌工程实验 ({len(exps)} 个)\n")
-            for e in exps:
-                desc = e['description'][:40] + '...' if len(e['description']) > 40 else e['description']
-                print(f"  {e['name']:<30} {desc}")
+            for exp in exps:
+                description = exp["description"]
+                desc = (
+                    description[:40] + "..."
+                    if len(description) > 40
+                    else description
+                )
+                print(f"  {exp['name']:<30} {desc}")
         elif args.action == "run":
             if not args.scenario:
                 print("❌ --scenario 必填。可用实验:")
-                for e in ce.list_experiments():
-                    print(f"  {e['name']}")
+                for exp in ce.list_experiments():
+                    print(f"  {exp['name']}")
                 return 1
             r = ce.run_experiment(args.scenario, dry_run=not args.execute_now)
             icon = "✅" if r.status == "passed" else "❌"
@@ -1416,10 +1471,15 @@ def main() -> int | None:
             print(f"🏗️ 集群状态 ({len(clusters)} 个)\n")
             for c in clusters:
                 core = reg.get_core(c["core_id"])
-                status = core.status if core else "unknown"
+                # 【P3-4】不复用变量名 status —— 别处 status 是 dict，
+                # 这里是核心状态字符串
+                core_status = core.status if core else "unknown"
                 model = core.model_name if core else ""
-                icon = {"healthy": "🟢", "degraded": "🟡", "down": "🔴", "quarantined": "⛔", "unknown": "⬜"}.get(status, "?")
-                print(f"  {icon} {c['name']:<30} {model:<25} {status}")
+                icon = {
+                    "healthy": "🟢", "degraded": "🟡", "down": "🔴",
+                    "quarantined": "⛔", "unknown": "⬜",
+                }.get(core_status, "?")
+                print(f"  {icon} {c['name']:<30} {model:<25} {core_status}")
         elif args.action == "replace":
             if not args.name:
                 print("❌ --name 必填。可用集群:")
@@ -1561,6 +1621,13 @@ def main() -> int | None:
     if args.module == "uninstall":
         from ..installer import uninstall_systemd
         return uninstall_systemd()
+
+    # 【2026-08-05 修复 P3-4】所有 module 分支都不匹配时原实现走到底
+    # 隐式返回 None（等于退出码 0）—— 未识别的模块会被当成功。
+    # argparse 通常已拦住未知子命令，但退出码契约不能依赖外部约束。
+    # 与 CLI 其余"参数错误"语义一致，返回 2。
+    print(f"❌ 未处理的模块: {args.module}")
+    return 2
 
 
 if __name__ == "__main__":

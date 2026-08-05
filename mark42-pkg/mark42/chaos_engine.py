@@ -777,7 +777,10 @@ class ChaosEngine:
         # 用 cat | cat 死锁：两个 cat 互读，永远不退出
         p1 = subprocess.Popen(["cat"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(["cat"], stdin=p1.stdout, stdout=subprocess.PIPE)
-        p1.stdin.close()  # p1 不再写
+        # Popen.stdin 类型是 IO | None，虽然传了 PIPE 必然非 None，
+        # 仍显式判断以免实现变更时静默 AttributeError（P3-4）
+        if p1.stdin is not None:
+            p1.stdin.close()  # p1 不再写
         # p1 读 EOF, p2 写 EOF, p1 退出 → 但 p2 会等 stdout 关闭
         # 简化：直接 spawn 一个 sleep 长进程，CPU=0 但不退出
         p_zombie = subprocess.Popen(
