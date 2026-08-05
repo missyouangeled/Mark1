@@ -693,12 +693,29 @@ def mark42_config() -> None:
     print("⚙️ Mark42 配置:\n")
     print(f"   版本: {get_version()}")
     print(f"   配置 schema: v{cfg.get('configSchemaVersion', 1)}")
-    print(f"   初始化于: {cfg.get('initializedAt', '?')}")
-    print(f"   上下文窗口: {cfg.get('contextWindow', 0)/1000:.0f}K")
-    print(f"   字节/KToken: {cfg.get('bytesPerKtoken', '?')}")
+    print(f"   初始化于: {cfg.get('initializedAt', '(未记录)')}")
+
+    # 【2026-08-05 审查修复】原实现直接取 state JSON 的字段，早期精简版
+    # state 缺 contextWindow / daemon 等键时会显示 "上下文窗口: 0K" 与
+    # 一堆 "?" —— 与真实运行值矛盾（armor --check 同时报 contextWindow
+    # 为 1000000），会让人误判配置损坏。
+    # 现回退到**运行时真正生效的值**，并标注数据来源。
+    ctx_window = cfg.get("contextWindow")
+    if isinstance(ctx_window, (int, float)) and ctx_window > 0:
+        print(f"   上下文窗口: {ctx_window/1000:.0f}K")
+    else:
+        print("   上下文窗口: (state 未记录，按运行时模型动态判定)")
+    print(f"   字节/KToken: {cfg.get('bytesPerKtoken', BYTES_PER_KTOKEN)}（运行时生效值）")
+
     print("\n   阈值:")
     t = cfg.get("thresholds", {})
-    print(f"     WARN: {t.get('warn', '?')}%  |  ALERT: {t.get('alert', '?')}%  |  CRIT: {t.get('crit', '?')}%")
+    if not isinstance(t, dict):
+        t = {}
+    # 缺失项回退到运行时常量而非显示 "?"
+    warn = t.get("warn", THRESHOLD_WARN)
+    alert = t.get("alert", THRESHOLD_ALERT)
+    crit = t.get("crit", THRESHOLD_CRIT)
+    print(f"     WARN: {warn}%  |  ALERT: {alert}%  |  CRIT: {crit}%")
     print("\n   模型配置表:")
     m = cfg.get("models", {})
     for key, entry in m.items():
@@ -708,9 +725,16 @@ def mark42_config() -> None:
             print(f"     {key}: {entry}  (旧格式)")
     print("\n   守护模式:")
     d = cfg.get("daemon", {})
-    print(f"     扫描间隔: {d.get('scanInterval', '?')}s")
-    print(f"     自动压缩: {d.get('autoArmorCompress', '?')}")
-    print(f"     自动监控: {d.get('autoTaskWatch', '?')}")
+    if not isinstance(d, dict):
+        d = {}
+    if d:
+        print(f"     扫描间隔: {d.get('scanInterval', '(未记录)')}s")
+        print(f"     自动压缩: {d.get('autoArmorCompress', '(未记录)')}")
+        print(f"     自动监控: {d.get('autoTaskWatch', '(未记录)')}")
+    else:
+        # state 里没有 daemon 段属正常（由 systemd 单元参数控制），
+        # 显示 "?" 会被误读为配置损坏
+        print("     (由 systemd 单元参数控制，state 未镜像该配置)")
     h = cfg.get("heavy", {})
     print("\n   重型战甲:")
     print(f"     大工程检测: {'启用' if h.get('autoDetectEnabled') else '关闭'}")

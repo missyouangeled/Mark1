@@ -475,6 +475,18 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
 
     # ── Heavy ──
     heavy_tasks = list(HEAVY_STATE.glob("*.json"))
+    # 【2026-08-05 审查修复】识别"幽灵任务"：状态文件说 started 但
+    # 对应 scratch 工作目录已不存在。status 若只读状态文件就报 started，
+    # 会与 heavy --finish（按当前 SCRATCH 查找）的判定相互矛盾。
+    # 注意：cli/status.py 里有一份同名实现，两处必须同步修（本次审查
+    # 发现 status_dashboard 存在重复实现，已记入报告待后续合并）。
+    heavy_orphan_names = set()
+    for _tf in heavy_tasks:
+        _ts = _load_json(_tf)
+        if _ts.get("status") == "started":
+            _n = _ts.get("taskName")
+            if isinstance(_n, str) and _n and not (SCRATCH / _n).exists():
+                heavy_orphan_names.add(_n)
 
     # ── Logs ──
     from ..logs import _load_state as _logs_state
@@ -527,6 +539,9 @@ def status_dashboard(json_mode: bool = False, verbose: bool = False) -> dict | N
                 stat = ts.get("status", "?")
                 tsum = ts.get("summary", "")
                 icon = "🔄" if stat == "started" else ("✅" if stat == "finished" else "⏳")
+                if name in heavy_orphan_names:
+                    icon = "⚠️"
+                    stat = f"{stat}（工作目录已不存在，疑似残留状态）"
                 print(f"     {icon} {name}: {stat} — {trim_summary(tsum, 100)}")
                 if verbose and ts.get("checkedAt"):
                     print(f"        checkedAt: {ts.get('checkedAt')}")
@@ -1356,6 +1371,13 @@ def main() -> int | None:
                 print(f"   需要答对 {result.get('min_correct')} 题")
             print()
             print(_j5.dumps(result, indent=2, ensure_ascii=False, default=str)[:500])
+            # 【2026-08-05 审查发现】原实现无论验证通过与否都走下方统一
+            # `return 0`，导致读协议验证 0/10 全败时仍报告成功退出码。
+            # 实测: consciousness revalidate 因端点不可达 10 题全失败，rc 仍为 0。
+            # 验证未通过必须非零，否则自动化/CI 无法感知能力已失效。
+            # skipped（如未配置模型）不算失败，仍返回 0。
+            if not result.get("skipped") and not result.get("passed"):
+                return 1
         return 0
 
     if args.module == "cores":

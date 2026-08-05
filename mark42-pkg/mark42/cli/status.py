@@ -50,6 +50,20 @@ def _collect_status_data() -> dict[str, Any]:
 
     heavy_tasks = list(HEAVY_STATE.glob("*.json"))
 
+    # 【2026-08-05 审查修复】识别"幽灵任务"：状态文件说 started，
+    # 但对应 scratch 工作目录已不存在。
+    # 原先 status 只读 HEAVY_STATE/*.json 就报告 started，而
+    # heavy --finish 按当前 SCRATCH 查找会报"任务不存在" ——
+    # 两边判据不一致，排查时极易被误导（本次审查即被误导过）。
+    # 根因是残留状态文件（scratchPath 指向早已废弃的临时目录）。
+    heavy_orphans = []
+    for _tf in heavy_tasks:
+        _ts = _load_json(_tf)
+        if _ts.get("status") == "started":
+            _name = _ts.get("taskName")
+            if isinstance(_name, str) and _name and not (SCRATCH / _name).exists():
+                heavy_orphans.append(_name)
+
     from ..logs import _load_state as _logs_state
 
     ls = _logs_state()
@@ -89,6 +103,7 @@ def _collect_status_data() -> dict[str, Any]:
         "active": active,
         "total": total,
         "heavy_tasks": heavy_tasks,
+        "heavy_orphans": heavy_orphans,
         "last_rot": last_rot,
         "count": count,
         "broker_lines": broker_lines,
@@ -134,6 +149,11 @@ def _format_status_text(d: dict[str, Any], verbose: bool = False) -> str:
             stat = ts.get("status", "?")
             tsum = ts.get("summary", "")
             icon = "🔄" if stat == "started" else ("✅" if stat == "finished" else "⏳")
+            # 【2026-08-05 审查修复】幽灵任务标注 —— 判定在采集阶段完成
+            # （SCRATCH 只在 _collect_status_data 作用域内可见）
+            if name in d.get("heavy_orphans", ()):
+                icon = "⚠️"
+                stat = f"{stat}（工作目录已不存在，疑似残留状态）"
             lines.append(f"     {icon} {name}: {stat} - {trim_summary(tsum, 100)}")
             if verbose and ts.get("checkedAt"):
                 lines.append(f"        checkedAt: {ts.get('checkedAt')}")
