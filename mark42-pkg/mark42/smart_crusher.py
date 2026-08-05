@@ -30,7 +30,7 @@ class SmartCrusher:
         self.max_numeric_array_len = max_numeric_array_len
 
     def crush(self, content: str) -> tuple[str, dict]:
-        stats = {
+        stats: dict[str, Any] = {
             "algorithm": "smartcrush",
             "original_bytes": len(content.encode('utf-8')),
             "crushed_bytes": 0,

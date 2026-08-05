@@ -126,12 +126,12 @@ class ModuleHealthMonitor:
             elif check == "consciousness_check":
                 from .consciousness import Consciousness
                 cs = Consciousness()
-                # self_check() 返回 SelfCheckResult（dataclass），不是 dict。
-                # mypy 此前把 r 推成 dict[str, Any] 是因为上文同名变量复用（P3-4）。
-                r = cs.self_check()
+                # 【P3-4】不复用变量名 r —— 上文 r 是 armor_check() 返回的 dict,
+                # 这里是 SelfCheckResult(dataclass), 同名不同类型
+                self_check = cs.self_check()
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
-                health.status = "green" if r.healthy else "yellow"
-                health.error_rate = len(r.issues) / 10.0
+                health.status = "green" if self_check.healthy else "yellow"
+                health.error_rate = len(self_check.issues) / 10.0
 
             elif check == "advisor_ping":
                 from .advisor_client import AdvisorClient

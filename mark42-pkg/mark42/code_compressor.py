@@ -18,6 +18,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 import re
+from typing import Any
 
 from mark42.utils import safe_call
 
@@ -63,7 +64,7 @@ class CodeCompressor:
         Returns:
             (压缩后代码, 统计信息)
         """
-        stats = {
+        stats: dict[str, Any] = {
             "algorithm": "code_compress",
             "language": self.language,
             "original_bytes": len(content.encode("utf-8")),

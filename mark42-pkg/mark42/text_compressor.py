@@ -19,6 +19,7 @@
 """
 
 import re
+from typing import Any
 
 # 【2026-07-13】不能用相对路径, algo_scheduler 从外部 import
 from mark42.utils import safe_call
@@ -306,7 +307,7 @@ class TextCompressor:
 
     def compress(self, text: str) -> tuple[str, dict]:
         """压缩通用文本"""
-        stats = {
+        stats: dict[str, Any] = {
             "algorithm": "text_compress",
             "original_bytes": 0,
             "original_lines": 0,

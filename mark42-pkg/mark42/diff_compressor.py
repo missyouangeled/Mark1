@@ -16,6 +16,7 @@
 """
 
 import re
+from typing import Any
 
 from mark42.utils import safe_call
 
@@ -48,7 +49,7 @@ class DiffCompressor:
         Returns:
             (压缩后 diff, 统计信息)
         """
-        stats = {
+        stats: dict[str, Any] = {
             "algorithm": "diff_compress",
             "original_bytes": len(content.encode("utf-8")),
             "original_lines": 0,

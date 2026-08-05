@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from . import AUDIT_CATEGORIES, VERDICT_FAIL_CATEGORIES, VERDICT_PASS_THRESHOLD, AuditResult, Finding
 
@@ -45,7 +45,9 @@ class LLMChecker:
     """
 
     def __init__(self) -> None:
-        self._llm_call = None  # 延迟初始化
+        # 延迟初始化。标注为 Any 是因为 LLMProvider 为 Protocol，
+        # 且构造失败时保持 None（P3-4）
+        self._llm_call: Any | None = None
 
     def _get_llm(self):
         """延迟加载 LLM provider。

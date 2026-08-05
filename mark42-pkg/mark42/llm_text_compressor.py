@@ -125,7 +125,7 @@ class LLMTextCompressor:
 
     def compress(self, text: str) -> tuple[str, dict]:
         """压缩文本; 失败时回退到 rule_based"""
-        stats = {
+        stats: dict[str, Any] = {
             "algorithm": "llm_text_compress",
             "mode": self.mode,
             "original_bytes": 0,

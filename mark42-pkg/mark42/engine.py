@@ -481,8 +481,14 @@ def engine_run_loop(name: str, persist: bool = True, _loops: dict[str, Any] | No
                 disk_root = f"{disk_root_gb:.1f}G"
                 data_usage = shutil.disk_usage(str(DATA_MOUNT)) if DATA_MOUNT.exists() else None
                 disk_data = f"{data_usage.free / (1024**3):.1f}G" if data_usage else "N/A"
-                with open("/proc/meminfo") as f:
-                    meminfo = {line.split()[0].rstrip(":"): int(line.split()[1]) for line in f if line}
+                # 【P3-4】此处不能复用变量名 f —— 上文 f 是失败计数(int),
+                # 同名不同类型会让 mypy 推断混乱, 也降低可读性
+                with open("/proc/meminfo") as meminfo_fp:
+                    meminfo = {
+                        line.split()[0].rstrip(":"): int(line.split()[1])
+                        for line in meminfo_fp
+                        if line
+                    }
                 mem_avail_mb = meminfo.get("MemAvailable", 0) // 1024
                 mem_avail = f"{mem_avail_mb}M"
             except Exception:

@@ -60,24 +60,30 @@ def _lite_toml_parse(text: str) -> dict[str, Any]:
 
         # key = value
         if "=" in line:
-            key, _, val = line.partition("=")
+            key, _, raw_val = line.partition("=")
             key = key.strip()
-            val = val.strip()
+            # 【P3-4】val 会依次尝试收敛为 bool/int/float，是刻意设计，
+            # 故显式标注联合类型而非让 mypy 锁定为 str
+            val: str | bool | int | float = raw_val.strip()
 
             # 去引号
-            if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
-                val = val[1:-1]
+            text_val = val if isinstance(val, str) else str(val)
+            if (
+                (text_val.startswith('"') and text_val.endswith('"'))
+                or (text_val.startswith("'") and text_val.endswith("'"))
+            ):
+                val = text_val[1:-1]
                 # 处理 ~ 展开
-                if val.startswith("~"):
+                if isinstance(val, str) and val.startswith("~"):
                     val = str(Path.home() / val[2:])
-            elif val.lower() in ("true", "false"):
-                val = val.lower() == "true"
+            elif text_val.lower() in ("true", "false"):
+                val = text_val.lower() == "true"
             else:
                 try:
-                    val = int(val)
+                    val = int(text_val)
                 except ValueError:
                     try:
-                        val = float(val)
+                        val = float(text_val)
                     except ValueError:
                         pass  # 保持字符串
 
@@ -298,7 +304,7 @@ def reload() -> dict[str, Any]:
 # ── 交互式配置向导 ────────────────────────────────────────
 
 
-def _prompt(msg: str, default: str | int | bool = None) -> str:
+def _prompt(msg: str, default: str | int | bool | None = None) -> str:
     """带默认值的输入提示。"""
     if default is not None:
         return input(f"  {msg} [{default}]: ").strip() or str(default)
