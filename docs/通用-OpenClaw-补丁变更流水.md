@@ -2537,3 +2537,82 @@ P3-4 剩余 106 项 mypy 属渐进式标注债（`no-any-return` 27、`index` 17
 **系统整体健康，无假死。** 服务层、Loop 层、核心能力层全部实测通过。发现的问题集中在**退出码语义**与**展示层一致性**两类——都不影响核心功能，但会在自动化场景下掩盖真实失效（`revalidate` 那个尤其危险：能力完全不可用却报成功）。
 
 审查方法上值得记的一条：**三次差点误判，都是因为"看到一个陈旧时间戳就下结论"**。正确做法是先确认自己看的是不是进程真正在写的那个文件（`/proc/<pid>/fd/1`）。
+
+## 2026-08-05 11:45:00 CST (+08:00) — 审查遗留项闭环：配置切换 + 重复实现合并 + 残留清理
+
+- 类型：config + refactor + cleanup
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- commits：36fc3bdb（合并重复实现）
+- 用户决策：点点确认「1 改成火山方舟，2 按建议来」
+
+### 一、model.yaml consciousness 切换到火山方舟
+
+**变更前**：`agnes-2.0-flash` @ `apihub.agnes-ai.com`
+**变更后**：`glm-5.2` @ `ark.cn-beijing.volces.com/api/plan/v3`（与 advisor 同源）
+
+操作规范：
+- 已备份到 `~/.config/mark42/model.yaml.bak-20260805-112728`
+- **切换前先用 curl 实测该 key 可调通**（返回正常 completion），不是照抄了就算
+- 只改 consciousness 段，advisor 与 fallback_chain 未动（YAML 校验确认）
+- 配置内注释写清了变更原因与依据
+
+**效果实测（唯一验收标准）**：
+
+| | 变更前 | 变更后 |
+|---|---|---|
+| 读协议验证 | **0/10 全败**（Network is unreachable） | **9/10 通过** |
+| 退出码 | rc=0（谎报成功） | rc=0（真实通过） |
+| 失败时退出码 | rc=0 | rc=1（前一轮已修） |
+
+即：该能力从**完全不可用**恢复为**正常工作**。
+
+### 二、合并 status_dashboard 重复实现（36fc3bdb）
+
+`cli/__init__.py` 的 199 行单体版与 `cli/status.py` 的模块化版长期并存。
+
+合并前**严格比对确认不改变行为**：
+- JSON 模式 9 个共有字段值完全一致
+- `status.py` 版额外有 `telemetry` 字段（旧单体缺失）
+- 文本模式非空输出行数相同（均 23 行）
+→ `status.py` 版是严格超集，保留它、删单体，`__init__.py` 改薄委托层
+（保留函数名以免破坏 `actions_runner` 等模块的既有导入）
+
+**合并收益已实测**：
+- 幽灵任务 ⚠️ 标注**走 CLI 也生效了**（此前只在直接调函数时可见——这正是双份实现的危害）
+- `status --json` 现在也输出 `telemetry`
+- 四种输出模式全部 rc=0
+
+### 三、清理 /mnt/data 僵尸日志副本
+
+那份日志 **7-14 就停止更新**，`~/.local/state` 才是活的（清理时仍在写）。
+
+处理方式：**归档而非删除**（保留 7 月历史可查）→ `logs-archived-until-20260714/`，
+并在原目录留 `README.md` 写明：
+- 真实日志在哪
+- 为什么会有两个目录（systemd 用 `MARK42_LOG_DIR` 覆盖了代码默认值）
+- **这个陷阱坑过人**（本次审查差点误判假死）
+- 排查守则：`ls -l /proc/<MainPID>/fd/1` 确认进程真正在写哪个文件
+
+### 四、清理残留状态文件
+
+备份到 `/mnt/data/openclaw/mark42/state-residue-backup-20260805-114129/`（含 README 与恢复方式）：
+
+| 文件 | 来源 | 危害 |
+|---|---|---|
+| `t1.json` / `t2.json` | 8-04 17:45 审查 P2-17 时的测试残留 | status 报 started 而 finish 报"不存在" |
+| `daemon-heartbeat-main.json` | 7-13 旧格式（带 `agent` 字段） | mtime 停在 23 天前，会被误判心跳停摆 |
+| `loops-main.json.lock` | 对应状态文件已不存在 | 陈旧锁误导 |
+
+清理后验证：`status` 正确显示"无活跃任务"，6 条 CLI 路径全 rc=0，三服务未受影响。
+
+### 审查遗留项闭环状态
+
+| 优先级 | 项 | 状态 |
+|---|---|---|
+| P1 | model.yaml 指向废弃端点 | ✅ 已切火山方舟，revalidate 恢复 9/10 |
+| P1 | status_dashboard 重复实现 | ✅ 已合并 |
+| P2 | /mnt/data 僵尸日志 | ✅ 已归档 + 留 README 防误导 |
+| P2 | lifecycle-maintainer exit 1 | ⏸️ 未修（功能正常，属退出码语义，与 revalidate 同类；属 OpenClaw 侧脚本非 Mark42） |
+| P3 | t1/t2 残留状态 | ✅ 已清理（可恢复） |
+| P3 | daemon-heartbeat-main 孤儿 | ✅ 已清理（可恢复） |
