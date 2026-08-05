@@ -2272,3 +2272,56 @@
 ### 方案进度
 
 P1 全部清零。剩余：P2-6（配置锁外读取）、P2-7（TOML 双轨制，路径部分已由 P2-16 接通）、P3-2/3/4/5/6。
+
+## 2026-08-05 09:00:00 CST (+08:00) — Mark42 P2-6：配置写入统一走锁内重读原语
+
+- 类型：fix (P2 级 — 数据丢失类)
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg（compaction_diag.py / context_safety.py / openclaw_config.py）
+- commit：749ce582
+
+### 问题（两处，均实证复现）
+
+`compaction_apply` 与 `context_safety_apply` 都在**锁外**读配置快照，锁只包住最后一步写入，中间隔着整个 diagnose/merge 过程。并发时拿陈旧快照**整份覆盖**，静默吃掉别人（另一模块 / Control UI / 用户）刚写的字段。
+
+> 讽刺的是 `compaction_diag` 的原注释已经明确写着"与 context_safety 并发时会基于旧快照整份覆盖，静默吃掉用户改动"，但代码并未解决。
+
+**复现结果**：A 读快照后 B 写入 `USER_EDIT` → A 落盘后 `USER_EDIT` 消失，**而 A 自己的修改正常生效**——所以不会有人察觉丢了东西。这是最难发现的一类 bug。
+
+另外，`context_safety` 这一处是我 P1-5 那轮手写流程时留下的，当时因为发现 `_exclusive_lock()` 不可重入而改成锁外读，属于同一缺陷的延续。
+
+### 修复
+
+关键发现：**仓里已经有正确的原语** `patch_openclaw_config(mutate=...)`——锁内重读、字段级 patch、备份、原子写、校验、回滚全都齐，比我 P1-5 手写那套更成熟。P2-6 的本质就是这两个调用方没用它。
+
+- 两处写入统一委托该原语
+- `compaction_diag` 抽出 `_collect_compaction_changes()` 作为 mutator，使变更能在锁内基于最新配置**重算**（原为一次性算好再整份写）
+- `context_safety` 的 mutator 内重新 merge，锁外快照仅用于 dry-run 预览与候选预校验
+- 锁内重读后若发现别人已对齐好，返回 `nothing_to_do` 而非重复写
+- `patch_openclaw_config` 新增 `config_path` 参数：跨模块调用时两边各自解析路径会造成**路径断裂**（已由 8 项既有测试实际暴露），调用方须显式传入
+- `compaction_diag` 保持 `validate=False`，不顺带改变原有校验行为
+
+### 验收
+
+- ruff 全过；全量 **1959 项收集 0 失败**（今日 1915 → 1925 → 1941 → 1951 → 1959）
+- 新增 7 项防回归；均验证有效：回退 compaction mutator → 2 项红；回退 context_safety mutator → 3 项红
+- 真实环境：`context-safety apply`(dry-run) rc=0；`--tune-compaction` rc=0；`openclaw config validate` 仍 Config valid；配置未被改动
+- 三个服务全部 active
+
+### 第三次遇到"测试把实现细节当契约"
+
+`test_call_sites_use_atomic_writer` 原本 grep 源码里是否出现 `_atomic_write_json` / `_exclusive_lock` 两个符号名。委托给 `patch_openclaw_config` 后该断言必然失败，**但安全性反而更强了**。
+
+按判据重写为断言真正的不变量：
+1. 不得出现裸 `open(..., "w")` 写配置（这才是要防的东西）
+2. 必须走安全写入通道之一（直接用原子写原语，或委托给自带锁的 `patch_openclaw_config`）
+3. 新增守卫：直接用原子写就必须自己拿跨进程锁
+
+并做了**自我验证**：往 `context_safety.py` 注入一段裸 `open(...,"w")` 写配置的代码，新测试立即报红——比原来靠符号名的版本更实在。
+
+> 今日第三次命中这个模式（前两次：`test_cost_tracker` 用 `timestamp[:10]` 当查询日期、`test_module_default_points_at_real_path` grep 硬编码常量）。这已经不是偶发，而是这个仓库的系统性测试债：**用"源码里有没有某个字符串"替代"行为对不对"**。建议后续审查专门扫一遍这类测试。
+
+### 方案进度
+
+P1 全部清零。P2 仅剩 P2-7（TOML 双轨制，路径部分已由 P2-16 接通）。剩余 P3-2/3/4/5/6。
