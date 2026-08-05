@@ -156,7 +156,9 @@ def _build_handlers() -> dict[str, Callable[..., ActionResult]]:
                 commandPreview=preview,
                 agent=target,
             )
-        result = assemble_restart(agent=target)
+        # 【P3-4】assemble_restart() 不接受 agent 参数，原调用运行时直接
+        # TypeError。它内部对全部 assemble 进程操作，agent 只用于结果标注。
+        result = assemble_restart()
         return ActionResult(
             actionId="restart-assemble",
             executed=True,
@@ -180,7 +182,9 @@ def _build_handlers() -> dict[str, Callable[..., ActionResult]]:
                 agent=agent,
             )
 
-        aggregate = status_dashboard(json_mode=True, all_agents=True)
+        # 【P3-4】status_dashboard() 只有 (json_mode, verbose)，
+        # 原调用传 all_agents 运行时直接 TypeError。
+        aggregate = status_dashboard(json_mode=True)
         action_count = len((aggregate or {}).get("suggestedActions", []))
         return ActionResult(
             actionId="refresh-actions",

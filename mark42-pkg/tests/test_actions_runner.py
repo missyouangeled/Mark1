@@ -109,7 +109,25 @@ class TestExecuteAction:
 
         assert result.executed is True
         assert result.metadata.get("pid") == 9999
-        restart_mock.assert_called_once_with(agent="main")
+        # 【2026-08-05 P3-4】原断言 assert_called_once_with(agent="main") 把
+        # **会抛 TypeError 的调用**固化成了预期 —— assemble_restart() 签名是零参。
+        # 因为这里用 mock 替换了真函数，签名不符永远暴露不出来。
+        # 现按真实契约断言：不带参数调用。
+        restart_mock.assert_called_once_with()
+
+    def test_assemble_restart_called_with_real_signature(self):
+        """防回归：actions_runner 对 assemble_restart 的调用必须符合真实签名。
+
+        用 mock 断言调用形式无法发现签名不符（mock 接受任何参数），
+        因此这里直接用 inspect 校验真实函数能否接受该调用形式。
+        """
+        import inspect
+
+        from mark42.cli import assemble_restart, status_dashboard
+
+        # 这两个调用形式必须是合法的，否则运行时 TypeError
+        inspect.signature(assemble_restart).bind()
+        inspect.signature(status_dashboard).bind(json_mode=True)
 
     def test_dry_run_only_action_refused_even_with_yes(self, pending_actions_file, mocker):
         restart_mock = mocker.patch("mark42.cli.assemble_restart")
@@ -165,7 +183,10 @@ class TestExecuteAction:
 
         assert result.executed is True
         assert result.metadata["actionCount"] == 2
-        mock_status.assert_called_once_with(json_mode=True, all_agents=True)
+        # 【2026-08-05 P3-4】原断言含 all_agents=True，但 status_dashboard()
+        # 只有 (json_mode, verbose) —— 该调用运行时直接 TypeError。
+        # mock 替换后签名不符被完全掩盖。现按真实契约断言。
+        mock_status.assert_called_once_with(json_mode=True)
 
 
 class TestCliBridge:

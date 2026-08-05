@@ -647,7 +647,15 @@ def _print_audit_report(r: dict) -> None:
     print(f"   摘要: {r.get('postSummary', {}).get('path', '?')}")
 
 
-def main() -> None:
+def main() -> int | None:
+    """CLI 主入口。
+
+    【P3-4】返回类型从 None 改为 int | None：P2-17 加入的
+    watchdog / install / uninstall 分支会 return int 作为进程退出码，
+    原标注 `-> None` 与实际契约矛盾（mypy return-value + func-returns-value），
+    而 `raise SystemExit(main())` 的退出码语义正依赖这个返回值。
+    返回 None 表示成功（SystemExit(None) 等价于退出码 0）。
+    """
     parser = argparse.ArgumentParser(
         description="Mark42 模块化智能铠甲系统",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1355,9 +1363,9 @@ def main() -> None:
             print(f"  setup: {'✅' if r.setup_ok else '❌'} | execute: {'✅' if r.execute_ok else '❌'} | verify: {'✅' if r.verify_ok else '❌'} | cleanup: {'✅' if r.cleanup_ok else '❌'}")
             print(f"  详情: {r.details}")
         elif args.action == "history":
-            h = ce.get_results(limit=50)
-            print(f"📜 Chaos Test 历史 ({len(h)} 条)\n")
-            for r in h:
+            history = ce.get_results(limit=50)
+            print(f"📜 Chaos Test 历史 ({len(history)} 条)\n")
+            for r in history:
                 icon = "✅" if r.get('status') == "passed" else "❌"
                 print(f"  {icon} {r.get('experiment',''):<30} {r.get('started_at','')[:19]}  {r.get('duration_ms',0)}ms")
         return
@@ -1369,11 +1377,21 @@ def main() -> None:
         if args.action == "check":
             results = mhm.check_all()
             print(f"🔌 模块级协议检查 ({len(results)} 模块)\n")
-            for h in results:
-                icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(h.status, "?")
-                lat = f"{h.latency_ms}ms" if h.latency_ms is not None else "-"
-                fb = f" [fallback: {h.fallback_active}]" if h.fallback_active else ""
-                print(f"  {icon} {h.module_name:<15} {lat:<8} {h.status}{fb}")
+            for health in results:
+                icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(
+                    health.status, "?"
+                )
+                lat = (
+                    f"{health.latency_ms}ms" if health.latency_ms is not None else "-"
+                )
+                fb = (
+                    f" [fallback: {health.fallback_active}]"
+                    if health.fallback_active
+                    else ""
+                )
+                print(
+                    f"  {icon} {health.module_name:<15} {lat:<8} {health.status}{fb}"
+                )
         elif args.action == "summary":
             s = mhm.summary()
             print("🔌 模块级协议摘要\n")

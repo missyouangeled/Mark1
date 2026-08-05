@@ -126,6 +126,8 @@ class ModuleHealthMonitor:
             elif check == "consciousness_check":
                 from .consciousness import Consciousness
                 cs = Consciousness()
+                # self_check() 返回 SelfCheckResult（dataclass），不是 dict。
+                # mypy 此前把 r 推成 dict[str, Any] 是因为上文同名变量复用（P3-4）。
                 r = cs.self_check()
                 health.latency_ms = int((time.monotonic() - t0) * 1000)
                 health.status = "green" if r.healthy else "yellow"

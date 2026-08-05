@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +73,17 @@ class CircuitBreaker:
         half_open -> 失败 -> open（重置计时）
     """
 
+    # 【P3-4】类级共享状态改为**显式声明**。
+    # 原实现用 hasattr + type(self)._shared_xxx = ... 动态创建类属性，
+    # 语义正确但 mypy 无法识别（4 处 attr-defined）。
+    # 显式声明后语义完全等价：仍是类级共享，同进程所有实例共用。
+    _shared_breakers: ClassVar[dict[str, BreakerState]] = {}
+    _shared_lock: ClassVar[threading.Lock] = threading.Lock()
+
     def __init__(self):
         # 单例共享状态：同一进程内所有 CircuitBreaker() 实例共享 _breakers
-        if not hasattr(self, '_shared_breakers'):
-            type(self)._shared_breakers: dict[str, BreakerState] = {}
         self._breakers = type(self)._shared_breakers
         # 保护半开试探名额的原子性（同进程多线程）
-        if not hasattr(type(self), '_shared_lock'):
-            type(self)._shared_lock = threading.Lock()
         self._lock = type(self)._shared_lock
 
     @classmethod

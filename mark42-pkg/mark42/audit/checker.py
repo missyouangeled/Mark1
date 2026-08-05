@@ -10,10 +10,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Protocol, runtime_checkable
 
 from . import AUDIT_CATEGORIES, VERDICT_FAIL_CATEGORIES, VERDICT_PASS_THRESHOLD, AuditResult, Finding
+
+logger = logging.getLogger(__name__)
 
 # ── 接口 ──────────────────────────────────────────────
 
@@ -45,16 +48,27 @@ class LLMChecker:
         self._llm_call = None  # 延迟初始化
 
     def _get_llm(self):
-        """延迟加载 LLM provider。"""
+        """延迟加载 LLM provider。
+
+        【2026-08-05 修复 P3-4】原实现 `from ..llm_provider import get_llm_provider`
+        导入的函数**根本不存在**（真实入口是 build_consciousness / build_provider），
+        而外层 `except Exception: return None` 把 ImportError 静默吞掉 ——
+        于是审计的 LLM 语义对比能力一直降级为 None，**从未真正工作过**，
+        且没有任何日志可循（与 P3-5 同源）。
+        """
         if self._llm_call is not None:
             return self._llm_call
         try:
-            from ..llm_provider import get_llm_provider
-            provider = get_llm_provider()
-            if provider:
-                self._llm_call = provider
+            from ..llm_provider import build_consciousness
+
+            self._llm_call = build_consciousness()
             return self._llm_call
-        except Exception:
+        except ImportError as e:
+            # 接口缺失属于代码级问题，必须显著告警而非静默降级
+            logger.error("LLM provider 接口缺失，审计将降级为规则模式: %s", e)
+            return None
+        except Exception as e:
+            logger.warning("LLM provider 构造失败，审计降级为规则模式: %s", e)
             return None
 
     def check(

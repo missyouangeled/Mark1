@@ -40,7 +40,9 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # 舒适范围定义（基于 128K+ 上下文窗口模型的实践数据）
-_COMFORT_ZONES = {
+# 【P3-4】异构 dict 显式标注：否则 zone["advice_low"] 被推成 object，
+# 调 .format() 报 attr-defined。
+_COMFORT_ZONES: dict[str, dict[str, Any]] = {
     # 键: (最小值, 舒适值, 最大值, 单位, 说明)
     "maxActiveTranscriptBytes": {
         "min": 1_000_000,     # ~1MB

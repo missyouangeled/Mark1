@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -90,7 +91,9 @@ class CompressorRegistry:
             "priority": priority,
         })
 
-    def select(self, content: str, content_type: str = "") -> tuple[str, callable]:
+    def select(
+        self, content: str, content_type: str = ""
+    ) -> tuple[str, Callable[..., Any]]:
         """根据内容选择最优压缩算法。
 
         从模块级全局命名空间动态查找函数，使 monkeypatch 有效。

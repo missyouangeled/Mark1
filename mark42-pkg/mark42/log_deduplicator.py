@@ -20,6 +20,7 @@
 
 import re
 from collections import Counter, OrderedDict
+from typing import Any
 
 # ============================================================================
 # LogDeduplicator - 借鉴 Headroom log dedup
@@ -84,7 +85,10 @@ class LogDeduplicator:
         Returns:
             (压缩后文本, 统计信息)
         """
-        stats = {
+        # 【P3-4】异构 dict 必须显式标注为 dict[str, Any]，否则 mypy 推成
+        # dict[str, object]，导致下方 stats["x"] += n 与 max(1, stats["y"])
+        # 报 operator / call-overload 错误（方案点名 166 与 180 两行）。
+        stats: dict[str, Any] = {
             "algorithm": "log_dedup",
             "original_bytes": len(content.encode('utf-8')),
             "original_lines": 0,

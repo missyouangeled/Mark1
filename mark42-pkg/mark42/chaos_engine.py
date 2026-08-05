@@ -355,7 +355,10 @@ class ChaosEngine:
         )
         return {"action": "restart"}
 
-    def _verify_kill_engine(self, dry_run: bool = True) -> dict:
+    # 【P3-4】以下 _verify_* 的真实契约是 bool | dict：
+    # run_experiment 用 bool(verify_result) 判定成功，若为 dict 则并入 metrics。
+    # 原标注 -> dict 与全部实现不符，mypy 报 11 处 return-value。
+    def _verify_kill_engine(self, dry_run: bool = True) -> bool | dict:
         """验证 engine 恢复运行。"""
         if dry_run:
             return True
@@ -389,7 +392,7 @@ class ChaosEngine:
         )
         return {"action": "restart"}
 
-    def _verify_kill_armor(self, dry_run: bool = True) -> dict:
+    def _verify_kill_armor(self, dry_run: bool = True) -> bool | dict:
         if dry_run:
             return True
         for _ in range(10):
@@ -421,7 +424,7 @@ class ChaosEngine:
             f.write(b"\0")
         return {"action": "fill", "file": str(tmp_file), "size_gb": 1}
 
-    def _verify_fill_disk(self, dry_run: bool = True) -> dict:
+    def _verify_fill_disk(self, dry_run: bool = True) -> bool | dict:
         """验证磁盘监控检测到了空间不足。"""
         if dry_run:
             return True
@@ -449,7 +452,7 @@ class ChaosEngine:
         # 实际实现可以临时修改 llm_provider 的 timeout 为 0.001s
         return {"action": "latency"}
 
-    def _verify_network_latency(self, dry_run: bool = True) -> dict:
+    def _verify_network_latency(self, dry_run: bool = True) -> bool | dict:
         """验证降级链路触发。"""
         if dry_run:
             return True
@@ -471,7 +474,7 @@ class ChaosEngine:
             return {"action": "high_context (dry_run)"}
         return {"action": "high_context"}
 
-    def _verify_high_context(self, dry_run: bool = True) -> dict:
+    def _verify_high_context(self, dry_run: bool = True) -> bool | dict:
         """验证压缩触发。"""
         if dry_run:
             return True
@@ -498,7 +501,7 @@ class ChaosEngine:
             cb.record_failure("core_1_main_consciousness", "chaos test")
         return {"action": "trip", "failures": 5}
 
-    def _verify_circuit_breaker(self, dry_run: bool = True) -> dict:
+    def _verify_circuit_breaker(self, dry_run: bool = True) -> bool | dict:
         """验证熔断器已 trip。"""
         if dry_run:
             return True
@@ -549,7 +552,7 @@ class ChaosEngine:
         self._original_load_config = original_load
         return {"action": "degrade"}
 
-    def _verify_consciousness_degraded(self, dry_run: bool = True) -> dict:
+    def _verify_consciousness_degraded(self, dry_run: bool = True) -> bool | dict:
         """验证 stub 降级生效：用被破坏的配置实际调用，检查是否回退到 stub。"""
         if dry_run:
             return True
@@ -608,7 +611,7 @@ class ChaosEngine:
         self._leak_ref = leak
         return {"action": "leak", "alloc_mb": 100, "held": True}
 
-    def _verify_memory_leak(self, dry_run: bool = True) -> dict:
+    def _verify_memory_leak(self, dry_run: bool = True) -> bool | dict:
         """验证 RSS 增长 > 50MB。"""
         if dry_run:
             return {"verified": True, "reason": "dry-run"}
@@ -662,7 +665,7 @@ class ChaosEngine:
         time.sleep(2.0)
         return {"action": "spawn", "procs": len(procs)}
 
-    def _verify_cpu_spike(self, dry_run: bool = True) -> dict:
+    def _verify_cpu_spike(self, dry_run: bool = True) -> bool | dict:
         """验证 load > baseline + 1.0。"""
         if dry_run:
             return {"verified": True, "reason": "dry-run"}
@@ -729,7 +732,7 @@ class ChaosEngine:
         target.write_text("= = = invalid = = =\n[broken\nkey = \n", encoding="utf-8")
         return {"action": "corrupt", "target": str(target)}
 
-    def _verify_config_corruption(self, dry_run: bool = True) -> dict:
+    def _verify_config_corruption(self, dry_run: bool = True) -> bool | dict:
         """验证 mark42 不崩（仅尝试 import user_config）。"""
         if dry_run:
             return {"verified": True, "reason": "dry-run"}
@@ -794,7 +797,7 @@ class ChaosEngine:
             return {"action": "spawn_failed", "pid": p_zombie.pid}
         return {"action": "spawn", "pid": p_zombie.pid}
 
-    def _verify_process_zombie(self, dry_run: bool = True) -> dict:
+    def _verify_process_zombie(self, dry_run: bool = True) -> bool | dict:
         """验证进程存在但 CPU=0。"""
         if dry_run:
             return {"verified": True, "reason": "dry-run"}

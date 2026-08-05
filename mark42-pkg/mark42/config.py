@@ -495,15 +495,18 @@ def resolve_model(config_key: str) -> dict[str, Any] | None:
     # 作为包模块（mark42.config）时走相对导入；
     # 被当顶层模块加载（llm_text_compressor 的 `from config import ...`
     # 兵底路径）时相对导入会抛 ImportError，退回绝对导入。
+    # 三层兼容导入：赋给同一变量而非重复 import 同名符号
+    # （重复 import 会触发 mypy no-redef，P3-4）
+    _resolver: Any
     try:
-        from .user_config import get_openclaw_config_path
+        from .user_config import get_openclaw_config_path as _resolver
     except ImportError:  # pragma: no cover - 无包上下文的兵底分支
         try:
-            from mark42.user_config import get_openclaw_config_path
+            from mark42.user_config import get_openclaw_config_path as _resolver
         except ImportError:
-            from user_config import get_openclaw_config_path
+            from user_config import get_openclaw_config_path as _resolver
 
-    openclaw_path = get_openclaw_config_path()
+    openclaw_path = _resolver()
     if openclaw_path.exists():
         try:
             oc = json.loads(openclaw_path.read_text())

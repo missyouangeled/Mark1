@@ -70,7 +70,11 @@ def _measure_peak_kb(run_once: Callable[[], Any]) -> float:
     return peak / 1024
 
 
-def _warmup(run_once: Callable[[], Any], sample: str, warmup_runs: int = 1) -> None:
+def _warmup(
+    run_once: Callable[[str], Any], sample: str, warmup_runs: int = 1
+) -> None:
+    """预热。注意 run_once 接收 sample 单参数 —— 原标注写成 Callable[[], Any]
+    与全部 3 个调用点不符（mypy call-arg，P3-4）。"""
     for _ in range(warmup_runs):
         run_once(sample)
 
