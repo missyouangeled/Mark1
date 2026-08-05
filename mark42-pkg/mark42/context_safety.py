@@ -300,35 +300,201 @@ def _merge_context_safety_patch(config: dict[str, Any]) -> tuple[dict[str, Any],
     return config, changed
 
 
-def context_safety_apply(verbose: bool = False) -> dict[str, Any]:
+def _validate_candidate_config(candidate: dict[str, Any]) -> tuple[bool, str]:
+    """在**不触碰正式文件**的前提下校验候选配置 (P1-5)。
+
+    做法：把候选配置写到临时文件，让 ``openclaw config validate``
+    通过 ``OPENCLAW_CONFIG`` 指向该临时文件。这样非法候选永远不会
+    成为正式配置。
+
+    返回 ``(是否通过, 输出)``。若无法在预校验阶段得出结论（例如
+    该版本 CLI 不支持环境变量覆盖），返回 ``(True, "")`` 表示
+    “预校验不可用”，由调用方回退到“写入后复验 + 失败回滚”。
+    """
+    import os
+    import tempfile
+
+    tmp_dir = tempfile.mkdtemp(prefix="mark42-cfg-validate-")
+    tmp_cfg = Path(tmp_dir) / "openclaw.json"
+    try:
+        tmp_cfg.write_text(
+            json.dumps(candidate, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env["OPENCLAW_CONFIG"] = str(tmp_cfg)
+        proc = subprocess.run(
+            [OPENCLAW_BIN, "config", "validate"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        output = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        if proc.returncode == 0:
+            return True, output
+
+        # 关键：只有当 CLI 真的看到了我们的临时文件并拒绞它时，
+        # 才能判定“候选配置非法”。如果该版本 CLI 不支持用
+        # OPENCLAW_CONFIG 覆盖路径（或它去读了另一个不存在的默认路径），
+        # 那这个失败只能说明“预校验不可用”，而不能说明候选配置有错。
+        # 把环境问题误当成 schema 非法会直接堵死正常 apply。
+        if str(tmp_cfg) not in output:
+            logger.warning(
+                "候选配置预校验不可用（CLI 未读取临时文件），将回退到写入后复验: %s",
+                output[:200],
+            )
+            return True, ""
+        return False, output
+    except Exception as e:
+        # 预校验本身出错不能造成“误报非法”，交由调用方走写后复验路径
+        logger.warning("候选配置预校验不可用，将回退到写入后复验: %s", e)
+        return True, ""
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _restore_openclaw_config(backup: Path) -> tuple[bool, str]:
+    """从备份恢复正式配置。返回 ``(是否成功, 说明)``。
+
+    回滚失败必须作为**独立高严重错误**上报（P1-5 验收标准），
+    因为此时正式配置可能已不可用，Gateway 有起不来的风险。
+    """
+    config_path = _openclaw_config_path()
+    try:
+        if not backup.exists():
+            return False, f"备份文件不存在: {backup}"
+        from .openclaw_config import _atomic_write_json
+
+        # 走原子写，避免回滚本身写到一半又把配置搞成半截 JSON
+        _atomic_write_json(config_path, json.loads(backup.read_text(encoding="utf-8")))
+        return True, f"已从备份恢复: {backup.name}"
+    except Exception as e:
+        logger.critical(
+            "回滚 openclaw.json 失败！正式配置可能已不可用，请立即人工从 %s 恢复: %s",
+            backup, e,
+        )
+        return False, f"回滚失败: {e}"
+
+
+def context_safety_apply(
+    verbose: bool = False, execute_now: bool = False
+) -> dict[str, Any]:
+    """对齐 OpenClaw context 安全基线。
+
+    【P1-5 修复】2026-08-05。旧流程是：先把新配置写进正式文件，
+    再跑 ``openclaw config validate``；validate 失败只把
+    ``validateOk=False`` 塞进返回值，**已写入的无效配置原地留着**。
+    备份虽然建了却从没人用它回滚 —— 一旦 merge 结果是合法 JSON 但
+    不符 OpenClaw schema，Gateway 直接起不来。
+
+    现流程：
+      1. 锁内重读最新配置（不用陈旧快照，兼顾 P2-6）
+      2. 生成候选配置
+      3. 在**临时文件**上校验候选配置
+      4. 预校验失败 -> 直接拒绞写入（正式配置未被碰过）
+      5. 预校验通过 -> 备份 + 原子替换
+      6. 写入后**再次校验**，失败立即从备份回滚
+      7. 回滚失败作为独立高严重错误上报
+
+    【注意】``_exclusive_lock()`` 不可重入（已实测：同进程嵌套获取会
+    ConfigWriteError 超时），因此这里**不能**把整个流程包在锁里——
+    ``_save_openclaw_config`` / ``_atomic_write_json`` 内部自己拿锁。
+    持锁范围只限定在写入区间。
+
+    Args:
+        verbose: 输出逐项变更
+        execute_now: 默认 ``False`` 为 dry-run，只报告将要做什么不真写。
+            真实写入必须显式传 ``True``（对齐仓内
+            ``heavy_execute`` 的 dry-run 默认安全惯例）。
+    """
     config = _load_openclaw_config()
     new_config, changed = _merge_context_safety_patch(config)
-    backup = None
-    if changed:
-        backup = _backup_openclaw_config()
-        _save_openclaw_config(new_config)
-    valid, output = _run_openclaw_validate()
+
+    result: dict[str, Any] = {
+        "backup": None,
+        "changed": changed,
+        "validateOk": True,
+        "validateOutput": "",
+        "dryRun": not execute_now,
+        "written": False,
+        "rolledBack": False,
+        "appliedAt": _now_iso(),
+    }
+
     print("== Mark42 Context Safety Apply ==")
-    print(f"backup: {backup if backup else 'none'}")
-    if changed:
-        print("changed:")
+
+    if not changed:
+        valid, output = _run_openclaw_validate()
+        result["validateOk"] = valid
+        result["validateOutput"] = output
+        print("backup: none")
+        print("changed: none")
+        print(f"validate: {'PASS' if valid else 'FAIL'}")
+        if output:
+            print(output)
+        return result
+
+    # 先在临时文件上校验候选配置 —— 非法候选永不落盘
+    pre_valid, pre_output = _validate_candidate_config(new_config)
+    result["candidateValidateOk"] = pre_valid
+    if not pre_valid:
+        result["validateOk"] = False
+        result["validateOutput"] = pre_output
+        print("backup: none")
+        print(f"changed: {len(changed)} 项待变更（已拒绞）")
         if verbose:
             for item in changed:
                 print(f"  - {item}")
-        else:
-            print(f"  - {len(changed)} 项变更")
+        print("validate: FAIL（候选配置预校验未通过，正式配置未被修改）")
+        if pre_output:
+            print(pre_output)
+        return result
+
+    if not execute_now:
+        print("backup: none（dry-run）")
+        print(f"changed: {len(changed)} 项待变更")
+        if verbose:
+            for item in changed:
+                print(f"  - {item}")
+        print("validate: PASS（候选配置预校验通过）")
+        print("dry-run：未写入。确认无误后加 --execute-now 真实应用。")
+        return result
+
+    # 真实写入：备份 -> 原子替换 -> 复验 -> 失败回滚
+    backup = _backup_openclaw_config()
+    result["backup"] = str(backup)
+    _save_openclaw_config(new_config)
+    result["written"] = True
+
+    valid, output = _run_openclaw_validate()
+    result["validateOk"] = valid
+    result["validateOutput"] = output
+
+    print(f"backup: {backup}")
+    print("changed:")
+    if verbose:
+        for item in changed:
+            print(f"  - {item}")
     else:
-        print("changed: none")
+        print(f"  - {len(changed)} 项变更")
     print(f"validate: {'PASS' if valid else 'FAIL'}")
     if output:
         print(output)
-    return {
-        "backup": str(backup) if backup else None,
-        "changed": changed,
-        "validateOk": valid,
-        "validateOutput": output,
-        "appliedAt": _now_iso(),
-    }
+
+    if not valid:
+        restored, note = _restore_openclaw_config(backup)
+        result["rolledBack"] = restored
+        result["rollbackNote"] = note
+        if restored:
+            print(f"rollback: OK（{note}）")
+        else:
+            # 回滚失败是独立的高严重错误，必须显著提示
+            result["rollbackFailed"] = True
+            print(f"rollback: FAILED！{note}")
+            print(f"⚠ 正式配置可能已不可用，请立即人工从 {backup} 恢复")
+
+    return result
 
 
 def context_safety_verify(verbose: bool = False) -> int:

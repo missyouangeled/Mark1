@@ -766,6 +766,11 @@ def main() -> None:
     context_p = sub.add_parser("context-safety", help="🧯 OpenClaw context 安全基线")
     context_p.add_argument("action", nargs="?", choices=["status", "apply", "verify"], default="status")
     context_p.add_argument("--verbose", action="store_true", help="输出更详细的检查/变更信息")
+    context_p.add_argument(
+        "--execute-now",
+        action="store_true",
+        help="真实写入配置（apply 默认 dry-run，只报告不修改）",
+    )
     status_p = sub.add_parser("status", help="一屏聚合系统状态")
     status_p.add_argument("--json", action="store_true", help="输出 JSON 格式")
     status_p.add_argument("--verbose", action="store_true", help="输出更详细的状态信息")
@@ -1148,9 +1153,15 @@ def main() -> None:
             context_safety_verify,
         )
         if args.action == "apply":
-            result = context_safety_apply(verbose=getattr(args, 'verbose', False))
+            result = context_safety_apply(
+                verbose=getattr(args, 'verbose', False),
+                execute_now=getattr(args, 'execute_now', False),
+            )
             if not result.get("validateOk", False):
                 sys.exit(1)
+            # 回滚失败是独立的高严重错误，退出码必须区分于普通校验失败
+            if result.get("rollbackFailed"):
+                sys.exit(2)
         elif args.action == "verify":
             sys.exit(context_safety_verify(verbose=getattr(args, 'verbose', False)))
         else:
