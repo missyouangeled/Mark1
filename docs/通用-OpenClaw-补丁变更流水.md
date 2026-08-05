@@ -2178,3 +2178,51 @@
 排查结论：**预期行为，无需处理**。`mark42-armor-guard` / `engine-daemon` / `bootstrap` 三个 unit 均配置了 `BindsTo=openclaw-gateway.service`（2026-07-31 P1 加固引入），因此 gateway 重启时会一起停，gateway 起来后再自动拉起。当时 gateway 正在 `draining 2 active task(s)` 走优雅重启（本会话自身触发），08:03:51 gateway active，三服务随即全部 active。系统层 `systemctl is-system-running` 全程 `running`，无关机/挂起动作。
 
 教训：看到多个服务**同一秒**集体 Stopping 时，应先查 unit 之间的 `BindsTo`/`PartOf` 依赖关系，而不是先怀疑崩溃。
+
+## 2026-08-05 08:30:00 CST (+08:00) — Mark42 审查方案续推：P2-15 锁所有权 + P2-16 配置路径单一解析器
+
+- 类型：fix (P2 级可靠性 / 可配置性)
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 适用范围：mark42-pkg（armor.py / user_config.py / openclaw_config.py / context_safety.py / compaction_diag.py / config.py）
+- 补丁注册表：未更新
+- 重建清单：不适用
+- 升级后自检清单：不适用
+
+### P2-15：compact 锁 unlink 竞态（commit bd8a3a12）
+
+审核确认两处缺陷，均实证复现：
+1. 回收过期/损坏锁时 check 与 unlink 非原子。读锁到 unlink 之间，另一进程可能已回收旧锁并建立**新鲜锁**，无条件 unlink 会把别人的新锁踩掉 → 三个进程可同时 compact。
+2. **方案未列出的额外发现**：`_release_compact_lock()` 无条件 unlink。本进程锁若已超时被别人接管，释放时会删掉**对方正在用的锁**，互斥彻底失效。这条比 1 更易触发（每次 compact 结束都走）。
+3. 递归重试无上界，锁被反复抢占时可栈溢出。
+
+修复：锁内写唯一 token（pid + uuid4，PID 会被复用不能单靠）；新增 `_unlink_compact_lock_if_same()` 删除前重新比对 token + inode，不一致即放手；`_release_compact_lock()` 先验 pid 归属；递归改为带上界的 `_acquire_compact_lock_once()`。
+
+> 实测发现 **inode 存在复用**，仅靠 inode 会漏判——token 与 inode 双重校验缺一不可。
+
+验证：新增 `TestCompactLockOwnership` 11 项；防回归有效（回退 release 校验 → 1 项红；回退 token/inode 校验 → 2 项红）。
+
+### P2-16：openclaw.json 路径硬编码（commit c4739d03）
+
+审核确认存在，且比方案列出的多一处（共 4 处），`compaction_diag.py:22` 方案未列出。根因：四处各自硬编码，且**三处是模块级常量**（import 时即固化）。后果：`OPENCLAW_CONFIG` 环境变量与配置向导写入的 TOML `[paths] openclaw_config` 完全无效——**向导让用户填了却从不读取**，这正是 P2-7 双轨制的交汇点。实测四处全部忽略环境变量。
+
+修复：`user_config.get_openclaw_config_path()` 作为全仓唯一入口，优先级 CLI > 环境变量 > TOML > 平台默认；**刻意不缓存**（缓存等于重蹈模块级常量固化的覆辙）；四个调用方改延迟求值，三个模块加 `__getattr__` 保持向后兼容（46 处既有测试注入契约不破）。
+
+顺带修一个连带回归：`llm_text_compressor.py:245` 有 `from config import ...` 兜底路径会把 config 当顶层模块加载，此时相对导入必然 ImportError，已由 test_llm_text_compressor 60 项暴露，改为三层兼容导入。
+
+验证：新增 15 项防回归；防回归有效（回退环境变量支持 → 9 项转红）。
+
+### 本轮共同验收
+
+- ruff 全过；全量 **1941 项收集 0 失败**（本轮从 1925 增至 1941）
+- `python -m mark42 status` rc=0；gateway / armor-guard / engine-daemon 全部 active
+- 生产行为未变：无环境变量时解析器仍指向真实 `~/.openclaw/openclaw.json`
+- 已推送 origin/master（bd8a3a12、c4739d03）
+
+### 方法论沉淀（本轮两次踩到同类问题）
+
+两次遇到**测试把缺陷或实现细节固化成预期**的情况：
+- `test_openclaw_config.py::test_module_default_points_at_real_path` 靠 grep 源码字符串验证，把实现细节当契约——消除硬编码后它必然失败，但生产行为完全正确。
+- 昨日 `test_cost_tracker.py` 用 `timestamp[:10]` 当查询日期，是照着 bug 语义写的。
+
+**判据**：测试变红时先问「它断言的是正确语义，还是当前实现？」若是后者，改测试；若是前者，改代码。不可反过来为了让测试变绿而迁就错误实现。
