@@ -1,22 +1,55 @@
 # HANDOFF.md — 跨模型/跨会话接力地图
 
-> 最后更新: 2026-08-06 09:18 CST
+> 最后更新: 2026-08-06 13:45 CST
 > 当前会话: 贾维斯主会话 (volcengine-agent/ark-code-latest)
-> 状态: ✅ 早间全部任务闭环，无阻塞待办
+> 状态: ✅ 下午 Unity 任务闭环并已推送，无阻塞待办
 
 ---
 
 ## ⏳ 待接力的第一件事
 
-**无阻塞项。** 上一轮的「gateway 需重启」已由点点于 09:10:50 执行完毕并验收通过。
+**无阻塞项。** 已推送至 `origin/master`（`0ff1a41e`），工作区干净。
 
-下次开机后建议复查一件事（非阻塞）：
-- `OnStartupSec` 方案目前只验证过 **restart** 场景，尚未验证**冷启动**（真正关机再开机）场景。
-  开机后跑一次 `systemctl --user list-timers --all | grep -E "openclaw-|mark42-"`，确认 8 个 timer 的 NEXT 列都有值、没有 `-`。
+下次开机后建议复查两件事（都非阻塞）：
+1. `systemctl --user list-timers --all | grep -E "openclaw-|mark42-"` —— 确认 8 个 timer 的 NEXT 列都有值（验证 `OnStartupSec` 方案在**冷启动**下也成立，此前只验过 restart）
+2. `bash scripts/unity-stack-patch.sh verify` —— 确认 Unity 两条通道开机自启真生效（本次只验了 start/stop/kill 自愈，**未验冷启动**）
 
 ---
 
-## ✅ 本轮完成（2026-08-06 早间 07:35-09:18）
+## ✅ 下午完成（2026-08-06 13:20-13:45）：Unity 连接栈收编为 systemd 模块
+
+### 起因
+点点意外重启 → Unity 两通道全断（27182 / 8080 均无进程）。两者原是 nohup 裸进程。
+同时他截图里 Gateway URL 误填 18789（Gateway 端口），应为 27182。
+
+### 结果：一个模块管两条通道
+
+```
+openclaw-unity.target                ← 总开关
+├─ openclaw-unity-bridge.service     老 Bridge   :27182
+└─ openclaw-unity-mcp.service        CoplayDev   :8080
+```
+
+**唯一入口**（默认 dry-run，`--apply` 才动手）：
+```bash
+bash scripts/unity-stack-patch.sh status | verify | install | uninstall | start | stop | restart
+```
+
+🔴 **不要再用 nohup 手启 Bridge/MCP**，会与 service 抢端口。日志在 `~/.local/state/openclaw/unity-stack/`。
+
+验收（实际调用，非看灯）：开就都开/关就都关各一轮、`kill -9` 8 秒自愈、verify 零告警、
+Bridge `scene.getActive`→`Main.unity` rootCount 7、MCP `reflect search`→14 类型 / hierarchy total 7，两边 7==7。
+
+沉淀：`CASE-20260806-018`（关键长驻服务跑裸进程）+ 补丁流水 + 安装注册表 + 两份 Unity 指南 + MEMORY.md。
+
+### 三个值得记的点
+- **Bridge 掉线不会自己重注册**（Auto Connect 只在启动时生效）→ 重装模块后需手点一次 Connect；MCP 会自动重连
+- **MCP 启动慢**：6 秒时端口还没 listen，约 8-14 秒才绑上 8080。探测勿在 6 秒内判失败
+- **`tools/unity-mcp-coplay/` 已 gitignore**：第三方 MIT 上游仓库自带 `.git`（add 会变空 gitlink）+ 81M venv。重建方式记在安装注册表
+
+---
+
+## ✅ 早间完成（2026-08-06 07:35-09:18）
 
 > 详细过程见 `memory/daily/2026-08-06.md`，变更留痕见 `docs/通用-OpenClaw-补丁变更流水.md`。
 
@@ -109,6 +142,9 @@ OpenClaw 图生按 provider **名字**查内置适配器表，只支持 openai/f
 | 配置备份（本轮两次） | `~/.openclaw/openclaw.json.bak-20260806-075354` / `-085830` |
 | systemd 备份（本轮两次） | `tmp/systemd-backup-20260806-084530` / `-090608` |
 | **timer 加固脚本** | `scripts/harden-user-timers.sh`（默认 dry-run，`--apply` 才写） |
+| **Unity 连接栈入口** | `scripts/unity-stack-patch.sh`（默认 dry-run；status/verify/install/uninstall/start/stop） |
+| **Unity 单元源文件** | `config/systemd/unity-stack/`（安装到 `~/.config/systemd/user/`） |
+| **Unity 日志** | `~/.local/state/openclaw/unity-stack/` |
 | **图生实际入口** | `scripts/doubao-image-gen.py "提示词" [文件名]` |
 | compaction 选型探针 | `tmp/probe-compaction-real.py` / `probe-compaction-edge.py` |
 | 变更流水 | `docs/通用-OpenClaw-补丁变更流水.md` |
