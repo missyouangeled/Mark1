@@ -1,28 +1,58 @@
 # HANDOFF.md — 跨模型/跨会话接力地图
 
-> 最后更新: 2026-08-06 13:45 CST
+> 最后更新: 2026-08-06 15:15 CST
 > 当前会话: 贾维斯主会话 (volcengine-agent/ark-code-latest)
-> 状态: ✅ 下午 Unity 任务闭环并已推送，无阻塞待办
+> 状态: ✅ Unity 工作闭环并已推送，无阻塞待办
 
 ---
 
 ## ⏳ 待接力的第一件事
 
-**无阻塞项。** 已推送至 `origin/master`（`0ff1a41e`），工作区干净。
+**无阻塞项。**
 
-下次开机后建议复查两件事（都非阻塞）：
-1. `systemctl --user list-timers --all | grep -E "openclaw-|mark42-"` —— 确认 8 个 timer 的 NEXT 列都有值（验证 `OnStartupSec` 方案在**冷启动**下也成立，此前只验过 restart）
-2. `bash scripts/unity-stack-patch.sh verify` —— 确认 Unity 两条通道开机自启真生效（本次只验了 start/stop/kill 自愈，**未验冷启动**）
+待办（非阻塞，按优先序）：
+1. **火焰位置需修正** —— 点点说「火焰的位置弄错了，但是效果还可以」。
+   我放在了 `SliderInfo`（右侧**常驻**信息卡片），但他要的是「hover 展开后出现的新选项卡」。
+   **下次先做 hover 前后的 hierarchy diff** 确认目标物件，别凭画面观感猜。
+2. 开机后复查 8 个 timer 的 NEXT 列（`OnStartupSec` 方案未验过**冷启动**）
+3. 开机后跑 `bash scripts/unity-stack-patch.sh verify`（Unity 两通道开机自启未验冷启动）
 
 ---
 
-## ✅ 下午完成（2026-08-06 13:20-13:45）：Unity 连接栈收编为 systemd 模块
+## 🔴 Unity 干活前必读（三份文档，按此顺序）
 
-### 起因
-点点意外重启 → Unity 两通道全断（27182 / 8080 均无进程）。两者原是 nohup 裸进程。
-同时他截图里 Gateway URL 误填 18789（Gateway 端口），应为 27182。
+| 顺序 | 文档 | 作用 |
+|------|------|------|
+| 1 | `docs/项目-ArmoredFortress-Unity项目档案.md` | 项目是什么：**HDRP**、2021.3、7 场景、UI 体系、现成资产 |
+| 2 | `docs/通用-Unity-实操手册.md` | 怎么干活：参数纠错、假 success、UI 特效、ffmpeg 录制（十二章） |
+| 3 | `docs/案例-Unity-UI火焰特效全流程复盘-20260806.md` | 做 UI 特效直接抄这份 |
 
-### 结果：一个模块管两条通道
+**三条最容易踩的坑**（完整列表在手册）：
+- 报 `status: success` ≠ 做成了（`lighting create` 不建 Light、`--components` 不生效、`playOnAwake` 默认关）
+- `activeInHierarchy=True` ≠ 看得见（UI 还要查 **`CanvasGroup.alpha`**，assembly reload 会把它打回 0）
+- 坐标 / 图集网格 / 参数名 **全部实测，不要猜**（本轮因猜图集 4×4（实为 8×8）、猜裁切坐标各绕一大圈）
+
+---
+
+## 📌 点点本轮定的新规矩（重要）
+
+> 「除了遇到**很难回退或者不可回退**的问题问我，其他的都是你说了算。」
+
+我原先说「方案未确认前不碰工程」，被他纠正：加个效果删了就完事，
+跟改坏场景文件不是一个量级。新划分：
+
+| 自己干 | 先问他 |
+|--------|--------|
+| 加/删效果物件、调参数、复用现成资产、改脚本（git 能回退）、场景存盘 | 批量改已有物件、动 HDRP 全局设置/Volume Profile、改预制体影响多场景、删资产、改 Scripting Define Symbols |
+
+另：他提醒「每次执行任务前先看看自己有什么技能」——
+启动流程第 7 步确实写了读 `SKILL_CATALOG.md`，但我**没在动手前回头对一遍**。读过 ≠ 用上。
+
+---
+
+## ✅ 下午完成（2026-08-06 13:20-15:15）
+
+### 1. Unity 连接栈收编为 systemd 模块
 
 ```
 openclaw-unity.target                ← 总开关
@@ -34,18 +64,38 @@ openclaw-unity.target                ← 总开关
 ```bash
 bash scripts/unity-stack-patch.sh status | verify | install | uninstall | start | stop | restart
 ```
+🔴 **不要再用 nohup 手启**，会与 service 抢端口。日志：`~/.local/state/openclaw/unity-stack/`
+起因：裸进程重启即失联，点点一天手动救两次（CASE-20260806-018）。
 
-🔴 **不要再用 nohup 手启 Bridge/MCP**，会与 service 抢端口。日志在 `~/.local/state/openclaw/unity-stack/`。
+验收：开就都开/关就都关各一轮、`kill -9` 8 秒自愈、verify 零告警、
+Bridge `scene.getActive`→`Main.unity` rootCount 7、MCP `reflect`→14 类型 / hierarchy total 7（7==7）。
 
-验收（实际调用，非看灯）：开就都开/关就都关各一轮、`kill -9` 8 秒自愈、verify 零告警、
-Bridge `scene.getActive`→`Main.unity` rootCount 7、MCP `reflect search`→14 类型 / hierarchy total 7，两边 7==7。
+补充实测：**Bridge 掉线不会自己重注册**（Auto Connect 只在启动时生效），MCP 会自动重连；
+**MCP 启动慢**，6 秒时端口未 listen，约 8-14 秒才绑上；
+`tools/unity-mcp-coplay/` 已 gitignore（第三方 MIT 仓库自带 `.git` + 81M venv）。
 
-沉淀：`CASE-20260806-018`（关键长驻服务跑裸进程）+ 补丁流水 + 安装注册表 + 两份 Unity 指南 + MEMORY.md。
+### 2. 管线钉死 HDRP + 建立项目档案 + 工作流程
 
-### 三个值得记的点
-- **Bridge 掉线不会自己重注册**（Auto Connect 只在启动时生效）→ 重装模块后需手点一次 Connect；MCP 会自动重连
-- **MCP 启动慢**：6 秒时端口还没 listen，约 8-14 秒才绑上 8080。探测勿在 6 秒内判失败
-- **`tools/unity-mcp-coplay/` 已 gitignore**：第三方 MIT 上游仓库自带 `.git`（add 会变空 gitlink）+ 81M venv。重建方式记在安装注册表
+点点定了 Unity 工作流程：**先读配置查管线 → 定场景 → 定工作 → 联网思考 → 出方案 → 做**。
+已提 Skill Workshop 提案 `unity-work-protocol`（**pending，待点点决定是否 apply**）。
+
+硬证据：场景内活组件 `fullType=UnityEngine.Rendering.HighDefinition.StaticLightingSky`，
+`UniversalRenderPipelineAsset` count=0。
+
+### 3. UI 火焰特效（已交付，点点评「效果还可以」）
+
+```
+Canvas/Main_Panels/HOME/Content/SliderInfo
+└─ FX_Fire_Overlay  [RawImage + UIFlipbookFire]
+   anchorMax.y=0.34（占底部三分之一）、8×8=64帧、fps 24、tileX 3、alpha 0.85
+```
+新增可复用组件 `Assets/Scenes/Interface/UI/Scripts/UIFlipbookFire.cs`。
+已 scene save、零编译错误。录了 30 帧动态视频（`media/unity/fire_edge_*.mp4`）。
+
+关键认知：**Canvas 是 ScreenSpaceOverlay → 3D 粒子永远被 UI 盖住**，
+UI 特效必须走 UI 层（RawImage + 序列帧 flipbook）。不要为特效改 Canvas 模式。
+
+**删除方式**（点点不满意时）：删 `FX_Fire_Overlay` 物件 + `scene save`，无痕。
 
 ---
 

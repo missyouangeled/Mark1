@@ -96,7 +96,88 @@
 
 ---
 
-## 五、复验命令（配置会变，隔久了要重查）
+## 五、🔴 UI 体系关键事实（做 UI 特效必读）
+
+### Canvas 是 **ScreenSpaceOverlay**
+
+```
+Canvas.renderMode  = ScreenSpaceOverlay
+Canvas.sortingOrder = 0
+Canvas.worldCamera  = NULL
+Canvas.scaleFactor  = 2.505625
+Screen = 2005x1102
+```
+
+**直接后果：3D 粒子系统永远被 UI 盖住**（官方 frame debugger 结论 + 本机实测）。
+要在 UI 上加特效，必须走 UI 层内部（`RawImage`/`Image` + 序列帧）。
+⚠️ 不要为了特效把 Canvas 改成 ScreenSpaceCamera —— 会变动整个菜单缩放与布局。
+
+### HOME 面板布局（屏幕坐标，已实测）
+
+```
+Canvas/Main_Panels/HOME/Content/
+  [0] LOGO        y 901~1085   x 0~401
+  [1] Image       y 942~1044   x 1097~1975
+  [2] SliderInfo  y 119~930    x 1546~1990   ← 右侧竖版信息卡片（177×323）
+  [3] Button List y 0~827      x 0~401       ← 左侧八个菜单按钮
+```
+
+⭐ **注意**：`SliderInfo` 是**一直都在**的面板，不是 hover 才出现的。
+hover 真正改变的只是**左侧按钮自身的高度**（25→70）。
+
+### 菜单按钮结构
+
+```
+CAMPAIGN [Button|Animator|EventTrigger|ChangeUIbim]  size=(70, 25)
+  - Background [Image]
+  - Normal [CanvasGroup] → Text(inactive) / CAMPAIGN(Image)
+  - Highlighted [CanvasGroup] (inactive)
+```
+
+按钮很小，**里面没有任何大预览图**。
+
+### hover 效果的实现：`ChangeUIbim`
+
+`Assets/Scenes/Interface/UI/Scripts/ChangeUIbim.cs`
+
+```csharp
+public void OnPointerEnter() {
+    element.element.sizeDelta = new Vector2(x, element.heightnew);   // 25 → 70
+    LayoutRebuilder.ForceRebuildLayoutImmediate(verticalLayoutGroup.transform as RectTransform);
+}
+```
+
+靠 `EventTrigger` 连线调用。**直接调这个方法比发 `ExecuteEvents` 可靠。**
+判据：`heightold=25` / `heightnew=70`，当前值 70 就是 hover 态。
+
+### 已有的 UI 特效手段（别重复造轮子）
+
+| 组件 | 挂在哪 | 作用 |
+|------|--------|------|
+| `BlurManager` | `Canvas/Modal Windows` | 弹窗背景模糊 |
+| `PanelBrushManager` | 各面板 | 面板笔刷效果 |
+| `Animator` + `CanvasGroup` | `Main_Panels` | 面板转场淡入淡出 |
+| `UIFlipbookFire` | （新增 08-06） | 序列帧火焰叠加，参数化可复用 |
+
+---
+
+## 六、现成火焰资产（已实测，优先复用）
+
+项目共 **1913 个材质**，火焰相关：Fire 13 / Flame 8 / Smoke 13 / Explosion 4。
+
+| 用途 | 资源 | 网格 |
+|------|------|------|
+| 竖直摇曳小火苗 | `Assets/AB/Pool/Material/Type_Fire/Fire_Sequence_02/AF_Fire_Sequence_02.png` | **8×8** |
+| 小火星生灭 | `Fire_Sequence_01/AF_Fire_Sequence_01.png` | **8×8** |
+| 大火球+浓烟（笼罩用） | `Fire_Sequence_06/AF_Fire_Sequence_06.png`（2048²） | **8×8** |
+| 粒子材质（已适配 HDRP） | `Type_Fire/Fire_01/AF_Fire_01.mat` | shader `Shader Graphs/ParticleUnlitEmission` |
+
+🔴 **图集都是 8×8，不是 4×4。** 切错会导致「火焰看起来很小」。
+⚠️ 不要自建材质：`material create` 默认 shader 是 `Standard`，HDRP 下**必粉红**。
+
+---
+
+## 七、复验命令（配置会变，隔久了要重查）
 
 ```bash
 # 0) 先确认两条通道活着

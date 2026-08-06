@@ -1,29 +1,29 @@
 {
-  "last_check": "2026-08-05T16:02:30+08:00",
-  "status": "ok",
+  "last_check": "2026-08-06T14:10:00+08:00",
+  "status": "attention_fixed",
   "notifications": 0,
-  "git_changes_pending": true,
-  "pending_changes": [
-    ".learnings/ERRORS.md",
-    ".learnings/LEARNINGS.md",
-    "docs/install-registry.md",
-    "media/tts/ (deleted ~26 old afternoon_chat wav files)"
-  ],
+  "git_changes_pending": false,
+  "pending_changes": [],
   "today_highlights": [
-    "Mark42 审查方案 P1/P2/P3 全部完成",
-    "cost_tracker 时区 bug 修复（UTC->本地日期）",
-    "mypy 174->0，4个真 bug 被捞出",
-    "consciousness revalidate 从 0/10 恢复到 9/10",
-    "1997 项测试 0 失败",
-    "全系统严格审查通过，0 假死"
+    "Unity 连接栈收编为 systemd 模块",
+    "模型路由按实测校正（5处不一致统一）",
+    "compaction 换豆包修静默丢数据隐患",
+    "timer 加固 8个全绿",
+    "Mark42 v2.8.2 健康 1975测试0失败"
+  ],
+  "issues_found": [
+    "数据盘 /mnt/data 启动时未挂载（fsck 竞态导致 mnt-data.mount 依赖失败）",
+    "已手动挂载 + fstab 加 nofail/mount-timeout 防复发",
+    "lifecycle-maintainer transcript-aggregate 安全拒绝覆盖（by design，非故障）"
   ],
   "system": {
-    "load": "0.40/0.81/1.02",
+    "load": "0.16/0.52/0.60",
     "mem": "3.0G/7.7G (39%)",
-    "disk_root": "75%",
+    "disk_root": "76%",
     "disk_data": "16%",
-    "uptime": "2h44min",
+    "uptime": "53min",
     "failed_services": 0,
-    "timers_active": 8
+    "timers_active": 8,
+    "data_mounted": true
   }
 }

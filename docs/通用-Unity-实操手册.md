@@ -60,13 +60,15 @@ M=".venv/bin/unity-mcp --host 127.0.0.1 --port 8080"
 
 ---
 
-## 三、🔴 三条"报 success 其实没成"（本轮全踩了）
+## 三、🔴 「报 success 其实没成」清单
 
 这是最危险的一类：**返回 `status: success` 但事情没做成。**
 
 1. **`lighting create`** → 光建了个空物件，Light 组件没有
 2. **`gameobject create --components`** → 组件列表被忽略
 3. **粒子 `playOnAwake`** → 编辑器里 `isPlaying: True`，一进 Play 变 False（详见第五节）
+4. **`editor play`** → 报 success ≠ 已进入，必须回读 `isPlaying`，且等 12-15 秒
+5. **`script create`** → 文件已存在时报 `Script already exists`，不覆盖（绕法见第四节）
 
 **通用防御：每一步做完，回读实际状态确认，不看返回值。**
 
@@ -78,6 +80,23 @@ import sys,json;d=json.load(sys.stdin)['result'][0]
 print('组件:',d['components']);print('坐标:',d['position'])
 for c in d.get('children',[]): print('  └',c['name'],c['components'])"
 ```
+
+### 🔴 UI 专项：`activeInHierarchy=True` 不代表看得见
+
+2026-08-06 实测踩坑：UI 整个消失，但数据层全部正常 ——
+`Canvas` / `Main_Panels` / `HOME` / `SliderInfo` 全是 `active=True`。
+真因是 **`HOME` 的 `CanvasGroup.alpha = 0`**（assembly reload 把 Animator 驱动的
+运行时状态打回初始值，重新播放的逻辑没跑）。
+
+**查 UI 可见性要逐级看四样：**
+```csharp
+activeInHierarchy   // 物件激活
+CanvasGroup.alpha   // ⭐ 最容易漏
+Image.enabled / color.a
+RectTransform.localScale / lossyScale
+```
+
+**修法**：不要手改 alpha 糊过去，**干净重启 Play** 让 UI 走自己的初始化逻辑。
 
 ---
 
@@ -99,6 +118,36 @@ $M code execute --no-safety-checks '...'           # 放开 File.Delete / WebCli
 - 直接调项目自己的脚本方法（比 ExecuteEvents 可靠）
 - 读私有/序列化字段的真实值
 - 截图 + **把文件传回 Linux**（见第六节）
+- **写脚本文件**（绕过 `script create` 不能覆盖的限制）
+
+### 🔴 绕过 `script create` 不能覆盖
+
+```csharp
+var path = System.IO.Path.Combine(Application.dataPath, "相对Assets的路径.cs");
+System.IO.File.WriteAllText(path, content, new System.Text.UTF8Encoding(false));
+UnityEditor.AssetDatabase.ImportAsset("Assets/相对路径.cs");
+```
+
+长内容用 Python 生成 `.cs` 探针文件再 `-f` 传入，避免 shell 转义地狱
+（**shell 会在逗号处截断参数**，实测 `code execute '...string.Join(",",x)...'` 报
+`Got unexpected extra argument`）。
+
+### 🔴 `reflect search` 查不到项目自己的脚本
+
+`reflect` 扫的是 **Unity 内置程序集**，不含 `Assembly-CSharp`。
+项目脚本编译成功也会 `count: 0`。验证项目类型要用：
+
+```csharp
+var t = System.Type.GetType("你的类名, Assembly-CSharp");
+if (t == null) return "NOT COMPILED";
+foreach (var f in t.GetFields()) sb.Append(f.Name + " ");   // 顺便验字段真在
+```
+
+### 🔴 assembly reload 会断开 MCP session
+
+改脚本触发编译时，MCP 报
+`Unity plugin session ... disconnected while awaiting command_result`，
+**这是正常现象**，等 20 秒左右自动重连。同时 Play 模式会被强制退出。
 
 ---
 
@@ -237,7 +286,73 @@ return "UPLOADED "+b.Length;'
 
 ---
 
-## 七、触发 UI 交互（hover / click）
+## 七、UI 特效叠加（🔴 先查 Canvas 渲染模式）
+
+> 完整案例：`docs/案例-Unity-UI火焰特效全流程复盘-20260806.md`
+
+### 第一步必须查渲染模式 —— 它决定全部技术选型
+
+```bash
+$M code execute 'var c=GameObject.Find("Canvas").GetComponent<Canvas>();
+return "renderMode="+c.renderMode+" sortingOrder="+c.sortingOrder;'
+```
+
+| Canvas 模式 | 渲染顺序 | 3D 粒子能盖在 UI 上？ |
+|------------|---------|--------------------|
+| **ScreenSpaceOverlay** | 场景物件先渲染 → Canvas 最后 | ❌ **永远不能** |
+| ScreenSpaceCamera | Canvas → 粒子在其后 | ✅ 可以（需配 sortingLayer） |
+| WorldSpace | 同上 | ✅ 可以 |
+
+**本项目是 `ScreenSpaceOverlay`**（实测）。所以：
+- ❌ 3D 粒子完全无效（上午那火焰 `particleCount: 54` 真在喷，但画面就是看不见）
+- ⚠️ 不要为了特效改 Canvas 模式 —— 会变动整个菜单的缩放与布局
+- ✅ **走 UI 层内部叠加**：`RawImage` + 序列帧 flipbook
+
+### 序列帧图集：🔴 网格行列必须实测
+
+**本轮最大的坑**：我猜 4×4，实际是 **8×8**。
+`uvRect` 用 0.25 切 → 实际取到「4 格拼在一块」，火焰只占中心一小点，
+表现为「火焰太小」—— **不是尺寸没调够，是切错了。**
+
+实测方法（导出图集肘眼看）：
+```csharp
+var rtex = new RenderTexture(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
+Graphics.Blit(tex, rtex);                    // 绕过 compressed/non-readable
+RenderTexture.active = rtex;
+var readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+readable.ReadPixels(new Rect(0,0,tex.width,tex.height), 0, 0);
+readable.Apply();
+// 再把透明区合成到深色底上写 PNG，否则透明看不出格子
+```
+
+### flipbook UV 切帧公式
+
+```csharp
+float w = 1f / columns, h = 1f / rows;
+int cx = idx % columns, cy = idx / columns;
+float y = 1f - h * (cy + 1);        // 图集第0帧在左上，UV 原点在左下 → y 需翻转
+raw.uvRect = new Rect(cx*w, y, w*tileX, h);   // tileX 横向平铺份数
+```
+
+可复用组件：`Assets/Scenes/Interface/UI/Scripts/UIFlipbookFire.cs`
+
+### 必记的三个细节
+
+- `raycastTarget = false` —— 否则挡住底下 UI 的鼠标事件
+- `SetAsLastSibling()` —— 保证画在目标图像之上
+- **编辑模式建 + `scene save`** —— 运行时建的物件退 Play 就没了
+
+### 找目标物件：不要凭画面观感猜
+
+本轮我先去查 `CAMPAIGN` 按钮内部，以为预览图在里面 ——
+**按钮本身只有 70×25，里面只有文字图片**。真正的卡片是兄弟节点 `SliderInfo`。
+
+**用户说的「选项卡展开后出现的东西」，不一定是那个按钮的子物件。**
+先遍历兄弟节点看全局布局（带 y/x 范围），再定目标。
+
+---
+
+## 八、触发 UI 交互（hover / click）
 
 ### 找按钮
 
@@ -285,7 +400,51 @@ cu.OnPointerEnter(); return cu.element.element.sizeDelta.y;'
 
 ---
 
-## 八、验收清单（别看灯）
+## 九、录制动态效果视频（ffmpeg）
+
+静态图看不出特效动态。完整脚本：`scripts/unity-record-ui-effect.sh`
+
+### 三个关键点
+
+1. **每帧都要重新锁 hover** —— UI 自身逻辑会把展开状态重置
+2. **必须用 Bridge `debug.screenshot`** —— `CaptureScreenshot` 拓不到 Overlay UI
+3. 截图落在 Windows，需 `code execute` + `WebClient` 回传
+
+```bash
+ffmpeg -y -framerate 12 -pattern_type glob -i 'seqframe_*.png' \
+  -vf "scale=1400:-2:flags=lanczos" -c:v libx264 -pix_fmt yuv420p -crf 22 \
+  -movflags +faststart out_full.mp4
+```
+
+⚠️ 接收端会把文件名里的 `/` 替掉（防目录穿越）→ 用扁平命名 `seqframe_001.png`
+
+### 🔴 裁切坐标必须从 Unity 读，不要猜
+
+本轮我猜了三次 crop、来回改了四遍。第四次才想到读真坐标：
+
+```bash
+$M code execute 'var rt=GameObject.Find("<路径>").GetComponent<RectTransform>();
+Vector3[] c=new Vector3[4]; rt.GetWorldCorners(c);
+return "x="+c[0].x+" y_top="+(Screen.height-c[2].y)+" w="+(c[2].x-c[0].x)+" h="+(c[2].y-c[0].y);'
+```
+
+实测 `y_top=707`，而我第一次猜的是 `130` —— **差了 577 像素**。
+
+⚠️ **看图反馈前后矛盾时（先说上边切、后说下边切），说明诊断方向错了**，
+要停下重新判断，不要接着调参数（真因是火焰被另一块 UI 挡住下半截）。
+
+### 自检：发给用户前必须自己看过
+
+```bash
+ffmpeg -y -i out.mp4 -vf "select='eq(n\,0)+eq(n\,10)+eq(n\,20)',tile=3x1,scale=1100:-2" \
+  -frames:v 1 verify.jpg
+```
+
+🔴 **`image` 工具对大图会超时**（1.3MB PNG 超 60s）→ 先转小 jpg 再看。
+
+---
+
+## 十、验收清单（别看灯）
 
 | 验什么 | 怎么验 |
 |--------|--------|
@@ -304,7 +463,7 @@ curl -s -X POST http://localhost:27182/unity/tool -H "Content-Type: application/
 
 ---
 
-## 九、已知坏的 / 别用
+## 十一、已知坏的 / 别用
 
 | 东西 | 状态 |
 |------|------|
@@ -313,13 +472,17 @@ curl -s -X POST http://localhost:27182/unity/tool -H "Content-Type: application/
 | `code search` 给目录 | 🔴 PATH 必须是**文件** |
 | `resource read` | 🔴 子命令不存在，错误处理自身会崩 |
 | Roslyn 精确校验 | 默认关，要加 `USE_ROSLYN` 编译符号（**影响全项目，别动**） |
-| `asset info "<名字>"` | 只认完整路径，不认资产名 |
+| `asset info "<名字>"` | 只认完整路径；要拿路径用 `-f json asset search` |
+| `reflect search` 查项目脚本 | 只扫 Unity 内置程序集 → `Type.GetType("X, Assembly-CSharp")` |
+| `script create` 覆盖已存文件 | 报错不覆盖 → `code execute` 里 `File.WriteAllText` + `ImportAsset` |
+| `code execute` 行内写带逗号的 C# | shell 在逗号处截断参数 → 写文件用 `-f` 传 |
+| `ScreenCapture.CaptureScreenshot` | 非 Play 不写盘；**且拓不到 ScreenSpaceOverlay 的 UI** → 用 Bridge `debug.screenshot` |
 
 ---
 
-## 十、待改进
+## 十二、待改进
 
-- **hover 后没截到"变化过程"**，只有静态终态。已装 ffmpeg 6.1.1 + `video-frames` skill，
-  下次可连续截帧合成短视频看动态（火苗窜动、hover 展开过程）
-- 截图接收服务目前是手起的临时进程，可考虑并入 unity-stack 模块
-- 本轮火焰放在 `(-20, 0.5, 2)`，被 UI Canvas 完全遮住，画面里看不见 → 位置要选镜头可见处
+- hover 状态靠「每帧重新调 OnPointerEnter」锁住，更稳的做法是写协程在 N 帧内持续锁定
+- 截图接收服务 `scripts/unity-shot-receiver.py` 目前手起，可并入 `openclaw-unity.target` 模块
+- 2026-08-06 火焰位置放错了（放在常驻的 SliderInfo，而非 hover 真正展开的物件）——
+  **下次应先做 hover 前后的 hierarchy diff**，看到底哪个物件是新出现/变化的
