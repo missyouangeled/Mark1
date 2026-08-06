@@ -2915,3 +2915,71 @@ provider 的 `api` 字段枚举全为对话协议，无图生类型 → **自定
 - `docs/对系统操作必须要参考的崩坏案例.md`（CASE-017）
 - `MEMORY.md`（compaction 选型依据 + 热重载范围校正）
 - `tmp/probe-compaction-*.py`（探针脚本，留作日后换模型复用）
+
+---
+
+## 2026-08-06 下午：Unity 连接栈合并为 systemd 模块（补丁式，可整体装卸）
+
+**起因**：点点意外重启后 Unity 两条通道全断（Bridge 27182 + MCP 8080 都无进程）。
+两者原为 nohup 裸进程，重启即失联。同日已手动拉起两次。
+
+**点点要求原话**：「把 Unity 连接这块的两个都写成一个模块，并且开机自动启动，做成一个补丁的那种，删掉就都删掉了，开启就都开启。」
+
+### 一、新增文件
+
+| 路径 | 说明 |
+|------|------|
+| `config/systemd/unity-stack/openclaw-unity.target` | 总开关 |
+| `config/systemd/unity-stack/openclaw-unity-bridge.service` | 老 Bridge，:27182 |
+| `config/systemd/unity-stack/openclaw-unity-mcp.service` | CoplayDev MCP，:8080 |
+| `scripts/unity-stack-patch.sh` | 统一入口（默认 dry-run） |
+
+单元源文件放仓库内，install 时复制到 `~/.config/systemd/user/`，已存在则先备份。
+
+### 二、「一个开关管两个」怎么实现的
+
+- `WantedBy=openclaw-unity.target` → start target 时成员被拉起（**开就都开**）
+- `PartOf=openclaw-unity.target` → stop/restart target 时成员跟着动（**关就都关**）
+- 只 enable target，不单独 enable 成员 → 不会出现半启动状态
+- `Restart=always` + `RestartSec=5` → 崩溃自愈
+- uninstall 一次删干净三个单元（日志默认保留，`--purge-logs` 才删）
+
+### 三、命令表
+
+```bash
+bash scripts/unity-stack-patch.sh status              # 状态
+bash scripts/unity-stack-patch.sh verify              # 实际调用验收
+bash scripts/unity-stack-patch.sh install --apply     # 安装+enable+启动
+bash scripts/unity-stack-patch.sh start|stop --apply  # 两个一起开/关
+bash scripts/unity-stack-patch.sh uninstall --apply    # 整体卸载
+```
+
+### 四、验证结果
+
+| 项 | 结果 |
+|---|---|
+| `systemd-analyze verify` | ✅ 零告警 |
+| 开就都开 / 关就都关 | ✅ 各测一轮，端口正确 listen / 正确释放、零残留 |
+| 开机自启 | ✅ 三单元 enabled，`Linger=yes` 已确认 |
+| 崩溃自愈 | ✅ `kill -9` Bridge → 8 秒复活（pid 7150→7231） |
+| Bridge 实际命令 | ✅ `debug.hierarchy` 读回 Canvas 全树；`scene.getActive` → `Main.unity`、rootCount 7 |
+| MCP 实际命令 | ✅ `reflect search GameObject` → 14 类型；`scene hierarchy` → total 7 |
+| 交叉印证 | ✅ 两通道 7 == 7 |
+
+遵守今早新立的硬规矩：**`config validate` / `is-active` 通过不算验收，实际调用成功才算。**
+
+### 五、踩到的两个坑
+
+1. **安装必须先 `pkill` 残留裸进程**，否则 service 因端口被占启动失败。
+   代价是已连上的 Unity 会短暂掉线 —— 安装前须告知用户。
+   实测 MCP 自动重连，Bridge 需手动点一次 Connect（Auto Connect 只在启动时生效）。
+2. **`Documentation=` 不能用中文路径**：systemd 报 `Invalid URL, ignoring`，
+   污染 verify 输出。已改为普通注释记录路径，verify 恢复零告警。
+
+### 六、涉及文件
+
+- 新增 4 个（见上表）
+- `docs/通用-Unity-Bridge-连接指南.md`（改为 systemd 管理，nohup 段标废弃）
+- `docs/通用-Unity-MCP-CoplayDev-使用指南.md`（同上 + 补启动耗时特性）
+- `docs/对系统操作必须要参考的崩坏案例.md`（新增 CASE-20260806-018）
+- `docs/install-registry.md`

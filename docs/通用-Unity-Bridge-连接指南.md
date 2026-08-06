@@ -1,52 +1,115 @@
 # Unity Bridge 连接指南
 
 > 适用机器：公司（Linux VM）↔ 宿主机 Windows Unity Editor
-> 最后更新：2026-06-04
+> 最后更新：2026-08-06（**已改为 systemd 管理，见下方「统一入口」**）
 > 目标读者：任意 AI 模型，无上下文前提
 
 ---
 
-## 架构
+## 🔴 先看这里：已改为 systemd 模块管理（2026-08-06）
+
+Bridge 和 MCP **不再用 nohup 手动启动**。两者已合并为一个 systemd 模块，开机自启 + 崩溃自愈。
 
 ```
-宿主机 Windows                         公司 Linux VM
-┌─────────────────────────┐           ┌──────────────────────┐
-│ Unity Editor             │  HTTP    │ Unity Bridge Server   │
-│ OpenClaw Unity Plugin    │◄────────┤ (独立 Node.js 服务)   │
-│ (主动连接 + Poll 命令)    │  :27182  │ 监听 0.0.0.0:27182    │
-└─────────────────────────┘           │ token 可选，默认跳过  │
-                                       └──────────────────────┘
-                                              ▲
-                                              │ localhost:27182
-                                              │
-                                       ┌──────┴─────────────┐
-                                       │ AI / OpenClaw       │
-                                       │ curl POST /unity/   │
-                                       │       tool-async    │
-                                       └────────────────────┘
+openclaw-unity.target                ← 总开关
+├─ openclaw-unity-bridge.service     老 Bridge   :27182
+└─ openclaw-unity-mcp.service        CoplayDev   :8080
 ```
 
-**关键点：**
-- Bridge 不在 Gateway 里运行（OpenClaw plugin 系统只支持内置 4 个 plugin 的 allowlist，用户自定义 plugin 无法加载）
-- Bridge 是独立 Node.js 进程，不影响 Gateway 稳定性
-- Unity Plugin 主动连接 Bridge，不需要宿主机开防火墙端口
+**统一入口 `scripts/unity-stack-patch.sh`（默认 dry-run，加 `--apply` 才动手）：**
+
+| 需求 | 命令 |
+|------|------|
+| 看状态 | `bash scripts/unity-stack-patch.sh status` |
+| **实际调用验收** | `bash scripts/unity-stack-patch.sh verify` |
+| 两个一起开 | `bash scripts/unity-stack-patch.sh start --apply` |
+| 两个一起关 | `bash scripts/unity-stack-patch.sh stop --apply` |
+| 重装 | `bash scripts/unity-stack-patch.sh install --apply` |
+| 整个模块卸掉 | `bash scripts/unity-stack-patch.sh uninstall --apply` |
+
+单元源文件在 `config/systemd/unity-stack/`（仓库内），安装到 `~/.config/systemd/user/`。
+
+⚠️ **不要单独 enable 成员服务**，统一由 target 拉起，否则会出现半启动状态。
+⚠️ **不要再用 `nohup` 手启**，会和 service 抢端口。要重启走上表的 `start/stop`。
+
+### 为什么改（2026-08-06 事故，CASE-20260806-018）
+
+两者原先都是 nohup 裸进程。当天一次意外重启把它俩双双带走：
+Unity 插件报 `An error occurred while sending the request`，MCP 点 Connect 无反应。
+用户一天内手动拉起两次。**裸进程 = 重启即失联、无自愈、无留痕。**
+
+实测自愈已验证：`kill -9` Bridge 进程后 8 秒自动复活（pid 变更），`Restart=always` 生效。
+
+### 开机自启的前提：Linger
+
+user 级 systemd 默认「首次登录才启动」。本机已 `Linger=yes`（2026-08-06 确认）。
+若哪天开机不自启，先查这个：
+
+```bash
+loginctl show-user $USER | grep Linger
+# 为 no 则：sudo loginctl enable-linger $USER
+```
+
+---
+
+## 架构（当前实际运行的）
+
+```
+宿主机 Windows                            公司 Linux VM
+┌─────────────────────────┐             ┌──────────────────────┐
+│ Unity Editor             │  HTTP      │ Unity Bridge Server   │
+│ OpenClaw Unity Plugin    │◄──────────►│ (独立 Node.js 服务)   │
+│ (主动连接 + Poll 命令)    │  :27182    │ 监听 0.0.0.0:27182    │
+└─────────────────────────┘             │ token 可选，默认跳过  │
+                                        └──────────────────────┘
+                                               ▲
+                                               │ localhost:27182
+                                               │
+                                        ┌──────┴─────────────┐
+                                        │ AI / OpenClaw       │
+                                        │ curl POST /unity/   │
+                                        │       tool          │
+                                        └────────────────────┘
+
+另外，Gateway 插件也已修复（端口 18789 上 /unity/* 路由可用），
+但 Unity Editor 插件实际连接走的是 Bridge（27182），不是 Gateway。
+Gateway 插件用于 AI agent tools（unity_execute / unity_sessions）。
+```
+
+### 两套系统并存
+
+| 系统 | 端口 | 用途 | 状态 |
+|------|------|------|------|
+| Bridge 独立服务 | 27182 | Unity Editor 连接 + AI 发命令 | ✅ 主要使用 |
+| Gateway 插件 | 18789 | AI agent tools（unity_execute 等） | ✅ 已修复，可用但 session 与 Bridge 独立 |
+
+⚠️ **Bridge 和 Gateway 插件有各自的 session 存储，互不共享。**
+- Unity 通过 Bridge（27182）注册的 session，Gateway 插件的 `unity_execute` 工具看不到
+- AI 发命令应通过 Bridge 的 `/unity/tool` 或 `/unity/tool-async` HTTP 端点
+- Gateway 插件的 agent tools 是另一条路径，适合 OpenClaw 原生工具调用
+
+**当前推荐方式：AI 通过 Bridge HTTP 端点发命令（同步 `/unity/tool` 或异步 `/unity/tool-async`）**
 
 ---
 
 ## 启动 Bridge
 
-**准备工作（只需一次）：**
+> ⚠️ **以下 nohup 方式已废弃**，保留仅作原理参考。
+> 正常操作请用文首的 `scripts/unity-stack-patch.sh start --apply`。
+> 手动 nohup 会和 systemd service 抢 27182 端口。
 
 ```bash
 # 检查 Bridge 是否已在运行
 curl -s http://localhost:27182/bridge/health
 
-# 如未运行，启动：
-nohup node /home/missyouangeled/.openclaw/workspace/scripts/unity-bridge-server.js 27182 "d488a7bb89c5fd8a69d4fe23c53c109017c0a5b8ca2d0a8f" > /tmp/openclaw/unity-bridge.log 2>&1 &
-```
+# ❌ 已废弃（会与 service 抢端口）：
+# nohup node /home/missyouangeled/.openclaw/workspace/scripts/unity-bridge-server.js 27182 > /tmp/openclaw/unity-bridge.log 2>&1 &
 
-**停止 Bridge：**
-```bash
+# ✅ 现在用：
+# systemctl --user start openclaw-unity.target
+# 日志：~/.local/state/openclaw/unity-stack/unity-bridge.log
+
+# 停止（已废弃的方式）：
 pkill -f "unity-bridge-server.js"
 # 或
 curl -X POST http://localhost:27182/bridge/stop
@@ -56,15 +119,28 @@ curl -X POST http://localhost:27182/bridge/stop
 
 ## Unity 侧配置
 
-Windows 宿主机 → Unity Editor → OpenClaw Plugin Settings：
+Windows 宿主机 -> Unity Editor -> Window -> OpenClaw Plugin -> Settings：
 
 | 设置 | 值 |
 |------|-----|
 | Gateway URL | `http://192.168.79.128:27182` |
-| API Token | 留空即可（Bridge 当前为无 token 模式） |
+| API Token | 留空 |
+| Auto Connect | ✅ 勾选 |
+| Show Status Overlay | ✅ 勾选 |
+| Heartbeat Interval | 30 秒 |
+| MCP Bridge Port | `27182`（不要用 18789） |
+| Enable MCP Bridge | ✅ 勾选 |
 
-**为什么无 token？**  
-目前 VM 到宿主机是 NAT 网络（192.168.79.0/24 子网），只有特定信任设备能连通。Unity Plugin 的 HttpClient 可能附带 token header 时格式不兼容，导致 401。当前用无 token 模式，后续如需加固再调整。
+### ⚠️ 端口不能设为 18789
+
+18789 是 Gateway 端口。Unity 插件的 "Remote Gateway Connection" 连 Gateway 端口时
+会报 "An error occurred while sending the request"（连接请求发不出去）。
+必须用 27182（Bridge 端口）。
+
+### 为什么无 token？
+
+VM 到宿主机是 NAT 网络（192.168.79.0/24 子网），只有特定信任设备能连通。
+Bridge 的 `checkAuth` 函数在没有 Authorization header 时跳过验证。
 
 ---
 
@@ -76,26 +152,27 @@ Windows 宿主机 → Unity Editor → OpenClaw Plugin Settings：
 | `/bridge/stop` | POST | 停止服务 |
 | `/unity/connect` | GET | 连接测试（不需 token） |
 | `/unity/register` | POST | Unity 注册 session |
+| `/unity/heartbeat` | POST | 心跳保活 |
 | `/unity/status` | GET | 查看所有 session 状态 |
 | `/unity/poll?sessionId=xxx` | GET | Unity 拉取待执行命令 |
 | `/unity/result` | POST | Unity 回传命令结果 |
+| `/unity/tool` | POST | AI 发送工具命令（同步，等 60s 结果） |
 | `/unity/tool-async` | POST | AI 发送工具命令（异步，立即返回） |
-| `/unity/tool` | POST | AI 发送工具命令（同步，等待 60s 结果） |
 
 ---
 
-## 给 Unity 发命令
+## AI 发命令给 Unity
 
 ```bash
-# 异步模式（推荐）
+# 同步模式（等待 Unity 执行完返回结果，最多 60s）
+curl -s -X POST http://localhost:27182/unity/tool \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"debug.hierarchy","arguments":{"depth":2}}'
+
+# 异步模式（立即返回，结果由 Unity poll 后执行）
 curl -s -X POST http://localhost:27182/unity/tool-async \
   -H "Content-Type: application/json" \
   -d '{"tool":"gameobject.create","arguments":{"name":"MyCube","primitive":"Cube","position":{"x":0,"y":1,"z":0}}}'
-```
-
-**返回：**
-```json
-{"success":true,"toolCallId":"u_...","status":"queued"}
 ```
 
 ---
@@ -104,48 +181,135 @@ curl -s -X POST http://localhost:27182/unity/tool-async \
 
 | 操作 | 工具名 | 参数示例 |
 |------|--------|----------|
-| 创建立方体 | `gameobject.create` | `{"name":"MyCube","primitive":"Cube","position":{"x":0,"y":1,"z":0}}` |
-| 创建球体 | `gameobject.create` | `{"name":"Sphere","primitive":"Sphere"}` |
-| 创建平面 | `gameobject.create` | `{"name":"Ground","primitive":"Plane"}` |
-| 缩放物体 | `transform.setScale` | `{"objectName":"TerrainPlane","x":10,"y":1,"z":10}` |
 | 查看场景层级 | `debug.hierarchy` | `{"depth":2}` |
-| 查看控制台 | `console.getLogs` | `{"count":50}` |
+| 截图 | `debug.screenshot` | `{}` |
+| 查看控制台日志 | `console.getLogs` | `{"count":50}` |
+| 查看控制台错误 | `console.getErrors` | `{"count":50}` |
+| 获取活跃场景 | `scene.getActive` | `{}` |
+| 列出所有场景 | `scene.list` | `{}` |
+| 查找物体 | `gameobject.find` | `{"name":"Player"}` |
+| 创建立方体 | `gameobject.create` | `{"name":"MyCube","primitive":"Cube","position":{"x":0,"y":1,"z":0}}` |
+| 移动物体 | `transform.setPosition` | `{"objectName":"Player","x":10,"y":0,"z":5}` |
+| 旋转物体 | `transform.setRotation` | `{"objectName":"Player","x":0,"y":90,"z":0}` |
+| 缩放物体 | `transform.setScale` | `{"objectName":"Player","x":2,"y":2,"z":2}` |
+| 获取组件 | `component.get` | `{"name":"Player","componentType":"Transform"}` |
+| Play 模式 | `app.play` | `{}` |
+| Stop 模式 | `app.stop` | `{}` |
+| 获取应用状态 | `app.getState` | `{}` |
+| 编辑器状态 | `editor.getState` | `{}` |
+| 编辑器 Play | `editor.play` | `{}` |
+| 编辑器 Stop | `editor.stop` | `{}` |
+| UI 点击 | `input.clickUI` | `{"path":"Canvas/Button"}` |
+| 键盘输入 | `input.keyPress` | `{"key":"Space"}` |
 
 **完整工具参考（~100 个）：** 见 `~/.openclaw/skills/openclaw-skills-openclaw-unity-skill/references/tools.md`
 
 ---
 
-## 踩过的坑 & 解决方法
+## 2026-08-06 修复记录（OpenClaw 2026.7.1-2）
 
-### 1. Gateway Plugin 无法加载（弃用）
-- **现象**：`openclaw gateway restart` 后日志始终只显示 4 个内置 plugins，unity 不在列表中。Gateway 启动失败，报 `api.registerHttpHandler deprecated`。
-- **根因**：OpenClaw plugin 系统使用 `bundledDiscovery: "allowlist"` 硬编码模式，只加载内置 plugin ID。用户自定义路径（`plugins.load.paths`）在当前版本不被识别。且 `api.registerHttpHandler` 在最新 OpenClaw 中已移除，需改为 `api.registerHttpRoute`。
-- **解决**：放弃 Gateway plugin 路线，改为独立 Node.js HTTP Server（本文件方案）。
+### 背景
 
-### 2. 404 — 路径不匹配
-- **现象**：Unity 连接报 404。
-- **根因**：Unity Plugin 去连 Gateway 端口 18789，但 Gateway 没有 `/unity/*` 路由。
-- **解决**：确认 Unity Plugin 中 Gateway URL 端口为 `27182`（Bridge），不是 `18789`（Gateway）。
+OpenClaw 从 2026.6.x 升级到 2026.7.1-2 后，Unity Bridge 连接断了。
+排查发现多个层面的兼容性问题。
 
-### 3. 401 — Token 不匹配
-- **现象**：Unity 连接报 401 Unauthorized。
-- **根因**：Bridge 的 `checkAuth` 函数严格要求 Authorization header 存在且 token 完全匹配。Unity Plugin 的 HttpClient 可能发请求时 token 格式不一致或未带 token。
-- **解决**：改为宽松模式：如果没有 Authorization header 就跳过验证。`checkAuth` 只在有 header 且 token 不匹配时才返回 401。
+### 修复 1：Gateway 插件清单缺 `activation.onStartup`
+
+- **现象**：Gateway 启动只加载 7 个插件，unity 不在列表
+- **根因**：OpenClaw 2026.7.1 改了插件启动机制——`enabled: true` 只代表"允许启用"，
+  不再代表"随 Gateway 启动"。新版要求清单显式声明 `"activation": {"onStartup": true}`
+- **修复**：在 `~/.openclaw/extensions/unity/openclaw.plugin.json` 添加 `activation.onStartup`
+- **文件**：`~/.openclaw/extensions/unity/openclaw.plugin.json`
+
+### 修复 2：Gateway 插件缺 `contracts.tools` 声明
+
+- **现象**：日志报 `plugin must declare contracts.tools before registering agent tools`
+- **根因**：新版要求注册 Agent 工具前必须在清单声明工具归属
+- **修复**：在 manifest 添加 `"contracts": {"tools": ["unity_execute", "unity_sessions"]}`
+
+### 修复 3：`api.registerHttpHandler` 已移除
+
+- **现象**：旧代码用 `api.registerHttpHandler(handleUnityHttpRequest)`，新版不存在
+- **根因**：OpenClaw 2026.7.1 移除了 `registerHttpHandler`，改为 `registerHttpRoute`
+- **修复**：改为 `api.registerHttpRoute({path:"/unity", match:"prefix", auth:"plugin", handler:...})`
+
+### 修复 4：Bridge 端口与 Gateway 端口混淆
+
+- **现象**：Unity 插件 "Remote Gateway Connection" 报 "An error occurred while sending the request"
+- **根因**：MCP Bridge Port 被设为 18789（Gateway 端口），Unity 插件连不上 Gateway
+- **修复**：Gateway URL 改为 `http://192.168.79.128:27182`，MCP Bridge Port 改为 `27182`
+
+### 修复 5：清理定时器 `unref()`
+
+- **现象**：`openclaw plugins inspect unity` 等 CLI 命令挂起不退出
+- **根因**：`setInterval` 不调 `unref()` 会阻止 Node.js 进程退出
+- **修复**：添加 `cleanupTimer.unref()`
+
+### 修复 6：Gateway 插件补 `connect` / `tool` / `tool-async` 端点
+
+- **现象**：Gateway 插件只有 register/heartbeat/poll/result/status，缺 connect/tool/tool-async
+- **修复**：在 `handleUnityHttpRequest` 的 switch 语句中添加这三个端点
+
+### 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `~/.openclaw/extensions/unity/openclaw.plugin.json` | 添加 `activation.onStartup` + `contracts.tools` |
+| `~/.openclaw/extensions/unity/index.ts` | 改用 `registerHttpRoute` + 添加 connect/tool/tool-async 端点 + cleanupTimer.unref() |
+| `~/.openclaw/extensions/unity/index.js` | 编译产物（esbuild ESM bundle, openclaw external） |
+
+### 备份文件
+
+| 文件 | 说明 |
+|------|------|
+| `index.ts.orig` | 原始版本（从 skill 安装的） |
+| `index.ts.bad-ctx-20260806-1108` | 第一次修改失败版本 |
+
+---
+
+## 踩过的坑 & 解决方法（历史）
+
+### 1. Gateway Plugin 无法加载（2026-06-04 弃用，2026-08-06 修复恢复）
+
+- **现象**：Gateway 启动后日志只显示内置 plugins，unity 不在列表
+- **根因**：`bundledDiscovery: "allowlist"` + 旧版没有 `activation.onStartup` 字段
+- **解决**：2026-08-06 补齐 manifest 字段后 Gateway 插件已可正常加载
+
+### 2. 404 - 路径不匹配
+
+- **现象**：Unity 连接报 404
+- **根因**：Unity Plugin 去连 Gateway 端口 18789，但 Gateway 没有 `/unity/*` 路由
+- **解决**：确认 Unity Plugin 中 Gateway URL 端口为 `27182`（Bridge），不是 `18789`（Gateway）
+
+### 3. 401 - Token 不匹配
+
+- **现象**：Unity 连接报 401 Unauthorized
+- **根因**：Bridge 的 `checkAuth` 函数严格要求 token 匹配
+- **解决**：改为宽松模式：如果没有 Authorization header 就跳过验证
 
 ### 4. Unity 连接上了但发命令卡住不动
-- **现象**：AI 发送工具命令后，Bridge 阻塞在同步等待，但 Unity 并没有执行。
-- **根因**：最初只实现了同步 `/unity/tool` 端点（长轮询 60s），不适合异步场景。
-- **解决**：新增 `/unity/tool-async` 端点，命令入队后立即返回，由 Unity Plugin 通过 `/unity/poll` 主动拉取执行。
 
-### 5. 工具名错误 — `scene.createTerrain` 不存在
-- **现象**：`System.ArgumentException: Unknown tool: scene.createTerrain`
-- **根因**：凭猜测构造工具名，未查 Plugin 实际注册的工具表。
-- **解决**：✅ 必须先查 `references/tools.md`，确认工具名和参数格式后发送。创建地形没有直接工具，改用 `gameobject.create` + Plane + `transform.setScale` 放大模拟。
+- **现象**：AI 发送工具命令后，Bridge 阻塞在同步等待
+- **根因**：最初只实现了同步 `/unity/tool` 端点（长轮询 60s）
+- **解决**：新增 `/unity/tool-async` 端点，命令入队后立即返回
 
-### 6. 工具名大小写错误 — `gameObject.createPrimitive`
+### 5. 工具名错误
+
+- **现象**：`Unknown tool: scene.createTerrain`
+- **根因**：凭猜测构造工具名
+- **解决**：必须先查 `references/tools.md`，确认工具名和参数格式
+
+### 6. 工具名大小写错误
+
 - **现象**：`Unknown tool: gameObject.createPrimitive`
-- **根因**：大小写或命名推断错误。
-- **解决**：所有工具名严格按 `tools.md` 里的实际标识符写（全部小写，点分隔，如 `gameobject.create`）。
+- **根因**：大小写错误
+- **解决**：所有工具名严格按 `tools.md` 里的实际标识符写（全部小写，点分隔）
+
+### 7. MCP Bridge Port 设为 18789 导致连接失败
+
+- **现象**：Unity 插件 "Remote Gateway Connection" 报 "An error occurred while sending the request"
+- **根因**：MCP Bridge Port 被改成 18789（Gateway 端口），Unity 插件连不上 Gateway
+- **解决**：MCP Bridge Port 改回 `27182`，Gateway URL 改为 `http://192.168.79.128:27182`
 
 ---
 
@@ -153,7 +317,7 @@ curl -s -X POST http://localhost:27182/unity/tool-async \
 
 | 组件 | 影响 | 说明 |
 |------|------|------|
-| OpenClaw Gateway | **零影响** | 完全不依赖 Gateway plugin 体系 |
+| OpenClaw Gateway | 零影响（Bridge）/ 已修复（插件） | Bridge 完全独立；Gateway 插件已修复 |
 | 内存 | <50MB | Node.js 进程 |
 | 磁盘 | <100KB | 单个 JS 文件 |
 | 端口 | :27182 | 监听 0.0.0.0，仅局域网可达 |
@@ -167,6 +331,9 @@ curl -s -X POST http://localhost:27182/unity/tool-async \
 | 文件 | 路径 |
 |------|------|
 | Bridge 服务脚本 | `scripts/unity-bridge-server.js` |
+| Gateway 插件清单 | `~/.openclaw/extensions/unity/openclaw.plugin.json` |
+| Gateway 插件源码 | `~/.openclaw/extensions/unity/index.ts` |
+| Gateway 插件编译产物 | `~/.openclaw/extensions/unity/index.js` |
 | 工具完整参考 | `~/.openclaw/skills/openclaw-skills-openclaw-unity-skill/references/tools.md` |
 | 安装注册表 | `docs/install-registry.md` |
 | 变更流水 | `docs/通用-OpenClaw-补丁变更流水.md` |

@@ -129,6 +129,17 @@
 ## 项目
 
 - **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲）。v2.8.1 四大可用性修复完成（安装器/配置向导/用户文档/错误处理）。compact 审计 6 类核对 + Constraint Pinning + 动态阈值 + 中文 compaction-notifier hook。审查评分 A-(91/100)，1622 个测试 0 失败。用户文档: QUICKSTART/TUTORIAL/INDEX。详见 `PROJECT_INDEX.md` 和 `docs/design/`。
+- **Unity 连接栈（2026-08-06 下午收编为 systemd 模块）**：两条通道合并成**一个模块**，开机自启 + 崩溃自愈。
+  ```
+  openclaw-unity.target              ← 总开关（只 enable 它，不单独 enable 成员）
+  ├─ openclaw-unity-bridge.service   老 Bridge   :27182
+  └─ openclaw-unity-mcp.service      CoplayDev   :8080
+  ```
+  **统一入口**（默认 dry-run，`--apply` 才动手）：`bash scripts/unity-stack-patch.sh {status|verify|install|uninstall|start|stop|restart}`
+  🔴 **不要再用 nohup 手启**，会和 service 抢端口。日志在 `~/.local/state/openclaw/unity-stack/`。
+  起因：裸进程重启即失联，点点一天手动救两次（CASE-20260806-018）。
+- **Unity Bridge**：Unity Editor ↔ OpenClaw AI 连接已修复并跑通（2026-08-06）。走独立 Bridge 服务端口 27182。Gateway 插件也已修复（activation.onStartup + contracts.tools + registerHttpRoute）。详见 `docs/通用-Unity-Bridge-连接指南.md`。
+- **Unity MCP (CoplayDev)**：第二套 Unity 控制通道（2026-08-06 装）。Linux VM 跑 MCP 服务 `0.0.0.0:8080`，Unity(Windows) 主动 WebSocket 外连。比老 Bridge 多出：`reflect`（Unity API 反射验证，防幻觉 API）、`code search`（正则搜代码）、`editor tests`（跑 Unity 测试）、分页场景查询。⚠️ `script validate` CLI 是上游 bug，需用 `raw manage_script` 绕过；Roslyn 校验默认关闭且不建议开（改编译符号影响全项目）。详见 `docs/通用-Unity-MCP-CoplayDev-使用指南.md`。
 
 ## 记忆归档索引
 

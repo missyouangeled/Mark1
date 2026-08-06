@@ -8,6 +8,77 @@
 
 ## 2026-08-06
 
+### ✅ 安装：Unity MCP (CoplayDev) — 跨机器 AI 控 Unity
+- **时间**：2026-08-06 12:20-12:50 CST
+- **触发**：点点要求搜有助于操作 Unity 的插件/Skill，选定后要求安装
+- **来源**：`https://github.com/CoplayDev/unity-mcp`（MIT 协议）
+- **安装路径**：`~/.openclaw/workspace/tools/unity-mcp-coplay/`
+- **Server 版本**：`mcpforunityserver 10.1.2`（FastMCP 3.0.2 + Uvicorn）
+- **Unity 包版本**：`10.1.3-beta.3` ⚠️ 与 Server 差一个小版本（见下方待观察）
+- **依赖**：85 包解析 / 75 校验通过，Python 3.11 venv
+- **架构**：Unity(Windows) 主动 WebSocket 外连 → Linux VM `0.0.0.0:8080/hub/plugin`
+- **是否成功**：✅ 实测通过
+  - `101 Switching Protocols` + 服务端 welcome 帧
+  - `Plugin registered` + `Registered 35 tools`
+  - 10 个工具组启用：animation, asset_gen, core, docs, probuilder, profiling, scripting_ext, testing, ui, vfx
+  - 场景层级与老 Bridge 完全一致（7 个根物体），确认同一项目
+- **使用指南**：`docs/通用-Unity-MCP-CoplayDev-使用指南.md`
+
+#### 坑点留痕（5 个）
+
+1. **`~/.cache/uv` 是断掉的符号链接** → 指向 `/mnt/data/openclaw/uv-cache`，目录在某次数据盘操作后丢失。已 `mkdir` 补回，保留符号链接结构未改配置。**任何用 uv 装东西的场景都会踩**。
+
+2. **`uv sync` 首次被 SIGKILL** → 内存不足（7.7G 总量，Gateway+模型占 4.2G）。与 2026-08-03 装 lxml 同一个坑。解法：`UV_CONCURRENT_BUILDS=1 UV_CONCURRENT_DOWNLOADS=2 UV_CONCURRENT_INSTALLS=1`。
+
+3. **模块入口不是 `src.server`** → 是 `main`（在 `src/` 下）。有现成 console script：`.venv/bin/mcp-for-unity`。
+
+4. **Unity 侧 Connect 按钮灰色不可点** → 不是没找对按钮。源码 `McpConnectionSection.cs:457` 写死：HTTP Remote 模式下 API Key 为空则强制禁用。自建服务端没开 key 校验，填任意字符串即可（已实测假 key 也返回 101）。
+
+5. **HTTP Remote 默认强制 HTTPS** → 源码 `HttpEndpointUtility.cs:276-284`。用明文必须先在 Advanced 勾 `Allow insecure HTTP for HTTP Remote`，顺序不能反。
+
+#### ⚠️ 上游 bug（换版本无解）
+
+**`script validate` CLI 命令是坏的**：
+```
+error: Unknown or unsupported command type: validate_script
+```
+**根因已核实**：下载 `v10.1.2` 正式版 tarball（17M）解开核对，里面同样没有 `validate_script` handler；Unity 侧脚本工具只注册了 `manage_script` 一个。服务端 CLI 发了一个 Unity 侧从来不存在的命令名。**不是版本错位，换版本解决不了。**
+
+**绕过方案（已实测可用）**：
+```bash
+unity-mcp raw manage_script '{"action":"validate","name":"Pool","path":"Assets/Scripts/Game/Pool","level":"comprehensive"}'
+# → status: success / diagnostics: [2 items]
+```
+参数用 `name`（类名）+ `path`（目录），不是 `uri`。等级：basic/standard/strict/comprehensive。
+
+#### ⚠️ 待观察
+
+- **版本错位**：Unity `10.1.3-beta.3` vs Server `10.1.2`。当前握手和 35 工具均正常，已确认与 `validate_script` 无关。若后续其他工具异常，此为第一嫌疑。
+- **Roslyn 精确校验默认关闭**：需装 `Microsoft.CodeAnalysis.CSharp` NuGet + Player Settings 加 `USE_ROSLYN` 编译符号 + 重启 Unity。**改编译符号影响整个项目编译，公司项目慎动，当前决定不开**。不开时降级为结构化校验（可用，但不精确到行号）。
+
+#### 📌 推荐时的判断失误（自我记录）
+
+推荐这套时说了三个卖点，实测两个不准：
+- ❌ 「有 Roslyn 语法校验」→ 默认关闭，需手动开启。**我只读了 README 功能列表就推荐，没核实启用条件**
+- ❌ 「没有 Test Runner」→ 我看漏了，其实在 `editor tests` 子命令下。**只看顶层命令列表导致误报**
+- ✅ 「明确测过 Unity 2021.3」→ 成立（`package.json` 的 `"unity": "2021.3"`）
+
+**教训**：README 功能列表 ≠ 默认可用。推荐工具前必须（1）读源码确认 `#if` 编译符号/默认值/opt-in 开关（2）命令清单看全部层级（3）装完先实测关键能力再汇报能力边界。
+
+### ✅ 修复：Unity Bridge 连接（OpenClaw 2026.7.1-2 兼容性）
+- **时间**：2026-08-06 11:00-11:56 CST
+- **问题**：OpenClaw 升级后 Unity Bridge 断连，报 404 / "An error occurred while sending the request"
+- **根因（6 层）**：
+  1. Gateway 插件清单缺 `activation.onStartup`（新版不再隐式启动，`enabled:true` 只代表"允许启用"）
+  2. 缺 `contracts.tools` 声明（新版要求注册工具前声明归属）
+  3. `api.registerHttpHandler` 已移除 → 改 `registerHttpRoute`
+  4. MCP Bridge Port 被设为 18789（Gateway 端口），应为 27182
+  5. 清理定时器缺 `unref()`，阻止 CLI 进程退出
+  6. Gateway 插件缺 connect/tool/tool-async 三个端点
+- **修复文件**：`~/.openclaw/extensions/unity/openclaw.plugin.json` + `index.ts` + `index.js`（esbuild ESM，openclaw external）
+- **是否成功**：✅ Gateway 启动 8 插件含 unity 零警告，Unity ArmoredFortress 注册成功，`debug.hierarchy` 返回完整场景
+- **指南**：`docs/通用-Unity-Bridge-连接指南.md`（已全面更新）
+
 ### ✅ 配置：doubao-seedream-5.0-lite 接入 image_generate 工具
 - **时间**：2026-08-06 07:56 CST
 - **触发**：点点要求把图生从 agnes-image-2.1-flash 换成豆包方案（最近生图一直用豆包）
@@ -773,3 +844,40 @@
 用户指出实际是「冷启动起不来、手动 restart 才恢复」后才修正方向。
 教训：日志里 `Stopping mark42-* → Stopping openclaw-gateway` 的相邻关系是**手动 restart 触发的连带停止**，
 不能仅凭时间相邻就推断因果；应优先向用户确认操作序列，再定因果方向。
+
+---
+
+### ✅ 加固：Unity 连接栈合并为 systemd 模块（2026-08-06 下午）
+
+- **触发**：点点意外重启后 Unity 两条通道全断，要求「写成一个模块、开机自启、做成补丁那种，删掉就都删掉，开启就都开启」
+- **性质**：不是装新工具，是把已装的两个服务从 **nohup 裸进程** 收编为 systemd 模块
+- **安装内容**（源文件在仓库 `config/systemd/unity-stack/`，install 时复制到 `~/.config/systemd/user/`）：
+
+| 单元 | 端口 | 说明 |
+|------|------|------|
+| `openclaw-unity.target` | — | 总开关 |
+| `openclaw-unity-bridge.service` | 27182 | 老 Bridge（TomLeeLive） |
+| `openclaw-unity-mcp.service` | 8080 | CoplayDev MCP |
+
+- **统一入口**：`scripts/unity-stack-patch.sh`（默认 dry-run，`--apply` 才动手）
+  - `status` / `verify` / `install` / `uninstall` / `start` / `stop` / `restart`
+- **日志**：`~/.local/state/openclaw/unity-stack/`（原先在 `/tmp`，重启即丢）
+- **卸载**：`uninstall --apply` 一次删净三单元；加 `--purge-logs` 连日志一起删
+- **开机自启前提**：`Linger=yes`（本机已确认；脚本会检查并在为 no 时明确报错）
+
+- **实际调用验收**（不看灯）：
+  - Bridge：`debug.hierarchy` 读回 Canvas 全树、`scene.getActive` → `Main.unity` rootCount 7
+  - MCP：`reflect search GameObject` → 14 个真实类型、`scene hierarchy` → total 7
+  - 崩溃自愈：`kill -9` Bridge → 8 秒复活（pid 7150→7231）
+  - `systemd-analyze verify` 零告警
+
+- **两个坑**：① 安装须先 `pkill` 裸进程否则抢端口，代价是 Unity 短暂断连（MCP 自动重连，Bridge 需手点一次 Connect）；② `Documentation=` 不能用中文路径，systemd 报 `Invalid URL`
+- **案例**：`CASE-20260806-018`
+- **文档**：`docs/通用-Unity-Bridge-连接指南.md`、`docs/通用-Unity-MCP-CoplayDev-使用指南.md`
+
+> 📌 **补充（2026-08-06 推送时发现）**：`tools/unity-mcp-coplay/` **不入 git**，已加进 `.gitignore`。
+> 原因：① 它是第三方 MIT 上游仓库且**自带 `.git`**，直接 `git add` 会变成空 gitlink（克隆下来是空目录）；
+> ② 内含 81M Python venv，平台绑定、可重建、不该入库。
+> **重建方式**：`git clone https://github.com/CoplayDev/unity-mcp` 到 `tools/unity-mcp-coplay/`，
+> 然后在 `Server/` 下建 venv 并安装（console script 为 `.venv/bin/mcp-for-unity`）。
+> 我们自己的产物已单独入库：`config/systemd/unity-stack/` + `scripts/unity-stack-patch.sh`。

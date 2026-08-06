@@ -62,3 +62,18 @@ media/Seedream-Images/
 # 但生成器和产物性质不同：产物可重建，生成器丢了就重建不了。
 # 现只排除产物，保留 generate*.py 入库。
 mark42-pkg/docs/devportal/*.html
+
+# ── Unity MCP (CoplayDev) 上游仓库（2026-08-06）──
+# 第三方 MIT 仓库 + 81M Python venv，且自带 .git（直接 add 会变成空 gitlink）。
+# 不入库，靠 docs/install-registry.md 的安装记录重建。
+# 我们自己的产物已单独入库：config/systemd/unity-stack/ + scripts/unity-stack-patch.sh
+tools/unity-mcp-coplay/
+
+# ── 临时/运行时产物（2026-08-06 推送前清理）──
+# 8-05 转移 CHANGELOG/更新日志时的临时备份，正式文件在 mark42-pkg/
+_changelog_backup.md
+_update_log_backup.md
+# transcript 聚合脚本的中间态文件
+memory/daily/*.md.partial
+# 自主决策器的待处理触发（运行时状态，心跳读完即删）
+scripts/autonomy/pending_trigger.txt

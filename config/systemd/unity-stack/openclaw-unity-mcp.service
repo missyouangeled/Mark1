@@ -1,0 +1,51 @@
+# 适用机器：公司（Linux VM）
+# 系统 / OS：Linux（systemd --user）
+# 建立日期：2026-08-06
+#
+# 用途：Unity MCP for Unity（CoplayDev 新通道），FastMCP HTTP，监听 0.0.0.0:8080。
+#       Unity 侧：Window → MCP for Unity → Connect 页签
+#         传输模式 = HTTP Remote（不能用 HTTP Local）
+#         URL      = http://192.168.79.128:8080  （只到端口，不加 /mcp）
+#         API Key  = 任意非空字符串（自建服务端未开 key 校验，但空值会让按钮置灰）
+#       Advanced 页签必须勾 "Allow insecure HTTP for HTTP Remote"，
+#       否则源码 HttpEndpointUtility.cs 强制 HTTPS，明文 http:// 会被直接拒绝。
+#
+# ⚠️ --http-host 必须是 0.0.0.0。绑 127.0.0.1 则 Windows 宿主机上的 Unity 连不进来。
+#
+# ── 启动特性（2026-08-06 实测）──
+#   本服务启动比老 Bridge 慢：6 秒时端口尚未 listen，约 8-14 秒才绑上 8080。
+#   属 Type=simple，systemd 报 Started 仅代表 fork 成功，不代表已 listen。
+#   故 verify 脚本探测须留足等待时间，勿在 6 秒内判定失败。
+#
+# 归属：openclaw-unity.target（总开关）。不要单独 enable 本单元。
+
+[Unit]
+Description=OpenClaw Unity MCP - CoplayDev (port 8080)
+# 文档（systemd 不接受非 ASCII 的 file:// URL，故以注释形式记录）：
+#   docs/通用-Unity-MCP-CoplayDev-使用指南.md
+
+# PartOf → stop/restart target 时本服务跟着停/重启（实现「关就都关」）
+PartOf=openclaw-unity.target
+After=default.target
+
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/missyouangeled/.openclaw/workspace/tools/unity-mcp-coplay/Server
+ExecStart=/home/missyouangeled/.openclaw/workspace/tools/unity-mcp-coplay/Server/.venv/bin/mcp-for-unity --transport http --http-host 0.0.0.0 --http-port 8080
+
+Restart=always
+RestartSec=5
+
+StandardOutput=append:/home/missyouangeled/.local/state/openclaw/unity-stack/unity-mcp.log
+StandardError=append:/home/missyouangeled/.local/state/openclaw/unity-stack/unity-mcp.log
+
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=openclaw-unity.target

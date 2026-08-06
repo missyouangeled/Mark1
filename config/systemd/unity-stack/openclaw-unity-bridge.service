@@ -1,0 +1,50 @@
+# 适用机器：公司（Linux VM）
+# 系统 / OS：Linux（systemd --user）
+# 建立日期：2026-08-06
+#
+# 用途：Unity Bridge（TomLeeLive 老通道），监听 0.0.0.0:27182。
+#       Unity Editor 插件的 Gateway URL 指向 http://192.168.79.128:27182
+#       AI 侧通过 POST /unity/tool 或 /unity/tool-async 发命令。
+#
+# ── 为什么要做成 service（2026-08-06 事故）──
+#   原先是 nohup 裸进程。当天一次意外重启把 Bridge 和 MCP 双双带走，
+#   Unity 插件报 "An error occurred while sending the request"，
+#   用户一天内手动拉起两次。裸进程 = 重启即失联，没有任何自愈。
+#
+# ⚠️ 端口不要改成 18789。18789 是 Gateway 端口，Unity 插件连它必报上述错误。
+#
+# 归属：openclaw-unity.target（总开关）。不要单独 enable 本单元。
+
+[Unit]
+Description=OpenClaw Unity Bridge (port 27182)
+# 文档（systemd 不接受非 ASCII 的 file:// URL，故以注释形式记录）：
+#   docs/通用-Unity-Bridge-连接指南.md
+
+# PartOf → stop/restart target 时本服务跟着停/重启（实现「关就都关」）
+PartOf=openclaw-unity.target
+
+# 不 BindsTo openclaw-gateway：Bridge 是独立 Node 服务，
+# 不依赖 Gateway 进程，Gateway 重启时不应牵连 Unity 连接。
+After=default.target
+
+# 重启风暴护栏：60 秒内最多 5 次
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/missyouangeled/.openclaw/workspace
+ExecStart=/usr/bin/node /home/missyouangeled/.openclaw/workspace/scripts/unity-bridge-server.js 27182
+
+Restart=always
+RestartSec=5
+
+StandardOutput=append:/home/missyouangeled/.local/state/openclaw/unity-stack/unity-bridge.log
+StandardError=append:/home/missyouangeled/.local/state/openclaw/unity-stack/unity-bridge.log
+
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=openclaw-unity.target
