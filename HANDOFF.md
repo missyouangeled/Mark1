@@ -1,6 +1,6 @@
 # HANDOFF.md — 跨模型/跨会话接力地图
 
-> 最后更新: 2026-08-06 15:15 CST
+> 最后更新: 2026-08-06 17:05 CST
 > 当前会话: 贾维斯主会话 (volcengine-agent/ark-code-latest)
 > 状态: ✅ Unity 工作闭环并已推送，无阻塞待办
 
@@ -73,6 +73,16 @@ Bridge `scene.getActive`→`Main.unity` rootCount 7、MCP `reflect`→14 类型 
 补充实测：**Bridge 掉线不会自己重注册**（Auto Connect 只在启动时生效），MCP 会自动重连；
 **MCP 启动慢**，6 秒时端口未 listen，约 8-14 秒才绑上；
 `tools/unity-mcp-coplay/` 已 gitignore（第三方 MIT 仓库自带 `.git` + 81M venv）。
+
+### 4. 情感对话引擎 v2（已 apply + 推送）
+
+联网搜了 Hume EVI / Awesome-LLM-Empathy 等论文，融合四条方法论落地到已验证的 28 条规则。
+已 apply emotional-dialogue-engine。Skill Workshop 里还有 unity-work-protocol（pending）。
+
+### 5. SSML 调研
+
+火山官方文档全量抓取。结论：只有 phoneme 对咱们有用（纠正千千名字读音）。
+break 2.0 不支持，effect 太奇怪，bgm 需要 TOS 暂不可用。
 
 ### 2. 管线钉死 HDRP + 建立项目档案 + 工作流程
 

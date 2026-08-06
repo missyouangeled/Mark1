@@ -1,29 +1,22 @@
 {
-  "last_check": "2026-08-06T14:10:00+08:00",
-  "status": "attention_fixed",
-  "notifications": 0,
-  "git_changes_pending": false,
-  "pending_changes": [],
-  "today_highlights": [
-    "Unity 连接栈收编为 systemd 模块",
-    "模型路由按实测校正（5处不一致统一）",
-    "compaction 换豆包修静默丢数据隐患",
-    "timer 加固 8个全绿",
-    "Mark42 v2.8.2 健康 1975测试0失败"
-  ],
-  "issues_found": [
-    "数据盘 /mnt/data 启动时未挂载（fsck 竞态导致 mnt-data.mount 依赖失败）",
-    "已手动挂载 + fstab 加 nofail/mount-timeout 防复发",
-    "lifecycle-maintainer transcript-aggregate 安全拒绝覆盖（by design，非故障）"
-  ],
-  "system": {
-    "load": "0.16/0.52/0.60",
-    "mem": "3.0G/7.7G (39%)",
-    "disk_root": "76%",
-    "disk_data": "16%",
-    "uptime": "53min",
-    "failed_services": 0,
-    "timers_active": 8,
-    "data_mounted": true
-  }
+  "timestamp": "2026-08-06T16:14:00+08:00",
+  "type": "cron-heartbeat",
+  "status": "OK",
+  "checks": {
+    "gateway": "active",
+    "mark42_armor_guard": "active",
+    "mark42_engine_daemon": "active",
+    "unity_stack": "all_active",
+    "timers": "8/8_have_NEXT",
+    "failed_units": "lifecycle-maintainer(exit1,known,non-critical)",
+    "load": "0.15",
+    "memory": "4.0G/7.7G",
+    "root_disk": "76%",
+    "data_disk": "17%"
+  },
+  "notes": [
+    "根盘 76%（+1%，持续关注）",
+    "lifecycle-maintainer exit 1：no flush memory for today，非异常",
+    "Unity 连接栈正常，端口均在监听"
+  ]
 }
