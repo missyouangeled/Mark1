@@ -2836,3 +2836,82 @@ provider 的 `api` 字段枚举全为对话协议，无图生类型 → **自定
 ### 七、未处理（按「没坏别修」）
 
 `generate_fulltext.py` 剩 8 个 ruff 错误（F541 无占位符 f-string / I001 导入序 / UP032），全部为 e214bd85 入库时带进来的既有技术债，非本次引入，8 个均可 `--fix` 自动修。**等点点指示再动。**
+
+## 2026-08-06 09:07:00 CST (+08:00) — compaction 换豆包（实测选型）+ 根治 user timer 永久卡死
+
+- 类型：config + fix + 新增脚本
+- 适用机器：公司（Linux）
+- 用户决策：点点「先把 compaction 模型换好、测试好，然后把 timer 一次性追到底，全绿为止」
+- 备份：`openclaw.json.bak-20260806-085830` / `tmp/systemd-backup-20260806-084530` / `tmp/systemd-backup-20260806-090608`
+
+### 一、compaction 换模型：实测选型，不按参数猜
+
+点点指定「用 GLM5.2 或者豆包」。写探针脚本对两者做压缩场景实测（长输入 + 要求输出正文）：
+
+| max_tokens | glm-5.2 | doubao-seed-2.0-pro |
+|---|---|---|
+| 64 | ❌ length / 正文 0 | ❌ length / 正文 95 |
+| 128 | ❌ length / 正文 0 | ✅ stop / 正文 96 |
+| 256 | ❌ length / 正文 0 | ✅ stop / 正文 152 |
+| 512 | ❌ length / 正文 53（截断） | ✅ stop / 正文 117 |
+
+**glm-5.2 在 ≤512 预算下四档全部 `finish=length`，三档正文完全为空** —— 与 agnes-2.0-flash 那个静默丢数据形态一致，不可用于 compaction。
+
+**决定性复测**：用 `openclaw.json` 里**真实的 memoryFlush prompt + systemPrompt** + 23478 token 上下文测豆包：
+- `max_tokens=1024`：✅ stop，正确输出 `edit` 工具调用（写 memory/daily）
+- `max_tokens=4096`：✅ stop，正确输出 `read` 工具调用
+
+说明豆包不只是能吐字，是真能理解并胜任 memoryFlush 任务。
+
+**变更**：`compaction.model` + `compaction.memoryFlush.model` → `volcengine-agent/doubao-seed-2.0-pro`
+**校验**：JSON 语法 + 无重复键 + `Config valid` 全过
+**未动**：fallback（agnes-2.5-flash）、imageGenerationModel、model.primary
+
+### 二、校正早先一个错误判断：热重载是部分支持的
+
+我早上说「改配置必须重启才生效」，过于笼统。日志证实：
+
+```
+[reload] config change detected; evaluating reload (...)
+[reload] config hot reload applied (agents.defaults.models..., models.providers...)
+```
+
+- **可热重载**：`models.providers.*`、`agents.defaults.models`（模型注册表）
+- **不能热重载**：`imageGenerationModel.primary`、`compaction.model`、`compaction.memoryFlush.model`
+- 判断方法：看目标字段在不在 `hot reload applied` 列表里
+
+已校正 MEMORY.md 对应段落。
+
+### 三、根治 user timer 永久卡死（详见 CASE-20260806-017）
+
+**现象**：`frontstage-guardian` / `health-collector` 显示 enabled + active，但 `list-timers` 的 NEXT 为 `-`，自 08-05 17:54 起完全停摆，前台假死检测 + CPU 过载响应两道防线空置 12 小时。
+
+**根因**（`man systemd.timer` 证实）：user 级 timer 用了 `OnBootSec`（相对开机），而官方明确指出 user manager「通常在首次登录时才启动」，该场景应用 `OnStartupSec`。秒级证据：开机 07:30:51 → user manager +86s → timer 单元 +94s，而 `OnBootSec=90s` 的触发点 +90s 已过去 4 秒。`Persistent=true` 因无 `OnCalendar` 而完全无效，错过无法补回 → `OnUnitActiveSec` 永远拿不到锚点 → 永久卡死。
+
+**更大的问题**：清点 9 个 timer 全部同一缺陷写法，今天没死的只是余量 34-94 秒「赶上了」，其中包含 **mark42-watchdog**（自愈机制本身）。
+
+**修法**：三重保障 `OnStartupSec` + `OnUnitActiveSec` + `OnCalendar`（OR 关系，不依赖单一锚点），新建 `scripts/harden-user-timers.sh`（默认 dry-run）统一加固另外 6 个。
+
+**过程中第二个坑**：`OnBootSec=` 空串会重置**整个 monotonic timer 列表**，主文件的 `OnUnitActiveSec` 被一起清掉，必须在 drop-in 显式重申。frontstage-guardian 当时没暴露是因为 `relax-interval.conf` 字母序在后加载又加回来了 —— 巧合，不可依赖。
+
+**我的一次误判**：观察到 `SubState=running` 而 service 已 dead，判定「修法无效、还有第二个问题」并已向用户报告。实际那是 timer 触发 service 期间的**正常中间态**，我恰好在执行窗口内单点采样。教训：**判断周期性任务健康，必须连续多周期观察 + 数实际执行次数，不看瞬时 SubState。**
+
+### 四、验证结果
+
+| 项 | 结果 |
+|---|---|
+| `systemd-analyze verify` | ✅ 全部通过，零告警 |
+| reload/restart 后关键服务 | ✅ gateway / armor-guard / engine-daemon 全 active（未重演 CASE-008） |
+| 连续观察 5 分钟 | ✅ 稳定 waiting + NEXT 有值 |
+| **实际执行次数** | ✅ 两个 service 各 **16 次**，08:52→09:03 稳定 60-70s 间隔 |
+| frontstage-guardian 实效 | ✅ 当场检出昨日记录的 `PENDING 假 running` |
+| **最终全量验收** | ✅ **8 个 timer，0 个无 NEXT — 全绿** |
+
+### 五、涉及文件
+
+- `~/.openclaw/openclaw.json`（compaction 两处）
+- `~/.config/systemd/user/*.timer.d/fix-onboot-deadlock.conf`（8 个 drop-in）
+- `scripts/harden-user-timers.sh`（新增，含完整根因注释 + dry-run 隔离）
+- `docs/对系统操作必须要参考的崩坏案例.md`（CASE-017）
+- `MEMORY.md`（compaction 选型依据 + 热重载范围校正）
+- `tmp/probe-compaction-*.py`（探针脚本，留作日后换模型复用）

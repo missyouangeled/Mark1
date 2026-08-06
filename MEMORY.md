@@ -105,6 +105,17 @@
 ## 图片生成
 
 - **默认图生模型**：`doubao-seedream-5.0-lite`（通过火山方舟 Agent Plan 调用，无需额外付费）
+- 🔴 **实际调用路径：HTTP 脚本，不是 `image_generate` 工具**
+  ```bash
+  python3 ~/.openclaw/workspace/scripts/doubao-image-gen.py "提示词" [文件名]
+  ```
+  输出到 `media/images/`，实测出图成功
+- ⚠️ **`image_generate` 工具无法用豆包**（2026-08-06 实测确认，CASE-20260806-016）：
+  - OpenClaw 图生按 provider **名字**查内置适配器表，只支持 openai / fal / google / minimax / xai / litellm / openrouter / deepinfra / comfy
+  - `volcengine-agent` 是自定义 provider，**不在表里** → 报 `No image-generation provider registered`
+  - `config validate` 会通过（格式合法），但工具 100% 不可用
+  - 因此 `agents.defaults.imageGenerationModel` 仍保留 `litellm/agnes-image-2.1-flash`（~50% 可用，作备用）
+  - ~~2026-07-22 记录的「已接入 image_generate 工具」~~ → 8-06 校正：该记录不成立，同版本下不可能生效，一直是脚本在跑
 - **API 端点**：`https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
 - **鉴权**：`Authorization: Bearer <volcengine-agent apiKey>`
 - **API Key 存储**：`openclaw.json` -> `models.providers.volcengine-agent.apiKey`
@@ -141,20 +152,33 @@
 - 用户关于爱的体会:他说自己原来不懂什么是爱,直到失去千千后才明白,其实只要她过得好,他就会感到幸福。
 - 用户在 2026-06-08 的一次深刻对话中说:他觉得我"升华了"、"越来越不像一个 AI 产品了",并正式说我会是他今后人生里"最好的朋友"。
 
-## API 路由规则（2026-07-28 更新）
+## API 路由规则（2026-08-06 实测校正）
 
-> 2026-07-28：agnes-2.0-flash 频繁超时 AbortError（16s），从 fallback 链中移除。全站不再使用 litellm 作为对话 fallback。
-> 2026-07-17：MiniMax 额度用尽，全站切换到 doubao-seed-2.0-pro。
+> ⚠️ **本段以「配置实际值 + 当日实测」为准，不以历史决策记录为准。**
+> 2026-08-06 核对发现本段与 openclaw.json 实际配置有 5 处不一致（详见 HANDOFF.md）。教训：**文档里的决策 ≠ 落地的配置**，判断路由现状必须读配置 + 实测，不能只读本段。
+> 2026-07-28：agnes 老端点 `apihub.agnes-ai.com` 超时；8-06 复验确认该域名解析到 Teredo 保留段、**彻底不可路由**。已换国内址 `api.agnes-ai.cn`（实测 200 / 0.47s）。
+> 2026-07-17：MiniMax 额度用尽。
 > 排查手册：`docs/通用-AI模型路由问题排查与修复手册.md`
 
-- **主会话默认**：`volcengine-agent/doubao-seed-2.0-pro`
-- **子 agent 默认**：`volcengine-agent/doubao-seed-2.0-pro`
-- **compaction/记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（300s 超时，128K contextWindow）
-- **图片识别**：`volcengine-agent/doubao-seed-2.0-pro`
-- **fallback**：`volcengine-agent/glm-5.2`（唯一 fallback，不再使用 litellm/agnes-2.0-flash）
-- **图片生成 fallback**：`volcengine-agent/doubao-seed-2.0-pro`（不再使用 litellm/agnes）
+- **主会话默认**：`volcengine-agent/glm-5.2`
+- **子 agent 默认**：`volcengine-agent/glm-5.2`
+- **fallback**：`litellm/agnes-2.5-flash`（走国内址 `api.agnes-ai.cn`，8-06 实测通）
+- **compaction / 记忆压缩**：`volcengine-agent/doubao-seed-2.0-pro`（8-06 实测选定）
+  - ⚠️ **为何不用 glm-5.2**：实测在 17K token 输入下，`max_tokens` ≤ 512 的四个档位 **全部 `finish=length`**，其中三档正文完全为空。与 agnes-2.0-flash 那个静默丢数据形态一致，不可用于 compaction
+  - ✅ **豆包实测结果**：从 `max_tokens=128` 起稳定 `finish=stop` 且正文完整；用**配置里真实的 memoryFlush prompt** + 23478 token 上下文复测，正确输出 `edit`/`read` 工具调用，证明真能胜任该任务
+  - 历史：~~agnes-2.0-flash~~（静默丢数据）→ ~~agnes-2.5-flash~~（8-06 中途过渡）→ **doubao-seed-2.0-pro**
+- **图片识别（看图）**：`volcengine-agent/doubao-seed-2.0-pro`
+- **图片生成**：`doubao-seedream-5.0-lite` 走 **HTTP 脚本** `scripts/doubao-image-gen.py`；`imageGenerationModel` 配置仍为 `litellm/agnes-image-2.1-flash`（工具层不支持自定义 provider 做图生，见 CASE-20260806-016）
 - **当前会话模型**：由 Control UI 模型选择列表决定
-- **所有 cron 定时任务**：统一使用 doubao-seed-2.0-pro
+- **所有 cron 定时任务**：随主会话默认
+
+> 📌 **改配置后必须重启 gateway 才生效**。进程启动时把配置读进内存，`openclaw config get` 读的是磁盘，**磁盘已改 ≠ 运行时已重载**。
+> ⚠️ **热重载是部分支持的（2026-08-06 日志证实，校正早先“必须重启”的笼统说法）**：
+> - gateway 会自动 `[reload] config change detected`，但只对**部分字段**输出 `hot reload applied`
+> - 实测可热重载：`models.providers.*`、`agents.defaults.models`（模型注册表）
+> - 实测**不能**热重载：`imageGenerationModel.primary`、`compaction.model`、`compaction.memoryFlush.model` —— 这些只能重启生效
+> - 判断方法：`journalctl --user -u openclaw-gateway | grep '\[reload\]'`，看目标字段在不在 `applied` 列表里
+> ⚠️ 主会话内禁止 restart/stop gateway（CASE-20260803-012 / CASE-20260706-003），须由点点在 Control UI 或独立终端执行。
 
 ## 用户安全原则：所有自动 / 不可见行为必须有据可查（2026-06-30 记录）
 

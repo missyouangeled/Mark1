@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-08-06
+
+### ✅ 配置：doubao-seedream-5.0-lite 接入 image_generate 工具
+- **时间**：2026-08-06 07:56 CST
+- **触发**：点点要求把图生从 agnes-image-2.1-flash 换成豆包方案（最近生图一直用豆包）
+- **变更**：
+  - `agents.defaults.imageGenerationModel.primary`：`litellm/agnes-image-2.1-flash` → `volcengine-agent/doubao-seedream-5.0-lite`
+  - `models.providers.volcengine-agent.models` 新增 `doubao-seedream-5.0-lite` 声明
+  - `agents.defaults.models` 注册表新增该模型
+- **API 端点**：`https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
+- **实测**：HTTP 200 / 18.4s / 1920x1920 出图成功
+- **备份**：`~/.openclaw/openclaw.json.bak-20260806-075354`
+- **是否成功**：✅ `openclaw config validate` = Config valid
+- **待办**：需重启 gateway 才生效（主会话内不可重启，CASE-012）
+- **坑点留痕**：provider models 数组 `additionalProperties: False`，写 `output: ["image"]` 会导致 `validate` 报 `models.3: Invalid input`。合法字段用 `openclaw config schema` 查，required 仅 `id`+`name`
+
+### ✅ 实测追记：Agnes 国内址 api.agnes-ai.cn 可用
+- **时间**：2026-08-06 07:52 CST
+- **背景**：配置里 baseUrl 已是国内址，但**换址 + 实测通过的记录一直没留痕**（grep 全仓库 `agnes-ai.cn` 零命中），本次补上
+- **实测结果**：
+  | 目标 | 结果 |
+  |---|---|
+  | `api.agnes-ai.cn` + agnes-2.5-flash | ✅ HTTP 200 / 0.47s / 正文正常 |
+  | `api.agnes-ai.cn` + agnes-2.0-flash | ⚠️ HTTP 200 但 content 空 / finish_reason=length |
+  | `apihub.agnes-ai.com`（老址） | ❌ HTTP 000 / 12s 超时 / 解析到 Teredo 保留段 |
+- **结论**：老端点彻底不可路由（与 8-05 model.yaml 事故同源）；国内址可用
+
+### ✅ 配置：compaction 切换到 agnes-2.5-flash（修静默丢数据隐患）
+- **时间**：2026-08-06 07:56 CST
+- **变更**：`compaction.model` + `compaction.memoryFlush.model`：`litellm/agnes-2.0-flash` → `litellm/agnes-2.5-flash`
+- **真正原因**：不是版本升级。agnes-2.0-flash 实测 HTTP 200 但 `content` 为空、`finish_reason=length`、token 全烧在 `reasoning_content`、`text_tokens: 0`。挂在 compaction 上 = 压缩结果为空、上下文静默丢失且不报错
+- **形态参考**：CASE-20260706-004（stopReason=length 死锁）
+- **是否成功**：✅ validate 通过，待重启生效
+
+---
+
 ## 2026-08-03
 
 ### ✅ 安装：cyclonedx-bom (SBOM 生成工具)
@@ -55,12 +91,13 @@
 - **时间**：2026-07-29 09:06 CST
 - **触发**：点点看到 Agnes 2.5 Flash 已上线，要求配置上
 - **来源**：已有 Agnes API Key（`credentials/api/agnes.env`），新增模型到 openclaw.json
-- **API 端点**：`https://apihub.agnes-ai.com/v1`（OpenAI 兼容）
+- **API 端点**：~~`https://apihub.agnes-ai.com/v1`~~ → **已改国内址 `https://api.agnes-ai.cn/v1`**
 - **模型名**：`agnes-2.5-flash`（litellm 通道：`litellm/agnes-2.5-flash`）
 - **参数**：512K 上下文 / 65536 输出 / 支持 text+image 输入
 - **费用**：$0/百万 token（免费）
-- **当前状态**：⚠️ Agnes API 服务器连接超时（2026-07-29 09:06 测试），配置已就绪，待服务器恢复即可用
-- **已知问题**：Agnes 服务器间歇性不可用（历史记录见非主模型使用手册）
+- **当前状态**：✅ **可用**（2026-08-06 实测追记，见下方 08-06 条目）
+- ~~⚠️ Agnes API 服务器连接超时（2026-07-29 09:06 测试），配置已就绪，待服务器恢复即可用~~
+- **已知问题**：老端点 `apihub.agnes-ai.com` 已彻底不可路由（解析到 Teredo 保留段），**必须用国内址**
 
 ## 2026-07-27
 
@@ -621,3 +658,118 @@
   - Mark42 核心仍为零第三方依赖，这些是可选依赖（pyproject.toml optional-dependencies）
   - 未安装时 telemetry 模块自动降级为空操作，不影响运行
   - 启用方式：`MARK42_METRICS_ENABLED=1` / `MARK42_TRACING_ENABLED=1`
+
+## 2026-08-05 卸载：openclaw-embed-venv312（Python 3.12 遗留 venv）
+
+- **路径**：`/mnt/data/openclaw/openclaw-embed-venv312`
+- **大小**：5.1G（nvidia 2.7G + torch 1.2G + triton 700M 等纯依赖库）
+- **创建**：2026-06-12，创建后从未被任何服务引用
+- **删除原因**：Python 3.12 环境搭建遗留物。实际在用的是 `embed-venv311`（1.3G，经 `~/.local/share/openclaw-embed-venv311` 软链被 embed-sidecar 引用）
+- **零引用核查**（全部无命中）：systemd 系统级+用户级单元 / openclaw.json / workspace scripts / mark42 / shell rc / crontab / 反向软链扫描 / 运行进程 / lsof。唯一命中项为当日会话记录本身，非代码引用
+- **无独有资产**：目录内无 .bin/.safetensors/.pt/.onnx 大模型文件，模型权重位于 `/mnt/data/openclaw/huggingface`，不受影响
+- **删除流程**：先 `mv` 改名隔离 → 重启 embed-sidecar 验证 → healthz/encode/search 三项功能验证 → 确认无误后 `rm -rf`
+- **验证结果**：sidecar active、model_loaded true、index_segments 10748（与删除前一致）、encode 正常、语义 search 正常（记忆检索链路通）
+- **磁盘**：/mnt/data 由 13G/27% 降至 7.4G/16%，释放 5.1G
+- **注**：health-collector / lifecycle-maintainer 两单元 failed 属当日既有状态（今日已失败 52 次 / 9 次，最早失败早于本次操作），经 grep 确认不引用该 venv，与本次删除无关
+
+## 2026-08-05 修复：两个 systemd 单元长期 failed（3 个独立根因）
+
+### 根因 1：lifecycle-maintainer 调用已删除的 ChatTTS 清理脚本（真凶）
+- **现象**：`openclaw-lifecycle-maintainer.service` exit 1 → failed，当日已失败 9 次
+- **根因**：`tools/chattts-on-demand/cleanup-old-audio.sh` 不存在。ChatTTS 下线换豆包 TTS 时目录被删，但 lifecycle-maintainer 里的调用未同步移除
+- **副作用**：现役 `tools/cleanup-tts.sh` 未被任何调度调用 → media/tts 过期音频长期无人清理
+- **修复**：`scripts/openclaw-lifecycle-maintainer.py` 中 `chattts-cleanup` 改为 `tts-cleanup`，指向 `tools/cleanup-tts.sh`（清理 media/tts 下超 4 小时 wav/mp3）
+
+### 根因 2：embed-sidecar 裸 socket 短读 → 向量索引增量更新长期失败
+- **现象**：`embed-index` 子检查每次报 `sidecar unavailable: HTTP Error 400`
+- **误判排除**：报错栈顶是 `urlopen(timeout=120)`，看似超时；实际响应体是 `{"ok":false,"error":"invalid JSON"}`
+- **根因**：`scripts/embed-sidecar.py` 用 `makefile('rb', buffering=0)` 裸 socket，`rfile.read(content_len)` 不保证一次读满。请求体超过约 128KB（TCP 缓冲区边界）被截断成非法 JSON。memory-embed-index 按 100 段/批发送，中文段落常达 190KB+，故**每次必中**
+- **阈值实测**：170 条/120KB 通过，184 条/130KB 失败（非固定上限，随 TCP 缓冲抖动）
+- **修复**：改为 `while remaining > 0` 循环读满，遇连接提前关闭 break
+- **顺带**：413 报错文案 "max 500 texts" 与实际上限 200 不符，已订正为 "max 200"
+- **影响**：此 bug 导致向量索引长期停在 10748 段，近期记忆未进语义索引。修复后增量重建成功，**10748 → 15194 段（新增 4446）**，耗时 136s
+
+### 根因 3：health-collector 的 stuck-session-detect 超时被判 failed（告警噪声）
+- **现象**：`TIMEOUT(20s)` → exit 1 → failed，当日已失败 52 次
+- **实测**：脚本单独运行仅 **45ms**，exit 0。超时仅发生在主会话被长任务占用、读会话状态被拖慢时
+- **逻辑矛盾**：该检查职责就是"检测主会话阻塞"，却因被检测现象本身而判定整个采集器崩溃
+- **修复**：`scripts/openclaw-health-collector.py` 新增 `TIMEOUT_TOLERANT_CHECKS = {"stuck-session-detect"}` 白名单，命中者超时降级为 degraded（同 exit 2 语义）——仍记日志、仍反映在 overall=⚠，但不再让单元 exit 1；超时预算 20s→30s
+
+### 验证结果
+- 三脚本 py_compile 通过
+- 大请求体验证：130KB/184条、140KB/199条 均 OK（修复前 400）
+- lifecycle-maintainer 手动运行 exit 0，7 项检查全 OK
+- health-collector 手动运行 exit 0，stuck-session-detect 耗时 137ms
+- systemd 启动两单元 ExecMainStatus 均为 0
+- **failed 单元数：2 → 0**
+- sidecar 重启后 index_segments=15183，语义检索可命中当日内容
+- **注**：sidecar 无 reload 接口，索引在启动时一次性载入，重建索引后需 restart 才生效
+
+## 2026-08-05 排查修复：冷启动 Gateway 长时间不可达（用户侧表现「启动不了」）
+
+### 现象（用户描述）
+关机做备份 → 开机 → 打开 Control UI 连不上 → 手动 `openclaw gateway restart` 后恢复正常。
+
+### 根因：不是故障，是冷启动过慢（机械盘 + 开机 I/O 争抢）
+- `sda` / `sdb` 均为**机械盘**（`rotational=1`），调度器 mq-deadline
+- OpenClaw 包 **371M**（dist 97M），冷启动需大量随机读
+- 开机 2 分钟内有 **322 个** systemd 启动事件同时争抢磁盘
+- **稳定复现规律**（node fork 后到首行日志的静默时长）：
+
+| 冷启动 | systemd Started | node 首行日志 | 静默 |
+|---|---|---|---|
+| 8-04 07:36 | 07:36:51 | 07:38:40 | **109s** |
+| 8-05 12:09 | 12:09:32 | 12:10:54 | **82s** |
+| 8-05 13:18 | 13:18:57 | 13:20:45 | **108s** |
+
+- 对照：缓存热后的重启仅 **0.9~3s**（相差 50~70 倍）→ 瓶颈确定为冷态磁盘 I/O
+- **误导性关键点**：单元为默认 `Type=simple`，systemd 在 13:18:57 即报 "Started"，
+  但那只代表 fork 成功，此时端口未 listen。这是「看起来启动不了」的直接原因
+- 本次时间线巧合：Gateway 13:20:56 listen，用户 13:21:02 敲 restart（仅差 6 秒），
+  restart 之所以 0.9s 完成，是因前 108s 已把文件缓存烧热
+
+### 排除项（均已实测，非本次原因）
+- compile-cache 未被开机清理（`/var/tmp/openclaw-compile-cache` 7-31 建，238M/41163 文件）
+- 无端口冲突（无 EADDRINUSE）
+- 无 OOM（内存峰值 578M / 上限 4.5G）
+- `NRestarts=0`，服务本身未崩溃
+- resume-watch 未参与（今日最后动作 07:46）
+- journal 中大量 `error|timeout` 命中行均为 `timeoutMs=600000` 参数名误匹配
+
+### 修复 1：boot-health-check 启动注入必然失败（真 bug）
+- **现象**：13:19:20 报 `[boot] 启动事件注入失败: ... timed out after 15 seconds`
+- **根因**：脚本 13:18:57 启动、13:19:20 就调 `chat.inject`，比 gateway 就绪（13:20:56）**早 96 秒**；
+  原 `timeout=15` 在冷启动场景下必然超时 → **开机启动消息从未成功送达**
+- 原有 `check_gateway_port()` 只探 TCP 连通，不足以判定会话层就绪
+- **修复**：新增 `wait_gateway_ready()` 双探针
+  - 第一道 HTTP `/health`（实测 **23ms**，比 `config.get` 的 4458ms 轻两个数量级）
+  - 第二道 `openclaw gateway status --json`（实测 1444ms，给 30s 余量）确认会话层可用
+  - 最长等 240s，interval 5s；inject 自身 timeout 15s → 60s
+- **实测**：就绪判定耗时由 9.8s 降至 **1.2s**，返回 `ready=True, waitedSeconds=0`
+- **配套**：原单元 `TimeoutStartSec=60` 会在 60s 掐死等待逻辑，
+  新增 drop-in `openclaw-boot-health-check.service.d/cold-boot-wait.conf` 放宽至 **300s**（已验证 TimeoutStartUSec=5min）
+
+### 修复 2：提高 Gateway 冷启动 I/O 优先级
+- 新增 drop-in `openclaw-gateway.service.d/cold-boot-io-priority.conf`
+- `IOSchedulingClass=best-effort` + `IOSchedulingPriority=0`（默认为 4），在开机争抢中优先拿磁盘
+- realtime 类（class 1）需 root，用户级 systemd 不可用（`ionice -c 1` → Operation not permitted），故取 best-effort 最高档
+- **已验证生效**：`IOSchedulingPriority=0`
+- **未重启 Gateway**（遵守 CASE-20260706-003：不得从主会话内 restart gateway）
+
+### ⚠️ 过程中自查拦下的一个风险（重要）
+初版 drop-in 曾写入 `Nice=-5`，随后实测发现：
+本机 `ulimit -e = 0`，普通用户**无权设置负 nice**（`nice -n -5` → Permission denied），
+`/etc/security/limits.conf` 未配置 nice 提升。若保留该行，**下次开机 Gateway 会因无权限直接启动失败**——
+把「启动慢」升级成真正的「启动不了」。已在写入后立即移除并 daemon-reload 验证（`Nice=0`）。
+如需 CPU 优先级提升，须先配 `missyouangeled - nice -5` 并重新登录验证。
+
+### 遗留与建议
+- I/O 优先级只能**缩短**、无法消除静默期，受机械盘物理限制
+- 彻底解决方向：换 SSD；或将 gateway 单元改 `Type=notify` 让依赖单元准确等待就绪（改动较大，未做）
+- 下次冷启动应观察：静默时长是否下降、是否能正常收到「系统已就绪」消息
+
+### 排查中的一次误判（自我记录）
+最初把 13:21:02 那次重启归因于 mark42-bootstrap 连带停止 gateway，并据此解读为「重启问题」。
+用户指出实际是「冷启动起不来、手动 restart 才恢复」后才修正方向。
+教训：日志里 `Stopping mark42-* → Stopping openclaw-gateway` 的相邻关系是**手动 restart 触发的连带停止**，
+不能仅凭时间相邻就推断因果；应优先向用户确认操作序列，再定因果方向。
