@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """生成 Mark42 静态开发门户 HTML（绝对路径，双击直接跳转）"""
-import os
+import sys
 from pathlib import Path
 
 WORKSPACE = Path("/home/missyouangeled/.openclaw/workspace")
@@ -17,8 +17,10 @@ def _read_version() -> str:
         m = _re.search(r'__version__\s*=\s*["\']([^"\']+)', txt)
         if m:
             return m.group(1)
-    except Exception:
-        pass
+    except Exception as exc:
+        # 【2026-08-06】原为 try/except/pass，静默吞异常（ruff S110）。
+        # 读版本失败会让页面显示 "unknown"，属于需要被知道的降级，不能默默咽掉。
+        print(f"⚠️  读取版本号失败，页面将显示 unknown: {exc}", file=sys.stderr)
     return "unknown"
 
 VERSION = _read_version()
@@ -211,8 +213,17 @@ def render_module_row(src_rel: str, name: str, desc: str, tests: list) -> str:
     # ② 改用相对路径指门户内副本：绝对路径指向 workspace 隐藏目录，
     #   门户整体拷到其他机器/其他位置后全部失效。
     # 存在性校验仍用绝对路径（构建时验证源文件真存在）。
+    # 【2026-08-06 补】原先只赋值 src_abs 却从未使用（ruff F841），
+    # 上行注释承诺的「存在性校验」实际根本没写。源码若被移走/改名，
+    # 会照样生成指向不存在文件的死链且不报错 —— 正是 8-05 那类链接腐化的温床。
+    # 现补上校验：缺失时标「缺」并向 stderr 告警，与下方 test 链接的处理对齐。
     src_abs = PKG / "mark42" / src_rel
     src_url = f"mark42/{src_rel}"
+    if src_abs.exists():
+        src_link = f'<a class="link src" href="{src_url}" target="_blank">📄 打开源码</a>'
+    else:
+        print(f"⚠️  源码缺失，链接标记为缺: mark42/{src_rel}", file=sys.stderr)
+        src_link = f'<span class="link src-missing">📄 {src_rel} (缺)</span>'
     test_links = ""
     if tests:
         test_links = '<div class="tests">'
@@ -231,7 +242,7 @@ def render_module_row(src_rel: str, name: str, desc: str, tests: list) -> str:
       </div>
       <div class="module-desc">{desc}</div>
       <div class="module-links">
-        <a class="link src" href="{src_url}" target="_blank">📄 打开源码</a>
+        {src_link}
         {test_links}
       </div>
     </div>'''
@@ -286,6 +297,7 @@ body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif
 .link.test {{ background: #d1fae5; color: #065f46; }}
 .link.test:hover {{ background: #059669; color: white; }}
 .test-missing {{ background: #fee2e2; color: #991b1b; font-size: 12px; padding: 4px 10px; border-radius: 4px; }}
+.src-missing {{ background: #fee2e2; color: #991b1b; font-size: 12px; padding: 4px 10px; border-radius: 4px; }}
 .stat-bar {{ background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 30px; font-size: 13px; color: #6b7280; }}
 .stat-bar b {{ color: #1e40af; font-size: 16px; }}
 </style>

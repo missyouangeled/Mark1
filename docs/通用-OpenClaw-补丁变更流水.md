@@ -2616,3 +2616,223 @@ P3-4 剩余 106 项 mypy 属渐进式标注债（`no-any-return` 27、`index` 17
 | P2 | lifecycle-maintainer exit 1 | ⏸️ 未修（功能正常，属退出码语义，与 revalidate 同类；属 OpenClaw 侧脚本非 Mark42） |
 | P3 | t1/t2 残留状态 | ✅ 已清理（可恢复） |
 | P3 | daemon-heartbeat-main 孤儿 | ✅ 已清理（可恢复） |
+
+## 2026-08-06 07:56:00 CST (+08:00) — 模型路由三方不一致实测校正 + 修 compaction 静默丢数据隐患
+
+- 类型：config + docs
+- 适用机器：公司（Linux）
+- 系统 / OS：Linux
+- 备份：`~/.openclaw/openclaw.json.bak-20260806-075354`（20985 字节）
+- 用户决策：点点确认「agnes-2.0 换 2.5、图生换豆包、deepseek-v4-pro 换 glm-5.2，但所有操作前期确保系统稳定」
+
+### 一、起因：启动必读文件互相矛盾
+
+点点问「有没有每天读启动项」，核对后发现真问题不是漏读，而是**启动链里的必读文件本身过期**：
+
+| 文件 | 状态 |
+|---|---|
+| `HANDOFF.md` | 停在 6-10，空窗近两个月 |
+| `docs/模型使用说明.md` | 停在 6-15，仍写主力 = deepseek-v4-pro |
+
+实际配置 / MEMORY.md / 模型使用说明 三方共 **5 处**不一致。三份都在启动必读链里 → **每天照着互相打脸的三套路由表走，还以为守了规矩**。
+
+### 二、我最初判断错了一次（记下来）
+
+第一轮我拿「MEMORY.md 写了什么」当「系统实际是什么」，断言 agnes 已从 fallback 移除。点点要求核对后查实际配置，发现 agnes 仍挂在 fallback + compaction + 图生三处。
+
+**教训：文档里的决策 ≠ 落地的配置。** 8-05 daily 第 218 行已踩过同一个坑（model.yaml 还指向失效域名，"配置没跟上决策"），今天差点用同一个错误方式再判一次。
+
+### 三、实测（本次唯一验收依据）
+
+| 目标 | 结果 |
+|---|---|
+| `api.agnes-ai.cn` + agnes-2.5-flash | ✅ HTTP 200 / 0.47s / 正文正常 |
+| `api.agnes-ai.cn` + agnes-2.0-flash | ⚠️ HTTP 200 但 content 空 / finish_reason=length |
+| `apihub.agnes-ai.com`（老址） | ❌ HTTP 000 / 12s / 解析到 `2001::c73b:95cd` Teredo 保留段 |
+| 豆包 doubao-seedream-5.0-lite | ✅ HTTP 200 / 18.4s / 1920x1920 出图成功 |
+
+### 四、⭐ 顺带揪出一个静默丢数据隐患
+
+agnes-2.0-flash HTTP 200 不报错，但 `content` 为空字符串，token 预算全烧在 `reasoning_content`，`text_tokens: 0`。**而它当时挂在 compaction 上。**
+
+compaction 输入必然是长上下文 → 正文输出为空 → **压缩结果为空 → 上下文静默丢失，全程不报错**。
+
+形态同 CASE-20260706-004；危害类型同 8-05 那个聚合脚本静默覆盖 transcript：**不报错、不崩溃、悄悄丢东西**。所以这次换版本号不是升级，是修隐患。
+
+### 五、四处配置变更
+
+- `compaction.model`：agnes-2.0-flash → **agnes-2.5-flash**
+- `compaction.memoryFlush.model`：agnes-2.0-flash → **agnes-2.5-flash**
+- `imageGenerationModel.primary`：litellm/agnes-image-2.1-flash → **volcengine-agent/doubao-seedream-5.0-lite**
+- `models.providers.volcengine-agent.models`：**新增 doubao-seedream-5.0-lite** + 注册表同步
+
+未动项（已确认保持原值）：`model.primary` = glm-5.2 / `model.fallbacks` = [agnes-2.5-flash] / `imageModel` = doubao-seed-2.0-pro
+
+### 六、操作规范（按崩坏案例执行）
+
+- 先 curl 实测再改，不照抄历史结论
+- `cp` 带时间戳备份
+- 用 `edit` 精确改，**不用 Python 直写**（CASE-20260616-002）
+- 分两批改，每批独立校验（第一批纯新增，第二批改指向）
+- 校验三连：JSON 语法 + 重复键检查 + `openclaw config validate`
+- ⚠️ **主会话内不执行 restart/stop**（CASE-20260803-012 / CASE-20260706-003），交由点点执行
+
+### 七、validate 拦下一个真错误
+
+第一次 validate 报 `models.providers.volcengine-agent.models.3: Invalid input`。**若直接重启，Gateway 会拒绝启动。**
+
+根因：我给 seedream 写了 `output: ["image"]`，但查 `openclaw config schema` 确认 provider models 的 `additionalProperties: False`，合法字段里**没有 `output`**，required 仅 `id` + `name`。删掉即通过。
+
+**这条固化为规矩：不确定字段合法性 → 查 schema，别猜。**
+
+### 八、本轮我自己踩的两个坑（都是"比较两端不同源"）
+
+1. **字节数误判**：拿 `stat` 文件字节数（20985）和 Python `len(raw)` 字符数（19752）直接相减，误判「加了内容反而变少」，一度以为触发 CASE-007。中文 UTF-8 占 3 字节，两个数不同量纲。同口径后 20985 → 21469（+484，正常）
+2. **磁盘 ≠ 内存**：改完配置立刻调 `image_generate`，报 `LiteLLM image generation response malformed`。查证 gateway 进程 07:32:31 启动、配置 07:56:39 才改 → 用的是进程内存旧值。`config get` 读磁盘，返回新值，**不代表运行时已重载**
+
+两条都和 8-05 那次守卫"没生效"同源：**验证的两端必须同源同口径**。
+
+### 九、验证结果
+
+| 项 | 状态 |
+|---|---|
+| JSON 语法 | ✅ 合法 |
+| 重复键检查 | ✅ 无重复（CASE-002 防御） |
+| 结构 diff | ✅ 仅新增 8 字段，无任何删减 |
+| 顶层 key | ✅ 17 个完全一致 |
+| `openclaw config validate` | ✅ **Config valid** |
+| 豆包 seedream API 直调 | ✅ 出图成功 |
+| gateway 服务 | ✅ active（全程未动） |
+| **image_generate 工具生效** | ⏳ 待重启 gateway |
+
+### 十、涉及文件
+
+- `~/.openclaw/openclaw.json`（4 处变更）
+- `HANDOFF.md`（6-10 → 8-06，含待接力项与回滚路径）
+- `MEMORY.md`（API 路由段按实测重写 + 图生段补工具接入）
+- `docs/模型使用说明.md`（总览表 + 主力/fallback/图生/弃用段全面重写 + 新增「改模型配置的标准动作」）
+- `docs/install-registry.md`（3 条新记录 + 修正 7-29 那条「待恢复」状态）
+
+## 2026-08-06 08:11:00 CST (+08:00) — 图生回滚：当前版本不支持自定义 provider 做图生（CASE-016）
+
+- 类型：rollback + docs + 新增脚本
+- 适用机器：公司（Linux）
+- 用户决策：点点确认「按 1 回滚，并且在崩坏案例上记上一笔，以后但凡涉及到系统工具的，先查寻当前版本支持不支持」
+
+### 问题
+
+上一条变更把 `imageGenerationModel.primary` 改成 `volcengine-agent/doubao-seedream-5.0-lite`，`config validate` 通过、gateway 重启生效，但调用 `image_generate` 报：
+
+```
+No image-generation provider registered for volcengine-agent
+```
+
+### 根因
+
+OpenClaw 图生子系统按 provider **名字**查内置适配器表（`dist/runtime-Da0CzszU.js`），只支持 openai / fal / google / minimax / xai / litellm / openrouter / deepinfra / comfy。`volcengine-agent` 为自定义 provider，不在表内。
+
+provider 的 `api` 字段枚举全为对话协议，无图生类型 → **自定义 provider 做图生在当前版本不可行**，非配置缺字段问题。
+
+### 影响
+
+图生成功率 **~50% → 0%**（原 agnes-image 有约一半概率成功）。属我引入的功能退化。
+
+### 处置
+
+| 项 | 处置 |
+|---|---|
+| `imageGenerationModel.primary` | ⬅️ 回滚 `litellm/agnes-image-2.1-flash` |
+| seedream provider 声明 | ✅ 保留（合法无害，脚本用同一模型名） |
+| `compaction` / `memoryFlush` | ✅ **保留 agnes-2.5-flash**（真修复，与图生无关，不连带回退） |
+| 图生实际路径 | 🆕 `scripts/doubao-image-gen.py`（HTTP 直调，实测出图 233382 字节成功） |
+| 回滚后校验 | ✅ JSON 语法 + 无重复键 + `Config valid` |
+
+### 留痕与规则固化
+
+- 新增 `CASE-20260806-016` 到崩坏案例（含三种「验证通过但其实没通」变种对照表 + 6 条防御清单 + 查支持情况的正确姿势）
+- `rules/agents-core.md` 修改类任务流程**新增第 1.5 步**：涉及系统工具/provider/capability，先确认当前版本支持不支持
+- `MEMORY.md` 图片生成段校正：明确工具不可用、实际走脚本；并划删 7-22 那条「已接入 image_generate 工具」的不成立记录
+
+### 本日第三次同类错误
+
+今天连踩三个变种，共性是**验证的两端不同源**：
+
+1. `stat` 文件字节数 vs Python `len()` 字符数 → 误判文件变小
+2. `config get` 读磁盘 vs 进程内存 → 误判配置已生效
+3. **`config validate` 校验格式 vs 运行时能力校验** → 误判功能可用（本次）
+
+第 3 条最隐蔽：schema 合法性与运行时能力是两套完全独立的校验。
+
+## 2026-08-06 08:35:00 CST (+08:00) — Mark42 巡检 + 清掉自己昨天引入的 2 个 ruff 退化（顺带补上没写的存在性校验）
+
+- 类型：health-check + fix
+- 适用机器：公司（Linux）
+- 项目：Mark42 v2.8.2
+- 用户决策：点点「检查一下 Mark42 项目是否正常运行」→「按照你的想法来」（清我自己引入的 2 个）
+
+### 一、巡检结论：健康
+
+| 项 | 结果 |
+|---|---|
+| 测试 | ✅ 1975 passed / 0 failed / 25 skipped |
+| ruff 核心代码 | ✅ mark42/ + tests/ 全过 |
+| mypy | ✅ 0 issues（74 文件） |
+| 版本 / 体量 | ✅ v2.8.2 / 24247 源码 / 28765 测试 / 1.19:1 |
+| 5 个 Loop | ✅ 全 registered |
+| 上下文铠甲 | ✅ 4.4%，ok |
+| 熔断器 | ✅ 全 closed |
+| 常驻进程 | ✅ armor-guard / engine-daemon 均 running，NRestarts=0 |
+| watchdog timer | ✅ 每 5 分钟准点，今早 9 次全 exit 0 |
+| Git | ✅ mark42-pkg 零未提交，无未推送 |
+
+### 二、复核分身报告，修正两条结论
+
+分身巡检报告核心数据可信，但两条结论不准：
+
+**① 「测试文件 76 个，比历史少 2」→ 错，一个没少。**
+多口径实测：`tests/` 下 `test_*.py` = **77**，与 8-05 记录的 77/77 精确吻合。`tests/` 下所有 `.py` = 78（多的是辅助文件），`conftest.py` 在仓库根不在 tests/。分身拿 76 对 78 得出「少 2」，又用「不影响健康度」盖过去。
+
+**② 「11 个 ruff 错误，如果基线含 docs 则是退化」→ 不能留成「如果」。查实：其中 2 个是我昨天引入的。**
+
+出错两文件正是我 8-05 改过的，取改前版本直接比：
+
+| 文件 | 改前(e214bd85) | 现在 | 判定 |
+|---|---|---|---|
+| `generate.py` | 1 个（F401） | 3 个 | 🔴 **我新增 2 个** |
+| `generate_fulltext.py` | 8 个 | 8 个 | 既有技术债，未动过 |
+
+### 三、⭐ F841 死变量暴露了一个真 bug（不只是 lint 噪音）
+
+`src_abs` 上方注释写着「存在性校验仍用绝对路径（构建时验证源文件真存在）」，**但代码只赋值、根本没写校验**。下方 test 链接有 `if test_path.exists()` 分支，源码链接却没有。
+
+后果：源码若被移走/改名，门户会照样生成指向不存在文件的死链**且不报错**。这正是 8-05 修的「68 个链接全失效」同一类问题，只是这次埋在生成器里没爆。
+
+### 四、修复内容
+
+- `F401`：`import os`（0 次使用）→ 换成 `import sys`（新告警需要）
+- `S110`：`_read_version()` 的 `try/except/pass` → 改为 `except Exception as exc` + stderr 告警（读版本失败会让页面显示 unknown，属于需要被知道的降级）
+- `F841`：**不删变量，补上注释承诺的校验**。缺失时标「(缺)」+ stderr 告警，与 test 链接处理对齐
+- 附带修：新加的 `.src-missing` class 原先无 CSS 定义，会渲染成无样式裸文本 → 补上样式（与 `.test-missing` 同款）
+
+### 五、验证（按回退验证规矩做）
+
+| 步骤 | 结果 |
+|---|---|
+| `py_compile` | ✅ 通过 |
+| `ruff check generate.py` | ✅ **All checks passed** |
+| 改前先存 HTML 基线 | 49754 字节 |
+| 重新生成 + diff | ✅ **只多我补的那行 CSS**，70 模块 / 43 文档 / 所有链接逐字节一致 |
+| stderr 告警 | ✅ 干净 —— 70 个源码全部通过存在性校验，0 缺失 |
+| **反向验证** | ✅ 故意把路径改成不存在目录 → **70 个模块全部报警**，证明校验真在工作 |
+| 全量测试 | ✅ 1975 passed / 0 failed（与基线一致，无回归） |
+
+### 六、本次自己踩的两个坑
+
+1. **edit 第 3 处把「替换后内容」当「查找原文」写**，报 Could not find。好在 edit 是原子的，前两处也一起没生效，文件保持原样。重新查准锚点后一次过
+2. **反向验证污染了正式产物**：临时脚本的输出路径是硬编码的，把门户 HTML 和桌面副本都覆盖成「70 个源码全缺失」的坏版本（48254 字节）。发现后立即重新生成恢复（49864 字节，缺失标记 0，桌面副本同步）
+
+第 2 条教训：**跑破坏性反向验证前，先确认脚本的输出路径是不是写死的正式产物路径。**
+
+### 七、未处理（按「没坏别修」）
+
+`generate_fulltext.py` 剩 8 个 ruff 错误（F541 无占位符 f-string / I001 导入序 / UP032），全部为 e214bd85 入库时带进来的既有技术债，非本次引入，8 个均可 `--fix` 自动修。**等点点指示再动。**
