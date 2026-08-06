@@ -192,7 +192,7 @@ curl -s -X POST http://localhost:27182/unity/tool-async \
 | 移动物体 | `transform.setPosition` | `{"objectName":"Player","x":10,"y":0,"z":5}` |
 | 旋转物体 | `transform.setRotation` | `{"objectName":"Player","x":0,"y":90,"z":0}` |
 | 缩放物体 | `transform.setScale` | `{"objectName":"Player","x":2,"y":2,"z":2}` |
-| 获取组件 | `component.get` | `{"name":"Player","componentType":"Transform"}` |
+| 获取组件 | `component.get` | `{"gameObject":"Player","type":"Transform"}` |
 | Play 模式 | `app.play` | `{}` |
 | Stop 模式 | `app.stop` | `{}` |
 | 获取应用状态 | `app.getState` | `{}` |
