@@ -129,6 +129,17 @@
 ## 项目
 
 - **Mark42**：模块化智能铠甲系统（上下文铠甲 + 循环引擎 + 重型战甲）。v2.8.1 四大可用性修复完成（安装器/配置向导/用户文档/错误处理）。compact 审计 6 类核对 + Constraint Pinning + 动态阈值 + 中文 compaction-notifier hook。审查评分 A-(91/100)，1622 个测试 0 失败。用户文档: QUICKSTART/TUTORIAL/INDEX。详见 `PROJECT_INDEX.md` 和 `docs/design/`。
+- 🔴 **Unity 实操手册（干活前必读）**：`docs/通用-Unity-实操手册.md`
+  - 全是实测踩出来的正确用法 + 参数名纠错表（多处文档/help 写错）
+  - 三条「报 success 其实没成」：`lighting create` 不建 Light、
+    `gameobject create --components` 不生效、粒子 `playOnAwake` 默认关
+  - 截图回传方案（Unity 在 Windows、AI 在 Linux VM，无共享盘）
+  - 🔴 `CaptureScreenshot` 非 Play 模式下根本不写盘（依赖渲染帧循环）
+- **项目档案**：`docs/项目-ArmoredFortress-Unity项目档案.md`——管线 **HDRP**（实测钉死）、
+  Unity 2021.3.32f1c1、7 个场景清单、Main.unity 结构、可用特效技术栈。
+  ⚠️ 管线判据分强弱：`reflect` 只证明程序集里有该类型，**不等于当前激活管线**；
+  硬判据是场景里有活的管线专属组件。
+- **截图接收端**：`scripts/unity-shot-receiver.py`（:28080，落盘到 `media/unity/`）
 - **Unity 连接栈（2026-08-06 下午收编为 systemd 模块）**：两条通道合并成**一个模块**，开机自启 + 崩溃自愈。
   ```
   openclaw-unity.target              ← 总开关（只 enable 它，不单独 enable 成员）
