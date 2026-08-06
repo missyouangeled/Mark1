@@ -26507,3 +26507,79 @@ Cron job "mark42-chaos-weekly" 执行失败：
 ### Metadata
 - Reproducible: yes
 - Related Files: mark42-pkg/mark42/chaos_engine.py, mark42-pkg/mark42/cli/__init__.py
+
+## 2026-08-05 · cron trigger.script 是 JavaScript，不是 shell
+
+**现象**：新建的 cron trigger job 连续 6 次运行全部失败，报
+`SyntaxError: unexpected token in expression: '.' at openclaw-code-mode:user.js:12:24`
+
+**我做错了什么**：把 `trigger.script` 当成 shell 命令，传了 `bash /path/to/script.sh`。
+它实际跑在 `openclaw-code-mode` 的 **JavaScript 沙箱**里，路径里的 `.` 被当 JS 属性访问符解析。
+
+**正确写法**：
+```js
+const res = await tools.call('exec', { command: '...' });
+const out = String(res?.result?.details?.stdout ?? '').trim();
+json({ fire: true/false, message: '可选，会追加到 payload', state: { ... } });
+```
+- 必须返回 `{ fire, message?, state? }`
+- 上一次的状态在 `trigger.state`（deeply frozen），返回新 `state` 即持久化，上限 16KB
+- 每次评估限 30 秒 + 最多 5 次工具调用
+- 触发调度最小间隔默认 30 秒
+- `fire: false` 不写 run history
+- ⚠️ payload 执行失败时返回的 state **不会**持久化 → trigger 脚本要写成只读检查，动作全放 payload
+
+**额外收获**：有了 `trigger.state`，"防抖" / "同一状态只触发一次" **不需要自己写文件管理**。
+我第一版手写了 `.last-model` + `.model-switch-debounce` 两个文件，纯属重复实现平台已有能力。
+
+**根因（比语法错误更重要）**：
+我本地跑 `bash model-switch-detector.sh` 验证通过就以为成了——**验证的是脚本本身，没验证 cron 调用契约那一层**。
+两层之间的接口假设从没被测试。
+
+**防御清单**：
+1. 建完任何 cron job，必须查 `cron runs <jobId>` 确认真跑通，不能只测被调用的脚本
+2. 新平台机制先查官方文档的示例代码（`docs/automation/cron-jobs.md`），别照直觉套
+3. 自己动手实现"状态持久化/防抖"之前，先查平台是否已提供
+
+### 追加（同日）：JS 版跑通了，但踩到第二个坑——评估耗时超预算
+
+`tools.call('exec', ...)` 这一整套工具调用链路开销很大：单次 trigger 评估实测 **52.8 秒**，
+而官方文档写明每次评估只有 **30 秒 wall-clock 预算**。
+
+症状：早期失败记录里 `errorReason` 一律是 `timeout`，即便真正原因是语法错误——
+说明超时是叠加在语法错误之上的第二个问题，修完语法才暴露出来。
+
+原周期 30 秒 + 单次耗时 50+ 秒 = **必然追尾**。已改为 `everyMs: 120000`（2 分钟）。
+
+**教训**：给 trigger 设周期时，先实测单次评估耗时，周期至少留 2 倍余量。
+`tools.call` 不是廉价操作，别按裸 shell 的耗时直觉去估。
+
+## [ERR-20260806-001] user-reported-error
+
+**Logged**: 2026-08-06T02:16:03.868Z
+**Priority**: high
+**Status**: pending
+**Area**: infra
+
+### Summary
+User message strongly indicated a real failure or error state.
+
+### Error
+```text
+# 🦞 OpenClaw Unity Plugin > **TL;DR:** Vibe-code your game development remotely from anywhere! 🌍 > > **한줄요약:** 이제 집밖에서도 원격으로 바이브코딩으로 게임 개발 가능합니다! 🎮 Connect Unity to [OpenClaw]([url] AI assistant via HTTP. Works in **Editor mode** without hitting Play! [![Unity]([url] [![OpenC…
+```
+
+### Context
+- Hook source: message:preprocessed
+- Session Key: agent:main:main
+- Suggested confidence: high
+
+### Suggested Fix
+Confirm the failure is real and recurring, then either resolve it or downgrade it to inbox if it was a one-off false positive.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+- See Also: none
+
+---

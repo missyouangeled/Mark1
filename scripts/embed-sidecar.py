@@ -163,7 +163,19 @@ def _handle_client(conn, handler_cls):
                 headers[k.strip().lower()] = v.strip()
 
         content_len = int(headers.get('content-length', 0))
-        body = rfile.read(content_len) if content_len > 0 else b''
+        # 2026-08-05 修复：buffering=0 的裸 socket 上 read(n) 不保证一次读满，
+        # 大请求体（实测 >~128KB，即 TCP 缓冲边界）会被短读截断，导致 JSON 解析失败返回
+        # 400 invalid JSON。memory-embed-index 按 100 段/批发送，中文段落常达 190KB+，
+        # 长期命中此 bug 使向量索引增量更新每次都失败。改为循环读满。
+        body = b''
+        if content_len > 0:
+            remaining = content_len
+            while remaining > 0:
+                chunk = rfile.read(remaining)
+                if not chunk:
+                    break  # 连接提前关闭
+                body += chunk
+                remaining -= len(chunk)
 
         # 创建 handler 实例并处理
         handler = handler_cls(method, path, headers, body)
@@ -239,7 +251,7 @@ class SimpleEmbedHandler:
             if not texts or not isinstance(texts, list):
                 return self._json_resp({'ok': False, 'error': "missing 'texts' array"}, 400)
             if len(texts) > 200:
-                return self._json_resp({'ok': False, 'error': 'max 500 texts per request'}, 413)
+                return self._json_resp({'ok': False, 'error': 'max 200 texts per request'}, 413)
             if _model is None:
                 return self._json_resp({'ok': False, 'error': 'model not loaded'}, 503)
             try:

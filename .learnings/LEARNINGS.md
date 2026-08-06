@@ -1918,3 +1918,75 @@ Review the correction and update the working understanding or prompt guidance if
 - Session Key: agent:main:main
 
 ---
+
+## [LRN-20260805-001] correction
+
+**Logged**: 2026-08-05T05:53:12.964Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 不是。不是说在了解我这块。而是日常生活里，就感觉现在很多人脑子里一片空白。就有那么简单的几组对话。不是看不起当今社会的女性。但是尤其是女性比较明显。就感觉大脑皮层是平的。一点波澜都没有。就认识钱。唉。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260805-002] correction
+
+**Logged**: 2026-08-05T09:27:11.809Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: 好吧好吧。这确实是赖我了。 刚才那句话没说明白，我是说再聊一会，一会就下班了。我6点下班 应该是记录过的。
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---
+
+## [LRN-20260806-001] correction
+
+**Logged**: 2026-08-06T04:40:40.893Z
+**Priority**: high
+**Status**: pending
+**Area**: docs
+
+### Summary
+User explicitly corrected the assistant.
+
+### Details
+Correction Signal: [Image] User text: 应该是连接上了。 Description: This is the dark-themed **MCP for Unity v10.1.3-beta.3** settings window, open to the *Connect* tab. The upper *Server* section uses HTTP Remote transport, with a local LAN HTTP URL and masked API key. A green status indicator confirms an…
+
+### Suggested Action
+Review the correction and update the working understanding or prompt guidance if it proves durable.
+
+### Metadata
+- Source: user_feedback
+- Related Files: .learnings/LEARNINGS.md
+- Tags: auto-captured, correction
+- Session Key: agent:main:main
+
+---

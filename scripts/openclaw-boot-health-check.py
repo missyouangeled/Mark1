@@ -180,6 +180,51 @@ def check_memory() -> dict:
     }
 
 
+def wait_gateway_ready(max_wait: int = 240, interval: int = 5) -> dict:
+    """等待 Gateway 真正就绪（能响应 RPC），而非仅端口可连。
+
+    2026-08-05 新增。背景：本机为机械盘（sda/sdb rotational=1），OpenClaw 包 371M，
+    冷启动时开机 2 分钟内有 300+ 个 systemd 启动事件争抢磁盘 I/O，
+    node 进程 fork 后需静默 80~110s 才输出第一行日志并 listen。
+    实测三次冷启动静默时长：8-04 07:36 -> 109s、8-05 12:09 -> 82s、8-05 13:18 -> 108s；
+    而缓存热后的重启仅需 0.9~3s（相差 50~70 倍）。
+
+    原实现直接以 timeout=15 调 chat.inject，在冷启动场景下必然超时失败，
+    导致开机启动消息从未成功送达（用户侧表现：开机后收不到「系统已就绪」）。
+
+    注意 systemd 单元为默认 Type=simple，"Started" 仅代表 fork 成功，
+    不代表服务可用；check_gateway_port 也只探 TCP 连通，同样不足以判定就绪。
+    故此处以一条轻量 RPC 的实际成功作为就绪判据。
+    """
+    waited = 0
+    http_ok = False
+    while waited < max_wait:
+        # 第一道：HTTP /health（极轻，实测 ~23ms）——先确认 HTTP 层已 listen
+        if not http_ok:
+            try:
+                import urllib.request
+                with urllib.request.urlopen(
+                    "http://127.0.0.1:18789/health", timeout=5
+                ) as resp:
+                    http_ok = resp.status == 200
+            except Exception:
+                http_ok = False
+
+        # 第二道：HTTP 通了再用一次 RPC 确认会话层真可用
+        # （实测 gateway status ~1.4s，config.get ~4.5s，故给 30s 充足余量）
+        if http_ok:
+            rc, _out, _err = run(
+                ["openclaw", "gateway", "status", "--json"],
+                timeout=30,
+            )
+            if rc == 0:
+                return {"ready": True, "waitedSeconds": waited}
+
+        time.sleep(interval)
+        waited += interval
+    return {"ready": False, "waitedSeconds": waited, "httpOk": http_ok}
+
+
 def check_gateway_port() -> dict:
     """快速验证 Gateway 端口可达。"""
     import socket
@@ -386,11 +431,21 @@ def main():
                 f"({inject_info.get('ageSeconds')}s < {STARTUP_INJECT_COOLDOWN_SECONDS}s)"
             )
         else:
+            # 2026-08-05: 先等 Gateway 真正就绪再注入。
+            # 冷启动时 gateway 需 80~110s 才 listen，原先直接 timeout=15 调用必败。
+            ready = wait_gateway_ready()
+            if not ready.get("ready"):
+                print(
+                    f"[boot] 启动事件跳过：Gateway 等待 {ready.get('waitedSeconds')}s 仍未就绪"
+                )
+                raise RuntimeError("gateway not ready for inject")
+            if ready.get("waitedSeconds"):
+                print(f"[boot] Gateway 就绪（等待 {ready.get('waitedSeconds')}s），开始注入启动事件")
             proc = subprocess.run(
                 ["openclaw", "gateway", "call", "chat.inject",
                  "--params", json.dumps({"sessionKey": "agent:main:main", "message": startup_msg}),
                  "--json"],
-                capture_output=True, text=True, timeout=15
+                capture_output=True, text=True, timeout=60
             )
             if proc.returncode == 0:
                 save_json(

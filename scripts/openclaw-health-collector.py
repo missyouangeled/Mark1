@@ -80,6 +80,16 @@ def append_log(line: str) -> None:
         fh.write(f"[{ts}] {line}\n")
 
 
+# ── 超时宽容名单（2026-08-05 新增）──
+# 这些检查本身极快（stuck-session-detect 实测 ~45ms），超时几乎总是因为
+# 主会话/网关正被长任务占用而读取状态被拖死。尤其 stuck-session-detect
+# 的职责就是“检测主会话阻塞”，若因被检测现象本身而被判 failed，
+# 会让 systemd 单元在正常忙碌时反复报 failed（当日已 50+ 次），构成告警噪声。
+# 故将其超时降级为 degraded（同 exit 2 语义）：仍然记日志、仍体现在 overall=⚠，
+# 但不再让整个采集器以 exit 1 崩掉。
+TIMEOUT_TOLERANT_CHECKS = {"stuck-session-detect"}
+
+
 def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, Any]:
     start = time.monotonic()
     try:
@@ -123,8 +133,17 @@ def run_sub_check(label: str, cmd: list[str], timeout: int = 60) -> dict[str, An
         }
     except subprocess.TimeoutExpired:
         elapsed = round(time.monotonic() - start, 3)
-        append_log(f"{label}: TIMEOUT ({timeout}s)")
-        return {"label": label, "ok": False, "exitCode": -1, "elapsedMs": int(elapsed * 1000), "summary": f"TIMEOUT({timeout}s)", "stderr": f"subprocess timed out after {timeout}s"}
+        tolerant = label in TIMEOUT_TOLERANT_CHECKS
+        append_log(f"{label}: TIMEOUT ({timeout}s){' [degraded, tolerated]' if tolerant else ''}")
+        return {
+            "label": label,
+            "ok": False,
+            "degraded": tolerant,
+            "exitCode": -1,
+            "elapsedMs": int(elapsed * 1000),
+            "summary": f"TIMEOUT({timeout}s)" + (": 主会话忙碌，已降级不计失败" if tolerant else ""),
+            "stderr": f"subprocess timed out after {timeout}s",
+        }
     except Exception as exc:
         elapsed = round(time.monotonic() - start, 3)
         append_log(f"{label}: EXCEPTION {exc}")
@@ -287,7 +306,7 @@ def main():
         "stuck-session-detect",
         [sys.executable, str(SCRIPTS / "openclaw-stuck-session-detector.py"),
          "--print-json", "--report"],
-        timeout=20,
+        timeout=30,  # 2026-08-05: 20s→30s。脚本实测 ~45ms，超时仅因主会话繁忙时读状态被拖慢
     ))
 
     # ── 完整层（每 N 次一次）──

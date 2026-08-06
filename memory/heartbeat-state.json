@@ -1,24 +1,29 @@
 {
-  "last_check": "2026-08-03T14:03:00+08:00",
+  "last_check": "2026-08-05T16:02:30+08:00",
   "status": "ok",
   "notifications": 0,
   "git_changes_pending": true,
   "pending_changes": [
-    "scripts/autonomy/decisions.jsonl",
-    "scripts/autonomy/state.json",
-    "HEARTBEAT_STATUS.md",
-    "backups/",
-    "media/tts/autonomy_1785733740.wav"
+    ".learnings/ERRORS.md",
+    ".learnings/LEARNINGS.md",
+    "docs/install-registry.md",
+    "media/tts/ (deleted ~26 old afternoon_chat wav files)"
   ],
   "today_highlights": [
-    "千千画像生成尝试，脸不像，点点放弃",
-    "点点情绪低落（唉～人生～）",
-    "自主决策器触发过一次语音回复",
-    "系统全部正常，8个timer运行中"
+    "Mark42 审查方案 P1/P2/P3 全部完成",
+    "cost_tracker 时区 bug 修复（UTC->本地日期）",
+    "mypy 174->0，4个真 bug 被捞出",
+    "consciousness revalidate 从 0/10 恢复到 9/10",
+    "1997 项测试 0 失败",
+    "全系统严格审查通过，0 假死"
   ],
   "system": {
-    "load": "0.02/0.07/0.09",
-    "mem": "4.0G/7.7G",
-    "disk": "70%"
+    "load": "0.40/0.81/1.02",
+    "mem": "3.0G/7.7G (39%)",
+    "disk_root": "75%",
+    "disk_data": "16%",
+    "uptime": "2h44min",
+    "failed_services": 0,
+    "timers_active": 8
   }
 }

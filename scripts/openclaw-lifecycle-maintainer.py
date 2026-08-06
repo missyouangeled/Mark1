@@ -214,10 +214,12 @@ def main():
             "temp-cleanup",
             ["/bin/bash", str(SCRIPTS / "openclaw-cleanup-temp.sh")]
         ))
-        # 并入原独立 cron 的 ChatTTS 过期音频清理
+        # TTS 过期音频清理（2026-08-05 修复：原 chattts-on-demand/cleanup-old-audio.sh
+        # 随 ChatTTS 下线被删除，导致本项长期 exit 1；改为现役 tools/cleanup-tts.sh，
+        # 清理 media/tts/ 下超过 4 小时的 wav/mp3）
         checks.append(run_sub_check(
-            "chattts-cleanup",
-            ["/bin/bash", str(WORKSPACE / "tools" / "chattts-on-demand" / "cleanup-old-audio.sh"), "--quiet"],
+            "tts-cleanup",
+            ["/bin/bash", str(WORKSPACE / "tools" / "cleanup-tts.sh")],
             timeout=120,
         ))
         # 清理 flat memory 文件（压缩 flush 产生的扁平 2026-0X-XX.md，内容已在 daily/）
@@ -226,7 +228,7 @@ def main():
             ["/bin/bash", "-c", "find /home/missyouangeled/.openclaw/workspace/memory -maxdepth 1 -name '202?-??-??*.md' -not -name 'MEMORY.md' -delete && echo ok || true"],
             timeout=10,
         ))
-        append_log(f"run #{new_count}: triggering cleanup (temp + chattts + flat-memory)")
+        append_log(f"run #{new_count}: triggering cleanup (temp + tts + flat-memory)")
     else:
         append_log(f"run #{new_count}: skip cleanup (next at #{CLEANUP_EVERY_N})")
 
