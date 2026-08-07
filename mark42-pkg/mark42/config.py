@@ -424,6 +424,40 @@ ALGO_HISTORY_DIR = ARMOR_STATE / "algo_history"
 #                     False = 直接调 SmartCrusher（Day 1-3 原始路径，仅供回退）。
 ALGO_USE_SCHEDULER = os.environ.get("MARK42_ALGO_USE_SCHEDULER", "true").lower() == "true"
 
+# ── 结构化增量压缩 (方案 44 建设项 A / Phase 2) ──────
+# 2026-08-07 新增：详见 docs/plans/44-Mark42-全功能缺口补全方案-v1.md §4.5
+#
+# ⚠️ 方案 §1.3 永久原则：新增能力默认关闭或 shadow，先观测、后灰度、最后才生效。
+#    每一项都有独立 feature flag，可单项回滚，不以整包升级绑架运行稳定性。
+#
+# STRUCTURED_STATE_ENABLED : 总开关。false = 完全走旧 _compress_build_index()
+# STRUCTURED_STATE_MODE    : shadow = 旁路生成状态但不影响 index 输出（只记录对比）
+#                            active = 用 ContextState 渲染的视图替代旧 index
+# STRUCTURED_STATE_INCREMENTAL : 是否走增量合并（false = 每次全量重建状态）
+# STRUCTURED_STATE_MAX_PATCH_ITEMS : 单次 patch 条目上限，防模型一次改太多
+# STRUCTURED_STATE_REQUIRE_EVIDENCE : 无来源的新增事实是否拒绝入库
+# STRUCTURED_STATE_KEEP_VERSIONS : 保留多少份历史状态版本
+STRUCTURED_STATE_ENABLED = os.environ.get(
+    "MARK42_STRUCTURED_STATE", "false").lower() == "true"
+STRUCTURED_STATE_MODE = os.environ.get("MARK42_STRUCTURED_STATE_MODE", "shadow")
+STRUCTURED_STATE_INCREMENTAL = os.environ.get(
+    "MARK42_STRUCTURED_STATE_INCREMENTAL", "true").lower() == "true"
+STRUCTURED_STATE_MAX_PATCH_ITEMS = _resolve_int(
+    env="MARK42_STRUCTURED_STATE_MAX_PATCH_ITEMS",
+    section="structured_state", key="max_patch_items",
+    default=100, name="STRUCTURED_STATE_MAX_PATCH_ITEMS")
+STRUCTURED_STATE_REQUIRE_EVIDENCE = os.environ.get(
+    "MARK42_STRUCTURED_STATE_REQUIRE_EVIDENCE", "true").lower() == "true"
+STRUCTURED_STATE_KEEP_VERSIONS = _resolve_int(
+    env="MARK42_STRUCTURED_STATE_KEEP_VERSIONS",
+    section="structured_state", key="keep_versions",
+    default=20, name="STRUCTURED_STATE_KEEP_VERSIONS")
+
+# 状态文件目录（版本化）。回滚时把整个目录原子标记为 .archived，
+# 不计入 keep_versions 轮替（方案 §14）。
+CONTEXT_STATE_DIR = ARMOR_STATE / "context_state"
+
+
 # ALGO_PII_ENABLED: 调度器内 PII 脱敏总开关。
 #                   True = 压缩前自动脱敏邮箱/手机/身份证/信用卡/API key 等。
 #                   False = 跳过脱敏（仅当确认数据安全时使用）。
