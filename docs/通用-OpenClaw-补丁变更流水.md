@@ -2997,3 +2997,17 @@ bash scripts/unity-stack-patch.sh uninstall --apply    # 整体卸载
 - 复现: mock 服务 not active，修复前 kill_engine/kill_armor status=error setup_ok=False、run_suite 非passed=[kill_engine,kill_armor]，与 07:44 失败完全一致。正向: 同条件下修复后 3 个测试全 passed，[DRY-RUN] 标记保留。反向: dry_run=False + 服务未运行仍 status=error 拦住，安全护栏未削弱。PII: 收集数 0->14，14 passed；反向破坏 redact 为恒等函数 -> 10 个用例立即变红、退出码1，证明非空壳。全量回归 EXIT=0 零失败，测试总数 2000->2014。ruff 全过、mypy 0 issues、chaos_engine 48/48 通过。
 - 相关文件：
 - [未记录文件]
+
+## 2026-08-07 08:30:47 CST (+08:00) — 规则沉淀: 长任务必须脱离 gateway cgroup（rules/work.md 第8节 + CASE-019）
+
+- 类型：docs
+- 适用范围：rules/work.md,docs/对系统操作必须要参考的崩坏案例.md
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- exec 起的进程属 gateway cgroup，gateway 重启（切模型/改配置/自愈均会触发）时被 systemd 整组清理，nohup/setsid 只脱 tty 不脱 cgroup，实测两次均被杀。更严重的是反向伤害：长任务把 gateway drain 窗口拖满 120s 超时，导致主会话 transcript 判定不可恢复、用户上下文断档。已在 rules/work.md 新增第 8 节（补上原本缺失的编号 8）给出 systemd-run --user --scope 标准写法 + 判断标准表；新增 CASE-20260807-019 记录完整排查链，含 8 项重启源头排除证据表、与 CASE-018 的交叉引用、7 条防御清单。核心方法论教训：先对齐时间线再猜机制（我因内存紧的先验强行查 OOM，绕了一圈；两事件时刻完全重合才是决定性证据）。
+- 验收 / 验证：
+- work.md 197 行未超 200 上限、章节编号 1-12 连续无缺口。实测 systemd-run --user --scope 后 /proc/self/cgroup 显示 verify-cgroup-*.scope 且不含 openclaw-gateway.service，证明文档给出的命令真实可用。案例库 1656 行，CASE-019 已就位并与 018 双向关联。
+- 相关文件：
+- [未记录文件]

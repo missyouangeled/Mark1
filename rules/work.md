@@ -119,6 +119,41 @@
 
 ---
 
+## 8. 长任务执行环境（必须脱离 gateway cgroup）
+
+> 2026-08-07 实测定为硬规矩（CASE-20260807-019）。
+
+**问题**：`exec` 起的进程是 gateway 的子进程，同属一个 systemd cgroup。
+gateway 一重启（切模型、改配置、自愈都会触发），systemd 按 cgroup **整组清理**，
+长任务当场陪葬。`nohup` 和 `setsid` 都救不了 —— 它们只脱离 tty，**脱离不了 cgroup**。
+
+**更严重的反向伤害**：长任务会把 gateway 的 drain 窗口拖满（默认 120s 超时）。
+用户切个模型本该几秒完成，被拖成 2 分钟，最后主会话 transcript 判定不可恢复、上下文断档。
+
+### 正确做法
+
+```bash
+# 跑全量测试/编译/大批处理等耗时任务，一律套独立 scope
+systemd-run --user --scope --unit=<任务名>-$(date +%s) --collect \
+  bash -c 'cd <目录> && <命令> > /tmp/<日志> 2>&1; echo "EXIT=$?" >> /tmp/<日志>'
+```
+
+- 末尾追加 `EXIT=$?`：日志被截断时仍能拿到真实退出码
+- 验证是否真脱离：`cat /proc/<pid>/cgroup`，**不应**出现 `openclaw-gateway.service`
+- 查运行状态：`systemctl --user list-units --type=scope | grep <任务名>`
+
+### 判断标准
+
+| 任务 | 做法 |
+|---|---|
+| 秒级命令（查状态、读文件、git log） | 直接 `exec` |
+| 预计 >30 秒（全量测试、编译、大批转码） | **必须** `systemd-run --scope` |
+| 需要跨 gateway 重启存活 | **必须** `systemd-run --scope` |
+
+**禁止**：用 `nohup` / `setsid` 跑长任务后就以为安全了 —— 已实测两次均被清理。
+
+---
+
 ## 9. 视频平台下载工作流
 
 优先使用 `scripts/download-platform-video.py`。
