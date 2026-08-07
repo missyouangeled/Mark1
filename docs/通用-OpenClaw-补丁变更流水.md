@@ -2983,3 +2983,17 @@ bash scripts/unity-stack-patch.sh uninstall --apply    # 整体卸载
 - `docs/通用-Unity-MCP-CoplayDev-使用指南.md`（同上 + 补启动耗时特性）
 - `docs/对系统操作必须要参考的崩坏案例.md`（新增 CASE-20260806-018）
 - `docs/install-registry.md`
+
+## 2026-08-07 08:15:17 CST (+08:00) — Mark42: 修 chaos_engine dry_run 外部状态泄漏 + 补 PII 测试 pytest 可见入口
+
+- 类型：patch
+- 适用范围：mark42-pkg/mark42/chaos_engine.py,mark42-pkg/tests/test_pii_redactor.py
+- 补丁注册表：未更新
+- 重建清单：未更新
+- 升级后自检清单：未更新
+- 结果摘要：
+- 1) _setup_kill_engine/_setup_kill_armor 忽略 dry_run 参数，直查真实 systemd 服务状态，服务非 active 即抛异常。导致 dry_run 测试结果取决于宿主机此刻是否在跑 Mark42 服务：CI/容器必失败，服务重启窗口内偶发失败。今日 07:44 gateway 重启带动两守护进程重启，恰好撞上，造成 3 个测试失败（kill_engine/kill_armor/run_suite）。已让 setup 在 dry_run 下不接触真实系统；真实模式(dry_run=False)的服务存活校验完整保留。2) tests/test_pii_redactor.py 仅有手写 run_tests()，不匹配 pytest.ini 的 python_functions=test_*，13 个 PII 脱敏用例长期从未被收集（静默零回归保护）。已提升用例表为模块级常量 TEST_CASES 并补参数化入口 + 用例表缩水守卫，两条路径共用同一份数据。
+- 验收 / 验证：
+- 复现: mock 服务 not active，修复前 kill_engine/kill_armor status=error setup_ok=False、run_suite 非passed=[kill_engine,kill_armor]，与 07:44 失败完全一致。正向: 同条件下修复后 3 个测试全 passed，[DRY-RUN] 标记保留。反向: dry_run=False + 服务未运行仍 status=error 拦住，安全护栏未削弱。PII: 收集数 0->14，14 passed；反向破坏 redact 为恒等函数 -> 10 个用例立即变红、退出码1，证明非空壳。全量回归 EXIT=0 零失败，测试总数 2000->2014。ruff 全过、mypy 0 issues、chaos_engine 48/48 通过。
+- 相关文件：
+- [未记录文件]

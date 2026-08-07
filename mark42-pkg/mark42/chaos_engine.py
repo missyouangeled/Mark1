@@ -354,7 +354,14 @@ class ChaosEngine:
     # ── kill_engine 各阶段 ──
 
     def _setup_kill_engine(self, dry_run: bool = True) -> dict:
-        """检查 engine 服务状态。"""
+        """检查 engine 服务状态。
+
+        dry_run 语义是「不接触真实系统」，因此不校验服务是否在运行：
+        否则实验结果会取决于宿主机此刻有没有跑 Mark42 服务（CI/容器内必失败，
+        服务重启窗口内偶发失败），属于外部状态泄漏进 dry_run 路径。
+        """
+        if dry_run:
+            return {"service_before": {"dry_run": True}}
         result = self._check_systemd_service("mark42-engine-daemon.service")
         if not result["active"]:
             raise RuntimeError("engine 未运行，无法测试")
@@ -394,6 +401,9 @@ class ChaosEngine:
     # ── kill_armor 各阶段 ──
 
     def _setup_kill_armor(self, dry_run: bool = True) -> dict:
+        """检查 armor 服务状态。dry_run 下不接触真实系统，理由同 _setup_kill_engine。"""
+        if dry_run:
+            return {"service_before": {"dry_run": True}}
         result = self._check_systemd_service("mark42-armor-guard.service")
         if not result["active"]:
             raise RuntimeError("armor 未运行，无法测试")
