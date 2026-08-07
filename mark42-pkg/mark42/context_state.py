@@ -416,11 +416,17 @@ def validate_context_state(
 
 
 def _has_evidence(item: dict[str, Any]) -> bool:
-    """判断条目是否携带可追溯来源。"""
+    """判断条目是否携带可追溯来源。
+
+    ❗ 此处必须用**真值性**判定，不能用白名单式的
+    `val not in (None, "", [], {})` —— 后者会把 `line: 0`、`message_id: 0`
+    这类“字面上存在、实际等于缺失”的值当成有效来源放过去，
+    相当于在 require_evidence 上开了一个静默后门。
+    （行号是 1-indexed，0 本身就不是合法行号。）
+    """
     for key in ("evidence", "evidence_ref", "message_id", "source",
                 "source_path", "cursor", "line"):
-        val = item.get(key)
-        if val not in (None, "", [], {}):
+        if item.get(key):
             return True
     return False
 

@@ -171,6 +171,23 @@ class TestEvidenceRequirement:
         st.decisions = [{"summary": "假装有源", "evidence": ""}]
         assert "missing_evidence" in _codes(st)
 
+    @pytest.mark.parametrize("falsy", [0, "", None, [], {}, False])
+    def test_falsy_source_values_do_not_count(self, falsy):
+        """回归：`line: 0` 曾被当成有效来源放过去。
+
+        旧实现用白名单 `val not in (None, "", [], {})` 判定，
+        数字 0 / False 不在该元组里 → 静默绕过 require_evidence。
+        行号是 1-indexed，0 本身就不是合法行号。
+        """
+        st = new_empty_state()
+        st.decisions = [{"summary": "假装有源", "line": falsy}]
+        assert "missing_evidence" in _codes(st)
+
+    def test_line_number_one_counts_as_source(self):
+        st = new_empty_state()
+        st.decisions = [{"summary": "有源", "line": 1}]
+        assert validate_context_state(st).ok
+
     def test_completed_work_does_not_require_evidence(self):
         """只有 decisions/constraints/artifacts 强制来源。"""
         st = new_empty_state()
