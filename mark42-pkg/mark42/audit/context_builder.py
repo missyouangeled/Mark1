@@ -204,8 +204,7 @@ def _build_full(
 ) -> ContextState | None:
     """全量路径：从消息重建状态。
 
-    首版用 LLM 分析结果填充（与旧 _llm_analyze 共享同一 provider）。
-    Phase 2 首版简化：只做结构化空壳。
+    用 LLM 分析结果填充（与旧 _llm_analyze 共享同一 provider）。
     """
     from ..armor import _llm_analyze
 
