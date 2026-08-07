@@ -101,6 +101,11 @@ class OpenClawSnapshotReader:
             ts_str = entry.name.replace("snapshot-", "")
             try:
                 snap_ts = datetime.strptime(ts_str, "%Y-%m-%dT%H%M%S")
+                # strptime 不带时区，target_ts 有时区 -> 比较会 TypeError
+                # 给 snap_ts 加上本地时区
+                from datetime import timezone
+                local_tz = datetime.now(timezone.utc).astimezone().tzinfo
+                snap_ts = snap_ts.replace(tzinfo=local_tz)
             except ValueError:
                 continue
             if snap_ts <= target_ts:

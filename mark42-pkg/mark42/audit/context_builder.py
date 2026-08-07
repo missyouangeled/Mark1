@@ -114,24 +114,89 @@ def _build_incremental(
 ) -> ContextState | None:
     """增量路径：从旧状态 + 新消息生成 patch 并合并。
 
-    首版简化：跳过 LLM patch 生成（那需要 armor 已有的 provider 解析逻辑），
-    直接返回深化后的旧状态作为 placeholder。
-    Phase 3 接入 LLM patch 生成。
+    使用 LLM 分析新消息，生成结构化 patch，再由 incremental_merge.merge_patch
+    安全合并。任何失败返回 None，让调用方回退全量路径。
     """
-    # 这个函数在 Phase 2 后期会接入 LLM patch 生成。
-    # 首版用验证旧状态有效性的方式占位 + 追加 step 占位。
-    # 方案 §4.6 要求连续 10 次增量后目标/约束仍在，旧状态本身已满足。
     if not messages:
         return old_state
 
-    # 占位：追加一条 next_steps 展示"增量合并路径活着的"
-    st = ContextState.from_dict(old_state.to_dict())
-    if len(st.next_steps) < 50:
-        st.next_steps.append({
-            "summary": "增量合并占位（Phase 2 首版）",
-            "evidence": "structured-incremental",
-        })
-    return st
+    from ..armor import _llm_analyze
+    from .incremental_merge import merge_patch
+
+    # 用 LLM 分析新增消息
+    llm_result = _llm_analyze(messages)
+    if not llm_result:
+        # LLM 不可用 -> 回退全量
+        return None
+
+    preserved = llm_result.get("preserved", {})
+    projects = preserved.get("activeProjects", [])
+    task_state = preserved.get("taskState", {})
+    current_task = task_state.get("current", "") if isinstance(task_state, dict) else ""
+
+    # 构建 patch
+    patch: dict[str, Any] = {}
+
+    if isinstance(projects, list) and projects:
+        patch["session_intent"] = str(projects[0])
+    elif current_task:
+        patch["session_intent"] = str(current_task)
+
+    if isinstance(projects, list) and projects:
+        patch["active_task"] = {
+            "op": "update",
+            "title": str(projects[0])[:60],
+            "status": "in_progress",
+        }
+    elif current_task:
+        patch["active_task"] = {
+            "op": "update",
+            "title": str(current_task)[:60],
+            "status": "in_progress",
+        }
+
+    # 新决策
+    decisions = []
+    if isinstance(preserved.get("recentDecisions"), list):
+        for d in preserved["recentDecisions"]:
+            if isinstance(d, str) and d.strip():
+                decisions.append({
+                    "op": "add",
+                    "decision_id": f"d-inc-{hash(d) % 10**12:012x}",
+                    "summary": d,
+                    "evidence": "incremental-llm",
+                })
+    if decisions:
+        patch["decisions"] = decisions
+
+    # 新约束
+    constraints = []
+    if isinstance(preserved.get("preferences"), list):
+        for pref in preserved["preferences"]:
+            if isinstance(pref, str) and pref.strip():
+                constraints.append({
+                    "op": "add",
+                    "constraint_id": f"c-inc-{hash(pref) % 10**12:012x}",
+                    "text": pref,
+                    "strength": "hard",
+                    "priority": "P1",
+                    "source": "incremental-llm",
+                    "evidence": "incremental-llm-output",
+                })
+    if constraints:
+        patch["constraints"] = constraints
+
+    if not patch:
+        # LLM 没提取到任何新信息 -> 旧状态不变
+        return old_state
+
+    # 安全合并
+    result = merge_patch(old_state, patch)
+    if result.ok and result.state is not None:
+        return result.state
+
+    # 合并失败 -> 回退全量
+    return None
 
 
 def _build_full(
@@ -149,11 +214,23 @@ def _build_full(
 
     if llm_result:
         preserved = llm_result.get("preserved", {})
-        st.session_intent = preserved.get("userIdentity", "")
-        if isinstance(preserved.get("activeProjects"), list):
+        # session_intent 应该是会话目标，不是用户身份
+        # LLM 返回的 activeProjects / taskState 更接近会话目标
+        task_state = preserved.get("taskState", {})
+        current_task = task_state.get("current", "") if isinstance(task_state, dict) else ""
+        projects = preserved.get("activeProjects", [])
+        if isinstance(projects, list) and projects:
+            st.session_intent = str(projects[0])
+        elif current_task:
+            st.session_intent = str(current_task)
+        if isinstance(projects, list) and projects:
             st.active_task = {
-                "title": preserved["activeProjects"][0][:60]
-                if preserved["activeProjects"] else "",
+                "title": str(projects[0])[:60],
+                "status": "in_progress",
+            }
+        elif current_task:
+            st.active_task = {
+                "title": str(current_task)[:60],
                 "status": "in_progress",
             }
         if isinstance(preserved.get("preferences"), list):
