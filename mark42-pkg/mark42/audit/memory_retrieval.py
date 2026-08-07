@@ -280,11 +280,18 @@ def hybrid_recall(
 
 def apply_rerank(
     result: HybridResult,
-    rerank_fn: Callable[[str, list[RecallItem], int], list[RecallItem]] | None,
+    rerank_fn: Any | None,
     query: str,
     *,
     top_k: int = DEFAULT_TOP_K,
 ) -> HybridResult:
+    """对 Hybrid 结果应用可选的 cross-encoder 重排。
+
+    ``rerank_fn`` 可以是：
+      - ``Reranker`` Protocol 实例（有 ``.rerank()`` 方法）
+      - 裸可调用对象（签名 ``(query, items, top_k) -> items``）
+      - ``None``（表示 reranker 不可用）
+    """
     """对 Hybrid 结果应用可选的 cross-encoder 重排。
 
     方案 §9.2：rerank 失败时降级到 hybrid，hybrid 失败降级到 BM25。
@@ -305,7 +312,26 @@ def apply_rerank(
         return result
 
     try:
-        reranked = rerank_fn(query, result.items, top_k)
+        # 支持 Reranker Protocol（有 .rerank 方法）和裸 Callable 两种形式
+        if hasattr(rerank_fn, "rerank"):
+            candidates = [i.to_dict() if hasattr(i, "to_dict") else i
+                          for i in result.items]
+            ranked = rerank_fn.rerank(query, candidates, top_k)
+            # 把 rerank_score 写回原 RecallItem
+            ranked_by_content = {}
+            for r in ranked:
+                content = r.get("content", "") if isinstance(r, dict) else getattr(r, "content", "")
+                ranked_by_content[content] = r
+            reranked = []
+            for item in result.items:
+                key = item.content
+                if key in ranked_by_content:
+                    raw = ranked_by_content[key]
+                    score = raw.get("rerank_score") if isinstance(raw, dict) else getattr(raw, "rerank_score", None)
+                    item.rerank_score = score if score is not None else item.rrf_score
+                reranked.append(item)
+        else:
+            reranked = rerank_fn(query, result.items, top_k)
         if reranked:
             for item in reranked:
                 if item.rerank_score is None:
