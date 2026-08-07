@@ -115,7 +115,7 @@ mark42-pkg/
 ├── pyproject.toml        # Python 包配置
 └── mark42/              # 源代码
     ├── cli/             # 命令行接口
-    ├── audit/           # 审计系统
+    ├── audit/           # 审计系统（探针+趋势+约束身份+增量合并+记忆检索+反馈学习+混沌闭环）
     ├── plugins/         # 插件
     ├── interfaces/      # 接口定义
     ├── templates/       # 配置模板

@@ -15,23 +15,39 @@
 
 ---
 
-## ✅ 已完成 (v2.8.1)
+## ✅ 已完成 (v2.8.2)
 
-- [x] 核心模块稳定可用
-  - `armor` 上下文压缩守护
-  - `engine` 循环引擎
-  - `heavy` 重型任务处理
-  - `consciousness` 战甲意识层（C1-C5 + advisor）
-  - `audit` 压缩后质量核对
-  - `pii_redactor` 隐私脱敏
-  - `cluster_manager` 集群思维（R14）
-  - `compaction_diag` OpenClaw 压缩配置诊断
-  - `chaos` 混沌工程、`breaker` 熔断器、`arclock` 通用适配层
-- [x] 1796 个单元测试 100% 通过（28 skip）
-- [x] CI 门禁转绿（ruff check + pytest + pip-audit + 安全扫描）
-- [x] `/mnt/data` 路径可移植化（`MARK42_DATA_MOUNT` env 覆盖 + XDG_STATE 回退）
-- [x] 完整中文文档体系（README / QUICKSTART / TUTORIAL / ARCHITECTURE / CONFIG-GUIDE）
-- [x] MIT 许可证
+### 核心模块稳定可用
+- `armor` 上下文压缩守护
+- `engine` 循环引擎
+- `heavy` 重型任务处理
+- `consciousness` 战甲意识层（C1-C5 + advisor）
+- `audit` 压缩后质量核对
+- `pii_redactor` 隐私脱敏
+- `cluster_manager` 集群思维（R14）
+- `compaction_diag` OpenClaw 压缩配置诊断
+- `chaos` 混沌工程、`breaker` 熔断器、`arclock` 通用适配层
+
+### 方案 44：全功能缺口补全（2026-08-07）
+
+> 上游方案：`docs/plans/44-Mark42-全功能缺口补全方案-v1.md`
+> 六条闭环全部落地，所有新增能力默认关闭 / shadow。
+
+- [x] **Phase 0**：基线冻结 + ContextState/SourceCursor schema + 探针 schema + 4 个场景
+- [x] **Phase 1**：约束身份/静态完整性 + 质量趋势 + 探针接入 builtin_audit（shadow）
+- [x] **Phase 2**：增量合并引擎（5 种 patch 操作 + 零污染保证）+ 状态版本化持久化 + 接入 armor 三路分支
+- [x] **Phase 3**：Hybrid Recall（BM25+Vector 并行 + RRF 融合）+ Cross-Encoder Reranker 接口 + QMD 适配器
+- [x] **Phase 4**：Heavy DAG 依赖图 + 资源预算 + 图校验 + 局部重规划 + Checkpoint
+- [x] **Phase 5**：混沌自动闭环（L0-L3 安全等级）+ 错误档案反馈学习（L3->L2 降级 + 有效性追踪）
+- [x] **Phase 6**：Shadow 对比报告 + 回滚演练（6/6 通过）
+
+### 数据
+- 2545 个单元测试 100% 通过（25 skip）
+- ruff 全绿 / mypy 89 文件 0 issues
+- CI 门禁转绿
+- `/mnt/data` 路径可移植化
+- 完整中文文档体系
+- MIT 许可证
 
 ---
 

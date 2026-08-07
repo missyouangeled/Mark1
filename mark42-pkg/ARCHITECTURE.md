@@ -2,7 +2,7 @@
 
 > 模块化智能铠甲系统 - 为 OpenClaw 提供上下文守护与循环引擎。
 
-本文档描述 Mark42 v2.8.1 的五层架构设计、模块职责、数据流和扩展机制。
+本文档描述 Mark42 v2.8.2 的五层架构设计、模块职责、数据流和扩展机制。
 
 ---
 
@@ -583,6 +583,9 @@ mark42/
 ├── context_safety.py    # Context 安全基线
 ├── error_archive.py     # 错误档案
 ├── advisor_client.py    # Advisor 主动交流
+├── context_state.py     # [方案44] 结构化上下文状态 + SourceCursor
+├── heavy_graph.py       # [方案44] Heavy DAG 依赖图 + 预算
+├── heavy_replan.py      # [方案44] 局部重规划 + Checkpoint
 ├── logs.py              # 日志轮替
 ├── watchdog.py          # 进程看门狗
 ├── installer.py         # systemd 安装
@@ -600,9 +603,21 @@ mark42/
 │       └── audit/
 │           ├── __init__.py          # 6 类审计分类定义
 │           ├── pinning.py           # Constraint Pinning
-│           ├── builtin_audit.py     # 内置审计逻辑
+│           ├── builtin_audit.py     # 内置审计逻辑（扩展探针+趋势）
 │           ├── snapshot_reader.py   # 快照读取 + artifact 提取
-│           └── summary_extractor.py # 摘要提取器
+│           ├── summary_extractor.py # 摘要提取器
+│           ├── probes.py            # [方案44] 六维能力探针 + SLO
+│           ├── constraint_identity.py # [方案44] 约束 ID + 静态完整性
+│           ├── trends.py            # [方案44] 质量趋势存储
+│           ├── incremental_merge.py # [方案44] 增量合并引擎
+│           ├── state_store.py       # [方案44] 状态版本化持久化
+│           ├── context_builder.py   # [方案44] 接入 armor 的结构化入口
+│           ├── memory_retrieval.py  # [方案44] Hybrid Recall + RRF
+│           ├── reranker.py          # [方案44] Cross-Encoder Reranker
+│           ├── remediation_feedback.py # [方案44] 错误档案反馈闭环
+│           ├── chaos_scheduler.py   # [方案44] 混沌自动闭环
+│           ├── shadow_report.py     # [方案44] Shadow 对比报告
+│           └── rollback_drill.py    # [方案44] 回滚演练
 ```
 
 ---

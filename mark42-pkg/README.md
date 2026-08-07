@@ -5,10 +5,10 @@
 [![CI](https://github.com/missyouangeled/Mark1/actions/workflows/mark42-ci.yml/badge.svg)](https://github.com/missyouangeled/Mark1/actions/workflows/mark42-ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-2.8.1-orange)
-![Tests](https://img.shields.io/badge/tests-1796%20passed-brightgreen)
+![Version](https://img.shields.io/badge/version-2.8.2-orange)
+![Tests](https://img.shields.io/badge/tests-2545%20passed-brightgreen)
 
-版本：`v2.8.1`
+版本：`v2.8.2`
 
 | 快速开始 | 完整教程 | 配置说明 | 架构设计 |
 |----------|----------|----------|----------|
@@ -28,6 +28,39 @@ mark42 armor --check               # 检查
 ---
 
 ## ✨ 功能概览
+
+### 核心能力（v2.8.2）
+
+| 能力 | 模块 | 说明 |
+|------|------|------|
+| 上下文铠甲 | `armor` | 实时检测 + LLM 记忆索引 + 启发式回退 |
+| 压缩后审计 | `audit` | 六类结构核对 + 能力探针 + 质量趋势 |
+| 循环引擎 | `engine` | Loop 调度 + 模板系统 + daemon 守护 |
+| 重型战甲 | `heavy` | 大工程检测 + DAG 依赖图 + 并发预算 + 局部重规划 |
+| 战甲意识 | `consciousness` | C1-C5 确信度评估 + advisor + 自动修复 |
+| 混沌工程 | `chaos_engine` | 故障注入实验 + 自动闭环 + 回归候选 |
+| 熔断器 | `circuit_breaker` | closed/open/half_open 状态机 |
+| 约束保护 | `audit/pinning` | Constraint Pinning + 静态完整性 + 约束 ID |
+| 记忆搜索 | `plugins/builtin_memory` | BM25 + Vector Hybrid + RRF + Cross-Encoder 重排 |
+| ArcLock 插件 | `interfaces` | 10 个 Protocol + YAML 替换 + 模块三态 |
+
+### 方案 44 新增（v2.8.2，默认关闭）
+
+| 能力 | 模块 | 说明 |
+|------|------|------|
+| 结构化增量压缩 | `context_state` / `incremental_merge` | ContextState schema + 游标 + 增量 patch 合并 |
+| 能力探针 | `audit/probes` | 六维响应能力代理测试 + SLO + 回归检测 |
+| 约束身份 | `audit/constraint_identity` | 稳定 ID + P0/P1/P2 分级 + 静态完整性 |
+| 质量趋势 | `audit/trends` | JSONL 追加 + 原子轮替 + 两套分数独立 |
+| Hybrid Recall | `audit/memory_retrieval` | BM25+Vector 并行 + RRF 融合 + 降级链 |
+| Cross-Encoder | `audit/reranker` | Reranker Protocol + QMD 适配器 + Noop 降级 |
+| Heavy DAG | `heavy_graph` / `heavy_replan` | 依赖图 + 预算 + 局部重规划 + Checkpoint |
+| 反馈学习 | `audit/remediation_feedback` | 执行结果回写 + L3->L2 降级 + 有效性追踪 |
+| 混沌闭环 | `audit/chaos_scheduler` | L0-L3 安全等级 + 自动调度 + 缺陷候选 |
+| Shadow 对比 | `audit/shadow_report` | 新旧路径对比 + 趋势汇总 |
+| 回滚演练 | `audit/rollback_drill` | 6 项 flag 回滚验证 |
+
+
 
 Mark42 由 12 大核心模块组成，通过 broker 事件总线联动：
 
@@ -367,7 +400,7 @@ python3 -m pytest tests/integration/ -v
 python3 -m pytest --cov=mark42 --cov-report=html
 ```
 
-### 测试统计 (v2.8.1)
+### 测试统计 (v2.8.2)
 
 | 指标 | 数值 |
 |---|---|

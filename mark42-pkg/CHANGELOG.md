@@ -171,6 +171,50 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
   - `.pre-commit-config.yaml`
   - README 加 badge（CI / Python / License / Version / Tests）+ 文档导航扩展
 
+### 新增 - 方案 44 Phase 3（Hybrid Recall + Cross-Encoder）
+
+- 🔍 **`mark42/audit/memory_retrieval.py`** - Hybrid Recall（§9.2）
+  BM25 + Vector 并行召回 -> RRF 融合 -> 去重 -> 截断 -> 可选重排。
+  降级链：rerank 失败 -> hybrid -> bm25_only -> empty。
+  端到端验证通过。
+- 🎯 **`mark42/audit/reranker.py`** - Cross-Encoder Reranker 接口（§9.3）
+  Reranker Protocol + QMDReranker 适配器 + NoopReranker 降级。
+  方案 §9.1 校正：旧 _rerank_available() 是死探针。
+
+### 新增 - 方案 44 Phase 4（Heavy DAG + 局部重规划）
+
+- 🗺️ **`mark42/heavy_graph.py`** - DAG 依赖图 + 资源预算 + 图校验
+- 🔄 **`mark42/heavy_replan.py`** - 局部重规划（retry/skip/replace/split/merge）+ Checkpoint
+
+### 新增 - 方案 44 Phase 5（混沌自动闭环 + 反馈学习）
+
+- 📊 **`mark42/audit/remediation_feedback.py`** - 执行结果回写 + L3->L2 降级 + 有效性追踪
+- 🔥 **`mark42/audit/chaos_scheduler.py`** - L0-L3 安全等级 + 自动调度 + 缺陷候选
+
+### 新增 - 方案 44 Phase 6（Shadow 对比 + 回滚演练）
+
+- 📈 **`mark42/audit/shadow_report.py`** - 新旧路径对比 + 趋势汇总
+- 🔙 **`mark42/audit/rollback_drill.py`** - 6 项 flag 回滚验证（全部通过）
+
+### 修复（审查发现 + 遗留项）
+
+- `apply_rerank` 把 QMDReranker 对象当裸 Callable 调用 -> TypeError。已适配 Protocol。
+- `context_builder.session_intent` 从 userIdentity 取而非会话目标。已改。
+- `_build_incremental` 占位逻辑替换为真正的 LLM + merge_patch 合并。
+- `snapshot_reader` offset-naive vs offset-aware datetime TypeError。已修。
+- `_has_evidence` 白名单漏 0/False。已改真值判定。
+- `SourceCursor.MESSAGE_ID_GAP` 死分支。已修。
+- `_item_key` 取不到任务主键 -> 两条安全规则静默失效。已修。
+
+### 最终数据
+
+- 2545 项测试 0 失败（基线 2014）
+- ruff 全绿 / mypy 89 文件 0 issues
+- 30 个模块 import 全成功
+- 10 个 ArcLock 锁扣全活
+- 回滚演练 6/6 通过
+- 所有 feature flag 默认关闭，零行为变化
+
 ## [2.8.1] - 2026-07-29
 
 ### 新增
