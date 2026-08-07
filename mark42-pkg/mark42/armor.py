@@ -26,6 +26,7 @@ from .config import (
     BYTES_PER_KTOKEN,
     DEFAULT_CONTEXT_WINDOW,
     OPENCLAW_BIN,
+    STRUCTURED_STATE_ENABLED,
     XDG_STATE,
     get_dynamic_thresholds,
     resolve_model,
@@ -742,20 +743,30 @@ def _compress_build_index(
     algo_stats: dict[str, Any],
     alert_pct: float,
 ) -> dict[str, Any]:
-    """构建记忆索引 — LLM 优先，启发式回退。
+    """构建记忆索引 — 三路分支（方案 44 Phase 2）。
 
-    2026-08-04 从 armor_compress 拆出。只负责分析 + 组装 index dict，
-    不做任何文件写入或事件上报，方便单独测试两条分支。
+    分支优先级：
+        1. 结构化增量（STRUCTURED_STATE_ENABLED=True 时检查）
+        2. LLM 分析（默认优先）
+        3. 启发式分类（兜底）
 
-    Args:
-        session_messages: session 尾部消息列表
-        usage: 当前上下文使用率
-        algo_stats: 阶段 1 压缩算法 hook 的统计结果
-        alert_pct: ALERT 阈值，用于启发式分支判定 recommendedAction
-
-    Returns:
-        index dict，含 strategyUsed 字段区分两条路径（llm-analyze / heuristic-classify）
+    结构化分支（方案 §4.4）：
+        - shadow 模式：旁路生成 ContextState，index 里加对比日志
+        - active 模式：用 ContextState 渲染的视图替代旧 index
+        - 任何失败都安全回退 LLM 分支，不阻塞主流程
     """
+    # ── 分支 1：结构化增量（默认关闭）──
+    if STRUCTURED_STATE_ENABLED:
+        try:
+            from .audit.context_builder import build_context_state_for_compress
+            result = build_context_state_for_compress(
+                session_messages, usage, algo_stats, alert_pct)
+            if result is not None:
+                return result
+        except Exception as e:
+            print(f"⚠️ 结构化状态分支失败，回退 LLM 分析: {type(e).__name__}: {e}")
+
+    # ── 分支 2：LLM 分析（默认优先）──
     llm_result = _llm_analyze(session_messages) if session_messages else None
     if llm_result:
         index = {
@@ -774,6 +785,7 @@ def _compress_build_index(
         print(f"🧠 LLM 分析完成 (model: {llm_result.get('_llm_meta', {}).get('model', '?')})")
         return index
 
+    # ── 分支 3：启发式分类（兜底）──
     classification = _classify_messages(session_messages)
     preserved_items = classification.get("preserved", [])
     preserved_roles: dict[str, list[str]] = {}
