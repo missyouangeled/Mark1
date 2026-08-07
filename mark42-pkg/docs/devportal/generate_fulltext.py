@@ -32,6 +32,33 @@ SECTIONS = [
         ("summary_extractor.py", "摘要提取"),
         ("report.py", "审计报告"),
     ]),
+    ("🔬 方案44: 能力探针与趋势", "mark42/audit", [
+        ("probes.py", "六维能力探针 + SLO"),
+        ("constraint_identity.py", "约束 ID + 静态完整性"),
+        ("trends.py", "质量趋势存储"),
+        ("shadow_report.py", "Shadow 对比报告"),
+        ("rollback_drill.py", "回滚演练"),
+    ]),
+    ("📐 方案44: 结构化增量压缩", "mark42", [
+        ("context_state.py", "ContextState + SourceCursor schema"),
+    ],),
+    ("📐 方案44: 增量合并与持久化", "mark42/audit", [
+        ("incremental_merge.py", "增量合并引擎"),
+        ("state_store.py", "状态版本化持久化"),
+        ("context_builder.py", "接入 armor 入口"),
+    ]),
+    ("🔎 方案44: Hybrid Recall + Reranker", "mark42/audit", [
+        ("memory_retrieval.py", "Hybrid Recall + RRF 融合"),
+        ("reranker.py", "Cross-Encoder Reranker"),
+    ]),
+    ("🗺️ 方案44: Heavy DAG + 重规划", "mark42", [
+        ("heavy_graph.py", "DAG 依赖图 + 预算"),
+        ("heavy_replan.py", "局部重规划 + Checkpoint"),
+    ]),
+    ("📊 方案44: 反馈学习 + 混沌闭环", "mark42/audit", [
+        ("remediation_feedback.py", "错误档案反馈闭环"),
+        ("chaos_scheduler.py", "混沌自动闭环"),
+    ]),
     ("⚙️ v3 核心 8", "mark42", [
         ("consciousness.py", "自主意识层"),
         ("code_analyzer.py", "代码理解引擎"),
@@ -114,6 +141,7 @@ DESIGN = [
 
 PLANS = [
     "40-Mark42-OS化深化方案-v3.md",
+    "44-Mark42-全功能缺口补全方案-v1.md",
     "Mark42-v3-evaluation-20260714.md",
     "mark42-context-safety-min-spec-2026-07-09.md",
     "mark42-multi-agent-phase1-min-spec-2026-07-09.md",
