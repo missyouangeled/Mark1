@@ -1,0 +1,112 @@
+{
+  "schema": "mark42.plan44.phase0.baseline.v1",
+  "frozen_at": "2026-08-07T13:45:00+08:00",
+  "plan": "docs/plans/44-Mark42-全功能缺口补全方案-v1.md",
+  "phase": "Phase 0 — 基线冻结与回归集",
+  "baseline_commit": "d6ee46fa49b7823741533d46914cd5ba2e2e7efb",
+  "package_version": "2.8.2",
+
+  "pre_change_baseline": {
+    "note": "方案 §11 要求：若 git HEAD 存在历史失败，必须列出完整 node id、失败摘要与提交哈希。实测无历史失败，故 historical_failures 为空数组，豁免条款不适用。",
+    "pytest": {
+      "exit_code": 0,
+      "tests": 2014,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 25,
+      "historical_failures": []
+    },
+    "mypy": {
+      "exit_code": 0,
+      "source_files": 74,
+      "issues": 0
+    },
+    "ruff": {
+      "exit_code": 1,
+      "errors": 8,
+      "all_in_single_file": "docs/devportal/generate_fulltext.py",
+      "outside_package": true,
+      "codes": ["I001", "F541", "F541", "UP032", "F541", "F541", "F541", "F541"],
+      "note": "既有技术债，随 e214bd85 入库。不在 mark42/ 包内。方案 §13 门禁第 3 条要求 ruff 全绿，Phase 0 一并清掉。"
+    }
+  },
+
+  "post_phase0_state": {
+    "pytest": {
+      "exit_code": 0,
+      "tests": 2189,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 25,
+      "new_tests": 175
+    },
+    "mypy": {
+      "exit_code": 0,
+      "source_files": 76,
+      "issues": 0
+    }
+  },
+
+  "frozen_contracts": [
+    {
+      "name": "ContextState",
+      "module": "mark42/context_state.py",
+      "schema_version": 1,
+      "note": "方案 §4.2。新增旁路能力，不修改也不替代 OpenClaw 官方 compact 流程。"
+    },
+    {
+      "name": "SourceCursor",
+      "module": "mark42/context_state.py",
+      "fields": ["session_id", "source_path", "inode", "byte_offset", "last_message_id", "observed_size", "prefix_hash", "message_count", "updated_at"],
+      "invalid_reasons": ["no_cursor", "session_mismatch", "inode_changed", "file_rotated", "file_truncated", "offset_out_of_range", "prefix_hash_mismatch", "message_id_gap", "schema_version_mismatch", "malformed"],
+      "note": "任一项不符即失效并全量回退，禁止猜测续接。"
+    },
+    {
+      "name": "ProbeSpec / ProbeOutcome / ProbeReport",
+      "module": "mark42/audit/probes.py",
+      "schema_version": 1,
+      "scoring_prompt_version": 1,
+      "dimensions": ["intent", "continuity", "decision", "artifact", "evidence", "instruction"],
+      "note": "方案 §5.2：与现有 AUDIT_CATEGORIES 互不相交，两套分数分别保存。"
+    },
+    {
+      "name": "CompactionScenario 场景集",
+      "module": "tests/fixtures/compaction_scenarios.py",
+      "set_version": 1,
+      "scenarios": ["work_continuity", "constraint_heavy", "inference_mixed", "sparse"],
+      "note": "场景一旦冻结不随意改动——改了等于换尺子，历史趋势不可比。"
+    }
+  ],
+
+  "feature_flags_default_state": {
+    "note": "方案 §1.3 永久原则：新增能力默认关闭或 shadow。Phase 0 未引入任何运行时开关（纯数据契约 + 评分函数），因此无 flag 需要落为 false。Phase 1 起在 config.py 注册。",
+    "flags": []
+  },
+
+  "self_caught_defects": [
+    {
+      "id": "P0-SELF-001",
+      "where": "SourceCursor.validate_against",
+      "problem": "首版 MESSAGE_ID_GAP 判定写成 `if first_message_id and ... and first_message_id == \"\"`，条件自相矛盾，该分支永远不可能触发。",
+      "why_it_matters": "与方案 §17 批评 cross-encoder 的形态完全一致：只有看起来存在的探针，实际不接入任何判定路径。",
+      "fix": "改为对照调用方实测的 observed_last_message_id 比对；None 表示调用方不做该项校验。",
+      "red_green_verified": true,
+      "verification": "把坏逻辑注回 → tests/unit/test_context_state.py::TestSourceCursor::test_message_id_gap_actually_fires 变红（assert 'ok' == 'message_id_gap'）→ 还原 → 变绿。"
+    },
+    {
+      "id": "P0-SELF-002",
+      "where": "ProbeOutcome.evidence_absent / evaluate_slo",
+      "problem": "上游 ContextState 本就没有某维度证据时，探针必然低分。若直接计入严格 SLO，会把'上游无数据'误判成'模型能力退化'。",
+      "why_it_matters": "同 HANDOFF 记录的四条同源教训：比较两端不同源、不同口径。",
+      "fix": "evidence_absent 维度豁免严格单项判定，但仍如实计入总分。scenario_sparse 专门钉住该行为。",
+      "red_green_verified": false,
+      "verification": "tests/unit/test_audit_probes.py::TestSLO::test_evidence_absent_exempts_strict_check + test_evidence_absent_still_counts_toward_total"
+    }
+  ],
+
+  "commands_to_reproduce": [
+    "cd mark42-pkg && python3 -m pytest -p no:cacheprovider --junit-xml=/tmp/junit.xml -q",
+    "cd mark42-pkg && python3 -m mypy mark42/",
+    "cd mark42-pkg && python3 -m ruff check ."
+  ]
+}

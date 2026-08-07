@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """重新生成全量内联版（2MB+），把每个文件内容嵌进 HTML。"""
-from pathlib import Path
 import html as html_mod
+from pathlib import Path
 
 DESKTOP = Path("/home/missyouangeled/Desktop/mark42-dev-portal")
 
@@ -141,11 +141,11 @@ def embed_file(path, file_type="py"):
 
 
 def render_section(title, subdir, files):
-    parts = [f'<section class="category">', f'<h2>{title}</h2>']
+    parts = ['<section class="category">', f'<h2>{title}</h2>']
     for fname, label in files:
         fpath = DESKTOP / subdir / fname
         size = fpath.stat().st_size if fpath.exists() else 0
-        parts.append(f'<div class="file-block">')
+        parts.append('<div class="file-block">')
         parts.append(f'<h3>📄 {label} · {subdir}/{fname} <span class="size">({size} 字节)</span></h3>')
         parts.append(embed_file(fpath, "py"))
         parts.append('</div>')
@@ -154,11 +154,11 @@ def render_section(title, subdir, files):
 
 
 def render_tests():
-    parts = ['<section class="category"><h2>🧪 测试文件 ({} 个)</h2>'.format(len(TESTS))]
+    parts = [f'<section class="category"><h2>🧪 测试文件 ({len(TESTS)} 个)</h2>']
     for t in TESTS:
         fpath = DESKTOP / "tests" / t
         if fpath.exists():
-            parts.append(f'<div class="file-block">')
+            parts.append('<div class="file-block">')
             parts.append(f'<h3>🧪 tests/{t} <span class="size">({fpath.stat().st_size} 字节)</span></h3>')
             parts.append(embed_file(fpath, "py"))
             parts.append('</div>')
@@ -171,7 +171,7 @@ def render_design():
     for d in DESIGN:
         fpath = DESKTOP / "docs/design" / d
         if fpath.exists():
-            parts.append(f'<div class="file-block">')
+            parts.append('<div class="file-block">')
             parts.append(f'<h3>📚 {d} <span class="size">({fpath.stat().st_size} 字节)</span></h3>')
             parts.append(embed_file(fpath, "md"))
             parts.append('</div>')
@@ -184,7 +184,7 @@ def render_plans():
     for p in PLANS:
         fpath = DESKTOP / "docs/plans" / p
         if fpath.exists():
-            parts.append(f'<div class="file-block">')
+            parts.append('<div class="file-block">')
             parts.append(f'<h3>📋 {p} <span class="size">({fpath.stat().st_size} 字节)</span></h3>')
             parts.append(embed_file(fpath, "md"))
             parts.append('</div>')
@@ -197,7 +197,7 @@ def render_pkg():
     for fname in PKG:
         fpath = DESKTOP / "docs" / fname
         if fpath.exists():
-            parts.append(f'<div class="file-block">')
+            parts.append('<div class="file-block">')
             parts.append(f'<h3>🚀 {fname} <span class="size">({fpath.stat().st_size} 字节)</span></h3>')
             parts.append(embed_file(fpath, "md"))
             parts.append('</div>')

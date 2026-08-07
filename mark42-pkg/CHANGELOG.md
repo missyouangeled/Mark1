@@ -7,6 +7,56 @@ Mark42 模块化智能铠甲系统的所有重要变更记录在此文件中。
 
 ## [Unreleased]
 
+### 新增 — 方案 44 Phase 0（基线冻结与回归集）
+
+> 上游：`docs/plans/44-Mark42-全功能缺口补全方案-v1.md`
+> 基线快照：`docs/plan44/phase0-baseline.json`（机器可读）
+> 本阶段**纯数据契约 + 确定性评分**，不含 LLM 调用编排，不引入任何运行时开关。
+
+- 📐 **`mark42/context_state.py`** — 冻结 `ContextState` / `SourceCursor` schema（方案 §4.2）
+  - `ContextState`：session_intent / active_task / decisions / constraints / artifacts /
+    completed_work / open_questions / next_steps / source_cursor / evidence_refs /
+    **inferences（单列，永不与 evidence 混存）** / generated_at
+  - `SourceCursor`：session_id + 文件标识 + inode + 字节偏移 + 最后消息 ID +
+    观测大小 + 前缀哈希 + 消息条数；任一项不符即失效并**全量回退，禁止猜测续接**
+  - `validate_context_state()`：evidence 强制、confidence 边界（含 bool 排除）、
+    约束 ID 唯一、supersedes 链引用完整、推断不得自称事实、done 任务不得留在 active
+  - `render_memory_index_view()`：把状态渲染成兼容视图，**旧 `memory-index.json` 消费方不受影响**
+  - ⚠️ 边界：新增**旁路**能力，不修改也不替代 OpenClaw 官方 compact 流程
+- 🔬 **`mark42/audit/probes.py`** — 冻结六类**响应能力**探针 schema（方案 §5）
+  - 六维：intent / continuity / decision / artifact / evidence / instruction
+  - **与现有 `AUDIT_CATEGORIES` 互不相交**：结构审计答「证据是否存在」，
+    探针答「给定证据时模型能否合规响应」，两套分数分别保存（方案 §5.2）
+  - `score_deterministic()`：先确定性断言，无断言才标 `skipped` 交 judge；
+    保留 raw_response / judge_model / judge_prompt_version（方案 §5.3 禁止只存最终分数）
+  - `evaluate_slo()`：总分 ≥24/30，instruction 与 evidence 单项 ≥4，
+    约束违规或 hallucination 直接失败
+  - `detect_regression()`：连续 3 次均值下降 >10% 触发回归事件
+  - ⚠️ `GATE_CANNOT_AUTO_REVERT=True` — gate 模式**不承诺**自动撤销 compact；
+    官方 CLI 返回后会话已改变，无官方恢复通道时只能保留证据 + 告警 + 停止升级（方案 §5.4）
+  - ⚠️ `ProbeReport.disclaimer` — 报告强制声明：隔离模型调用**不等价于**生产 Agent 行为（方案 §6.2）
+- 🧪 **`tests/fixtures/compaction_scenarios.py`** — 4 个冻结场景（`SCENARIO_SET_VERSION=1`）
+  - `work_continuity`：目标/决策/文件/下一步齐全，驱动全部六维
+  - `constraint_heavy`：5 hard + 1 soft，验证静态存活率
+  - `inference_mixed`：事实与推断混杂，验证召回/推断分离
+  - `sparse`：几乎无内容，专门钉住 `evidence_absent` 豁免逻辑
+- ✅ **175 项新测试**（context_state 70 / probes 45 / scenarios 60），全量 2189 项 0 失败
+
+### 修复
+
+- 🐛 **`SourceCursor` 消息 ID 断裂判定是死分支**（自查发现，P0-SELF-001）：
+  首版写成 `if first_message_id and ... and first_message_id == ""`，条件自相矛盾，
+  该分支**永远不可能触发**。形态与方案 §17 批评 cross-encoder 的「只有可用性探针、
+  实际不接入」完全一致。已改为对照调用方实测值比对，并做**红→绿反向验证**：
+  把坏逻辑注回去测试变红（`assert 'ok' == 'message_id_gap'`），还原后变绿。
+- 🐛 **`evidence_absent` 豁免**（自查发现，P0-SELF-002）：上游本就没有某维度证据时，
+  探针必然低分。若直接计入严格 SLO，会把「上游无数据」误判为「模型能力退化」——
+  即 HANDOFF 记录的「比较两端不同源」老毛病。现豁免严格单项判定，但仍如实计入总分。
+- 🧹 **清掉 `docs/devportal/generate_fulltext.py` 的 8 个 ruff 错误**（F541×5 / I001 / UP032）：
+  随 `e214bd85` 入库的既有技术债，全部纯语法修正、无行为变化。
+  方案 §13 门禁第 3 条要求 ruff 全绿，故在 Phase 0 一并清理。
+
+
 ### 重构
 - 🔨 **`armor_compress()` 拆分：665 行 → 235 行（-65%）**：该函数长期是全仓最大的
   单体函数，压缩流程的六个阶段（索引构建、事件上报、冷却期检查、已压缩预检、
